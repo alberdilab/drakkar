@@ -1,3 +1,4 @@
+include drakkar/log/*
 include drakkar/profile/*
 include drakkar/profile/slurm/*
 include drakkar/workflow/*
