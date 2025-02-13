@@ -2,7 +2,10 @@ import argparse
 import os
 import subprocess
 from pathlib import Path
-from drakkar.config import SNAKEMAKE_MODULE  # Load from config.py
+
+# Get the installed package directory (this ensures config.yaml is always in the right place)
+PACKAGE_DIR = Path(__file__).parent
+CONFIG_PATH = PACKAGE_DIR / "workflow" / "config.yaml"
 
 ###
 # Define workflow launching functions
@@ -22,12 +25,23 @@ def run_snakemake_complete(workflow, input_dir, output_dir):
     subprocess.run(" && ".join(snakemake_command), shell=True, check=True)
 
 def run_snakemake_preprocessing(workflow, input_dir, output_dir):
+
+    # Add user-supplied arguments to config
+    config_vars["workflow"] = workflow
+    config_vars["input_dir"] = input_dir
+    config_vars["output_dir"] = output_dir
+
+    # Write updated config to the correct package path
+    with open(CONFIG_PATH, "w") as f:
+        yaml.dump(config_vars, f)
+
     """ Run the preprocessing workflow """
     snakemake_command = [
         "/bin/bash", "-c",  # Ensures the module system works properly
-        f"module load {SNAKEMAKE_MODULE} && "
+        f"module load {config_vars['SNAKEMAKE_MODULE']} && "
         "snakemake "
-        f"-s {str(Path(__file__).parent / 'workflow' / 'Snakefile')} "
+        f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile')} "
+        f"--configfile {CONFIG_PATH}"
         f"--config workflow={workflow} reads_dir={input_dir} output_dir={output_dir}"
     ]
 
@@ -84,6 +98,7 @@ def run_snakemake_quantification(workflow, assembly_dir, output_dir):
             f"output_dir={output_dir}"
     ]
     subprocess.run(" && ".join(snakemake_command), shell=True, check=True)
+
 
 ###
 # Main function to launch workflows
