@@ -83,7 +83,7 @@ if USE_REFERENCE:
             basename=f"{OUTPUT_DIR}/preprocessing/reference/reference"
         threads: 8
         resources:
-            mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 16) * 2 ** (attempt - 1)),
+            mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
             runtime=lambda wildcards, attempt: max(10, int(reads_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
         shell:
             """
@@ -102,7 +102,7 @@ if USE_REFERENCE:
             samtools_module={SAMTOOLS_MODULE}
         threads: 1
         resources:
-            mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 16) * 2 ** (attempt - 1)),
+            mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
             runtime=lambda wildcards, attempt: max(10, int(reads_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
         shell:
             """
@@ -120,7 +120,7 @@ if USE_REFERENCE:
             samtools_module={SAMTOOLS_MODULE}
         threads: 1
         resources:
-            mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 16) * 2 ** (attempt - 1)),
+            mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
             runtime=lambda wildcards, attempt: max(10, int(reads_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
         shell:
             """
