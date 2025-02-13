@@ -5,6 +5,7 @@ from glob import glob
 
 WORKFLOW = config["workflow"]
 READS_DIR = config["reads_dir"]
+OUTPUT_DIR = config["output_dir"]
 
 if WORKFLOW == "complete":
     rule all:
