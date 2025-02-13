@@ -52,8 +52,8 @@ def run_snakemake_preprocessing(workflow, input_dir, output_dir, reference):
 
     subprocess.run(snakemake_command, shell=False, check=True)
 
-def run_snakemake_assembly(workflow, input_dir, output_dir, mode):
-    """ Run the assembly workflow """
+def run_snakemake_cataloging(workflow, input_dir, output_dir, mode):
+    """ Run the cataloging workflow """
     snakemake_command = [
         "/bin/bash", "-c",  # Ensures the module system works properly
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
@@ -66,8 +66,8 @@ def run_snakemake_assembly(workflow, input_dir, output_dir, mode):
     ]
     subprocess.run(" && ".join(snakemake_command), shell=True, check=True)
 
-def run_snakemake_binning(workflow, assembly_dir, output_dir):
-    """ Run the binning workflow """
+def run_snakemake_dereplicating(workflow, assembly_dir, output_dir):
+    """ Run the dereplicating workflow """
     snakemake_command = [
         f"module load {SNAKEMAKE_MODULE}",
         "snakemake",

@@ -58,7 +58,7 @@ if WORKFLOW == "preprocessing":
 
     include: "rules/preprocessing.smk"
 
-if WORKFLOW == "assembly":
+if WORKFLOW == "cataloging":
 
     samples, = glob_wildcards(f"{READS_DIR}/{{sample}}_1.fq.gz")
 

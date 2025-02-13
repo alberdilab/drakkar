@@ -13,10 +13,10 @@ if ASSEMBLY_MODE == "individual":
             r1=f"{READS_DIR}/{{sample}}_1.fq.gz",
             r2=f"{READS_DIR}/{{sample}}_2.fq.gz"
         output:
-            f"{OUTPUT_DIR}/assembly/final/{{sample}}.fna"
+            f"{OUTPUT_DIR}/cataloging/final/{{sample}}.fna"
         params:
             megahit_module={MEGAHIT_MODULE},
-            outputdir=f"{OUTPUT_DIR}/assembly/megahit/{{sample}}"
+            outputdir=f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}"
         threads: 8
         resources:
             mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 8) * 2 ** (attempt - 1)),
@@ -39,10 +39,10 @@ if ASSEMBLY_MODE == "coassembly":
             r1=expand(f"{READS_DIR}/{{sample}}_1.fq.gz", sample=samples)
             r2=expand(f"{READS_DIR}/{{sample}}_2.fq.gz", sample=samples)
         output:
-            f"{OUTPUT_DIR}/assembly/final/coassembly.fna"
+            f"{OUTPUT_DIR}/cataloging/final/coassembly.fna"
         params:
             megahit_module={MEGAHIT_MODULE},
-            outputdir=f"{OUTPUT_DIR}/assembly/megahit/"
+            outputdir=f"{OUTPUT_DIR}/cataloging/megahit/"
         threads: 8
         resources:
             mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 8) * 2 ** (attempt - 1)),
