@@ -24,15 +24,14 @@ def run_snakemake_complete(workflow, input_dir, output_dir):
 def run_snakemake_preprocessing(workflow, input_dir, output_dir):
     """ Run the preprocessing workflow """
     snakemake_command = [
-        f"module load {SNAKEMAKE_MODULE}",
-        "snakemake",
-        "-s", str(Path(__file__).parent / "workflow" / "Snakefile"),
-        "--config",
-            f"workflow={workflow}",
-            f"reads_dir={input_dir}",
-            f"output_dir={output_dir}"
+        "/bin/bash", "-c",  # Ensures the module system works properly
+        f"module load {SNAKEMAKE_MODULE} && "
+        "snakemake "
+        f"-s {str(Path(__file__).parent / 'workflow' / 'Snakefile')} "
+        f"--config workflow={workflow} reads_dir={input_dir} output_dir={output_dir}"
     ]
-    subprocess.run(" && ".join(snakemake_command), shell=True, check=True)
+
+    subprocess.run(snakemake_command, shell=False, check=True)
 
 def run_snakemake_assembly(workflow, input_dir, output_dir):
     """ Run the assembly workflow """
