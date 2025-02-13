@@ -1,0 +1,8 @@
+rule all:
+    input:
+        "results/complete.txt"
+
+include: "rules/assembly.smk"
+include: "rules/binning.smk"
+include: "rules/annotation.smk"
+include: "rules/quantification.smk"
