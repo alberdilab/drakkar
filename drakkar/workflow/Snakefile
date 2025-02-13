@@ -9,10 +9,6 @@ from glob import glob
 
 configfile: "workflow/config.yaml"
 WORKFLOW = config["workflow"]
-READS_DIR = config["reads_dir"]
-OUTPUT_DIR = config["output_dir"]
-REFERENCE = config["reference"]
-ASSEMBLY_MODE = config["assembly_mode"]
 
 ####
 # Calculate optimal resources for computing
@@ -50,6 +46,10 @@ if WORKFLOW == "complete":
 
 if WORKFLOW == "preprocessing":
 
+    READS_DIR = config["reads_dir"]
+    OUTPUT_DIR = config["output_dir"]
+    REFERENCE = config["reference"]
+
     samples, = glob_wildcards(f"{READS_DIR}/{{sample}}_1.fq.gz")
 
     rule all:
@@ -59,6 +59,8 @@ if WORKFLOW == "preprocessing":
     include: "rules/preprocessing.smk"
 
 if WORKFLOW == "cataloging":
+
+    ASSEMBLY_MODE = config["assembly_mode"]
 
     samples, = glob_wildcards(f"{READS_DIR}/{{sample}}_1.fq.gz")
 
