@@ -13,7 +13,7 @@ if ASSEMBLY_MODE == "individual":
             r1=f"{READS_DIR}/{{sample}}_1.fq.gz",
             r2=f"{READS_DIR}/{{sample}}_2.fq.gz"
         output:
-            f"{OUTPUT_DIR}/cataloging/final/{{sample}}.fna"
+            f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}.fna"
         params:
             megahit_module={MEGAHIT_MODULE},
             outputdir=f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}"
@@ -31,6 +31,43 @@ if ASSEMBLY_MODE == "individual":
                 -1 {input.r1} -2 {input.r2} \
                 -o {params.outputdir}
             mv {params.outputdir}/final.contigs.fa {output}
+            """
+
+    rule assembly_index:
+        input:
+            f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}.fna"
+        output:
+            index=f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}.rev.2.bt2"
+        params:
+            bowtie2_module={BOWTIE2_MODULE},
+            basename=f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}"
+        threads: 1
+        resources:
+            mem_mb=
+            runtime=
+        shell:
+            """
+            module load {params.bowtie2_module}
+            bowtie2-build {input} {params.basename}
+            """
+
+    rule assembly_map:
+        input:
+            index=f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}.rev.2.bt2",
+            r1=f"{READS_DIR}/{{sample}}_1.fq.gz",
+            r2=f"{READS_DIR}/{{sample}}_2.fq.gz"
+        params:
+            bowtie2_module={BOWTIE2_MODULE},
+            samtools_module={SAMTOOLS_MODULE},
+            basename=f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}"
+        threads: 8
+        resources:
+            mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
+            runtime=lambda wildcards, attempt: max(10, int(reads_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
+        shell:
+            """
+            module load {params.bowtie2_module} {params.samtools_module}
+            bowtie2 -x {params.basename} -1 {input.r1} -2 {input.r2} | samtools view -bS - | samtools sort -o {output}
             """
 
 if ASSEMBLY_MODE == "coassembly":

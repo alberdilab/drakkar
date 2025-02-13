@@ -30,7 +30,7 @@ if USE_REFERENCE:
             fastp_module={FASTP_MODULE}
         threads: 4
         resources:
-            mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 8) * 2 ** (attempt - 1)),
+            mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 5) * 2 ** (attempt - 1)),
             runtime=lambda wildcards, attempt: max(10, int(reads_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
         shell:
             """
@@ -61,7 +61,7 @@ if USE_REFERENCE:
             basename=f"{OUTPUT_DIR}/preprocessing/reference/reference"
         threads: 1
         resources:
-            mem_mb=lambda wildcards, attempt: max(1,int(reference_mb * 10 ** (attempt - 1))),
+            mem_mb=lambda wildcards, attempt: max(1,int(reference_mb * 10 * 2 ** (attempt - 1))),
             runtime=lambda wildcards, attempt: max(15,int((reference_mb / 20 * 2 ** (attempt - 1))))
         shell:
             """
@@ -83,12 +83,12 @@ if USE_REFERENCE:
             basename=f"{OUTPUT_DIR}/preprocessing/reference/reference"
         threads: 8
         resources:
-            mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
-            runtime=lambda wildcards, attempt: max(10, int(reads_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
+            mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * reference_mb / 500) * 2 ** (attempt - 1)),
+            runtime=lambda wildcards, attempt: max(10, int(reads_mb.get(wildcards.sample, 1) / 1024 * reference_mb / 20) * 2 ** (attempt - 1))
         shell:
             """
             module load {params.bowtie2_module} {params.samtools_module}
-            bowtie2 -x {params.basename} -1 {input.r1} -2 {input.r2} | samtools view -bS - | samtools sort -o {output}
+            bowtie2 -x {params.basename} -1 {input.r1} -2 {input.r2} -p {threads} | samtools view -bS - | samtools sort -o {output}
             """
 
     rule metagenomic_reads:
@@ -141,7 +141,7 @@ else:
             fastp_module={FASTP_MODULE}
         threads: 4
         resources:
-            mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 8) * 2 ** (attempt - 1)),
+            mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 5) * 2 ** (attempt - 1)),
             runtime=lambda wildcards, attempt: max(10, int(reads_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
         shell:
             """
