@@ -11,7 +11,7 @@ setup(
     py_modules=["drakkar"],
     install_requires=[
         'snakemake==8.16.0',
-        'snakemake-executor-plugin-slurm==0.15.0'
+        'snakemake-executor-plugin-slurm==0.15.0',
         "numpy",
         "pandas",
     ],
