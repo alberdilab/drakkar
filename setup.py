@@ -7,6 +7,7 @@ setup(
     author_email="antton.alberdi@sund.ku.dk",
     description="Metagenomics pipeline optimized for Mjolnir",
     packages=find_packages(),  # Automatically discovers drakkar/
+    include_package_data=True,  # Ensures non-Python files are included
     install_requires=[
         "numpy",
         "pandas",
