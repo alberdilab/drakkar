@@ -15,7 +15,16 @@ OUTPUT_DIR = config["output_dir"]
 ####
 # Calculate optimal resources for computing
 ####
-
+def calculate_file_sizes(folder):
+    file_sizes = {}
+    for file in os.listdir(folder):
+        if file.endswith("1.fq.gz") or file.endswith(".fna"):
+            filepath = os.path.join(folder, file)
+            # Get file size in bytes and convert to megabytes
+            size_mb = os.path.getsize(filepath) / (1024 ** 2)
+            file_sizes[file] = size_mb
+    return file_sizes
+    
 reads_mb = calculate_file_sizes(READS_DIR)
 reads_mb = {key.replace('_1.fq.gz', ''): value for key, value in reads_mb.items()}
 reads_mb_total = sum(reads_mb.values())
