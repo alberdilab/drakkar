@@ -1,4 +1,6 @@
 FASTP_MODULE = config["FASTP_MODULE"]
+BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
+SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 
 rule fastp:
     input:
@@ -62,6 +64,7 @@ rule reference_map:
         f"{OUTPUT_DIR}/preprocessing/bowtie2/{{sample}}.bam"
     params:
         bowtie2_module={BOWTIE2_MODULE},
+        samtools_module={SAMTOOLS_MODULE},
         basename=f"{OUTPUT_DIR}/preprocessing/reference/reference"
     threads: 1
     resources:
@@ -69,6 +72,6 @@ rule reference_map:
         runtime=lambda wildcards, attempt: max(10, int(reads_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
     shell:
         """
-        module load {params.bowtie2_module}
+        module load {params.bowtie2_module} {params.samtools_module}
         bowtie2 -x {params.basename} -1 {input.r1} -2 {input.r2} | samtools view -bS - | samtools sort -o {output}
         """
