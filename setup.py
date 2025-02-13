@@ -14,7 +14,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "drakkar=drakkar:main",
+            "drakkar=drakkar.cli:main",
         ],
     },
     python_requires=">=3.6",
