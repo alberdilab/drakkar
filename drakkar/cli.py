@@ -3,9 +3,21 @@ import os
 import subprocess
 from pathlib import Path
 
-# Get the installed package directory (this ensures config.yaml is always in the right place)
+###
+# Define and read config file
+###
+
 PACKAGE_DIR = Path(__file__).parent
 CONFIG_PATH = PACKAGE_DIR / "workflow" / "config.yaml"
+
+def load_config():
+    """Load fixed variables from config.yaml."""
+    if CONFIG_PATH.exists():
+        with open(CONFIG_PATH, "r") as f:
+            return yaml.safe_load(f)
+    return {}
+
+config_vars = load_config()
 
 ###
 # Define workflow launching functions
@@ -25,16 +37,6 @@ def run_snakemake_complete(workflow, input_dir, output_dir):
     subprocess.run(" && ".join(snakemake_command), shell=True, check=True)
 
 def run_snakemake_preprocessing(workflow, input_dir, output_dir):
-
-    # Add user-supplied arguments to config
-    config_vars["workflow"] = workflow
-    config_vars["input_dir"] = input_dir
-    config_vars["output_dir"] = output_dir
-
-    # Write updated config to the correct package path
-    with open(CONFIG_PATH, "w") as f:
-        yaml.dump(config_vars, f)
-
     """ Run the preprocessing workflow """
     snakemake_command = [
         "/bin/bash", "-c",  # Ensures the module system works properly
