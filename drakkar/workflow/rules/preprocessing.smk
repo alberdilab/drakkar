@@ -1,5 +1,3 @@
-from drakkar.config import FASTP_MODULE
-
 rule fastp:
     input:
         r1=f"{READS_DIR}/{{sample}}_1.fq.gz",

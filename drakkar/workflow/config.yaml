@@ -1,0 +1,2 @@
+SNAKEMAKE_MODULE: "snakemake/8.16.0"
+FASTP_MODULE: "fastp/0.23.4"

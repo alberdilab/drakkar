@@ -3,6 +3,8 @@ import gzip
 import pandas as pd
 from glob import glob
 
+configfile: "workflow/config.yaml"
+
 WORKFLOW = config["workflow"]
 READS_DIR = config["reads_dir"]
 OUTPUT_DIR = config["output_dir"]
