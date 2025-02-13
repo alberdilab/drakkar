@@ -12,6 +12,9 @@ rule fastp:
     params:
         fastp_module={FASTP_MODULE}
     threads: 1
+    resources:
+        mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 32) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, attempt: max(10, int(reads_mb.get(wildcards.sample, 1) / 1024 * 100) * 2 ** (attempt - 1))
     shell:
         """
         module load {params.fastp_module}

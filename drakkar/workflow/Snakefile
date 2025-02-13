@@ -3,11 +3,22 @@ import gzip
 import pandas as pd
 from glob import glob
 
-configfile: "workflow/config.yaml"
+####
+# Define config variables
+####
 
+configfile: "workflow/config.yaml"
 WORKFLOW = config["workflow"]
 READS_DIR = config["reads_dir"]
 OUTPUT_DIR = config["output_dir"]
+
+####
+# Calculate optimal resources for computing
+####
+
+reads_mb = calculate_file_sizes(READS_DIR)
+reads_mb = {key.replace('_1.fq.gz', ''): value for key, value in reads_mb.items()}
+reads_mb_total = sum(reads_mb.values())
 
 if WORKFLOW == "complete":
     rule all:
