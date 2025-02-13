@@ -46,21 +46,23 @@ def run_snakemake_preprocessing(workflow, input_dir, output_dir, reference):
         f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / 'slurm'} "
         f"--configfile {CONFIG_PATH} "
-        f"--config workflow={workflow} reads_dir={input_dir} output_dir={output_dir} reference={reference}"
+        f"--config workflow={workflow} reads_dir={input_dir} output_dir={output_dir} reference={reference} "
+        f"--quiet rules"
     ]
 
     subprocess.run(snakemake_command, shell=False, check=True)
 
-def run_snakemake_assembly(workflow, input_dir, output_dir):
+def run_snakemake_assembly(workflow, input_dir, output_dir, mode):
     """ Run the assembly workflow """
     snakemake_command = [
-        f"module load {SNAKEMAKE_MODULE}",
+        "/bin/bash", "-c",  # Ensures the module system works properly
+        f"module load {config_vars['SNAKEMAKE_MODULE']} && "
         "snakemake",
-        "-s", str(Path(__file__).parent / "workflow" / "Snakefile"),
-        "--config",
-            f"workflow={workflow}",
-            f"reads_dir={input_dir}",
-            f"output_dir={output_dir}"
+        f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
+        f"--workflow-profile {PACKAGE_DIR / 'profile' / 'slurm'} "
+        f"--configfile {CONFIG_PATH} "
+        f"--config workflow={workflow} reads_dir={input_dir} output_dir={output_dir} assembly_mode={mode} "
+        f"--quiet rules"
     ]
     subprocess.run(" && ".join(snakemake_command), shell=True, check=True)
 

@@ -12,6 +12,7 @@ WORKFLOW = config["workflow"]
 READS_DIR = config["reads_dir"]
 OUTPUT_DIR = config["output_dir"]
 REFERENCE = config["reference"]
+ASSEMBLY_MODE = config["assembly_mode"]
 
 ####
 # Calculate optimal resources for computing
@@ -56,3 +57,13 @@ if WORKFLOW == "preprocessing":
             expand(f"{OUTPUT_DIR}/preprocessing/bowtie2/{{sample}}.bam", sample=samples)
 
     include: "rules/preprocessing.smk"
+
+if WORKFLOW == "assembly":
+
+    samples, = glob_wildcards(f"{READS_DIR}/{{sample}}_1.fq.gz")
+
+    rule all:
+        input:
+            expand(f"{OUTPUT_DIR}/preprocessing/bowtie2/{{sample}}.bam", sample=samples)
+
+    include: "rules/assembly.smk"
