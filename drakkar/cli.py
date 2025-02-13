@@ -42,10 +42,7 @@ def run_snakemake_complete(workflow, input_dir, output_dir):
 def run_snakemake_preprocessing(workflow, input_dir, output_dir, reference):
     """ Run the preprocessing workflow """
     # Create a log file for progress tracking
-    LOG_DIR = Path(output_dir / "logs")
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-    LOG_FILE = LOG_DIR / "snakemake.log"
-
+    log_file = PACKAGE_DIR / "log" / "preprocessing.log"
     if log_file.exists():
         log_file.unlink()  # Remove old log file
 
@@ -57,21 +54,10 @@ def run_snakemake_preprocessing(workflow, input_dir, output_dir, reference):
         f"--workflow-profile {PACKAGE_DIR / 'profile' / 'slurm'} "
         f"--configfile {CONFIG_PATH} "
         f"--config workflow={workflow} reads_dir={input_dir} output_dir={output_dir} reference={reference} "
-        f"--quiet --printshellcmds > {log_file} 2>&1 &"
+        f"--quiet rules"
     ]
 
     subprocess.run(snakemake_command, shell=False, check=True)
-
-    # Track job progress
-    total_jobs = count_total_jobs()
-    while True:
-        completed_jobs, running_jobs, remaining_jobs = track_snakemake_progress(log_file, total_jobs)
-        print_progress_bar(completed_jobs, total_jobs, running_jobs, remaining_jobs)
-
-        if remaining_jobs == 0:
-            print("\n✅ Workflow completed successfully!")
-            break
-        time.sleep(10)  # Update every 10 seconds
 
 def run_snakemake_cataloging(workflow, input_dir, output_dir, mode):
     """ Run the cataloging workflow """
