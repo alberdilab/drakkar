@@ -1,6 +1,14 @@
+####
+# Define config variables
+####
+
 FASTP_MODULE = config["FASTP_MODULE"]
 BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
+
+####
+# Run preprocessing rules
+####
 
 rule fastp:
     input:
@@ -15,7 +23,7 @@ rule fastp:
         fastp_module={FASTP_MODULE}
     threads: 1
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 16) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 8) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, attempt: max(10, int(reads_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
     shell:
         """
@@ -46,8 +54,8 @@ rule reference_index:
         basename=f"{OUTPUT_DIR}/preprocessing/reference/reference"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, attempt: max(1,int(reference_mb * 5 ** (attempt - 1))),
-        runtime=lambda wildcards, attempt: max(15,int((reference_mb / 4 * 2 ** (attempt - 1))))
+        mem_mb=lambda wildcards, attempt: max(1,int(reference_mb * 10 ** (attempt - 1))),
+        runtime=lambda wildcards, attempt: max(15,int((reference_mb / 20 * 2 ** (attempt - 1))))
     shell:
         """
         module load {params.bowtie2_module}
@@ -74,4 +82,41 @@ rule reference_map:
         """
         module load {params.bowtie2_module} {params.samtools_module}
         bowtie2 -x {params.basename} -1 {input.r1} -2 {input.r2} | samtools view -bS - | samtools sort -o {output}
+        """
+
+rule metagenomic_reads:
+    input:
+        f"{OUTPUT_DIR}/preprocessing/bowtie2/{{sample}}.bam"
+    output:
+        r1=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz",
+        r2=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz"
+    params:
+        bowtie2_module={BOWTIE2_MODULE},
+        samtools_module={SAMTOOLS_MODULE}
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 16) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, attempt: max(10, int(reads_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
+    shell:
+        """
+        module load {params.bowtie2_module} {params.samtools_module}
+        samtools view -b -f12 -@ {threads} {input} | samtools fastq -@ {threads} -1 {output.r1} -2 {output.r2} -
+        """
+
+rule host_reads:
+    input:
+        f"{OUTPUT_DIR}/preprocessing/bowtie2/{{sample}}.bam"
+    output:
+        f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam"
+    params:
+        bowtie2_module={BOWTIE2_MODULE},
+        samtools_module={SAMTOOLS_MODULE}
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 16) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, attempt: max(10, int(reads_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
+    shell:
+        """
+        module load {params.bowtie2_module} {params.samtools_module}
+        samtools view -b -F12 -@ {threads} {input} | samtools sort -@ {threads} -o {output} -
         """
