@@ -28,7 +28,7 @@ def run_snakemake_preprocessing(workflow, input_dir, output_dir):
         f"module load {SNAKEMAKE_MODULE} && "
         "snakemake "
         f"-s {str(Path(__file__).parent / 'workflow' / 'Snakefile')} "
-        f"--config workflow={workflow} reads_dir={input_dir} output_dir={output_dir}"
+        f"--config WORKFLOW={workflow} READS_DIR={input_dir} OUTPUT_DIR={output_dir}"
     ]
 
     subprocess.run(snakemake_command, shell=False, check=True)
