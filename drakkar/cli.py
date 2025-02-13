@@ -116,12 +116,12 @@ def main():
     subparser_complete = subparsers.add_parser("complete", help="Run the complete workflow")
     subparser_complete.add_argument("-i", "--input", required=True, help="Input directory")
     subparser_complete.add_argument("-o", "--output", required=True, help="Output directory")
-    subparser_assembly.add_argument("-r", "--reference", required=True, help="Reference host genome")
+    subparser_complete.add_argument("-r", "--reference", required=True, help="Reference host genome")
 
-    subparser_assembly = subparsers.add_parser("preprocessing", help="Run the preprocessing workflow")
-    subparser_assembly.add_argument("-i", "--input", required=True, help="Input directory")
-    subparser_assembly.add_argument("-o", "--output", required=True, help="Output directory")
-    subparser_assembly.add_argument("-r", "--reference", required=True, help="Reference host genome")
+    subparser_preprocessing = subparsers.add_parser("preprocessing", help="Run the preprocessing workflow")
+    subparser_preprocessing.add_argument("-i", "--input", required=True, help="Input directory")
+    subparser_preprocessing.add_argument("-o", "--output", required=True, help="Output directory")
+    subparser_preprocessing.add_argument("-r", "--reference", required=True, help="Reference host genome")
 
     subparser_assembly = subparsers.add_parser("assembly", help="Run the assembly workflow")
     subparser_assembly.add_argument("-i", "--input", required=True, help="Input directory")
