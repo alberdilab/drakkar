@@ -1,4 +1,3 @@
-
 from setuptools import setup, find_packages
 
 setup(
@@ -6,16 +5,16 @@ setup(
     version="1.0.0",
     author="Antton Alberdi",
     author_email="antton.alberdi@sund.ku.dk",
-    description="Metagenomics pipeline optimised for Mjolnir",
-    packages=find_packages(),
-    py_modules=["drakkar"],
+    description="Metagenomics pipeline optimized for Mjolnir",
+    packages=find_packages(),  # Automatically discovers drakkar/
     install_requires=[
         "numpy",
         "pandas",
+        "argparse"
     ],
     entry_points={
         "console_scripts": [
-            "drakkar=drakkar.cli:main",
+            "drakkar=drakkar:main",
         ],
     },
     python_requires=">=3.6",
