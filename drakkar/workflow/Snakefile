@@ -1,8 +1,29 @@
-rule all:
-    input:
-        "results/complete.txt"
+import os
+import gzip
+import pandas as pd
+from glob import glob
 
-include: "rules/assembly.smk"
-include: "rules/binning.smk"
-include: "rules/annotation.smk"
-include: "rules/quantification.smk"
+WORKFLOW = config["workflow"]
+READS_DIR = config["reads_dir"]
+
+if WORKFLOW == "complete":
+    rule all:
+        input:
+            "results/complete.txt"
+
+    include: "rules/preprocessing.smk"
+    include: "rules/assembly.smk"
+    include: "rules/binning.smk"
+    include: "rules/annotation.smk"
+    include: "rules/quantification.smk"
+
+if WORKFLOW == "preprocessing":
+
+    samples, = glob_wildcards(f"{READS_DIR}/{{sample}}_1.fq.gz")
+
+    rule all:
+        input:
+            expand(f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}_1.fq.gz", sample=samples),
+            expand(f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}_2.fq.gz", sample=samples)
+
+    include: "rules/preprocessing.smk"
