@@ -42,7 +42,10 @@ def run_snakemake_complete(workflow, input_dir, output_dir):
 def run_snakemake_preprocessing(workflow, input_dir, output_dir, reference):
     """ Run the preprocessing workflow """
     # Create a log file for progress tracking
-    log_file = PACKAGE_DIR / "log" / "preprocessing.log"
+    LOG_DIR = "logs"
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    LOG_FILE = LOG_DIR / "snakemake.log"
+
     if log_file.exists():
         log_file.unlink()  # Remove old log file
 
