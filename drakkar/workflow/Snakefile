@@ -26,9 +26,15 @@ def calculate_file_sizes(folder):
             file_sizes[file] = size_mb
     return file_sizes
 
+def calculate_file_size(filepath):
+    file_size = os.path.getsize(filepath) / (1024 ** 2)
+    return file_size
+
 reads_mb = calculate_file_sizes(READS_DIR)
 reads_mb = {key.replace('_1.fq.gz', ''): value for key, value in reads_mb.items()}
 reads_mb_total = sum(reads_mb.values())
+
+reference_mb = calculate_file_size(REFERENCE)
 
 if WORKFLOW == "complete":
     rule all:

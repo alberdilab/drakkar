@@ -44,8 +44,8 @@ rule reference_index:
         basename=f"{OUTPUT_DIR}/preprocessing/reference/reference"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 16) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(reads_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, attempt: max(1,int(reference_mb * 5 ** (attempt - 1))),
+        runtime=lambda wildcards, attempt: max(15,int((reference_mb / 4 * 2 ** (attempt - 1))))
     shell:
         """
         module load {params.bowtie2_module}
