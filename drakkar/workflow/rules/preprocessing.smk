@@ -6,9 +6,12 @@ rule fastp:
         r2=f"{READS_DIR}/{{sample}}_2.fq.gz"
     output:
         r1=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}_1.fq.gz",
-        r2=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}_2.fq.gz"
+        r2=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}_2.fq.gz",
+        html=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}.html",
+        json=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}.json"
     params:
         fastp_module={FASTP_MODULE}
+    threads: 1
     shell:
         """
         module load {params.fastp_module}
@@ -22,8 +25,8 @@ rule fastp:
             --qualified_quality_phred 20 \
             --length_required 60 \
             --thread {threads} \
-            --html {output.fastp_html} \
-            --json {output.fastp_json} \
+            --html {output.html} \
+            --json {output.json} \
             --adapter_sequence AGATCGGAAGAGCACACGTCTGAACTCCAGTCA \
             --adapter_sequence_r2 AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
         """
