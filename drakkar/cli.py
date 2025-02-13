@@ -37,7 +37,7 @@ def run_snakemake_complete(workflow, input_dir, output_dir):
     ]
     subprocess.run(" && ".join(snakemake_command), shell=True, check=True)
 
-def run_snakemake_preprocessing(workflow, input_dir, output_dir):
+def run_snakemake_preprocessing(workflow, input_dir, output_dir, reference):
     """ Run the preprocessing workflow """
     snakemake_command = [
         "/bin/bash", "-c",  # Ensures the module system works properly
@@ -46,7 +46,7 @@ def run_snakemake_preprocessing(workflow, input_dir, output_dir):
         f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / 'slurm'} "
         f"--configfile {CONFIG_PATH} "
-        f"--config workflow={workflow} reads_dir={input_dir} output_dir={output_dir}"
+        f"--config workflow={workflow} reads_dir={input_dir} output_dir={output_dir} reference={reference}"
     ]
 
     subprocess.run(snakemake_command, shell=False, check=True)
@@ -116,10 +116,12 @@ def main():
     subparser_complete = subparsers.add_parser("complete", help="Run the complete workflow")
     subparser_complete.add_argument("-i", "--input", required=True, help="Input directory")
     subparser_complete.add_argument("-o", "--output", required=True, help="Output directory")
+    subparser_assembly.add_argument("-r", "--reference", required=True, help="Reference host genome")
 
     subparser_assembly = subparsers.add_parser("preprocessing", help="Run the preprocessing workflow")
     subparser_assembly.add_argument("-i", "--input", required=True, help="Input directory")
     subparser_assembly.add_argument("-o", "--output", required=True, help="Output directory")
+    subparser_assembly.add_argument("-r", "--reference", required=True, help="Reference host genome")
 
     subparser_assembly = subparsers.add_parser("assembly", help="Run the assembly workflow")
     subparser_assembly.add_argument("-i", "--input", required=True, help="Input directory")
@@ -140,9 +142,9 @@ def main():
     args = parser.parse_args()
 
     if args.command == "complete":
-        run_snakemake_complete(args.command, args.input, args.output)
+        run_snakemake_complete(args.command, args.input, args.output, args.reference)
     elif args.command == "preprocessing":
-        run_snakemake_preprocessing(args.command, args.input, args.output)
+        run_snakemake_preprocessing(args.command, args.input, args.output, args.reference)
     elif args.command == "assembly":
         run_snakemake_assembly(args.command, args.input, args.output)
     elif args.command == "binning":
