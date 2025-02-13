@@ -27,12 +27,6 @@ def calculate_file_size(filepath):
     file_size = os.path.getsize(filepath) / (1024 ** 2)
     return file_size
 
-reads_mb = calculate_file_sizes(READS_DIR)
-reads_mb = {key.replace('_1.fq.gz', ''): value for key, value in reads_mb.items()}
-reads_mb_total = sum(reads_mb.values())
-
-reference_mb = calculate_file_size(REFERENCE)
-
 if WORKFLOW == "complete":
     rule all:
         input:
@@ -49,6 +43,11 @@ if WORKFLOW == "preprocessing":
     READS_DIR = config["reads_dir"]
     OUTPUT_DIR = config["output_dir"]
     REFERENCE = config["reference"]
+
+    reads_mb = calculate_file_sizes(READS_DIR)
+    reads_mb = {key.replace('_1.fq.gz', ''): value for key, value in reads_mb.items()}
+    reads_mb_total = sum(reads_mb.values())
+    reference_mb = calculate_file_size(REFERENCE)
 
     samples, = glob_wildcards(f"{READS_DIR}/{{sample}}_1.fq.gz")
 
