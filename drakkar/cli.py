@@ -58,7 +58,7 @@ def run_snakemake_preprocessing(workflow, input_dir, output_dir, reference):
         f"--quiet"
     ]
 
-    total_jobs = count_total_jobs()
+    total_jobs = count_total_jobs(output_dir)
     print(total_jobs)
 
     subprocess.run(snakemake_command, shell=False, check=True)
@@ -132,7 +132,7 @@ def run_snakemake_quantification(workflow, assembly_dir, output_dir):
 # Progress report
 ###
 
-def count_total_jobs():
+def count_total_jobs(output_dir):
     """Count the total number of jobs in the Snakemake DAG using the correct Snakefile."""
     try:
         snakemake_summary = [
