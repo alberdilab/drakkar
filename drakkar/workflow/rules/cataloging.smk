@@ -102,7 +102,7 @@ if "individual" in CATALOGING_MODE:
         shell:
             """
             module load {params.metabat2_module}
-            jgi_summarize_bam_contig_depths –-outputDepth {output} {input}
+            jgi_summarize_bam_contig_depths --outputDepth {output} {input}
             """
 
     rule individual_assembly_metabat:
@@ -249,5 +249,5 @@ if "all" in CATALOGING_MODE:
         shell:
             """
             module load {params.metabat2_module}
-            jgi_summarize_bam_contig_depths –-outputDepth {output} {input}
+            jgi_summarize_bam_contig_depths --outputDepth {output} {input}
             """
