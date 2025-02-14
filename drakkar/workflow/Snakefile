@@ -67,7 +67,7 @@ if WORKFLOW == "cataloging":
 
     rule all:
         input:
-            expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam", sample=samples)
+            expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam", sample=samples),
             expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz", sample=samples),
             expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz", sample=samples)
 
