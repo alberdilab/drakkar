@@ -5,6 +5,8 @@
 MEGAHIT_MODULE = config["MEGAHIT_MODULE"]
 BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
+METABAT2_MODULE = config["METABAT2_MODULE"]
+MAXBIN2_MODULE = config["MAXBIN2_MODULE"]
 
 ####
 # Calculate file sizes
@@ -69,19 +71,74 @@ if "individual" in CATALOGING_MODE:
             r1=f"{PREPROCESS_DIR}/{{sample}}_1.fq.gz",
             r2=f"{PREPROCESS_DIR}/{{sample}}_2.fq.gz"
         output:
-            f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}.bam",
+            f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}.bam"
         params:
             bowtie2_module={BOWTIE2_MODULE},
             samtools_module={SAMTOOLS_MODULE},
-            basename=f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}"
+            basename=f"{OUTPUT_DIR}/cataloging/metabat2/{{sample}}/{{sample}}"
         threads: 8
         resources:
-            mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
-            runtime=lambda wildcards, attempt: max(10, int(reads_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
+            mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
+            runtime=lambda wildcards, attempt: max(10, int(preprocess_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
         shell:
             """
             module load {params.bowtie2_module} {params.samtools_module}
             bowtie2 -x {params.basename} -1 {input.r1} -2 {input.r2} | samtools view -bS - | samtools sort -o {output}
+            """
+
+    rule individual_assembly_map_depth:
+        input:
+            f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}.bam"
+        output:
+            f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}.tsv
+        params:
+            metabat2_module={METABAT2_MODULE}
+        threads: 1
+        resources:
+            mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
+            runtime=lambda wildcards, attempt: max(10, int(preprocess_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
+        shell:
+            """
+            module load {params.metabat2_module}
+            jgi_summarize_bam_contig_depths –outputDepth {output} {input}
+            """
+
+    rule individual_assembly_metabat:
+        input:
+            assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}/{{sample}}.fna",
+            depth=f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}.tsv
+        output:
+            f"{OUTPUT_DIR}/cataloging/metabat2/{{sample}}/bin.1.fa"
+        params:
+            metabat2_module={METABAT2_MODULE},
+            outdir=f"{OUTPUT_DIR}/cataloging/metabat2/{{sample}}"
+        threads: 1
+        resources:
+            mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
+            runtime=lambda wildcards, attempt: max(10, int(preprocess_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
+        shell:
+            """
+            module load {params.metabat2_module}
+            metabat2 -i {input.assembly} -a {input.depth} -o {params.outdir} -m 1500
+            """
+
+    rule individual_assembly_maxbin:
+        input:
+            assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}/{{sample}}.fna",
+            depth=f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}.tsv
+        output:
+            f"{OUTPUT_DIR}/cataloging/maxbin/{{sample}}/{{sample}}.summary",
+        params:
+            maxbin2_module={MAXBIN2_MODULE}
+            outdir=f"{OUTPUT_DIR}/cataloging/maxbin/{{sample}}"
+        threads: 1
+        resources:
+            mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
+            runtime=lambda wildcards, attempt: max(10, int(preprocess_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
+        shell:
+            """
+            module load {params.maxbin2_module}
+            run_MaxBin.pl -contig {input.assembly} -max_iteration 10 -out {params.outdir} -min_contig_length 1500
             """
 
 if "all" in CATALOGING_MODE:
@@ -147,8 +204,8 @@ if "all" in CATALOGING_MODE:
             basename=f"{OUTPUT_DIR}/cataloging/bowtie2/all"
         threads: 8
         resources:
-            mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
-            runtime=lambda wildcards, attempt: max(10, int(reads_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
+            mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
+            runtime=lambda wildcards, attempt: max(10, int(preprocess_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
         shell:
             """
             module load {params.bowtie2_module} {params.samtools_module}
