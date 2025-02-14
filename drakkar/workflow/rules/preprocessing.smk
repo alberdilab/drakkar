@@ -6,9 +6,6 @@ FASTP_MODULE = config["FASTP_MODULE"]
 BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 
-# Check if reference is provided
-USE_REFERENCE = config.get("reference") is not None
-
 ####
 # Run preprocessing rules
 ####
