@@ -8,6 +8,7 @@ SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 
 # Check if reference is provided
 USE_REFERENCE = bool(config.get("reference"))
+print(USE_REFERENCE)
 
 ####
 # Run preprocessing rules
