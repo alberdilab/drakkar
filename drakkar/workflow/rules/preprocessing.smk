@@ -7,7 +7,7 @@ BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 
 # Check if reference is provided
-bool(config.get("reference"))
+USE_REFERENCE = config.get("reference") is not None
 
 ####
 # Run preprocessing rules
