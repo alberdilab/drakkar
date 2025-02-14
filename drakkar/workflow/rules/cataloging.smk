@@ -53,8 +53,8 @@ if CATALOGING_MODE == "individual":
     rule assembly_map:
         input:
             index=f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}.rev.2.bt2",
-            r1=f"{READS_DIR}/{{sample}}_1.fq.gz",
-            r2=f"{READS_DIR}/{{sample}}_2.fq.gz"
+            r1=f"{PREPROCESS_DIR}/{{sample}}_1.fq.gz",
+            r2=f"{PREPROCESS_DIR}/{{sample}}_2.fq.gz"
         output:
             f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}.bam",
         params:
@@ -74,8 +74,8 @@ if CATALOGING_MODE == "individual":
 if CATALOGING_MODE == "coassembly":
     rule coassembly:
         input:
-            r1=expand(f"{READS_DIR}/{{sample}}_1.fq.gz", sample=samples),
-            r2=expand(f"{READS_DIR}/{{sample}}_2.fq.gz", sample=samples)
+            r1=expand(f"{PREPROCESS_DIR}/{{sample}}_1.fq.gz", sample=samples),
+            r2=expand(f"{PREPROCESS_DIR}/{{sample}}_2.fq.gz", sample=samples)
         output:
             f"{OUTPUT_DIR}/cataloging/megahit/coassembly.fna"
         params:
