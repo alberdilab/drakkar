@@ -39,7 +39,9 @@ def run_snakemake_complete(workflow, input_dir, output_dir):
     subprocess.run(" && ".join(snakemake_command), shell=True, check=True)
 
 def run_snakemake_preprocessing(workflow, input_dir, output_dir, reference):
+
     """ Run the preprocessing workflow """
+
     snakemake_command = [
         "/bin/bash", "-c",  # Ensures the module system works properly
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
@@ -55,18 +57,22 @@ def run_snakemake_preprocessing(workflow, input_dir, output_dir, reference):
     subprocess.run(snakemake_command, shell=False, check=True)
 
 def run_snakemake_cataloging(workflow, input_dir, output_dir, mode):
+
     """ Run the cataloging workflow """
+
     snakemake_command = [
         "/bin/bash", "-c",  # Ensures the module system works properly
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
-        "snakemake",
+        "snakemake "
         f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
+        f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / 'slurm'} "
         f"--configfile {CONFIG_PATH} "
-        f"--config workflow={workflow} reads_dir={input_dir} output_dir={output_dir} assembly_mode={mode} "
+        f"--config workflow={workflow} preprocess_dir={input_dir} output_dir={output_dir} cataloging_mode={mode} "
         f"--quiet rules"
     ]
-    subprocess.run(" && ".join(snakemake_command), shell=True, check=True)
+
+    subprocess.run(snakemake_command, shell=False, check=True)
 
 def run_snakemake_dereplicating(workflow, assembly_dir, output_dir):
     """ Run the dereplicating workflow """
@@ -126,13 +132,10 @@ def main():
     subparser_preprocessing.add_argument("-o", "--output", required=True, help="Output directory")
     subparser_preprocessing.add_argument("-r", "--reference", required=False, help="Reference host genome")
 
-    subparser_assembly = subparsers.add_parser("assembly", help="Run the assembly workflow")
-    subparser_assembly.add_argument("-i", "--input", required=True, help="Input directory")
-    subparser_assembly.add_argument("-o", "--output", required=True, help="Output directory")
-
-    subparser_binning = subparsers.add_parser("binning", help="Run the binning workflow")
-    subparser_binning.add_argument("-a", "--assembly", required=True, help="Assembly directory")
-    subparser_binning.add_argument("-o", "--output", required=True, help="Output directory")
+    subparser_cataloging = subparsers.add_parser("cataloging", help="Run the assembly workflow")
+    subparser_cataloging.add_argument("-i", "--input", required=True, help="Input directory")
+    subparser_cataloging.add_argument("-o", "--output", required=True, help="Output directory")
+    subparser_cataloging.add_argument("-m", "--mode", required=True, default="individual", help="Cataloging mode")
 
     subparser_annotation = subparsers.add_parser("annotation", help="Run the annotation workflow")
     subparser_annotation.add_argument("-a", "--assembly", required=True, help="Assembly directory")
@@ -149,10 +152,8 @@ def main():
         run_snakemake_complete(args.command, args.input, args.output, args.reference)
     elif args.command == "preprocessing":
         run_snakemake_preprocessing(args.command, Path(args.input).resolve(), Path(args.output).resolve(), Path(args.reference).resolve() if args.reference else None)
-    elif args.command == "assembly":
-        run_snakemake_assembly(args.command, args.input, args.output)
-    elif args.command == "binning":
-        run_snakemake_binning(args.command, args.assembly, args.output)
+    elif args.command == "cataloging":
+        run_snakemake_cataloging(args.command, Path(args.input).resolve(), Path(args.output).resolve(), args.mode)
     elif args.command == "annotation":
         run_snakemake_annotation(args.command, args.assembly, args.output)
     elif args.command == "quantification":

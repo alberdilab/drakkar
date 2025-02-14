@@ -5,13 +5,12 @@
 MEGAHIT_MODULE = config["MEGAHIT_MODULE"]
 BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
-ASSEMBLY_MODE = config["ASSEMBLY_MODE"]
 
-if ASSEMBLY_MODE == "individual":
+if CATALOGING_MODE == "individual":
     rule individual_assembly:
         input:
-            r1=f"{READS_DIR}/{{sample}}_1.fq.gz",
-            r2=f"{READS_DIR}/{{sample}}_2.fq.gz"
+            r1=f"{PREPROCESS_DIR}/{{sample}}_1.fq.gz",
+            r2=f"{PREPROCESS_DIR}/{{sample}}_2.fq.gz"
         output:
             f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}.fna"
         params:
@@ -56,6 +55,8 @@ if ASSEMBLY_MODE == "individual":
             index=f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}.rev.2.bt2",
             r1=f"{READS_DIR}/{{sample}}_1.fq.gz",
             r2=f"{READS_DIR}/{{sample}}_2.fq.gz"
+        output:
+            f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}.bam",
         params:
             bowtie2_module={BOWTIE2_MODULE},
             samtools_module={SAMTOOLS_MODULE},
@@ -70,7 +71,7 @@ if ASSEMBLY_MODE == "individual":
             bowtie2 -x {params.basename} -1 {input.r1} -2 {input.r2} | samtools view -bS - | samtools sort -o {output}
             """
 
-if ASSEMBLY_MODE == "coassembly":
+if CATALOGING_MODE == "coassembly":
     rule coassembly:
         input:
             r1=expand(f"{READS_DIR}/{{sample}}_1.fq.gz", sample=samples)

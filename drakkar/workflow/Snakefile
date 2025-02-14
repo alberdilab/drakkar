@@ -9,10 +9,11 @@ from glob import glob
 
 configfile: "workflow/config.yaml"
 WORKFLOW = config.get("workflow", None)
-READS_DIR = config.get("reads_dir", None)
 OUTPUT_DIR = config.get("output_dir", None)
-ASSEMBLY_MODE = config.get("assembly_mode", None)
+READS_DIR = config.get("reads_dir", None)
+PREPROCESS_DIR = config.get("preprocess_dir", None)
 REFERENCE = config.get("reference", None)
+CATALOGING_MODE = config.get("cataloging_mode", None)
 
 ####
 # Calculate optimal resources for computing
@@ -37,8 +38,7 @@ if WORKFLOW == "complete":
             "results/complete.txt"
 
     include: "rules/preprocessing.smk"
-    include: "rules/assembly.smk"
-    include: "rules/binning.smk"
+    include: "rules/cataloging.smk"
     include: "rules/annotation.smk"
     include: "rules/quantification.smk"
 
@@ -47,9 +47,7 @@ if WORKFLOW == "preprocessing":
     samples, = glob_wildcards(f"{READS_DIR}/{{sample}}_1.fq.gz")
 
     # Check if reference is provided
-    print(REFERENCE)
     USE_REFERENCE = REFERENCE not in [None, "None"]
-    print(USE_REFERENCE)
 
     rule all:
         input:
@@ -61,12 +59,10 @@ if WORKFLOW == "preprocessing":
 
 if WORKFLOW == "cataloging":
 
-    samples, = glob_wildcards(f"{READS_DIR}/{{sample}}_1.fq.gz")
+    samples, = glob_wildcards(f"{PREPROCESS_DIR}/{{sample}}_1.fq.gz")
 
     rule all:
         input:
-            expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam", sample=samples),
-            expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz", sample=samples),
-            expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz", sample=samples)
+            expand(f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}.bam", sample=samples)
 
-    include: "rules/assembly.smk"
+    include: "rules/cataloging.smk"
