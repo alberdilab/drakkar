@@ -193,7 +193,7 @@ def main():
     if args.command == "complete":
         run_snakemake_complete(args.command, args.input, args.output, args.reference)
     elif args.command == "preprocessing":
-        run_snakemake_preprocessing(args.command, args.input, args.output, args.reference)
+        run_snakemake_preprocessing(args.command, Path(args.input).resolve(), Path(args.output).resolve(), Path(args.reference).resolve())
     elif args.command == "assembly":
         run_snakemake_assembly(args.command, args.input, args.output)
     elif args.command == "binning":
