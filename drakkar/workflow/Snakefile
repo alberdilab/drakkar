@@ -12,6 +12,7 @@ WORKFLOW = config.get("workflow", None)
 READS_DIR = config.get("reads_dir", None)
 OUTPUT_DIR = config.get("output_dir", None)
 ASSEMBLY_MODE = config.get("assembly_mode", None)
+REFERENCE = config.get("reference", None)
 
 ####
 # Calculate optimal resources for computing
