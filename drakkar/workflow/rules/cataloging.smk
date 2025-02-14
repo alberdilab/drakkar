@@ -141,7 +141,7 @@ if "individual" in CATALOGING_MODE:
         shell:
             """
             module load {params.maxbin2_module}
-            run_MaxBin.pl -contig {input.assembly} -abund {input.depth} -max_iteration 10 -out {params.outdir} -min_contig_length 1500
+            run_MaxBin.pl -contig {input.assembly} -abund {input.depth} -max_iteration 10 -out {params.basename} -min_contig_length 1500
             mv {params.basename}.summary {output}
             """
 
@@ -282,7 +282,7 @@ if "all" in CATALOGING_MODE:
             f"{OUTPUT_DIR}/cataloging/maxbin2/all/all.tsv"
         params:
             maxbin2_module={MAXBIN2_MODULE},
-            outdir=f"{OUTPUT_DIR}/cataloging/maxbin2/all"
+            basename=f"{OUTPUT_DIR}/cataloging/maxbin2/all/all"
         threads: 1
         resources:
             mem_mb=24*1024,
@@ -290,6 +290,6 @@ if "all" in CATALOGING_MODE:
         shell:
             """
             module load {params.maxbin2_module}
-            run_MaxBin.pl -contig {input.assembly} -abund {input.depth} -max_iteration 10 -out {params.outdir} -min_contig_length 1500
+            run_MaxBin.pl -contig {input.assembly} -abund {input.depth} -max_iteration 10 -out {params.basename} -min_contig_length 1500
             mv {params.basename}.summary {output}
             """
