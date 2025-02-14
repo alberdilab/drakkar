@@ -106,7 +106,7 @@ if "individual" in CATALOGING_MODE:
     rule individual_assembly_metabat:
         input:
             assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}/{{sample}}.fna",
-            depth=f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}.tsv
+            depth=f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}.tsv"
         output:
             f"{OUTPUT_DIR}/cataloging/metabat2/{{sample}}/bin.1.fa"
         params:
@@ -125,7 +125,7 @@ if "individual" in CATALOGING_MODE:
     rule individual_assembly_maxbin:
         input:
             assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}/{{sample}}.fna",
-            depth=f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}.tsv
+            depth=f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}.tsv"
         output:
             f"{OUTPUT_DIR}/cataloging/maxbin/{{sample}}/{{sample}}.summary",
         params:
