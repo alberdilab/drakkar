@@ -87,8 +87,8 @@ if "individual" in CATALOGING_MODE:
 if "all" in CATALOGING_MODE:
     rule all_assembly:
         input:
-            r1=",".join(expand(f"{PREPROCESS_DIR}/{{sample}}_1.fq.gz", sample=samples)),
-            r2=",".join(expand(f"{PREPROCESS_DIR}/{{sample}}_2.fq.gz", sample=samples))
+            r1=expand(f"{PREPROCESS_DIR}/{{sample}}_1.fq.gz", sample=samples),
+            r2=expand(f"{PREPROCESS_DIR}/{{sample}}_2.fq.gz", sample=samples)
         output:
             f"{OUTPUT_DIR}/cataloging/megahit/all/all.fna"
         params:
@@ -102,11 +102,16 @@ if "all" in CATALOGING_MODE:
             """
             module load {params.megahit_module}
             rm -rf {params.outputdir}
+
+            # Convert input list to a comma-separated string
+            R1_FILES=$(echo {input.r1} | tr ' ' ',')
+            R2_FILES=$(echo {input.r2} | tr ' ' ',')
+
             megahit \
                 -t {threads} \
                 --verbose \
                 --min-contig-len 1500 \
-                -1 {input.r1} -2 {input.r2} \
+                -1 $R1_FILES -2 $R2_FILES \
                 -o {params.outputdir}
             mv {params.outputdir}/final.contigs.fa {output}
             """
