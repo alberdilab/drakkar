@@ -52,7 +52,7 @@ if WORKFLOW == "preprocessing":
 
     # Check if reference is provided
     print(REFERENCE)
-    USE_REFERENCE = REFERENCE is not "None"
+    USE_REFERENCE = REFERENCE not in [None, "None"]
     print(USE_REFERENCE)
 
     rule all:
