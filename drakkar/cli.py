@@ -148,7 +148,6 @@ def main():
     if args.command == "complete":
         run_snakemake_complete(args.command, args.input, args.output, args.reference)
     elif args.command == "preprocessing":
-        print(Path(args.reference).resolve() if args.reference else None)
         run_snakemake_preprocessing(args.command, Path(args.input).resolve(), Path(args.output).resolve(), Path(args.reference).resolve() if args.reference else None)
     elif args.command == "assembly":
         run_snakemake_assembly(args.command, args.input, args.output)
