@@ -140,6 +140,7 @@ def count_total_jobs(output_dir):
             f"module load {config_vars['SNAKEMAKE_MODULE']} && "
             "snakemake "
             f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
+            f"--configfile {CONFIG_PATH} "
             f"--directory {output_dir} "
             f"--summary"
         ]
