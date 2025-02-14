@@ -13,7 +13,7 @@ OUTPUT_DIR = config.get("output_dir", None)
 READS_DIR = config.get("reads_dir", None)
 PREPROCESS_DIR = config.get("preprocess_dir", None)
 REFERENCE = config.get("reference", None)
-CATALOGING_MODE = config["mode"].split(",") if "mode" in config else []
+CATALOGING_MODE = config["cataloging_mode"].split(",") if "cataloging_mode" in config else []
 print(CATALOGING_MODE)
 
 ####

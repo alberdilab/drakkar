@@ -61,7 +61,7 @@ def run_snakemake_cataloging(workflow, input_dir, output_dir, mode):
         f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / 'slurm'} "
         f"--configfile {CONFIG_PATH} "
-        f"--config workflow={workflow} reads_dir={input_dir} output_dir={output_dir} assembly_mode={mode} "
+        f"--config workflow={workflow} reads_dir={input_dir} output_dir={output_dir} cataloging_mode={mode} "
         f"--quiet rules"
     ]
     subprocess.run(" && ".join(snakemake_command), shell=True, check=True)
