@@ -30,8 +30,8 @@ if "individual" in CATALOGING_MODE:
             outputdir=f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}"
         threads: 8
         resources:
-            mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 16) * 2 ** (attempt - 1)),
-            runtime=lambda wildcards, attempt: max(10, int(preprocess_mb.get(wildcards.sample, 1) / 1024 * 100) * 2 ** (attempt - 1))
+            mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 24) * 2 ** (attempt - 1)),
+            runtime=lambda wildcards, attempt: max(10, int(preprocess_mb.get(wildcards.sample, 1) / 1024 * 200) * 2 ** (attempt - 1))
         shell:
             """
             module load {params.megahit_module}
