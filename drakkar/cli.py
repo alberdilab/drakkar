@@ -137,7 +137,7 @@ def count_total_jobs():
     try:
         result = subprocess.run(
             [
-                f"module load {SNAKEMAKE_MODULE}",
+                f"module load {config_vars['SNAKEMAKE_MODULE']} && ",
                 "snakemake",
                 "-s", str(PACKAGE_DIR / "workflow" / "Snakefile"),
                 "--summary"
