@@ -18,7 +18,7 @@ preprocess_mb_total = sum(preprocess_mb.values())
 # Run rules
 ####
 
-if CATALOGING_MODE == "individual":
+if "individual" in CATALOGING_MODE:
     rule individual_assembly:
         input:
             r1=f"{PREPROCESS_DIR}/{{sample}}_1.fq.gz",
@@ -35,6 +35,7 @@ if CATALOGING_MODE == "individual":
         shell:
             """
             module load {params.megahit_module}
+            rm -rf {params.outputdir}
             megahit \
                 -t {threads} \
                 --verbose \
@@ -83,7 +84,7 @@ if CATALOGING_MODE == "individual":
             bowtie2 -x {params.basename} -1 {input.r1} -2 {input.r2} | samtools view -bS - | samtools sort -o {output}
             """
 
-if CATALOGING_MODE == "coassembly":
+if "all" in CATALOGING_MODE:
     rule all_assembly:
         input:
             r1=expand(f"{PREPROCESS_DIR}/{{sample}}_1.fq.gz", sample=samples),
@@ -100,6 +101,7 @@ if CATALOGING_MODE == "coassembly":
         shell:
             """
             module load {params.megahit_module}
+            rm -rf {params.outputdir}
             megahit \
                 -t {threads} \
                 --verbose \
