@@ -13,7 +13,7 @@ OUTPUT_DIR = config.get("output_dir", None)
 READS_DIR = config.get("reads_dir", None)
 PREPROCESS_DIR = config.get("preprocess_dir", None)
 REFERENCE = config.get("reference", None)
-CATALOGING_MODE = config.get("cataloging_mode", None)
+CATALOGING_MODE = parse_list(config["mode"])
 
 ####
 # Calculate optimal resources for computing

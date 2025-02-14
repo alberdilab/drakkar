@@ -21,6 +21,10 @@ def load_config():
 
 config_vars = load_config()
 
+def parse_list(value):
+    """Convert a comma-separated string into a list"""
+    return value.split(",") if value else []
+
 ###
 # Define workflow launching functions
 ###
@@ -117,10 +121,6 @@ def run_snakemake_quantification(workflow, assembly_dir, output_dir):
 # Main function to launch workflows
 ###
 
-def parse_list(value):
-    """Convert a comma-separated string into a list"""
-    return value.split(",") if value else []
-
 def main():
     parser = argparse.ArgumentParser(description="Drakkar: A Snakemake-based workflow for sequencing analysis")
     subparsers = parser.add_subparsers(dest="command")
@@ -139,7 +139,7 @@ def main():
     subparser_cataloging = subparsers.add_parser("cataloging", help="Run the assembly workflow")
     subparser_cataloging.add_argument("-i", "--input", required=True, help="Input directory")
     subparser_cataloging.add_argument("-o", "--output", required=True, help="Output directory")
-    subparser_cataloging.add_argument("-m", "--mode", required=False, type=parse_list, help="Comma-separated list of cataloging modes")
+    subparser_cataloging.add_argument("-m", "--mode", required=False, help="Comma-separated list of cataloging modes")
 
     subparser_annotation = subparsers.add_parser("annotation", help="Run the annotation workflow")
     subparser_annotation.add_argument("-a", "--assembly", required=True, help="Assembly directory")
