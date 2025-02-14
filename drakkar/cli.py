@@ -62,6 +62,7 @@ def run_snakemake_preprocessing(workflow, input_dir, output_dir, reference):
 
     # Track job progress
     total_jobs = count_total_jobs()
+    print(total_jobs)
     while True:
         completed_jobs, running_jobs, remaining_jobs = track_snakemake_progress(LOG_FILE, total_jobs)
         print_progress_bar(completed_jobs, total_jobs, running_jobs, remaining_jobs)
