@@ -42,8 +42,8 @@ if CATALOGING_MODE == "individual":
             basename=f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}"
         threads: 1
         resources:
-            mem_mb=
-            runtime=
+            mem_mb=32*1024
+            runtime=60
         shell:
             """
             module load {params.bowtie2_module}
