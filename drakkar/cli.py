@@ -60,6 +60,18 @@ def run_snakemake_preprocessing(workflow, input_dir, output_dir, reference):
 
     subprocess.run(snakemake_command, shell=False, check=True)
 
+    # Track job progress
+    total_jobs = count_total_jobs()
+    while True:
+        completed_jobs, running_jobs, remaining_jobs = track_snakemake_progress(LOG_FILE, total_jobs)
+        print_progress_bar(completed_jobs, total_jobs, running_jobs, remaining_jobs)
+
+        if remaining_jobs == 0:
+            print("\n✅ Preprocessing completed successfully!")
+            break
+        time.sleep(10)  # Update progress every 10 seconds
+
+
 def run_snakemake_cataloging(workflow, input_dir, output_dir, mode):
     """ Run the cataloging workflow """
     snakemake_command = [
@@ -118,16 +130,23 @@ def run_snakemake_quantification(workflow, assembly_dir, output_dir):
 ###
 
 def count_total_jobs():
-    """Count the total number of jobs in the Snakemake DAG."""
+    """Count the total number of jobs in the Snakemake DAG using the correct Snakefile."""
     try:
         result = subprocess.run(
-            ["snakemake", "--summary"],
+            [
+                "snakemake",
+                "-s", str(PACKAGE_DIR / "workflow" / "Snakefile"),
+                "--summary"
+            ],
             capture_output=True,
-            text=True
+            text=True,
+            check=True  # Ensure error detection
         )
-        return len(result.stdout.strip().split("\n")) - 1  # Exclude header line
-    except Exception:
-        return 0  # Default if job count fails
+        lines = result.stdout.strip().split("\n")
+        return max(len(lines) - 1, 0)  # Exclude header line
+    except subprocess.CalledProcessError as e:
+        print(f"Error counting jobs: {e}")
+        return 0
 
 def track_snakemake_progress(log_file, total_jobs):
     """Parse the Snakemake log file to count completed and running jobs."""
@@ -190,6 +209,7 @@ def main():
 
     args = parser.parse_args()
 
+    # Relative paths are turned into absolute paths
     if args.command == "complete":
         run_snakemake_complete(args.command, args.input, args.output, args.reference)
     elif args.command == "preprocessing":
