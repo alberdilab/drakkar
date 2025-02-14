@@ -55,25 +55,8 @@ def run_snakemake_preprocessing(workflow, input_dir, output_dir, reference):
         f"--workflow-profile {PACKAGE_DIR / 'profile' / 'slurm'} "
         f"--configfile {CONFIG_PATH} "
         f"--config workflow={workflow} reads_dir={input_dir} output_dir={output_dir} reference={reference} "
-        f"--quiet"
+        f"--quiet rules"
     ]
-
-    total_jobs = count_total_jobs(output_dir)
-    print(total_jobs)
-
-    subprocess.run(snakemake_command, shell=False, check=True)
-
-    # Track job progress
-
-    while True:
-        completed_jobs, running_jobs, remaining_jobs = track_snakemake_progress(LOG_FILE, total_jobs)
-        print_progress_bar(completed_jobs, total_jobs, running_jobs, remaining_jobs)
-
-        if remaining_jobs == 0:
-            print("\n✅ Preprocessing completed successfully!")
-            break
-        time.sleep(10)  # Update progress every 10 seconds
-
 
 def run_snakemake_cataloging(workflow, input_dir, output_dir, mode):
     """ Run the cataloging workflow """
@@ -127,55 +110,6 @@ def run_snakemake_quantification(workflow, assembly_dir, output_dir):
             f"output_dir={output_dir}"
     ]
     subprocess.run(" && ".join(snakemake_command), shell=True, check=True)
-
-###
-# Progress report
-###
-
-def count_total_jobs(output_dir):
-    """Count the total number of jobs in the Snakemake DAG using the correct Snakefile."""
-    try:
-        snakemake_summary = [
-            "/bin/bash", "-c",  # Ensures the module system works properly
-            f"module load {config_vars['SNAKEMAKE_MODULE']} && "
-            "snakemake "
-            f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
-            f"--configfile {CONFIG_PATH} "
-            f"--directory {output_dir} "
-            f"--summary"
-        ]
-        result=subprocess.run(snakemake_summary, shell=False, check=True, capture_output=True, text=True)
-
-        print(result)
-        lines = result.stdout.strip().split("\n")
-        return max(len(lines) - 1, 0)  # Exclude header line
-    except subprocess.CalledProcessError as e:
-        print(f"Error counting jobs: {e}")
-        return 0
-
-def track_snakemake_progress(log_file, total_jobs):
-    """Parse the Snakemake log file to count completed and running jobs."""
-    if not log_file.exists():
-        return 0, 0, total_jobs  # No progress yet
-
-    with open(log_file, "r") as f:
-        log_content = f.readlines()
-
-    completed_jobs = sum(1 for line in log_content if "Finished job" in line)
-    running_jobs = sum(1 for line in log_content if "running" in line)
-    remaining_jobs = max(total_jobs - completed_jobs, 0)
-
-    return completed_jobs, running_jobs, remaining_jobs
-
-def print_progress_bar(completed, total, running, remaining):
-    """Prints a progress bar that updates on the same line."""
-    bar_length = 40
-    progress = int((completed / total) * bar_length) if total else 0
-    bar = "#" * progress + "-" * (bar_length - progress)
-
-    sys.stdout.write(f"\r[{bar}] {completed}/{total} jobs completed | {running} running | {remaining} remaining")
-    sys.stdout.flush()  # Force update on the same line
-
 
 ###
 # Main function to launch workflows
