@@ -64,6 +64,6 @@ if WORKFLOW == "cataloging":
     rule all:
         input:
             *([expand(f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}.bam", sample=samples)] if "individual" in CATALOGING_MODE else []),
-            *([expand(f"{OUTPUT_DIR}/cataloging/bowtie2/all/{{sample}}.bam", sample=samples)] if "all" in CATALOGING_MODE else [])
+            #*([expand(f"{OUTPUT_DIR}/cataloging/bowtie2/all/{{sample}}.bam", sample=samples)] if "all" in CATALOGING_MODE else [])
 
     include: "rules/cataloging.smk"
