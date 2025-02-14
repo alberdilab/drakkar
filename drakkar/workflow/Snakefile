@@ -50,11 +50,14 @@ if WORKFLOW == "preprocessing":
 
     samples, = glob_wildcards(f"{READS_DIR}/{{sample}}_1.fq.gz")
 
+    # Check if reference is provided
+    USE_REFERENCE = REFERENCE is not None
+
     rule all:
         input:
             expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz", sample=samples),
             expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz", sample=samples),
-            *([expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam", sample=samples)] if REFERENCE else [])
+            *([expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam", sample=samples)] if USE_REFERENCE else [])
 
     include: "rules/preprocessing.smk"
 
