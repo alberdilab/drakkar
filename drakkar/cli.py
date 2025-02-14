@@ -21,10 +21,6 @@ def load_config():
 
 config_vars = load_config()
 
-def parse_list(value):
-    """Convert a comma-separated string into a list"""
-    return value.split(",") if value else []
-
 ###
 # Define workflow launching functions
 ###
