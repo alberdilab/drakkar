@@ -40,11 +40,6 @@ def run_snakemake_complete(workflow, input_dir, output_dir):
 
 def run_snakemake_preprocessing(workflow, input_dir, output_dir, reference):
     """ Run the preprocessing workflow """
-    # Create a log file for progress tracking
-    log_file = PACKAGE_DIR / "log" / "preprocessing.log"
-    if log_file.exists():
-        log_file.unlink()  # Remove old log file
-
     snakemake_command = [
         "/bin/bash", "-c",  # Ensures the module system works properly
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
@@ -153,7 +148,7 @@ def main():
     if args.command == "complete":
         run_snakemake_complete(args.command, args.input, args.output, args.reference)
     elif args.command == "preprocessing":
-        run_snakemake_preprocessing(args.command, Path(args.input).resolve(), Path(args.output).resolve(), Path(args.reference).resolve())
+        run_snakemake_preprocessing(args.command, Path(args.input).resolve(), Path(args.output).resolve(), Path(args.reference).resolve() if args.reference else None)
     elif args.command == "assembly":
         run_snakemake_assembly(args.command, args.input, args.output)
     elif args.command == "binning":
