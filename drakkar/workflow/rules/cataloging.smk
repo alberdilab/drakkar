@@ -110,10 +110,9 @@ if "individual" in CATALOGING_MODE:
             assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}/{{sample}}.fna",
             depth=f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}.tsv"
         output:
-            f"{OUTPUT_DIR}/cataloging/metabat2/{{sample}}/bin.1.fa"
+            f"{OUTPUT_DIR}/cataloging/metabat2/{{sample}}/{{sample}}.tsv"
         params:
-            metabat2_module={METABAT2_MODULE},
-            outdir=f"{OUTPUT_DIR}/cataloging/metabat2/{{sample}}"
+            metabat2_module={METABAT2_MODULE}
         threads: 1
         resources:
             mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
@@ -121,7 +120,7 @@ if "individual" in CATALOGING_MODE:
         shell:
             """
             module load {params.metabat2_module}
-            metabat2 -i {input.assembly} -a {input.depth} -o {params.outdir} -m 1500 --saveCls --noBinOut
+            metabat2 -i {input.assembly} -a {input.depth} -o {output} -m 1500 --saveCls --noBinOut
             touch {output}
             """
 
@@ -258,10 +257,9 @@ if "all" in CATALOGING_MODE:
             assembly=f"{OUTPUT_DIR}/cataloging/megahit/all/all.fna",
             depth=f"{OUTPUT_DIR}/cataloging/bowtie2/all/all.tsv"
         output:
-            f"{OUTPUT_DIR}/cataloging/metabat2/all/bin.1.fa"
+            f"{OUTPUT_DIR}/cataloging/metabat2/all/all.tsv"
         params:
-            metabat2_module={METABAT2_MODULE},
-            outdir=f"{OUTPUT_DIR}/cataloging/metabat2/all"
+            metabat2_module={METABAT2_MODULE}
         threads: 1
         resources:
             mem_mb=24*1024,
@@ -269,8 +267,7 @@ if "all" in CATALOGING_MODE:
         shell:
             """
             module load {params.metabat2_module}
-            metabat2 -i {input.assembly} -a {input.depth} -o {params.outdir} -m 1500 --saveCls --noBinOut
-            touch {output}
+            metabat2 -i {input.assembly} -a {input.depth} -o {output} -m 1500 --saveCls --noBinOut
             """
 
     rule all_assembly_maxbin:
