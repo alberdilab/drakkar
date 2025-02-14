@@ -17,6 +17,9 @@ USE_REFERENCE = config.get("reference", "").strip() != ""
 # the reference genome file is provided. Otherwise, the fastp rule already outputs the final files.
 
 if USE_REFERENCE:
+
+    reference_mb = calculate_file_size(REFERENCE)
+
     rule fastp:
         input:
             r1=f"{READS_DIR}/{{sample}}_1.fq.gz",
