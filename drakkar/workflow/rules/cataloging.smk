@@ -96,8 +96,8 @@ if "all" in CATALOGING_MODE:
             outputdir=f"{OUTPUT_DIR}/cataloging/megahit/all"
         threads: 8
         resources:
-            mem_mb=lambda wildcards, attempt: max(1,int(preprocess_mb_total * 1024 / 4 * 2 ** (attempt - 1))),
-            runtime=lambda wildcards, attempt: max(15,int((preprocess_mb_total / 4 * 2 ** (attempt - 1))))
+            mem_mb=lambda wildcards, attempt: max(1,int(preprocess_mb_total * 1024 / 40 * 2 ** (attempt - 1))),
+            runtime=lambda wildcards, attempt: max(15,int((preprocess_mb_total / 10 * 2 ** (attempt - 1))))
         shell:
             """
             module load {params.megahit_module}
