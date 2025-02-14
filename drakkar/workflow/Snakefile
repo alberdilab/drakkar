@@ -47,7 +47,8 @@ if WORKFLOW == "preprocessing":
     reads_mb = calculate_file_sizes(READS_DIR)
     reads_mb = {key.replace('_1.fq.gz', ''): value for key, value in reads_mb.items()}
     reads_mb_total = sum(reads_mb.values())
-    reference_mb = calculate_file_size(REFERENCE)
+
+    reference_mb = calculate_file_size(REFERENCE) if reference else None
 
     samples, = glob_wildcards(f"{READS_DIR}/{{sample}}_1.fq.gz")
 
