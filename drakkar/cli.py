@@ -55,7 +55,6 @@ def run_snakemake_preprocessing(workflow, input_dir, output_dir, reference):
         f"--workflow-profile {PACKAGE_DIR / 'profile' / 'slurm'} "
         f"--configfile {CONFIG_PATH} "
         f"--config workflow={workflow} reads_dir={input_dir} output_dir={output_dir} reference={reference} "
-        f"--quiet rules"
     ]
 
 def run_snakemake_cataloging(workflow, input_dir, output_dir, mode):
@@ -163,8 +162,6 @@ def main():
         run_snakemake_quantification(args.command, args.assembly, args.output)
     else:
         parser.print_help()
-
-
 
 if __name__ == "__main__":
     main()
