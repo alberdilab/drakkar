@@ -63,6 +63,6 @@ if WORKFLOW == "cataloging":
 
     rule all:
         input:
-            expand(f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}.bam", sample=samples)
+            expand(f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}.bam", sample=samples)
 
     include: "rules/cataloging.smk"
