@@ -244,8 +244,8 @@ if "all" in CATALOGING_MODE:
             metabat2_module={METABAT2_MODULE}
         threads: 1
         resources:
-            mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
-            runtime=lambda wildcards, attempt: max(10, int(preprocess_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
+            mem_mb=16*1024,
+            runtime=60
         shell:
             """
             module load {params.metabat2_module}
