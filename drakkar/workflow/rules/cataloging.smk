@@ -92,7 +92,8 @@ if "individual" in CATALOGING_MODE:
         input:
             f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}.bam"
         output:
-            f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}.tsv"
+            metabat2=f"{OUTPUT_DIR}/cataloging/metabat2/{{sample}}/{{sample}}.depth",
+            maxbin2=f"{OUTPUT_DIR}/cataloging/maxbin2/{{sample}}/{{sample}}.depth"
         params:
             metabat2_module={METABAT2_MODULE}
         threads: 1
@@ -102,13 +103,14 @@ if "individual" in CATALOGING_MODE:
         shell:
             """
             module load {params.metabat2_module}
-            jgi_summarize_bam_contig_depths --outputDepth {output} {input}
+            jgi_summarize_bam_contig_depths --outputDepth {output.metabat2} {input}
+            cut -f1,3 {output.metabat2} | tail -n+2 > {output.maxbin2}
             """
 
     rule individual_assembly_metabat:
         input:
             assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}/{{sample}}.fna",
-            depth=f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}.tsv"
+            depth=f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}.depth"
         output:
             f"{OUTPUT_DIR}/cataloging/metabat2/{{sample}}/{{sample}}.tsv"
         params:
@@ -121,18 +123,17 @@ if "individual" in CATALOGING_MODE:
             """
             module load {params.metabat2_module}
             metabat2 -i {input.assembly} -a {input.depth} -o {output} -m 1500 --saveCls --noBinOut
-            touch {output}
             """
 
     rule individual_assembly_maxbin:
         input:
             assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}/{{sample}}.fna",
-            depth=f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}.tsv"
+            depth=f"{OUTPUT_DIR}/cataloging/maxbin2/{{sample}}/{{sample}}.depth"
         output:
-            f"{OUTPUT_DIR}/cataloging/maxbin2/{{sample}}/{{sample}}.summary"
+            f"{OUTPUT_DIR}/cataloging/maxbin2/{{sample}}/{{sample}}.tsv"
         params:
             maxbin2_module={MAXBIN2_MODULE},
-            outdir=f"{OUTPUT_DIR}/cataloging/maxbin2/{{sample}}"
+            basename=f"{OUTPUT_DIR}/cataloging/maxbin2/{{sample}}/{{sample}}"
         threads: 1
         resources:
             mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
@@ -140,7 +141,8 @@ if "individual" in CATALOGING_MODE:
         shell:
             """
             module load {params.maxbin2_module}
-            run_MaxBin.pl -contig {input.assembly} -max_iteration 10 -out {params.outdir} -min_contig_length 1500
+            run_MaxBin.pl -contig {input.assembly} -abund {input.depth} -max_iteration 10 -out {params.outdir} -min_contig_length 1500
+            mv {params.basename}.summary {output}
             """
 
     rule individual_binette:
@@ -239,7 +241,8 @@ if "all" in CATALOGING_MODE:
         input:
             expand(f"{OUTPUT_DIR}/cataloging/bowtie2/all/{{sample}}.bam", sample=samples)
         output:
-            f"{OUTPUT_DIR}/cataloging/bowtie2/all/all.tsv"
+            metabat2=f"{OUTPUT_DIR}/cataloging/metabat2/all/all.tsv",
+            maxbin2=f"{OUTPUT_DIR}/cataloging/maxbin2/all/all.tsv"
         params:
             metabat2_module={METABAT2_MODULE}
         threads: 1
@@ -249,13 +252,14 @@ if "all" in CATALOGING_MODE:
         shell:
             """
             module load {params.metabat2_module}
-            jgi_summarize_bam_contig_depths --outputDepth {output} {input}
+            jgi_summarize_bam_contig_depths --outputDepth {output.metabat2} {input}
+            cut -f1,3 {output.metabat2} | tail -n+2 > {output.maxbin2}
             """
 
     rule all_assembly_metabat:
         input:
             assembly=f"{OUTPUT_DIR}/cataloging/megahit/all/all.fna",
-            depth=f"{OUTPUT_DIR}/cataloging/bowtie2/all/all.tsv"
+            depth=f"{OUTPUT_DIR}/cataloging/metabat2/all/all.depth"
         output:
             f"{OUTPUT_DIR}/cataloging/metabat2/all/all.tsv"
         params:
@@ -273,9 +277,9 @@ if "all" in CATALOGING_MODE:
     rule all_assembly_maxbin:
         input:
             assembly=f"{OUTPUT_DIR}/cataloging/megahit/all/all.fna",
-            depth=f"{OUTPUT_DIR}/cataloging/bowtie2/all/all.tsv"
+            depth=f"{OUTPUT_DIR}/cataloging/maxbin2/all/all.depth"
         output:
-            f"{OUTPUT_DIR}/cataloging/maxbin2/all/all.summary"
+            f"{OUTPUT_DIR}/cataloging/maxbin2/all/all.tsv"
         params:
             maxbin2_module={MAXBIN2_MODULE},
             outdir=f"{OUTPUT_DIR}/cataloging/maxbin2/all"
@@ -286,5 +290,6 @@ if "all" in CATALOGING_MODE:
         shell:
             """
             module load {params.maxbin2_module}
-            run_MaxBin.pl -contig {input.assembly} -max_iteration 10 -out {params.outdir} -min_contig_length 1500
+            run_MaxBin.pl -contig {input.assembly} -abund {input.depth} -max_iteration 10 -out {params.outdir} -min_contig_length 1500
+            mv {params.basename}.summary {output}
             """
