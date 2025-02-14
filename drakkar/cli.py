@@ -1,7 +1,6 @@
 import argparse
 import os
 import sys
-import time
 import subprocess
 import yaml
 from pathlib import Path
