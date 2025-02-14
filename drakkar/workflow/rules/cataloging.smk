@@ -251,3 +251,41 @@ if "all" in CATALOGING_MODE:
             module load {params.metabat2_module}
             jgi_summarize_bam_contig_depths --outputDepth {output} {input}
             """
+
+    rule all_assembly_metabat:
+        input:
+            assembly=f"{OUTPUT_DIR}/cataloging/megahit/all/all.fna",
+            depth=f"{OUTPUT_DIR}/cataloging/bowtie2/all/all.tsv"
+        output:
+            f"{OUTPUT_DIR}/cataloging/metabat2/all/bin.1.fa"
+        params:
+            metabat2_module={METABAT2_MODULE},
+            outdir=f"{OUTPUT_DIR}/cataloging/metabat2/all"
+        threads: 1
+        resources:
+            mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
+            runtime=lambda wildcards, attempt: max(10, int(preprocess_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
+        shell:
+            """
+            module load {params.metabat2_module}
+            metabat2 -i {input.assembly} -a {input.depth} -o {params.outdir} -m 1500 --saveCls --noBinOut
+            """
+
+    rule all_assembly_maxbin:
+        input:
+            assembly=f"{OUTPUT_DIR}/cataloging/megahit/all/all.fna",
+            depth=f"{OUTPUT_DIR}/cataloging/bowtie2/all/all.tsv"
+        output:
+            f"{OUTPUT_DIR}/cataloging/maxbin/all/all.summary"
+        params:
+            maxbin2_module={MAXBIN2_MODULE},
+            outdir=f"{OUTPUT_DIR}/cataloging/maxbin/all"
+        threads: 1
+        resources:
+            mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
+            runtime=lambda wildcards, attempt: max(10, int(preprocess_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
+        shell:
+            """
+            module load {params.maxbin2_module}
+            run_MaxBin.pl -contig {input.assembly} -max_iteration 10 -out {params.outdir} -min_contig_length 1500
+            """
