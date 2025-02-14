@@ -144,6 +144,7 @@ def count_total_jobs():
             text=True,
             check=True  # Ensure error detection
         )
+        print(result)
         lines = result.stdout.strip().split("\n")
         return max(len(lines) - 1, 0)  # Exclude header line
     except subprocess.CalledProcessError as e:
