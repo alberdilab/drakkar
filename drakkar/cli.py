@@ -135,7 +135,7 @@ def main():
     subparser_cataloging = subparsers.add_parser("cataloging", help="Run the assembly workflow")
     subparser_cataloging.add_argument("-i", "--input", required=True, help="Input directory")
     subparser_cataloging.add_argument("-o", "--output", required=True, help="Output directory")
-    subparser_cataloging.add_argument("-m", "--mode", required=True, default="individual", help="Cataloging mode")
+    subparser_cataloging.add_argument("-m", "--mode", required=False, help="Cataloging mode")
 
     subparser_annotation = subparsers.add_parser("annotation", help="Run the annotation workflow")
     subparser_annotation.add_argument("-a", "--assembly", required=True, help="Assembly directory")
@@ -153,7 +153,7 @@ def main():
     elif args.command == "preprocessing":
         run_snakemake_preprocessing(args.command, Path(args.input).resolve(), Path(args.output).resolve(), Path(args.reference).resolve() if args.reference else None)
     elif args.command == "cataloging":
-        run_snakemake_cataloging(args.command, Path(args.input).resolve(), Path(args.output).resolve(), args.mode)
+        run_snakemake_cataloging(args.command, Path(args.input).resolve(), Path(args.output).resolve(), args.mode if args.mode else "individual")
     elif args.command == "annotation":
         run_snakemake_annotation(args.command, args.assembly, args.output)
     elif args.command == "quantification":
