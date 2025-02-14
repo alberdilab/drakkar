@@ -74,10 +74,10 @@ if CATALOGING_MODE == "individual":
 if CATALOGING_MODE == "coassembly":
     rule coassembly:
         input:
-            r1=expand(f"{READS_DIR}/{{sample}}_1.fq.gz", sample=samples)
+            r1=expand(f"{READS_DIR}/{{sample}}_1.fq.gz", sample=samples),
             r2=expand(f"{READS_DIR}/{{sample}}_2.fq.gz", sample=samples)
         output:
-            f"{OUTPUT_DIR}/cataloging/final/coassembly.fna"
+            f"{OUTPUT_DIR}/cataloging/megahit/coassembly.fna"
         params:
             megahit_module={MEGAHIT_MODULE},
             outputdir=f"{OUTPUT_DIR}/cataloging/megahit/"
