@@ -42,7 +42,7 @@ if WORKFLOW == "preprocessing":
 
     READS_DIR = config["reads_dir"]
     OUTPUT_DIR = config["output_dir"]
-    REFERENCE = config["reference"]
+    REFERENCE = config.get("reference", None)
 
     reads_mb = calculate_file_sizes(READS_DIR)
     reads_mb = {key.replace('_1.fq.gz', ''): value for key, value in reads_mb.items()}
@@ -53,7 +53,9 @@ if WORKFLOW == "preprocessing":
 
     rule all:
         input:
-            expand(f"{OUTPUT_DIR}/preprocessing/bowtie2/{{sample}}.bam", sample=samples)
+            ([expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam", sample=samples)] if REFERENCE else []) +
+            expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz", sample=samples) +
+            expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz", sample=samples)
 
     include: "rules/preprocessing.smk"
 
@@ -65,6 +67,8 @@ if WORKFLOW == "cataloging":
 
     rule all:
         input:
-            expand(f"{OUTPUT_DIR}/preprocessing/bowtie2/{{sample}}.bam", sample=samples)
+            expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam", sample=samples)
+            expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz", sample=samples),
+            expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz", sample=samples)
 
     include: "rules/assembly.smk"
