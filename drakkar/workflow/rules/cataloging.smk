@@ -122,6 +122,7 @@ if "individual" in CATALOGING_MODE:
             """
             module load {params.metabat2_module}
             metabat2 -i {input.assembly} -a {input.depth} -o {params.outdir} -m 1500 --saveCls --noBinOut
+            touch {output}
             """
 
     rule individual_assembly_maxbin:
@@ -269,6 +270,7 @@ if "all" in CATALOGING_MODE:
             """
             module load {params.metabat2_module}
             metabat2 -i {input.assembly} -a {input.depth} -o {params.outdir} -m 1500 --saveCls --noBinOut
+            touch {output}
             """
 
     rule all_assembly_maxbin:
