@@ -55,7 +55,7 @@ def run_snakemake_preprocessing(workflow, input_dir, output_dir, reference):
         f"--workflow-profile {PACKAGE_DIR / 'profile' / 'slurm'} "
         f"--configfile {CONFIG_PATH} "
         f"--config workflow={workflow} reads_dir={input_dir} output_dir={output_dir} reference={reference} "
-        f"--quiet rules"
+        f"--quiet"
     ]
 
     subprocess.run(snakemake_command, shell=False, check=True)
