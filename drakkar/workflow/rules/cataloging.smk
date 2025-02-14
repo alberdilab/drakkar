@@ -12,7 +12,7 @@ SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 
 preprocess_mb = calculate_file_sizes(PREPROCESS_DIR)
 preprocess_mb = {key.replace('_1.fq.gz', ''): value for key, value in preprocess_mb.items()}
-preprocess_mb_total = sum(reads_mb.values())
+preprocess_mb_total = sum(preprocess_mb.values())
 
 ####
 # Run rules
