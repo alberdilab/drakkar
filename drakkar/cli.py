@@ -144,7 +144,7 @@ def count_total_jobs():
             f"--directory {output_dir} "
             f"--summary"
         ]
-        result=subprocess.run(snakemake_command, shell=False, check=True, capture_output=True, text=Tru)
+        result=subprocess.run(snakemake_summary, shell=False, check=True, capture_output=True, text=Tru)
 
         print(result)
         lines = result.stdout.strip().split("\n")
