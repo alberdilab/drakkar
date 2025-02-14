@@ -127,9 +127,9 @@ if "individual" in CATALOGING_MODE:
             assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}/{{sample}}.fna",
             depth=f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}.tsv"
         output:
-            f"{OUTPUT_DIR}/cataloging/maxbin/{{sample}}/{{sample}}.summary",
+            f"{OUTPUT_DIR}/cataloging/maxbin/{{sample}}/{{sample}}.summary"
         params:
-            maxbin2_module={MAXBIN2_MODULE}
+            maxbin2_module={MAXBIN2_MODULE},
             outdir=f"{OUTPUT_DIR}/cataloging/maxbin/{{sample}}"
         threads: 1
         resources:
@@ -197,7 +197,7 @@ if "all" in CATALOGING_MODE:
             r1=f"{PREPROCESS_DIR}/{{sample}}_1.fq.gz",
             r2=f"{PREPROCESS_DIR}/{{sample}}_2.fq.gz"
         output:
-            f"{OUTPUT_DIR}/cataloging/bowtie2/all/{{sample}}.bam",
+            f"{OUTPUT_DIR}/cataloging/bowtie2/all/{{sample}}.bam"
         params:
             bowtie2_module={BOWTIE2_MODULE},
             samtools_module={SAMTOOLS_MODULE},
