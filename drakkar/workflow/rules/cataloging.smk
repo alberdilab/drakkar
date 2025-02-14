@@ -90,7 +90,7 @@ if "individual" in CATALOGING_MODE:
         input:
             f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}.bam"
         output:
-            f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}.tsv
+            f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}.tsv"
         params:
             metabat2_module={METABAT2_MODULE}
         threads: 1
