@@ -8,7 +8,11 @@ from glob import glob
 ####
 
 configfile: "workflow/config.yaml"
-WORKFLOW = config["workflow"]
+WORKFLOW = config.get("workflow", None)
+READS_DIR = config.get("reads_dir", None)
+OUTPUT_DIR = config.get("output_dir", None)
+REFERENCE = config.get("reference", None)
+ASSEMBLY_MODE = config.get("assembly_mode", None)
 
 ####
 # Calculate optimal resources for computing
@@ -40,10 +44,6 @@ if WORKFLOW == "complete":
 
 if WORKFLOW == "preprocessing":
 
-    READS_DIR = config["reads_dir"]
-    OUTPUT_DIR = config["output_dir"]
-    REFERENCE = config.get("reference", None)
-
     reads_mb = calculate_file_sizes(READS_DIR)
     reads_mb = {key.replace('_1.fq.gz', ''): value for key, value in reads_mb.items()}
     reads_mb_total = sum(reads_mb.values())
@@ -60,8 +60,6 @@ if WORKFLOW == "preprocessing":
     include: "rules/preprocessing.smk"
 
 if WORKFLOW == "cataloging":
-
-    ASSEMBLY_MODE = config["assembly_mode"]
 
     samples, = glob_wildcards(f"{READS_DIR}/{{sample}}_1.fq.gz")
 

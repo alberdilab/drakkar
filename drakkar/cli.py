@@ -51,6 +51,7 @@ def run_snakemake_preprocessing(workflow, input_dir, output_dir, reference):
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
         "snakemake "
         f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
+        f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / 'slurm'} "
         f"--configfile {CONFIG_PATH} "
         f"--config workflow={workflow} reads_dir={input_dir} output_dir={output_dir} reference={reference} "
