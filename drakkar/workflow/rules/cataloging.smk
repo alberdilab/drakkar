@@ -239,7 +239,7 @@ if "all" in CATALOGING_MODE:
         input:
             expand(f"{OUTPUT_DIR}/cataloging/bowtie2/all/{{sample}}.bam", sample=samples)
         output:
-            f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}.tsv"
+            f"{OUTPUT_DIR}/cataloging/bowtie2/all/all.tsv"
         params:
             metabat2_module={METABAT2_MODULE}
         threads: 1
