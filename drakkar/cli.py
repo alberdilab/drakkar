@@ -135,7 +135,6 @@ def run_snakemake_quantification(workflow, assembly_dir, output_dir):
 def count_total_jobs():
     """Count the total number of jobs in the Snakemake DAG using the correct Snakefile."""
     try:
-        subprocess.run(snakemake_command, shell=False, check=True)
         snakemake_summary = [
             "/bin/bash", "-c",  # Ensures the module system works properly
             f"module load {config_vars['SNAKEMAKE_MODULE']} && "
