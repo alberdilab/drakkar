@@ -75,7 +75,7 @@ if "individual" in CATALOGING_MODE:
         params:
             bowtie2_module={BOWTIE2_MODULE},
             samtools_module={SAMTOOLS_MODULE},
-            basename=f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}"
+            basename=f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}/{{sample}}"
         threads: 8
         resources:
             mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
