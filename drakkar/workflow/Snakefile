@@ -51,6 +51,7 @@ if WORKFLOW == "preprocessing":
     samples, = glob_wildcards(f"{READS_DIR}/{{sample}}_1.fq.gz")
 
     # Check if reference is provided
+    print(REFERENCE)
     USE_REFERENCE = REFERENCE is not None
     print(USE_REFERENCE)
 
