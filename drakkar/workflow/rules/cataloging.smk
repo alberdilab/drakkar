@@ -7,6 +7,8 @@ BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 METABAT2_MODULE = config["METABAT2_MODULE"]
 MAXBIN2_MODULE = config["MAXBIN2_MODULE"]
+CHECKM2_MODULE = config["CHECKM2_MODULE"]
+BINETTE_MODULE = config["BINETTE_MODULE"]
 
 ####
 # Calculate file sizes
@@ -79,7 +81,7 @@ if "individual" in CATALOGING_MODE:
         threads: 8
         resources:
             mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
-            runtime=lambda wildcards, attempt: max(10, int(preprocess_mb.get(wildcards.sample, 1) / 1024 * 100) * 2 ** (attempt - 1))
+            runtime=lambda wildcards, attempt: max(10, int(preprocess_mb.get(wildcards.sample, 1) / 1024 * 150) * 2 ** (attempt - 1))
         shell:
             """
             module load {params.bowtie2_module} {params.samtools_module}
@@ -140,6 +142,28 @@ if "individual" in CATALOGING_MODE:
             module load {params.maxbin2_module}
             run_MaxBin.pl -contig {input.assembly} -max_iteration 10 -out {params.outdir} -min_contig_length 1500
             """
+
+    rule individual_binette:
+        input:
+            metabat2=f"{OUTPUT_DIR}/cataloging/metabat2/{{sample}}/{{sample}}.tsv",
+            maxbin2=f"{OUTPUT_DIR}/cataloging/maxbin/{{sample}}/{{sample}}.tsv",
+            fasta=f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}/{{sample}}.fna"
+        output:
+            f"{OUTPUT_DIR}/cataloging/binette/{{sample}}/final_bins_quality_reports.tsv"
+        params:
+            checkm2_module={CHECKM2_MODULE},
+            binette_module={BINETTE_MODULE},
+            outdir=f"{OUTPUT_DIR}/cataloging/binette/{{sample}}"
+        threads: 1
+        resources:
+            mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
+            runtime=lambda wildcards, attempt: max(10, int(preprocess_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
+        shell:
+            """
+            module load {params.checkm2_module} {params.binette_module}
+            binette --bin_dirs {input.metabat2} {input.maxbin2} --contigs {input.fasta} --outdir {params.outdir}
+            """
+
 
 if "all" in CATALOGING_MODE:
     rule all_assembly:
@@ -205,7 +229,7 @@ if "all" in CATALOGING_MODE:
         threads: 8
         resources:
             mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
-            runtime=lambda wildcards, attempt: max(10, int(preprocess_mb.get(wildcards.sample, 1) / 1024 * 100) * 2 ** (attempt - 1))
+            runtime=lambda wildcards, attempt: max(10, int(preprocess_mb.get(wildcards.sample, 1) / 1024 * 150) * 2 ** (attempt - 1))
         shell:
             """
             module load {params.bowtie2_module} {params.samtools_module}
