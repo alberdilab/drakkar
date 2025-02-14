@@ -87,8 +87,8 @@ if "individual" in CATALOGING_MODE:
 if "all" in CATALOGING_MODE:
     rule all_assembly:
         input:
-            r1=expand(f"{PREPROCESS_DIR}/{{sample}}_1.fq.gz", sample=samples),
-            r2=expand(f"{PREPROCESS_DIR}/{{sample}}_2.fq.gz", sample=samples)
+            r1=",".join(expand(f"{PREPROCESS_DIR}/{{sample}}_1.fq.gz", sample=samples)),
+            r2=",".join(expand(f"{PREPROCESS_DIR}/{{sample}}_2.fq.gz", sample=samples))
         output:
             f"{OUTPUT_DIR}/cataloging/megahit/all/all.fna"
         params:

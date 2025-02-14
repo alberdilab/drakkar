@@ -14,7 +14,6 @@ READS_DIR = config.get("reads_dir", None)
 PREPROCESS_DIR = config.get("preprocess_dir", None)
 REFERENCE = config.get("reference", None)
 CATALOGING_MODE = config["cataloging_mode"].split(",") if "cataloging_mode" in config else []
-print(CATALOGING_MODE)
 
 ####
 # Calculate optimal resources for computing
