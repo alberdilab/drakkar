@@ -130,10 +130,10 @@ if "individual" in CATALOGING_MODE:
             assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}/{{sample}}.fna",
             depth=f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}.tsv"
         output:
-            f"{OUTPUT_DIR}/cataloging/maxbin/{{sample}}/{{sample}}.summary"
+            f"{OUTPUT_DIR}/cataloging/maxbin2/{{sample}}/{{sample}}.summary"
         params:
             maxbin2_module={MAXBIN2_MODULE},
-            outdir=f"{OUTPUT_DIR}/cataloging/maxbin/{{sample}}"
+            outdir=f"{OUTPUT_DIR}/cataloging/maxbin2/{{sample}}"
         threads: 1
         resources:
             mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
@@ -147,7 +147,7 @@ if "individual" in CATALOGING_MODE:
     rule individual_binette:
         input:
             metabat2=f"{OUTPUT_DIR}/cataloging/metabat2/{{sample}}/{{sample}}.tsv",
-            maxbin2=f"{OUTPUT_DIR}/cataloging/maxbin/{{sample}}/{{sample}}.tsv",
+            maxbin2=f"{OUTPUT_DIR}/cataloging/maxbin2/{{sample}}/{{sample}}.tsv",
             fasta=f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}/{{sample}}.fna"
         output:
             f"{OUTPUT_DIR}/cataloging/binette/{{sample}}/final_bins_quality_reports.tsv"
@@ -278,10 +278,10 @@ if "all" in CATALOGING_MODE:
             assembly=f"{OUTPUT_DIR}/cataloging/megahit/all/all.fna",
             depth=f"{OUTPUT_DIR}/cataloging/bowtie2/all/all.tsv"
         output:
-            f"{OUTPUT_DIR}/cataloging/maxbin/all/all.summary"
+            f"{OUTPUT_DIR}/cataloging/maxbin2/all/all.summary"
         params:
             maxbin2_module={MAXBIN2_MODULE},
-            outdir=f"{OUTPUT_DIR}/cataloging/maxbin/all"
+            outdir=f"{OUTPUT_DIR}/cataloging/maxbin2/all"
         threads: 1
         resources:
             mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
