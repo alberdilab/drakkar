@@ -121,7 +121,7 @@ if "individual" in CATALOGING_MODE:
         shell:
             """
             module load {params.metabat2_module}
-            metabat2 -i {input.assembly} -a {input.depth} -o {params.outdir} -m 1500
+            metabat2 -i {input.assembly} -a {input.depth} -o {params.outdir} -m 1500 --saveCls --noBinOut
             """
 
     rule individual_assembly_maxbin:
@@ -163,7 +163,6 @@ if "individual" in CATALOGING_MODE:
             module load {params.checkm2_module} {params.binette_module}
             binette --bin_dirs {input.metabat2} {input.maxbin2} --contigs {input.fasta} --outdir {params.outdir}
             """
-
 
 if "all" in CATALOGING_MODE:
     rule all_assembly:
@@ -234,4 +233,21 @@ if "all" in CATALOGING_MODE:
             """
             module load {params.bowtie2_module} {params.samtools_module}
             bowtie2 -x {params.basename} -1 {input.r1} -2 {input.r2} | samtools view -bS - | samtools sort -o {output}
+            """
+
+    rule all_assembly_map_depth:
+        input:
+            expand(f"{OUTPUT_DIR}/cataloging/bowtie2/all/{{sample}}.bam", sample=samples)
+        output:
+            f"{OUTPUT_DIR}/cataloging/bowtie2/{{sample}}/{{sample}}.tsv"
+        params:
+            metabat2_module={METABAT2_MODULE}
+        threads: 1
+        resources:
+            mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
+            runtime=lambda wildcards, attempt: max(10, int(preprocess_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
+        shell:
+            """
+            module load {params.metabat2_module}
+            jgi_summarize_bam_contig_depths –outputDepth {output} {input}
             """
