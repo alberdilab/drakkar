@@ -263,7 +263,7 @@ def main():
 
                 # Create output directories and concatenate files
                 for sample, reads in samples.items():
-                    sample_dir = Path(args.output).resolve() / data
+                    sample_dir = Path(args.output).resolve() / "data"
                     sample_dir.mkdir(parents=True, exist_ok=True)  # Create output directory
 
                     rawreads1_output = sample_dir / f"{sample}_1.fq.gz"
