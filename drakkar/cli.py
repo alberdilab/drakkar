@@ -261,9 +261,9 @@ def main():
 
                 unique_samples = df["sample"].nunique()
 
-                FILE_TO_SAMPLE1 = dict(zip(df["rawreads1"], df["sample"]))
+                FILE_TO_SAMPLE1 = dict(zip(df["sample"], df["rawreads1"]))
                 print(FILE_TO_SAMPLE1)
-                FILE_TO_SAMPLE2 = dict(zip(df["rawreads2"], df["sample"]))
+                FILE_TO_SAMPLE2 = dict(zip(df["sample"], df["rawreads2"]))
                 print(FILE_TO_SAMPLE2)
 
                 total_datafiles = len(df)
@@ -308,7 +308,6 @@ def main():
                     subprocess.run(rawreads2_cmd, shell=True, check=True)
 
                     INPUTPATH=sample_dir
-
 
                 ####
                 # Process reference genomes
