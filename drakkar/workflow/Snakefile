@@ -54,7 +54,7 @@ if WORKFLOW == "preprocessing":
     # Check if reference is provided
     USE_REFERENCE = REFERENCE not in [None, "None"]
 
-    samples, = list(SAMPLE_TO_READS1.keys()
+    samples = list(SAMPLE_TO_READS1.keys()
 
     rule all:
         input:
