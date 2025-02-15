@@ -11,14 +11,6 @@ CHECKM2_MODULE = config["CHECKM2_MODULE"]
 BINETTE_MODULE = config["BINETTE_MODULE"]
 
 ####
-# Calculate file sizes
-####
-
-preprocess_mb = calculate_file_sizes(PREPROCESS_DIR)
-preprocess_mb = {key.replace('_1.fq.gz', ''): value for key, value in preprocess_mb.items()}
-preprocess_mb_total = sum(preprocess_mb.values())
-
-####
 # Run rules
 ####
 
@@ -47,6 +39,8 @@ rule individual_assembly:
             -o {params.outputdir}
         mv {params.outputdir}/final.contigs.fa {output}
         """
+    onfinish:
+        "snakemake track_progress"
 
 rule individual_assembly_index:
     input:
@@ -65,7 +59,9 @@ rule individual_assembly_index:
         module load {params.bowtie2_module}
         bowtie2-build {input} {params.basename}
         """
-
+    onfinish:
+        "snakemake track_progress"
+        
 rule individual_assembly_map:
     input:
         index=f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}/{{sample}}.rev.2.bt2",
