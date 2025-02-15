@@ -80,7 +80,7 @@ rule reference_map:
     threads: 8
     resources:
         mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 2 * 1024 / 500) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(reads_mb.get(wildcards.sample, 1) / 1024 *  2 * 1024/ 10) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, attempt: max(10, int(reads_mb.get(wildcards.sample, 1) / 1024 * 1024 / 20) * 2 ** (attempt - 1))
     shell:
         """
         module load {params.bowtie2_module} {params.samtools_module}
