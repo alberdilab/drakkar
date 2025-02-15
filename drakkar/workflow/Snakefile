@@ -32,6 +32,9 @@ def calculate_file_size(filepath):
     file_size = os.path.getsize(filepath) / (1024 ** 2)
     return file_size
 
+
+include: "rules/preparing.smk"
+
 if WORKFLOW == "complete":
     rule all:
         input:

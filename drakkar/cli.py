@@ -245,6 +245,7 @@ def main():
     ###
 
     if args.file and args.input:
+        print(f"")
         print(f"Both sample info file and input directory were provided.")
         print(f"DRAKKAR will continue with the information provided in the sample info file.")
         INPUTPATH=Path(args.input).resolve()
@@ -291,42 +292,6 @@ def main():
 
                 INFOFILE = True
 
-                # Ensure required columns exist
-                required_columns = {"sample", "rawreads1", "rawreads2"}
-                if not required_columns.issubset(df.columns):
-                    raise ValueError(f"Missing required columns in {TABLE_FILE}. Expected: {required_columns}")
-
-                # Group file paths by sample
-                samples = {}
-                for _, row in df.iterrows():
-                    sample = row["sample"]
-                    rawreads1, rawreads2 = row["rawreads1"], row["rawreads2"]
-
-                    if sample not in samples:
-                        samples[sample] = {"rawreads1": [], "rawreads2": []}
-
-                    samples[sample]["rawreads1"].append(rawreads1)
-                    samples[sample]["rawreads2"].append(rawreads2)
-
-                # Create output directories and concatenate files
-                for sample, reads in samples.items():
-                    sample_dir = Path(args.output).resolve() / "data" / "reads"
-                    sample_dir.mkdir(parents=True, exist_ok=True)  # Create output directory
-
-                    rawreads1_output = sample_dir / f"{sample}_1.fq.gz"
-                    rawreads2_output = sample_dir / f"{sample}_2.fq.gz"
-
-                    print(f"   📂 Processing sample: {sample}")
-
-                    # Concatenate rawreads1 using `cat`
-                    rawreads1_cmd = f"cat {' '.join(reads['rawreads1'])} > {rawreads1_output}"
-                    rawreads2_cmd = f"cat {' '.join(reads['rawreads2'])} > {rawreads2_output}"
-
-                    subprocess.run(rawreads1_cmd, shell=True, check=True)
-                    subprocess.run(rawreads2_cmd, shell=True, check=True)
-
-                    INPUTPATH=sample_dir
-
                 ####
                 # Process reference genomes
                 ####
@@ -342,6 +307,8 @@ def main():
         if args.input:
             print(f"")
             print(f"    No sample info file was provided. Drakkar will guess samples from the provided directory.")
+
+
         else:
             print(f"")
             print(f"Please provide either an input directory (-i) or a sample info file (-f)")
