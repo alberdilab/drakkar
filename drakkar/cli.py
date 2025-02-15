@@ -226,10 +226,10 @@ def main():
     ###
 
     if "STY" not in os.environ:
-        print(" ⚠️WARNING: You are not running this script inside a 'screen' session.")
+        print(" ⚠️   WARNING: You are not running this script inside a 'screen' session.")
         print("     Running long processes outside of 'screen' may cause issues if your session is disconnected.")
-        print("\n📌 To start a screen session, use:  screen -S mysession")
-        print("     Then run this script inside the screen session.\n")
+        print("     \n📌 To start a screen session, use:  screen -S mysession")
+        print("         Then run this script inside the screen session.\n")
 
         # Prompt user to continue
         while True:
@@ -238,6 +238,7 @@ def main():
                 break  # Continue execution
             else:
                 print("     Invalid input. Please type '1' to continue.")
+
     ###
     # Processing of sample detail file
     ###
@@ -255,6 +256,7 @@ def main():
             else:
                 unique_samples = df["sample"].nunique()
                 total_datafiles = len(df)
+                print(f"")
                 print(f" Running DRAKKAR with {total_datafiles} files belonging to {unique_samples} samples.")
                 print(f" Preparing input data based on the sample info file.")
 
@@ -279,7 +281,7 @@ def main():
 
                 # Create output directories and concatenate files
                 for sample, reads in samples.items():
-                    sample_dir = Path(args.output).resolve() / "data"
+                    sample_dir = Path(args.output).resolve() / "data" / "reads"
                     sample_dir.mkdir(parents=True, exist_ok=True)  # Create output directory
 
                     rawreads1_output = sample_dir / f"{sample}_1.fq.gz"
