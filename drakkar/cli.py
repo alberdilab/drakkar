@@ -46,7 +46,7 @@ def run_snakemake_complete(workflow, input_dir, output_dir):
 
     subprocess.run(snakemake_command, shell=False, check=True)
 
-def run_snakemake_preprocessing(workflow, input_dir, output_dir, reference, profile):
+def run_snakemake_preprocessing(workflow, output_dir, reference, profile):
 
     """ Run the preprocessing workflow """
 
