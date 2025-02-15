@@ -81,7 +81,7 @@ if USE_REFERENCE:
     rule reference_map:
         input:
             index=lambda wildcards: expand(
-                f"{OUTPUT_DIR}/data/references/{{reference}}.rev.2.bt2",
+                f"{OUTPUT_DIR}/data/references/{{reference}}.rev.1.bt2",
                 reference=[SAMPLE_TO_REFERENCE[wildcards.sample]]
             ),
             r1=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}_1.fq.gz",
