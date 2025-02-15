@@ -32,7 +32,11 @@ def calculate_file_size(filepath):
     file_size = os.path.getsize(filepath) / (1024 ** 2)
     return file_size
 
+####
+# Run pipelines
+####
 
+# Run preparing
 include: "rules/preparing.smk"
 
 if WORKFLOW == "complete":
@@ -47,7 +51,7 @@ if WORKFLOW == "complete":
 
 if WORKFLOW == "preprocessing":
 
-    samples, = glob_wildcards(f"{READS_DIR}/{{sample}}_1.fq.gz")
+    samples, = list(SAMPLE_TO_READS1.keys()
 
     # Check if reference is provided
     USE_REFERENCE = REFERENCE not in [None, "None"]
