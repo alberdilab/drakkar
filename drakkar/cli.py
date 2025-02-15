@@ -36,7 +36,7 @@ def run_snakemake_complete(workflow, input_dir, output_dir):
         "snakemake "
         f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
         f"--directory {output_dir} "
-        f"--workflow-profile {PACKAGE_DIR / 'profile' / 'slurm'} "
+        f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
         f"--config workflow={workflow} reads_dir={input_dir} output_dir={output_dir} reference={reference} cataloging_mode={mode}"
         f"--quiet rules"
