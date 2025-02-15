@@ -222,6 +222,23 @@ def main():
     display_drakkar()
 
     ###
+    # Check screen session
+    ###
+
+    if "STY" not in os.environ:
+        print("WARNING: You are not running this script inside a 'screen' session.")
+        print("Running long processes outside of 'screen' may cause issues if your session is disconnected.")
+        print("\n📌 To start a screen session, use:  screen -S mysession")
+        print("Then run this script inside the screen session.\n")
+
+        # Prompt user to continue
+        while True:
+            user_input = input("👉 Type '1' to ignore this warning and continue, or Ctrl+C to exit: ")
+            if user_input.strip() == "1":
+                break  # Continue execution
+            else:
+                print("Invalid input. Please type '1' to continue.")
+    ###
     # Processing of sample detail file
     ###
 
@@ -294,7 +311,7 @@ def main():
     # Launch snakemake commands
     ###
     print(f"")
-    print(f"Starting Snakemake pipeline(s)...")
+    print(f"Starting Snakemake pipeline...")
     print(f"")
 
     # Relative paths are turned into absolute paths
