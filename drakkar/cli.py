@@ -307,7 +307,9 @@ def main():
                 ####
 
                 # Extract mapping of samples to references
-                REFERENCE_TO_FILE = dict(zip(df["reference_name"], df["reference_path"]))
+                REFERENCE_TO_FILE = {
+                    ref_name: str(Path(ref_path).resolve()) for ref_name, ref_path in zip(df["reference_name"], df["reference_path"])
+                }
                 with open(f"{args.output}/data/reference_to_file.json", "w") as f:
                     json.dump(REFERENCE_TO_FILE, f, indent=4)
 
