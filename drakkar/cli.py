@@ -226,18 +226,18 @@ def main():
     ###
 
     if "STY" not in os.environ:
-        print("WARNING: You are not running this script inside a 'screen' session.")
-        print("Running long processes outside of 'screen' may cause issues if your session is disconnected.")
+        print(" ⚠️WARNING: You are not running this script inside a 'screen' session.")
+        print("     Running long processes outside of 'screen' may cause issues if your session is disconnected.")
         print("\n📌 To start a screen session, use:  screen -S mysession")
-        print("Then run this script inside the screen session.\n")
+        print("     Then run this script inside the screen session.\n")
 
         # Prompt user to continue
         while True:
-            user_input = input("👉 Type '1' to ignore this warning and continue, or Ctrl+C to exit: ")
+            user_input = input("    👉 Type '1' to ignore this warning and continue, or Ctrl+C to exit: ")
             if user_input.strip() == "1":
                 break  # Continue execution
             else:
-                print("Invalid input. Please type '1' to continue.")
+                print("     Invalid input. Please type '1' to continue.")
     ###
     # Processing of sample detail file
     ###
