@@ -225,7 +225,7 @@ def main():
     # Processing of sample detail file
     ###
 
-    INFOFILE=False
+    INPUTPATH=Path(args.input).resolve()
 
     if args.file:
         file_path = Path(args.file).resolve()
@@ -241,6 +241,7 @@ def main():
                 unique_samples = df["sample"].nunique()
                 total_datafiles = len(df)
                 print(f" Running DRAKKAR with {total_datafiles} files belonging to {unique_samples} samples.")
+                print(f" Preparing input data based on the sample info file.")
 
                 INFOFILE = True
 
@@ -269,17 +270,16 @@ def main():
                     rawreads1_output = sample_dir / f"{sample}_1.fq.gz"
                     rawreads2_output = sample_dir / f"{sample}_2.fq.gz"
 
-                    print(f"📂 Processing sample: {sample}")
+                    print(f"   📂 Processing sample: {sample}")
 
                     # Concatenate rawreads1 using `cat`
                     rawreads1_cmd = f"cat {' '.join(reads['rawreads1'])} > {rawreads1_output}"
                     rawreads2_cmd = f"cat {' '.join(reads['rawreads2'])} > {rawreads2_output}"
 
-                    print(f"  ➕ Concatenating forward reads: {rawreads1_output}")
                     subprocess.run(rawreads1_cmd, shell=True, check=True)
-
-                    print(f"  ➕ Concatenating reverse reads: {rawreads2_output}")
                     subprocess.run(rawreads2_cmd, shell=True, check=True)
+
+                    INPUTPATH=sample_dir
 
         except Exception as e:
             print(f"Error reading file: {e}")
@@ -302,7 +302,7 @@ def main():
     if args.command == "complete":
         run_snakemake_complete(args.command, args.input, args.output, args.reference)
     elif args.command == "preprocessing":
-        run_snakemake_preprocessing(args.command, Path(args.input).resolve(), Path(args.output).resolve(), Path(args.reference).resolve() if args.reference else None, args.profile if args.profile else ["slurm"])
+        run_snakemake_preprocessing(args.command, INPUTPATH, Path(args.output).resolve(), Path(args.reference).resolve() if args.reference else None, args.profile if args.profile else ["slurm"])
     elif args.command == "cataloging":
         run_snakemake_cataloging(args.command, Path(args.input).resolve(), Path(args.output).resolve(), args.mode if args.mode else ["individual"], args.profile if args.profile else ["slurm"])
     elif args.command == "annotation":
