@@ -220,6 +220,9 @@ def main():
         run_snakemake_annotation(args.command, args.assembly, args.output)
     elif args.command == "quantification":
         run_snakemake_quantification(args.command, args.assembly, args.output)
+    elif args.help:
+        display_drakkar()
+        parser.print_help()
     else:
         display_drakkar()
         parser.print_help()
