@@ -24,7 +24,7 @@ rule prepare_reference:
     input:
         lambda wildcards: REFERENCE_TO_FILE[wildcards.reference]
     output:
-        f"{OUTPUT_DIR}/data/references/{{reference}}.fna",
+        f"{OUTPUT_DIR}/data/references/{{reference}}.fna"
     shell:
         """
         ln -s $(realpath {input}) {output}
