@@ -91,7 +91,7 @@ if USE_REFERENCE:
         params:
             bowtie2_module={BOWTIE2_MODULE},
             samtools_module={SAMTOOLS_MODULE},
-            basename=lambda wildcards: f"{OUTPUT_DIR}/preprocessing/references/{SAMPLE_TO_REFERENCE[wildcards.sample]}"
+            basename=lambda wildcards: f"{OUTPUT_DIR}/data/references/{SAMPLE_TO_REFERENCE[wildcards.sample]}"
         threads: 8
         resources:
             mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * reference_mb / 500) * 2 ** (attempt - 1)),
