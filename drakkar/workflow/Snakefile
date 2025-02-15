@@ -52,6 +52,7 @@ if WORKFLOW == "complete":
 if WORKFLOW == "preprocessing":
 
     samples, = list(SAMPLE_TO_READS1.keys()
+    print(samples)
 
     # Check if reference is provided
     USE_REFERENCE = REFERENCE not in [None, "None"]
