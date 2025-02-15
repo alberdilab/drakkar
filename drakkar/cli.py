@@ -225,7 +225,6 @@ def main():
     # Processing of sample detail file
     ###
 
-    # If --file is provided, process the file
     if args.file:
         file_path = Path(args.file).resolve()
         if not file_path.exists():
@@ -242,13 +241,18 @@ def main():
             print(f" Running DRAKKAR with {total_datafiles} files belonging to {unique_samples} samples.")
         except Exception as e:
             print(f"Error reading file: {e}")
-        return  # Exit after file processing
+
     else:
         if args.file:
             print(f"No sample info file was provided. Drakkar will guess samples from the provided directory")
+            return  # Exit after file processing
         else:
             print(f"Please provide either an input directory (-i) or a sample info file (-f)")
+            return  # Exit after file processing
 
+    ###
+    # Launch snakemake commands
+    ###
 
     # Relative paths are turned into absolute paths
     if args.command == "complete":
