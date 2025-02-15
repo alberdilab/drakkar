@@ -138,21 +138,25 @@ if "individual" in CATALOGING_MODE:
         resources:
             mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
             runtime=lambda wildcards, attempt: max(10, int(preprocess_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
-        shell:
-            """
-            module load {params.maxbin2_module}
-            # If MaxBin succeeds, move the output; otherwise, create an empty file
-            run_MaxBin.pl -contig {input.assembly} -abund {input.depth} -max_iteration 10 -out {params.basename} -min_contig_length 1500
+        run:
+            import os
+            import subprocess
 
-            if [[ -f {params.basename}.summary ]]; then
-                mv {params.basename}.summary {output}
-            else
-                touch {output}
-            fi
-
-            # Always exit with 0 to prevent Snakemake from failing
-            exit 0
-            """
+            try:
+                subprocess.run(
+                    f"module load {params.maxbin2_module} && "
+                    f"run_MaxBin.pl -contig {input.assembly} -abund {input.depth} "
+                    f"-max_iteration 10 -out {params.basename} -min_contig_length 1500",
+                    shell=True,
+                    check=True
+                )
+                if os.path.exists(f"{params.basename}.summary"):
+                    os.rename(f"{params.basename}.summary", output[0])
+                else:
+                    raise FileNotFoundError
+            except:
+                with open(output[0], "w") as f:
+                    f.write("")
 
     rule individual_binette:
         input:
@@ -296,18 +300,22 @@ if "all" in CATALOGING_MODE:
         resources:
             mem_mb=24*1024,
             runtime=120
-        shell:
-            """
-            module load {params.maxbin2_module}
-            # If MaxBin succeeds, move the output; otherwise, create an empty file
-            run_MaxBin.pl -contig {input.assembly} -abund {input.depth} -max_iteration 10 -out {params.basename} -min_contig_length 1500
+        run:
+            import os
+            import subprocess
 
-            if [[ -f {params.basename}.summary ]]; then
-                mv {params.basename}.summary {output}
-            else
-                touch {output}
-            fi
-
-            # Always exit with 0 to prevent Snakemake from failing
-            exit 0
-            """
+            try:
+                subprocess.run(
+                    f"module load {params.maxbin2_module} && "
+                    f"run_MaxBin.pl -contig {input.assembly} -abund {input.depth} "
+                    f"-max_iteration 10 -out {params.basename} -min_contig_length 1500",
+                    shell=True,
+                    check=True
+                )
+                if os.path.exists(f"{params.basename}.summary"):
+                    os.rename(f"{params.basename}.summary", output[0])
+                else:
+                    raise FileNotFoundError
+            except:
+                with open(output[0], "w") as f:
+                    f.write("")
