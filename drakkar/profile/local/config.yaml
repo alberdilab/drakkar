@@ -1,0 +1,9 @@
+latency-wait: 60
+use-conda: true
+rerun-incomplete: true
+keep-going: false
+
+default-resources:
+    mem_mb: 8 * 1024
+    runtime: 10 * 2 ** (attempt - 1)
+max-threads: 8
