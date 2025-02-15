@@ -61,11 +61,24 @@ if WORKFLOW == "cataloging":
 
     samples, = glob_wildcards(f"{PREPROCESS_DIR}/{{sample}}_1.fq.gz")
 
-    rule all:
-        input:
-            *([expand(f"{OUTPUT_DIR}/cataloging/metabat2/{{sample}}/{{sample}}.tsv", sample=samples)] if "individual" in CATALOGING_MODE else []),
-            *([expand(f"{OUTPUT_DIR}/cataloging/maxbin2/{{sample}}/{{sample}}.tsv", sample=samples)] if "individual" in CATALOGING_MODE else []),
-            *([f"{OUTPUT_DIR}/cataloging/metabat2/all/all.tsv"] if "all" in CATALOGING_MODE else []),
-            *([f"{OUTPUT_DIR}/cataloging/maxbin2/all/all.tsv"] if "all" in CATALOGING_MODE else [])
+    preprocess_mb = calculate_file_sizes(PREPROCESS_DIR)
+    preprocess_mb = {key.replace('_1.fq.gz', ''): value for key, value in preprocess_mb.items()}
+    preprocess_mb_total = sum(preprocess_mb.values())
 
-    include: "rules/cataloging.smk"
+    if "individual" in CATALOGING_MODE:
+
+        rule all:
+            input:
+                expand(f"{OUTPUT_DIR}/cataloging/metabat2/{{sample}}/{{sample}}.tsv", sample=samples),
+                expand(f"{OUTPUT_DIR}/cataloging/maxbin2/{{sample}}/{{sample}}.tsv", sample=samples)
+
+        include: "rules/cataloging_ind.smk"
+
+    if "all" in CATALOGING_MODE:
+
+        rule all:
+            input:
+                f"{OUTPUT_DIR}/cataloging/metabat2/all/all.tsv",
+                f"{OUTPUT_DIR}/cataloging/maxbin2/all/all.tsv"
+
+        include: "rules/cataloging_all.smk"
