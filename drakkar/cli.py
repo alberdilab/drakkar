@@ -288,10 +288,11 @@ def main():
                 print("SAMPLE_TO_READS2:", SAMPLE_TO_READS2)
 
                 # Save dictionaries to JSON files
-                with open("sample_to_reads1.json", "w") as f:
+                os.makedirs(f"{OUTPUT_DIR}/data", exist_ok=True)
+                with open(f"{output_dir}/data/sample_to_reads1.json", "w") as f:
                     json.dump(SAMPLE_TO_READS1, f)
 
-                with open("sample_to_reads2.json", "w") as f:
+                with open(f"{output_dir}/data/sample_to_reads2.json", "w") as f:
                     json.dump(SAMPLE_TO_READS2, f)
 
                 total_datafiles = len(df)
@@ -347,10 +348,11 @@ def main():
             SAMPLE_TO_READS1 = dict(SAMPLE_TO_READS1)
             SAMPLE_TO_READS2 = dict(SAMPLE_TO_READS2)
 
-            with open("sample_to_reads1.json", "w") as f:
+            os.makedirs(f"{OUTPUT_DIR}/data", exist_ok=True)
+            with open(f"{output_dir}/data/sample_to_reads1.json", "w") as f:
                 json.dump(SAMPLE_TO_READS1, f)
 
-            with open("sample_to_reads2.json", "w") as f:
+            with open(f"{output_dir}/data/sample_to_reads2.json", "w") as f:
                 json.dump(SAMPLE_TO_READS2, f)
 
         else:
