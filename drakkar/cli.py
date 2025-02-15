@@ -161,7 +161,7 @@ def display_drakkar():
     ░░░░░░░░░░   ░░░░░   ░░░░░ ░░░░░   ░░░░░ ░░░░░   ░░░░ ░░░░░   ░░░░ ░░░░░   ░░░░░ ░░░░░   ░░░░░
     """
 
-    ascii_ship = r"""
+    ascii_intro = r"""
 
     By Antton Alberdi [antton.alberdi@sund.ku.dk]
     DRAKKAR is a snakemake-based genome-resolved metagenomics pipeline optimised for Mjolnir.
