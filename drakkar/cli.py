@@ -254,6 +254,11 @@ def main():
                 print(f"WARNING: The mandatory column 'sample' was not found in the file.")
                 unique_samples = "N/A"
             else:
+
+                ####
+                # Process samples
+                ####
+
                 unique_samples = df["sample"].nunique()
                 total_datafiles = len(df)
                 print(f"")
@@ -297,6 +302,15 @@ def main():
                     subprocess.run(rawreads2_cmd, shell=True, check=True)
 
                     INPUTPATH=sample_dir
+
+
+                ####
+                # Process reference genomes
+                ####
+
+                # Extract mapping of samples to references
+                SAMPLE_TO_REFERENCE = dict(zip(df["sample"], df["reference"]))
+                print(SAMPLE_TO_REFERENCE)
 
         except Exception as e:
             print(f"Error reading file: {e}")
