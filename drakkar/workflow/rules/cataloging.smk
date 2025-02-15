@@ -250,8 +250,8 @@ if "all" in CATALOGING_MODE:
         input:
             expand(f"{OUTPUT_DIR}/cataloging/bowtie2/all/{{sample}}.bam", sample=samples)
         output:
-            metabat2=f"{OUTPUT_DIR}/cataloging/metabat2/all/all.tsv",
-            maxbin2=f"{OUTPUT_DIR}/cataloging/maxbin2/all/all.tsv"
+            metabat2=f"{OUTPUT_DIR}/cataloging/metabat2/all/all.depth",
+            maxbin2=f"{OUTPUT_DIR}/cataloging/maxbin2/all/all.depth"
         params:
             metabat2_module={METABAT2_MODULE}
         threads: 1
