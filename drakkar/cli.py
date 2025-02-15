@@ -260,6 +260,10 @@ def main():
                 ####
 
                 unique_samples = df["sample"].nunique()
+
+                FILE_TO_SAMPLE = dict(zip(df["sample"], df["reference"]))
+                print(FILE_TO_SAMPLE)
+
                 total_datafiles = len(df)
                 print(f"")
                 print(f" Running DRAKKAR with {total_datafiles} files belonging to {unique_samples} samples.")
