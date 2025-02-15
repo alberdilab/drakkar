@@ -243,7 +243,7 @@ def main():
             print(f"Error reading file: {e}")
 
     else:
-        if args.file:
+        if args.input:
             print(f"No sample info file was provided. Drakkar will guess samples from the provided directory")
             return  # Exit after file processing
         else:
