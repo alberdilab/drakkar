@@ -12,8 +12,7 @@ setup(
         "numpy",
         "pandas",
         "argparse",
-        "PyYAML",
-        "tqdm"
+        "PyYAML"
     ],
     entry_points={
         "console_scripts": [
