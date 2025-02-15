@@ -92,10 +92,6 @@ def file_samples_to_json(infofile, output):
     SAMPLE_TO_READS1 = dict(SAMPLE_TO_READS1)
     SAMPLE_TO_READS2 = dict(SAMPLE_TO_READS2)
 
-    # Print for verification
-    print("SAMPLE_TO_READS1:", SAMPLE_TO_READS1)
-    print("SAMPLE_TO_READS2:", SAMPLE_TO_READS2)
-
     # Save dictionaries to JSON files
     os.makedirs(f"{output}/data", exist_ok=True)
     with open(f"{output}/data/sample_to_reads1.json", "w") as f:
