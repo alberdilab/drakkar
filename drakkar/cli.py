@@ -225,8 +225,6 @@ def main():
     # Processing of sample detail file
     ###
 
-    INPUTPATH=Path(args.input).resolve()
-
     if args.file:
         file_path = Path(args.file).resolve()
         if not file_path.exists():
@@ -287,6 +285,7 @@ def main():
     else:
         if args.input:
             print(f"No sample info file was provided. Drakkar will guess samples from the provided directory")
+            INPUTPATH=Path(args.input).resolve()
         else:
             print(f"Please provide either an input directory (-i) or a sample info file (-f)")
             return  # Exit after file processing
