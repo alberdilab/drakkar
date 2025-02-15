@@ -258,6 +258,7 @@ def main():
             return
         try:
             df = pd.read_csv(file_path, sep="\t")
+            print(df)
             if "sample" not in df.columns:
                 print(f"WARNING: The mandatory column 'sample' was not found in the file.")
                 unique_samples = "N/A"
