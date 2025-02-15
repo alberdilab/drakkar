@@ -8,11 +8,10 @@ completed_jobs = 0
 total_jobs = None
 bar = None
 
-def log_handler(msg):
+def log_handler(log_event):
     global completed_jobs, total_jobs, bar
 
-    # Parse Snakemake log event
-    log_event = json.loads(msg)
+    # Snakemake already provides log_event as a dictionary, no need to use json.loads()
 
     # Initialize progress bar when total jobs are known
     if log_event.get("event") == "job_info" and total_jobs is None:
@@ -24,13 +23,17 @@ def log_handler(msg):
     # Update progress on job completion
     if log_event.get("event") == "job_finished":
         completed_jobs += 1
-        bar.n = completed_jobs
-        bar.refresh()
+        if bar:
+            bar.n = completed_jobs
+            bar.refresh()
 
     # Handle workflow completion
     if log_event.get("event") == "workflow_error":
-        bar.close()
+        if bar:
+            bar.close()
         print("❌ Workflow failed.")
+
     elif log_event.get("event") == "workflow_end":
-        bar.close()
+        if bar:
+            bar.close()
         print("✅ Workflow completed!")
