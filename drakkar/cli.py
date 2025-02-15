@@ -225,6 +225,8 @@ def main():
     # Processing of sample detail file
     ###
 
+    INFOFILE=False
+
     if args.file:
         file_path = Path(args.file).resolve()
         if not file_path.exists():
@@ -237,8 +239,50 @@ def main():
                 unique_samples = "N/A"
             else:
                 unique_samples = df["sample"].nunique()
-            total_datafiles = len(df)
-            print(f" Running DRAKKAR with {total_datafiles} files belonging to {unique_samples} samples.")
+                total_datafiles = len(df)
+                print(f" Running DRAKKAR with {total_datafiles} files belonging to {unique_samples} samples.")
+
+                INFOFILE = True
+
+                # Ensure required columns exist
+                required_columns = {"sample", "rawreads1", "rawreads2"}
+                if not required_columns.issubset(df.columns):
+                    raise ValueError(f"Missing required columns in {TABLE_FILE}. Expected: {required_columns}")
+
+                # Group file paths by sample
+                samples = {}
+                for _, row in df.iterrows():
+                    sample = row["sample"]
+                    rawreads1, rawreads2 = row["rawreads1"], row["rawreads2"]
+
+                    if sample not in samples:
+                        samples[sample] = {"rawreads1": [], "rawreads2": []}
+
+                    samples[sample]["rawreads1"].append(rawreads1)
+                    samples[sample]["rawreads2"].append(rawreads2)
+
+                # Create output directories and concatenate files
+                for sample, reads in samples.items():
+                    sample_dir = Path(args.output).resolve() / data
+                    sample_dir.mkdir(parents=True, exist_ok=True)  # Create output directory
+
+                    rawreads1_output = sample_dir / f"{sample}_1.fq.gz"
+                    rawreads2_output = sample_dir / f"{sample}_2.fq.gz"
+
+                    # Concatenate rawreads1
+                    with open(rawreads1_output, "wb") as outfile:
+                        for file in reads["rawreads1"]:
+                            print(f"  ➕ Adding {file} to {rawreads1_output}")
+                            with open(file, "rb") as infile:
+                                outfile.write(infile.read())
+
+                    # Concatenate rawreads2
+                    with open(rawreads2_output, "wb") as outfile:
+                        for file in reads["rawreads2"]:
+                            print(f"  ➕ Adding {file} to {rawreads2_output}")
+                            with open(file, "rb") as infile:
+                                outfile.write(infile.read())
+
         except Exception as e:
             print(f"Error reading file: {e}")
 
