@@ -99,8 +99,8 @@ def file_samples_to_json(infofile, output):
 
     # Populate the dictionaries
     for _, row in df.iterrows():
-        SAMPLE_TO_READS1[row["sample"]].append(row["rawreads1"])
-        SAMPLE_TO_READS2[row["sample"]].append(row["rawreads2"])
+        SAMPLE_TO_READS1[row["sample"]].append(str(Path(row["rawreads1"]).resolve()))
+        SAMPLE_TO_READS2[row["sample"]].append(str(Path(row["rawreads2"]).resolve()))
 
     # Convert defaultdict to standard dict (optional)
     SAMPLE_TO_READS1 = dict(SAMPLE_TO_READS1)
