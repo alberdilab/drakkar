@@ -5,6 +5,7 @@ import subprocess
 import yaml
 import pandas as pd
 from pathlib import Path
+from collections import defaultdict
 
 ###
 # Define and read config file
