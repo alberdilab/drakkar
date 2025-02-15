@@ -141,8 +141,17 @@ if "individual" in CATALOGING_MODE:
         shell:
             """
             module load {params.maxbin2_module}
+            # If MaxBin succeeds, move the output; otherwise, create an empty file
             run_MaxBin.pl -contig {input.assembly} -abund {input.depth} -max_iteration 10 -out {params.basename} -min_contig_length 1500
-            mv {params.basename}.summary {output}
+
+            if [[ -f {params.basename}.summary ]]; then
+                mv {params.basename}.summary {output}
+            else
+                touch {output}
+            fi
+
+            # Always exit with 0 to prevent Snakemake from failing
+            exit 0
             """
 
     rule individual_binette:
@@ -290,6 +299,15 @@ if "all" in CATALOGING_MODE:
         shell:
             """
             module load {params.maxbin2_module}
+            # If MaxBin succeeds, move the output; otherwise, create an empty file
             run_MaxBin.pl -contig {input.assembly} -abund {input.depth} -max_iteration 10 -out {params.basename} -min_contig_length 1500
-            mv {params.basename}.summary {output}
+
+            if [[ -f {params.basename}.summary ]]; then
+                mv {params.basename}.summary {output}
+            else
+                touch {output}
+            fi
+
+            # Always exit with 0 to prevent Snakemake from failing
+            exit 0
             """
