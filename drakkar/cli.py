@@ -303,9 +303,11 @@ def main():
 
     else:
         if args.input:
-            print(f"No sample info file was provided. Drakkar will guess samples from the provided directory")
+            print(f"")
+            print(f"    No sample info file was provided. Drakkar will guess samples from the provided directory.")
             INPUTPATH=Path(args.input).resolve()
         else:
+            print(f"")
             print(f"Please provide either an input directory (-i) or a sample info file (-f)")
             return  # Exit after file processing
 
