@@ -36,13 +36,6 @@ def calculate_file_sizes(file_dict):
         file_sizes[sample] = total_size_mb  # Store total size per sample
     return file_sizes
 
-
-reads_mb = calculate_file_sizes(SAMPLE_TO_READS1)
-reads_mb_total = sum(reads_mb.values())
-
-reference_mb = calculate_file_sizes(REFERENCE_TO_FILE)
-reference_mb_total = sum(reference_mb.values())
-
 ####
 # Run pipelines
 ####
@@ -79,6 +72,12 @@ if WORKFLOW == "preprocessing":
 
     samples = list(SAMPLE_TO_READS1.keys())
     references = list(REFERENCE_TO_FILE.keys())
+
+    reads_mb = calculate_file_sizes(SAMPLE_TO_READS1)
+    reads_mb_total = sum(reads_mb.values())
+
+    reference_mb = calculate_file_sizes(REFERENCE_TO_FILE)
+    reference_mb_total = sum(reference_mb.values())
 
     rule all:
         input:
