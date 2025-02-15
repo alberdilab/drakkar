@@ -27,5 +27,5 @@ rule prepare_reference:
         f"{OUTPUT_DIR}/data/references/{{reference}}.fna"
     shell:
         """
-        ln -s $(realpath {input}) {output}
+        cp {input} {output}
         """
