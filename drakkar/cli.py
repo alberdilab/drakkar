@@ -308,7 +308,8 @@ def main():
 
                 # Extract mapping of samples to references
                 SAMPLE_TO_REFERENCE = dict(zip(df["sample"], df["reference"]))
-                print(SAMPLE_TO_REFERENCE)
+                with open(f"{args.output}/data/sample_to_reference.json", "w") as f:
+                    json.dump(SAMPLE_TO_REFERENCE, f, indent=4)
 
         except Exception as e:
             print(f"Error reading file: {e}")
