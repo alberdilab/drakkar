@@ -27,8 +27,8 @@ if USE_REFERENCE:
 
     rule fastp:
         input:
-            r1=f"{READS_DIR}/{{sample}}_1.fq.gz",
-            r2=f"{READS_DIR}/{{sample}}_2.fq.gz"
+            r1=f"{OUTPUT_DIR}/data/reads/{{sample}}_1.fq.gz",
+            r2=f"{OUTPUT_DIR}/data/reads/{{sample}}_2.fq.gz"
         output:
             r1=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}_1.fq.gz",
             r2=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}_2.fq.gz",
@@ -138,8 +138,8 @@ if USE_REFERENCE:
 else:
     rule fastp:
         input:
-            r1=f"{READS_DIR}/{{sample}}_1.fq.gz",
-            r2=f"{READS_DIR}/{{sample}}_2.fq.gz"
+            r1=f"{OUTPUT_DIR}/data/reads/{{sample}}_1.fq.gz",
+            r2=f"{OUTPUT_DIR}/data/reads/{{sample}}_2.fq.gz"
         output:
             r1=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz",
             r2=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz",
