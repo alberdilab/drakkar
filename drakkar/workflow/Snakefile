@@ -85,7 +85,7 @@ if WORKFLOW == "preprocessing":
                 expand(f"{OUTPUT_DIR}/data/references/{{reference}}.rev.1.bt2", reference=references),
                 expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz", sample=samples),
                 expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz", sample=samples),
-                *([expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam", sample=samples)] if REFERENCE else [])
+                expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam", sample=samples)
 
         include: "rules/preprocessing_ref.smk"
 
