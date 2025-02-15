@@ -261,8 +261,10 @@ def main():
 
                 unique_samples = df["sample"].nunique()
 
-                FILE_TO_SAMPLE = dict(zip(df["sample"], df["reference"]))
-                print(FILE_TO_SAMPLE)
+                FILE_TO_SAMPLE1 = dict(zip(df["rawreads1"], df["sample"]))
+                print(FILE_TO_SAMPLE1)
+                FILE_TO_SAMPLE2 = dict(zip(df["rawreads2"], df["sample"]))
+                print(FILE_TO_SAMPLE2)
 
                 total_datafiles = len(df)
                 print(f"")
