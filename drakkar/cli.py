@@ -3,6 +3,7 @@ import os
 import sys
 import subprocess
 import yaml
+import pandas as pd
 from pathlib import Path
 
 ###
@@ -190,15 +191,17 @@ def main():
     subparser_complete.add_argument("-r", "--reference", required=False, help="Reference host genome")
 
     subparser_preprocessing = subparsers.add_parser("preprocessing", help="Run the preprocessing workflow (quality-filtering and host removal)")
-    subparser_preprocessing.add_argument("-i", "--input", required=True, help="Input directory")
+    subparser_preprocessing.add_argument("-i", "--input", required=False, help="Input directory (required if no sample detail file is provided)")
+    subparser_preprocessing.add_argument("-f", "--file", required=False, help="Sample detail file (required if no input directory is provided)")
     subparser_preprocessing.add_argument("-o", "--output", required=True, help="Output directory")
-    subparser_preprocessing.add_argument("-r", "--reference", required=False, help="Reference host genome")
+    subparser_preprocessing.add_argument("-r", "--reference", required=False, help="Reference host genome file (fna.gz)")
     subparser_preprocessing.add_argument("-p", "--profile", required=False, help="Snakemake profile")
 
     subparser_cataloging = subparsers.add_parser("cataloging", help="Run the cataloging workflow (assemly and binning)")
-    subparser_cataloging.add_argument("-i", "--input", required=True, help="Input directory")
+    subparser_cataloging.add_argument("-i", "--input", required=False, help="Input directory (required if no sample detail file is provided)")
+    subparser_cataloging.add_argument("-f", "--file", required=False, help="Sample detail file (required if no input directory is provided)")
     subparser_cataloging.add_argument("-o", "--output", required=True, help="Output directory")
-    subparser_cataloging.add_argument("-m", "--mode", required=False, help="Comma-separated list of cataloging modes")
+    subparser_cataloging.add_argument("-m", "--mode", required=False, help="Comma-separated list of cataloging modes (e.g. individual,custom,all)")
     subparser_cataloging.add_argument("-p", "--profile", required=False, help="Snakemake profile")
 
     subparser_dereplication = subparsers.add_parser("dereplication", help="Run the dereplication workflow")
@@ -217,6 +220,24 @@ def main():
 
     # Display ASCII logo before running any command or showing help
     display_drakkar()
+
+    ###
+    # Processing of sample detail file
+    ###
+
+    # If --file is provided, process the file
+    if args.file:
+        file_path = Path(args.file).resolve()
+        if not file_path.exists():
+            print(f"ERROR: File '{file_path}' not found.")
+            return
+        try:
+            df = pd.read_csv(file_path, sep="\t")
+            print("\n📂 File Content:\n")
+            print(df.to_string(index=False))  # Display table without index
+        except Exception as e:
+            print(f"Error reading file: {e}")
+        return  # Exit after file processing
 
     # Relative paths are turned into absolute paths
     if args.command == "complete":
