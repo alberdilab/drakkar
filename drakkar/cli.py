@@ -269,19 +269,17 @@ def main():
                     rawreads1_output = sample_dir / f"{sample}_1.fq.gz"
                     rawreads2_output = sample_dir / f"{sample}_2.fq.gz"
 
-                    # Concatenate rawreads1
-                    with open(rawreads1_output, "wb") as outfile:
-                        for file in reads["rawreads1"]:
-                            print(f"  ➕ Adding {file} to {rawreads1_output}")
-                            with open(file, "rb") as infile:
-                                outfile.write(infile.read())
+                    print(f"📂 Processing sample: {sample}")
 
-                    # Concatenate rawreads2
-                    with open(rawreads2_output, "wb") as outfile:
-                        for file in reads["rawreads2"]:
-                            print(f"  ➕ Adding {file} to {rawreads2_output}")
-                            with open(file, "rb") as infile:
-                                outfile.write(infile.read())
+                    # Concatenate rawreads1 using `cat`
+                    rawreads1_cmd = f"cat {' '.join(reads['rawreads1'])} > {rawreads1_output}"
+                    rawreads2_cmd = f"cat {' '.join(reads['rawreads2'])} > {rawreads2_output}"
+
+                    print(f"  ➕ Concatenating forward reads: {rawreads1_output}")
+                    subprocess.run(rawreads1_cmd, shell=True, check=True)
+
+                    print(f"  ➕ Concatenating reverse reads: {rawreads2_output}")
+                    subprocess.run(rawreads2_cmd, shell=True, check=True)
 
         except Exception as e:
             print(f"Error reading file: {e}")
