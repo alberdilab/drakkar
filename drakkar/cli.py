@@ -176,8 +176,12 @@ def display_drakkar():
 ###
 
 def main():
-    parser = argparse.ArgumentParser(description="Drakkar: A Snakemake-based workflow for sequencing analysis")
-    subparsers = parser.add_subparsers(dest="command")
+    parser = argparse.ArgumentParser(
+        description="Drakkar: A Snakemake-based workflow for sequencing analysis",
+        formatter_class=argparse.RawTextHelpFormatter
+    )
+    subparsers = parser.add_subparsers(dest="command", help="Available workflows")
+
 
     # Define subcommands for each workflow
     subparser_complete = subparsers.add_parser("complete", help="Run the complete workflow")
@@ -185,17 +189,21 @@ def main():
     subparser_complete.add_argument("-o", "--output", required=True, help="Output directory")
     subparser_complete.add_argument("-r", "--reference", required=False, help="Reference host genome")
 
-    subparser_preprocessing = subparsers.add_parser("preprocessing", help="Run the preprocessing workflow")
+    subparser_preprocessing = subparsers.add_parser("preprocessing", help="Run the preprocessing workflow (quality-filtering and host removal)")
     subparser_preprocessing.add_argument("-i", "--input", required=True, help="Input directory")
     subparser_preprocessing.add_argument("-o", "--output", required=True, help="Output directory")
     subparser_preprocessing.add_argument("-r", "--reference", required=False, help="Reference host genome")
     subparser_preprocessing.add_argument("-p", "--profile", required=False, help="Snakemake profile")
 
-    subparser_cataloging = subparsers.add_parser("cataloging", help="Run the assembly workflow")
+    subparser_cataloging = subparsers.add_parser("cataloging", help="Run the cataloging workflow (assemly and binning)")
     subparser_cataloging.add_argument("-i", "--input", required=True, help="Input directory")
     subparser_cataloging.add_argument("-o", "--output", required=True, help="Output directory")
     subparser_cataloging.add_argument("-m", "--mode", required=False, help="Comma-separated list of cataloging modes")
     subparser_cataloging.add_argument("-p", "--profile", required=False, help="Snakemake profile")
+
+    subparser_dereplication = subparsers.add_parser("dereplication", help="Run the dereplication workflow")
+    subparser_dereplication.add_argument("-b", "--bins", required=True, help="Bins directory")
+    subparser_dereplication.add_argument("-o", "--output", required=True, help="Output directory")
 
     subparser_annotation = subparsers.add_parser("annotation", help="Run the annotation workflow")
     subparser_annotation.add_argument("-a", "--assembly", required=True, help="Assembly directory")
@@ -207,6 +215,7 @@ def main():
 
     args = parser.parse_args()
 
+    # Display ASCII logo before running any command or showing help
     display_drakkar()
 
     # Relative paths are turned into absolute paths
@@ -220,11 +229,7 @@ def main():
         run_snakemake_annotation(args.command, args.assembly, args.output)
     elif args.command == "quantification":
         run_snakemake_quantification(args.command, args.assembly, args.output)
-    elif args.help:
-        display_drakkar()
-        parser.print_help()
     else:
-        display_drakkar()
         parser.print_help()
 
 if __name__ == "__main__":
