@@ -51,7 +51,7 @@ rule reference_index:
         index=f"{OUTPUT_DIR}/data/references/{{reference}}.rev.1.bt2"
     params:
         bowtie2_module={BOWTIE2_MODULE},
-        basename=lambda wildcards: f"{OUTPUT_DIR}/data/references/{wildcards.reference}"
+        basename=lambda wildcards: f"{OUTPUT_DIR}/data/references/{{reference}}"
     threads: 1
     resources:
         mem_mb=lambda wildcards, attempt: max(8*1024, int(reference_mb.get(wildcards.reference, 1) * 10 * 2 ** (attempt - 1))),
