@@ -350,7 +350,7 @@ def main():
                 json.dump(SAMPLE_TO_READS1, f)
 
             with open("sample_to_reads2.json", "w") as f:
-                json.dump(SAMPLE_TO_READS2, f))
+                json.dump(SAMPLE_TO_READS2, f)
 
         else:
             print(f"")
