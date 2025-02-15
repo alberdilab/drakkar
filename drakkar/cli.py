@@ -308,6 +308,39 @@ def main():
             print(f"")
             print(f"    No sample info file was provided. Drakkar will guess samples from the provided directory.")
 
+            # Define the directory containing the raw reads
+            READS_DIR = Path(args.input).resolve()
+
+            # Initialize dictionaries
+            SAMPLE_TO_READS1 = defaultdict(list)
+            SAMPLE_TO_READS2 = defaultdict(list)
+
+            # Regular expression to capture sample names
+            pattern = re.compile(r"^(.*)_\d\.fq\.gz$")  # Captures everything before "_1.fq.gz" or "_2.fq.gz"
+
+            # Scan the directory
+            for filename in os.listdir(READS_DIR):
+                if filename.endswith(".fq.gz"):
+                    full_path = os.path.join(READS_DIR, filename)
+
+                    # Extract sample name using regex
+                    match = pattern.match(filename)
+                    if match:
+                        sample_name = match.group(1)  # Everything before _1.fq.gz or _2.fq.gz
+
+                        # Sort into forward and reverse reads
+                        if "_1.fq.gz" in filename:
+                            SAMPLE_TO_READS1[sample_name].append(full_path)
+                        elif "_2.fq.gz" in filename:
+                            SAMPLE_TO_READS2[sample_name].append(full_path)
+
+            # Convert defaultdict to standard dict (optional)
+            SAMPLE_TO_READS1 = dict(SAMPLE_TO_READS1)
+            SAMPLE_TO_READS2 = dict(SAMPLE_TO_READS2)
+
+            # Print for verification
+            print("SAMPLE_TO_READS1:", SAMPLE_TO_READS1)
+            print("SAMPLE_TO_READS2:", SAMPLE_TO_READS2)
 
         else:
             print(f"")
