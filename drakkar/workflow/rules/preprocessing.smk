@@ -79,10 +79,10 @@ if USE_REFERENCE:
             """
 
     rule reference_map:
-        index=lambda wildcards: f"{OUTPUT_DIR}/data/references/{SAMPLE_TO_REFERENCE[wildcards.sample]}.rev.2.bt2",
-        r1=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}_1.fq.gz",
-        r2=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}_2.fq.gz"
-
+        input:
+            index=lambda wildcards: f"{OUTPUT_DIR}/data/references/{SAMPLE_TO_REFERENCE[wildcards.sample]}.rev.2.bt2",
+            r1=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}_1.fq.gz",
+            r2=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}_2.fq.gz"
         output:
             f"{OUTPUT_DIR}/preprocessing/bowtie2/{{sample}}.bam"
         params:
