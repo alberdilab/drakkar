@@ -175,138 +175,58 @@ def main():
     # Check screen session
     check_screen_session()
 
-    # Generate dictionaries from sample info file or input arguments
-    #file_samples_to_json()
-    #file_references_to_json()
-    #file_assemblies_to_json()
-    #argument_samples_to_json()
-    #argument_references_to_json()
-    #argument_assemblies_to_json()
-
     ###
-    # Processing of sample detail file
+    # Generate raw data dictionaries
     ###
 
     if args.file and args.input:
         print(f"")
         print(f"Both sample info file and input directory were provided.")
         print(f"DRAKKAR will continue with the information provided in the sample info file.")
+        file_samples_to_json(args.file,args.output)
 
-    if args.file:
-        file_path = Path(args.file).resolve()
-        if not file_path.exists():
-            print(f"ERROR: Sample info file '{file_path}' was not found.")
-            return
-        try:
-            df = pd.read_csv(file_path, sep="\t")
-            print(df)
-            if "sample" not in df.columns:
-                print(f"WARNING: The mandatory column 'sample' was not found in the file.")
-                unique_samples = "N/A"
-            else:
+    elif args.file and not args.input:
+        print(f"")
+        print(f"DRAKKAR will run with the information provided in the sample info file.")
+        file_samples_to_json(args.file,args.output)
 
-                ####
-                # Process samples
-                ####
-
-                unique_samples = df["sample"].nunique()
-
-                # Initialize dictionaries with lists
-                SAMPLE_TO_READS1 = defaultdict(list)
-                SAMPLE_TO_READS2 = defaultdict(list)
-
-                # Populate the dictionaries
-                for _, row in df.iterrows():
-                    SAMPLE_TO_READS1[row["sample"]].append(row["rawreads1"])
-                    SAMPLE_TO_READS2[row["sample"]].append(row["rawreads2"])
-
-                # Convert defaultdict to standard dict (optional)
-                SAMPLE_TO_READS1 = dict(SAMPLE_TO_READS1)
-                SAMPLE_TO_READS2 = dict(SAMPLE_TO_READS2)
-
-                # Print for verification
-                print("SAMPLE_TO_READS1:", SAMPLE_TO_READS1)
-                print("SAMPLE_TO_READS2:", SAMPLE_TO_READS2)
-
-                # Save dictionaries to JSON files
-                os.makedirs(f"{args.output}/data", exist_ok=True)
-                with open(f"{args.output}/data/sample_to_reads1.json", "w") as f:
-                    json.dump(SAMPLE_TO_READS1, f)
-
-                with open(f"{args.output}/data/sample_to_reads2.json", "w") as f:
-                    json.dump(SAMPLE_TO_READS2, f)
-
-                total_datafiles = len(df)
-                print(f"")
-                print(f" Running DRAKKAR with {total_datafiles} files belonging to {unique_samples} samples.")
-                print(f" Preparing input data based on the sample info file.")
-
-                INFOFILE = True
-
-                ####
-                # Process reference genomes
-                ####
-
-                # Extract mapping of samples to references
-                REFERENCE_TO_FILE = {
-                    ref_name: str(Path(ref_path).resolve()) for ref_name, ref_path in zip(df["reference_name"], df["reference_path"])
-                }
-                with open(f"{args.output}/data/reference_to_file.json", "w") as f:
-                    json.dump(REFERENCE_TO_FILE, f, indent=4)
-
-                SAMPLE_TO_REFERENCE = dict(zip(df["sample"], df["reference_name"]))
-                with open(f"{args.output}/data/sample_to_reference.json", "w") as f:
-                    json.dump(SAMPLE_TO_REFERENCE, f, indent=4)
-
-        except Exception as e:
-            print(f"Error reading file: {e}")
+    elif args.input and not args.file:
+        print(f"")
+        print(f"No sample info file was provided.")
+        print(f"DRAKKAR will run with the files in the input directory.")
+        argument_samples_to_json(args.input,args.output)
 
     else:
-        if args.input:
-            print(f"")
-            print(f"    No sample info file was provided. Drakkar will guess samples from the provided directory.")
+        print(f"")
+        print(f"Please provide either an input directory (-i) or a sample info file (-f)")
+        return
 
-            # Define the directory containing the raw reads
-            READS_DIR = Path(args.input).resolve()
 
-            # Initialize dictionaries
-            SAMPLE_TO_READS1 = defaultdict(list)
-            SAMPLE_TO_READS2 = defaultdict(list)
+    ###
+    # Generate reference genome dictionaries
+    ###
 
-            # Regular expression to capture sample names
-            pattern = re.compile(r"^(.*)_\d\.fq\.gz$")  # Captures everything before "_1.fq.gz" or "_2.fq.gz"
+    if args.file and args.reference:
+        print(f"")
+        print(f"Both sample info file and reference genome file were provided.")
+        print(f"DRAKKAR will continue with the information provided in the sample info file.")
+        file_references_to_json(args.file,args.output)
 
-            # Scan the directory
-            for filename in os.listdir(READS_DIR):
-                if filename.endswith(".fq.gz"):
-                    full_path = os.path.join(READS_DIR, filename)
+    elif args.file and not args.reference:
+        print(f"")
+        print(f"DRAKKAR will extract the reference genome information from the sample info file.")
+        file_references_to_json(args.file,args.output)
 
-                    # Extract sample name using regex
-                    match = pattern.match(filename)
-                    if match:
-                        sample_name = match.group(1)  # Everything before _1.fq.gz or _2.fq.gz
+    elif args.reference and not args.file:
+        print(f"")
+        print(f"No sample info file was provided.")
+        print(f"DRAKKAR willuse the reference genome file.")
+        argument_references_to_json(args.reference,f"{args.output}/data/sample_to_reads1.json",args.output)
 
-                        # Sort into forward and reverse reads
-                        if "_1.fq.gz" in filename:
-                            SAMPLE_TO_READS1[sample_name].append(full_path)
-                        elif "_2.fq.gz" in filename:
-                            SAMPLE_TO_READS2[sample_name].append(full_path)
-
-            # Convert defaultdict to standard dict (optional)
-            SAMPLE_TO_READS1 = dict(SAMPLE_TO_READS1)
-            SAMPLE_TO_READS2 = dict(SAMPLE_TO_READS2)
-
-            os.makedirs(f"{args.output}/data", exist_ok=True)
-            with open(f"{args.output}/data/sample_to_reads1.json", "w") as f:
-                json.dump(SAMPLE_TO_READS1, f)
-
-            with open(f"{args.output}/data/sample_to_reads2.json", "w") as f:
-                json.dump(SAMPLE_TO_READS2, f)
-
-        else:
-            print(f"")
-            print(f"Please provide either an input directory (-i) or a sample info file (-f)")
-            return  # Exit after file processing
+    else:
+        print(f"")
+        print(f"Please provide either a reference genome (-r) or a sample info file (-f)")
+        return
 
     ###
     # Launch snakemake commands
