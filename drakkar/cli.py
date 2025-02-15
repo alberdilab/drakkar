@@ -189,7 +189,7 @@ def main():
     subparser_cataloging.add_argument("-i", "--input", required=True, help="Input directory")
     subparser_cataloging.add_argument("-o", "--output", required=True, help="Output directory")
     subparser_cataloging.add_argument("-m", "--mode", required=False, help="Comma-separated list of cataloging modes")
-    subparser_preprocessing.add_argument("-p", "--profile", required=False, help="Snakemake profile")
+    subparser_cataloging.add_argument("-p", "--profile", required=False, help="Snakemake profile")
 
     subparser_annotation = subparsers.add_parser("annotation", help="Run the annotation workflow")
     subparser_annotation.add_argument("-a", "--assembly", required=True, help="Assembly directory")
