@@ -61,7 +61,7 @@ if USE_REFERENCE:
 
     rule reference_index:
         input:
-            lambda wildcards: f"{wildcards.reference}"
+            f"{OUTPUT_DIR}/data/references/{{reference}}.fna"
         output:
             index=f"{OUTPUT_DIR}/preprocessing/reference/{{reference}}.rev.1.bt2"
         params:

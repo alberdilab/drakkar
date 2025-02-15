@@ -19,3 +19,13 @@ rule concatenate_or_link_reads:
             ln -s $(realpath {input.r2}) {output.r2};
         fi
         """
+
+rule prepare_reference:
+    input:
+        lambda wildcards: REFERENCE_TO_FILE[wildcards.reference]
+    output:
+        r1f"{OUTPUT_DIR}/data/references/{{reference}}.fna",
+    shell:
+        """
+        ln -s $(realpath {input}) {output}
+        """
