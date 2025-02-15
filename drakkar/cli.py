@@ -250,7 +250,6 @@ def main():
         print(f"")
         print(f"Both sample info file and input directory were provided.")
         print(f"DRAKKAR will continue with the information provided in the sample info file.")
-        INPUTPATH=Path(args.input).resolve()
 
     if args.file:
         file_path = Path(args.file).resolve()
