@@ -229,15 +229,25 @@ def main():
     if args.file:
         file_path = Path(args.file).resolve()
         if not file_path.exists():
-            print(f"ERROR: File '{file_path}' not found.")
+            print(f"ERROR: Sample info file '{file_path}' was not found.")
             return
         try:
-            df = pd.read_csv(file_path, sep="\t")
-            print("\n📂 File Content:\n")
-            print(df.to_string(index=False))  # Display table without index
+            if "sample" not in df.columns:
+                print(f"WARNING: The mandatory column 'sample' was not found in the file.")
+                unique_samples = "N/A"
+            else:
+                unique_samples = df["sample"].nunique()
+            total_datafiles = len(df)
+            print(f" Running DRAKKAR with {total_datafiles} files belonging to {unique_samples} samples.")
         except Exception as e:
             print(f"Error reading file: {e}")
         return  # Exit after file processing
+    else:
+        if args.file:
+            print(f"No sample info file was provided. Drakkar will guess samples from the provided directory")
+        else:
+            print(f"Please provide either an input directory (-i) or a sample info file (-f)")
+
 
     # Relative paths are turned into absolute paths
     if args.command == "complete":
