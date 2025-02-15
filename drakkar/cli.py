@@ -244,7 +244,7 @@ def main():
     # Processing of sample detail file
     ###
 
-    if args.file && if args.input:
+    if args.file and args.input:
         print(f"Both sample info file and input directory were provided.")
         print(f"DRAKKAR will continue with the information provided in the sample info file.")
         INPUTPATH=Path(args.input).resolve()
