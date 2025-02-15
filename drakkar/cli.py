@@ -261,10 +261,22 @@ def main():
 
                 unique_samples = df["sample"].nunique()
 
-                FILE_TO_SAMPLE1 = dict(zip(df["sample"], df["rawreads1"]))
-                print(FILE_TO_SAMPLE1)
-                FILE_TO_SAMPLE2 = dict(zip(df["sample"], df["rawreads2"]))
-                print(FILE_TO_SAMPLE2)
+                # Initialize dictionaries with lists
+                SAMPLE_TO_READS1 = defaultdict(list)
+                SAMPLE_TO_READS2 = defaultdict(list)
+
+                # Populate the dictionaries
+                for _, row in df.iterrows():
+                    SAMPLE_TO_READS1[row["sample"]].append(row["rawreads1"])
+                    SAMPLE_TO_READS2[row["sample"]].append(row["rawreads2"])
+
+                # Convert defaultdict to standard dict (optional)
+                SAMPLE_TO_READS1 = dict(SAMPLE_TO_READS1)
+                SAMPLE_TO_READS2 = dict(SAMPLE_TO_READS2)
+
+                # Print for verification
+                print("SAMPLE_TO_READS1:", SAMPLE_TO_READS1)
+                print("SAMPLE_TO_READS2:", SAMPLE_TO_READS2)
 
                 total_datafiles = len(df)
                 print(f"")
