@@ -27,6 +27,8 @@ rule individual_assembly:
     resources:
         mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 24) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, attempt: max(10, int(preprocess_mb.get(wildcards.sample, 1) / 1024 * 200) * 2 ** (attempt - 1))
+    onfinish:
+        "snakemake track_progress"
     shell:
         """
         module load {params.megahit_module}
@@ -39,8 +41,7 @@ rule individual_assembly:
             -o {params.outputdir}
         mv {params.outputdir}/final.contigs.fa {output}
         """
-    onfinish:
-        "snakemake track_progress"
+
 
 rule individual_assembly_index:
     input:
@@ -54,14 +55,15 @@ rule individual_assembly_index:
     resources:
         mem_mb=32*1024,
         runtime=60
+    onfinish:
+        "snakemake track_progress"
     shell:
         """
         module load {params.bowtie2_module}
         bowtie2-build {input} {params.basename}
         """
-    onfinish:
-        "snakemake track_progress"
-        
+
+
 rule individual_assembly_map:
     input:
         index=f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}/{{sample}}.rev.2.bt2",
