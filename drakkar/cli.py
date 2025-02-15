@@ -245,7 +245,6 @@ def main():
     else:
         if args.input:
             print(f"No sample info file was provided. Drakkar will guess samples from the provided directory")
-            return  # Exit after file processing
         else:
             print(f"Please provide either an input directory (-i) or a sample info file (-f)")
             return  # Exit after file processing
@@ -253,6 +252,9 @@ def main():
     ###
     # Launch snakemake commands
     ###
+    print(f"")
+    print(f"Starting Snakemake pipeline(s)...")
+    print(f"")
 
     # Relative paths are turned into absolute paths
     if args.command == "complete":
