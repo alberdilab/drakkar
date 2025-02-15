@@ -75,6 +75,21 @@ def check_screen_session():
             else:
                 print("     Invalid input. Please type '1' to continue.")
 
+
+def check_reference_columns(file_path):
+    """Checks if a file contains 'reference_name' and 'reference_path' columns with non-NA values."""
+    # Read the file (assumed to be TSV, change sep="," for CSV)
+    df = pd.read_csv(file_path, sep="\t")
+    # Check if required columns exist
+    required_columns = {"reference_name", "reference_path"}
+    if not required_columns.issubset(df.columns):
+        return False
+    # Check if both columns have at least one non-NA value
+    if df["reference_name"].dropna().empty or df["reference_path"].dropna().empty:
+        return False
+    return True
+
+
 def file_samples_to_json(infofile, output):
     # Load sample info file
     df = pd.read_csv(infofile, sep="\t")
