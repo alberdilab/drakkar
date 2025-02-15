@@ -66,7 +66,7 @@ if USE_REFERENCE:
             index=f"{OUTPUT_DIR}/data/references/{{reference}}.rev.1.bt2"
         params:
             bowtie2_module={BOWTIE2_MODULE},
-            basename=f"{OUTPUT_DIR}/preprocessing/references/{{reference}}"
+            basename=lambda wildcards: f"{OUTPUT_DIR}/data/references/{wildcards.reference}"
         threads: 1
         resources:
             mem_mb=lambda wildcards, attempt: max(1,int(reference_mb * 10 * 2 ** (attempt - 1))),
