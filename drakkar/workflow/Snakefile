@@ -61,15 +61,18 @@ if WORKFLOW == "preprocessing":
     with open(f"{OUTPUT_DIR}/data/sample_to_reads2.json", "r") as f:
         SAMPLE_TO_READS2 = json.load(f)
 
+    with open(f"{OUTPUT_DIR}/data/reference_to_file.json", "r") as f:
+        REFERENCE_TO_FILE = json.load(f)
+
     with open(f"{OUTPUT_DIR}/data/sample_to_reference.json", "r") as f:
         SAMPLE_TO_REFERENCE = json.load(f)
 
     samples = list(SAMPLE_TO_READS1.keys())
-    references = list(set(SAMPLE_TO_REFERENCE.values()))
-    
+    references = list(REFERENCE_TO_FILE.keys())
+
     rule all:
         input:
-            expand(f"{OUTPUT_DIR}/preprocessing/reference/{{reference}}.rev.1.bt2", reference=references),
+            expand(f"{OUTPUT_DIR}/preprocessing/references/{{reference}}.rev.1.bt2", reference=references),
             expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz", sample=samples),
             expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz", sample=samples),
             *([expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam", sample=samples)] if USE_REFERENCE else [])
