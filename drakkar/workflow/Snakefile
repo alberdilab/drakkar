@@ -55,12 +55,12 @@ if WORKFLOW == "preprocessing":
     # Check if reference is provided
     USE_REFERENCE = REFERENCE not in [None, "None"]
 
-    with open("sample_to_reads1.json", "r") as f:
+    with open(f"{OUTPUT_DIR}/data/sample_to_reads1.json", "r") as f:
         SAMPLE_TO_READS1 = json.load(f)
 
-    with open("sample_to_reads2.json", "r") as f:
+    with open(f"{OUTPUT_DIR}/data/sample_to_reads2.json", "r") as f:
         SAMPLE_TO_READS2 = json.load(f)
-        
+
     samples = list(SAMPLE_TO_READS1.keys())
 
     rule all:
