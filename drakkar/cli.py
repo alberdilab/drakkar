@@ -70,7 +70,7 @@ def run_snakemake_cataloging(workflow, input_dir, output_dir, mode):
         f"--configfile {CONFIG_PATH} "
         f"--config workflow={workflow} preprocess_dir={input_dir} output_dir={output_dir} cataloging_mode={mode} "
         f"--quiet rules "
-        f"--log-handler-script {PACKAGE_DIR / 'workflow' / 'scrips' / 'progress_logger.py'}"
+        f"--log-handler-script {PACKAGE_DIR / 'workflow' / 'scripts' / 'progress_logger.py'}"
     ]
 
     subprocess.run(snakemake_command, shell=False, check=True)
