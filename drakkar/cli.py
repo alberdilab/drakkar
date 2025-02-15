@@ -221,6 +221,7 @@ def main():
     elif args.command == "quantification":
         run_snakemake_quantification(args.command, args.assembly, args.output)
     else:
+        display_drakkar()
         parser.print_help()
 
 if __name__ == "__main__":
