@@ -8,7 +8,7 @@ import json
 import pandas as pd
 from pathlib import Path
 from collections import defaultdict
-import utils
+from drakkar import utils
 
 ###
 # Define and read config file
