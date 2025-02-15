@@ -5,14 +5,6 @@
 FASTP_MODULE = config["FASTP_MODULE"]
 
 ####
-# Calculate file sizes
-####
-
-reads_mb = calculate_file_sizes(READS_DIR)
-reads_mb = {key.replace('_1.fq.gz', ''): value for key, value in reads_mb.items()}
-reads_mb_total = sum(reads_mb.values())
-
-####
 # Run preprocessing rules
 ####
 
