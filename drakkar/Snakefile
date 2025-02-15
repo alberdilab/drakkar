@@ -19,19 +19,29 @@ CATALOGING_MODE = config["cataloging_mode"].split(",") if "cataloging_mode" in c
 ####
 # Calculate optimal resources for computing
 ####
-def calculate_file_sizes(folder):
+
+def calculate_file_sizes(file_dict):
+    """Calculates file sizes in megabases (MB) for each sample's read files."""
     file_sizes = {}
-    for file in os.listdir(folder):
-        if file.endswith("1.fq.gz") or file.endswith(".fna"):
-            filepath = os.path.join(folder, file)
-            # Get file size in bytes and convert to megabytes
-            size_mb = os.path.getsize(filepath) / (1024 ** 2)
-            file_sizes[file] = size_mb
+    for sample, files in file_dict.items():
+        total_size_mb = 0  # Size in MB
+
+        for file_path in files:
+            if os.path.exists(file_path):  # Check if file exists
+                file_size = os.path.getsize(file_path) / 1e6  # Convert bytes to MB
+                total_size_mb += file_size
+            else:
+                print(f"⚠️ Warning: File not found - {file_path}")
+
+        file_sizes[sample] = total_size_mb  # Store total size per sample
     return file_sizes
 
-def calculate_file_size(filepath):
-    file_size = os.path.getsize(filepath) / (1024 ** 2)
-    return file_size
+
+reads_mb = calculate_file_sizes(SAMPLE_TO_READS1)
+reads_mb_total = sum(reads_mb.values())
+
+reference_mb = calculate_file_sizes(REFERENCE_TO_FILE)
+reference_mb_total = sum(reference_mb.values())
 
 ####
 # Run pipelines
@@ -81,12 +91,6 @@ if WORKFLOW == "preprocessing":
     include: "rules/preprocessing.smk"
 
 if WORKFLOW == "cataloging":
-
-    samples, = glob_wildcards(f"{PREPROCESS_DIR}/{{sample}}_1.fq.gz")
-
-    preprocess_mb = calculate_file_sizes(PREPROCESS_DIR)
-    preprocess_mb = {key.replace('_1.fq.gz', ''): value for key, value in preprocess_mb.items()}
-    preprocess_mb_total = sum(preprocess_mb.values())
 
     # A single cataloging rule is created, as multiple cataloging modes can be combined
     rule all:

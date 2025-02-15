@@ -75,6 +75,21 @@ def check_screen_session():
             else:
                 print("     Invalid input. Please type '1' to continue.")
 
+def calculate_file_sizes(file_dict):
+    """Calculates file sizes in megabases (MB) for each sample's read files."""
+    file_sizes = {}
+    for sample, files in file_dict.items():
+        total_size_mb = 0  # Size in MB
+
+        for file_path in files:
+            if os.path.exists(file_path):  # Check if file exists
+                file_size = os.path.getsize(file_path) / 1e6  # Convert bytes to MB
+                total_size_mb += file_size
+            else:
+                print(f"⚠️ Warning: File not found - {file_path}")
+
+        file_sizes[sample] = total_size_mb  # Store total size per sample
+    return file_sizes
 
 def check_reference_columns(file_path):
     """Checks if a file contains 'reference_name' and 'reference_path' columns with non-NA values."""
