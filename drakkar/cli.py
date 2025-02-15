@@ -46,7 +46,7 @@ def run_snakemake_complete(workflow, input_dir, output_dir):
 
     subprocess.run(snakemake_command, shell=False, check=True)
 
-def run_snakemake_preprocessing(workflow, output_dir, sample_to_reads1, sample_to_reads2, reference, profile):
+def run_snakemake_preprocessing(workflow, output_dir, reference, profile):
 
     """ Run the preprocessing workflow """
 
@@ -58,7 +58,7 @@ def run_snakemake_preprocessing(workflow, output_dir, sample_to_reads1, sample_t
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config workflow={workflow} output_dir={output_dir} reference={reference} sample_to_reads1={sample_to_reads1}, sample_to_reads2={sample_to_reads2} "
+        f"--config workflow={workflow} output_dir={output_dir} reference={reference} "
         f"--quiet rules"
     ]
 
@@ -286,6 +286,13 @@ def main():
                 print("SAMPLE_TO_READS1:", SAMPLE_TO_READS1)
                 print("SAMPLE_TO_READS2:", SAMPLE_TO_READS2)
 
+                # Save dictionaries to JSON files
+                with open("sample_to_reads1.json", "w") as f:
+                    json.dump(SAMPLE_TO_READS1, f)
+
+                with open("sample_to_reads2.json", "w") as f:
+                    json.dump(SAMPLE_TO_READS2, f)
+
                 total_datafiles = len(df)
                 print(f"")
                 print(f" Running DRAKKAR with {total_datafiles} files belonging to {unique_samples} samples.")
@@ -339,9 +346,11 @@ def main():
             SAMPLE_TO_READS1 = dict(SAMPLE_TO_READS1)
             SAMPLE_TO_READS2 = dict(SAMPLE_TO_READS2)
 
-            # Print for verification
-            print("SAMPLE_TO_READS1:", SAMPLE_TO_READS1)
-            print("SAMPLE_TO_READS2:", SAMPLE_TO_READS2)
+            with open("sample_to_reads1.json", "w") as f:
+                json.dump(SAMPLE_TO_READS1, f)
+
+            with open("sample_to_reads2.json", "w") as f:
+                json.dump(SAMPLE_TO_READS2, f))
 
         else:
             print(f"")
@@ -359,7 +368,7 @@ def main():
     if args.command == "complete":
         run_snakemake_complete(args.command, args.input, args.output, args.reference)
     elif args.command == "preprocessing":
-        run_snakemake_preprocessing(args.command, Path(args.output).resolve(), SAMPLE_TO_READS1, SAMPLE_TO_READS2, Path(args.reference).resolve() if args.reference else None, args.profile if args.profile else "slurm")
+        run_snakemake_preprocessing(args.command, Path(args.output).resolve(), Path(args.reference).resolve() if args.reference else None, args.profile if args.profile else "slurm")
     elif args.command == "cataloging":
         run_snakemake_cataloging(args.command, Path(args.input).resolve(), Path(args.output).resolve(), args.mode if args.mode else ["individual"], args.profile if args.profile else "slurm")
     elif args.command == "annotation":

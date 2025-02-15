@@ -60,6 +60,7 @@ if WORKFLOW == "preprocessing":
 
     with open("sample_to_reads2.json", "r") as f:
         SAMPLE_TO_READS2 = json.load(f)
+        
     samples = list(SAMPLE_TO_READS1.keys())
 
     rule all:
