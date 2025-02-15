@@ -72,12 +72,10 @@ if WORKFLOW == "preprocessing":
     reads_mb_total = sum(reads_mb.values())
 
     reference_mb = calculate_file_sizes(REFERENCE_TO_FILE)
-    reference_mb_total = sum(reference_mb.values())ç
+    reference_mb_total = sum(reference_mb.values())
 
     # The rules reference_index, reference_map, metagenomic_reads and host_reads are only run if
     # the reference genome file is provided. Otherwise, the fastp rule already outputs the final files.
-
-    print(REFERENCE)
 
     if REFERENCE:
 
@@ -91,7 +89,7 @@ if WORKFLOW == "preprocessing":
 
         include: "rules/preprocessing_ref.smk"
 
-    else:
+    if not REFERENCE:
 
         rule all:
             input:
