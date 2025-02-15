@@ -58,7 +58,7 @@ def run_snakemake_preprocessing(workflow, input_dir, output_dir, reference, prof
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config workflow={workflow} reads_dir={input_dir} output_dir={output_dir} reference={reference} "
+        f"--config workflow={workflow} output_dir={output_dir} reference={reference} "
         f"--quiet rules"
     ]
 
@@ -359,7 +359,7 @@ def main():
     if args.command == "complete":
         run_snakemake_complete(args.command, args.input, args.output, args.reference)
     elif args.command == "preprocessing":
-        run_snakemake_preprocessing(args.command, Path(args.input).resolve(), Path(args.output).resolve(), Path(args.reference).resolve() if args.reference else None, args.profile if args.profile else "slurm")
+        run_snakemake_preprocessing(args.command, Path(args.output).resolve(), Path(args.reference).resolve() if args.reference else None, args.profile if args.profile else "slurm")
     elif args.command == "cataloging":
         run_snakemake_cataloging(args.command, Path(args.input).resolve(), Path(args.output).resolve(), args.mode if args.mode else ["individual"], args.profile if args.profile else "slurm")
     elif args.command == "annotation":
