@@ -211,22 +211,25 @@ def main():
         print(f"Both sample info file and reference genome file were provided.")
         print(f"DRAKKAR will continue with the information provided in the sample info file.")
         file_references_to_json(args.file,args.output)
+        REFERENCE = True
 
     elif args.file and not args.reference:
         print(f"")
         print(f"DRAKKAR will extract the reference genome information from the sample info file.")
         file_references_to_json(args.file,args.output)
+        REFERENCE = True
 
     elif args.reference and not args.file:
         print(f"")
         print(f"No sample info file was provided.")
         print(f"DRAKKAR willuse the reference genome file.")
         argument_references_to_json(args.reference,f"{args.output}/data/sample_to_reads1.json",args.output)
+        REFERENCE = True
 
     else:
         print(f"")
-        print(f"Please provide either a reference genome (-r) or a sample info file (-f)")
-        return
+        print(f"Running DRAKKAR without mapping against a reference genome")
+        REFERENCE = False
 
     ###
     # Launch snakemake commands
@@ -239,7 +242,7 @@ def main():
     if args.command == "complete":
         run_snakemake_complete(args.command, args.input, args.output, args.reference)
     elif args.command == "preprocessing":
-        run_snakemake_preprocessing(args.command, Path(args.output).resolve(), Path(args.reference).resolve() if args.reference else None, args.profile if args.profile else "slurm")
+        run_snakemake_preprocessing(args.command, Path(args.output).resolve(), REFERENCE, args.profile if args.profile else "slurm")
     elif args.command == "cataloging":
         run_snakemake_cataloging(args.command, Path(args.input).resolve(), Path(args.output).resolve(), args.mode if args.mode else ["individual"], args.profile if args.profile else "slurm")
     elif args.command == "annotation":

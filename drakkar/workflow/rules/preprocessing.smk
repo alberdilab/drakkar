@@ -21,7 +21,7 @@ reads_mb_total = sum(reads_mb.values())
 # The rules reference_index, reference_map, metagenomic_reads and host_reads are only run if
 # the reference genome file is provided. Otherwise, the fastp rule already outputs the final files.
 
-if USE_REFERENCE:
+if REFERENCE:
 
     reference_mb = calculate_file_size(REFERENCE)
 

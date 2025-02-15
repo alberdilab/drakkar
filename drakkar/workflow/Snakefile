@@ -52,9 +52,6 @@ if WORKFLOW == "complete":
 
 if WORKFLOW == "preprocessing":
 
-    # Check if reference is provided
-    USE_REFERENCE = REFERENCE not in [None, "None"]
-
     with open(f"{OUTPUT_DIR}/data/sample_to_reads1.json", "r") as f:
         SAMPLE_TO_READS1 = json.load(f)
 
@@ -76,7 +73,7 @@ if WORKFLOW == "preprocessing":
             expand(f"{OUTPUT_DIR}/data/references/{{reference}}.rev.1.bt2", reference=references),
             expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz", sample=samples),
             expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz", sample=samples),
-            *([expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam", sample=samples)] if USE_REFERENCE else [])
+            *([expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam", sample=samples)] if REFERENCE else [])
 
     include: "rules/preprocessing.smk"
 
