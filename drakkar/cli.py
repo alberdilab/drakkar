@@ -232,6 +232,7 @@ def main():
             print(f"ERROR: Sample info file '{file_path}' was not found.")
             return
         try:
+            df = pd.read_csv(file_path, sep="\t")
             if "sample" not in df.columns:
                 print(f"WARNING: The mandatory column 'sample' was not found in the file.")
                 unique_samples = "N/A"
