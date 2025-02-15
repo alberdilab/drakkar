@@ -61,9 +61,9 @@ if USE_REFERENCE:
 
     rule reference_index:
         input:
-            f"{REFERENCE}"
+            lambda wildcards: wildcards.reference
         output:
-            index=expand(f"{OUTPUT_DIR}/preprocessing/reference/reference.{{ext}}", ext=["1.bt2", "2.bt2", "3.bt2", "4.bt2", "rev.1.bt2", "rev.2.bt2"]),
+            index=f"{OUTPUT_DIR}/preprocessing/reference/{{reference}}.rev.1.bt2"
         params:
             bowtie2_module={BOWTIE2_MODULE},
             basename=f"{OUTPUT_DIR}/preprocessing/reference/reference"
@@ -78,17 +78,17 @@ if USE_REFERENCE:
             cat {input} > {params.basename}.fna
             """
 
-    rule reference_map:
-        input:
-            index=expand(f"{OUTPUT_DIR}/preprocessing/reference/reference.{{ext}}", ext=["1.bt2", "2.bt2", "3.bt2", "4.bt2", "rev.1.bt2", "rev.2.bt2"]),
-            r1=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}_1.fq.gz",
-            r2=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}_2.fq.gz"
+    rule reference_map::
+        index=lambda wildcards: f"{OUTPUT_DIR}/preprocessing/reference/{SAMPLE_TO_REFERENCE[wildcards.sample]}.rev.2.bt2",
+        r1=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}_1.fq.gz",
+        r2=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}_2.fq.gz"
+
         output:
             f"{OUTPUT_DIR}/preprocessing/bowtie2/{{sample}}.bam"
         params:
             bowtie2_module={BOWTIE2_MODULE},
             samtools_module={SAMTOOLS_MODULE},
-            basename=f"{OUTPUT_DIR}/preprocessing/reference/reference"
+            basename=lambda wildcards: f"{OUTPUT_DIR}/preprocessing/reference/{SAMPLE_TO_REFERENCE[wildcards.sample]}"
         threads: 8
         resources:
             mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * reference_mb / 500) * 2 ** (attempt - 1)),
