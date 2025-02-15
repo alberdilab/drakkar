@@ -206,25 +206,28 @@ def main():
     # Generate reference genome dictionaries
     ###
 
-    if check_reference_columns(args.file) and args.reference:
-        print(f"")
-        print(f"Both sample info file and reference genome file were provided.")
-        print(f"DRAKKAR will continue with the information provided in the sample info file.")
-        file_references_to_json(args.file,args.output)
-        REFERENCE = True
+    if args.file and args.reference:
+        if check_reference_columns(args.file):
+            print(f"")
+            print(f"Both sample info file and reference genome file were provided.")
+            print(f"DRAKKAR will continue with the information provided in the sample info file.")
+            file_references_to_json(args.file,args.output)
+            REFERENCE = True
 
-    elif check_reference_columns(args.file) and not args.reference:
-        print(f"")
-        print(f"DRAKKAR will extract the reference genome information from the sample info file.")
-        file_references_to_json(args.file,args.output)
-        REFERENCE = True
+    elif args.file and not args.reference:
+        if check_reference_columns(args.file):
+            print(f"")
+            print(f"DRAKKAR will extract the reference genome information from the sample info file.")
+            file_references_to_json(args.file,args.output)
+            REFERENCE = True
 
-    elif args.reference and not check_reference_columns(args.file):
-        print(f"")
-        print(f"No sample info file was provided.")
-        print(f"DRAKKAR will use the reference genome file.")
-        argument_references_to_json(args.reference,f"{args.output}/data/sample_to_reads1.json",args.output)
-        REFERENCE = True
+    elif args.reference and not args.file:
+        if check_reference_columns(args.file):
+            print(f"")
+            print(f"No sample info file was provided.")
+            print(f"DRAKKAR will use the reference genome file.")
+            argument_references_to_json(args.reference,f"{args.output}/data/sample_to_reads1.json",args.output)
+            REFERENCE = True
 
     else:
         print(f"")
