@@ -125,15 +125,22 @@ if WORKFLOW == "cataloging":
     preprocessed_mb_total = sum(preprocessed_mb.values())
 
     samples = list(PREPROCESSED_TO_READS1.keys())
+    assemblies = list(ASSEMBLY_TO_SAMPLES.keys())
 
-    # A single cataloging rule is created, as multiple cataloging modes can be combined
     rule all:
         input:
-            *([expand(f"{OUTPUT_DIR}/cataloging/final/{{sample}}.tsv", sample=samples)] if "individual" in CATALOGING_MODE else []),
-            *([f"{OUTPUT_DIR}/cataloging/final/all.tsv"] if "all" in CATALOGING_MODE else [])
+            expand(f"{OUTPUT_DIR}/cataloging/final/{{assembly}}.tsv", assembly=assemblies)
 
-    if "individual" in CATALOGING_MODE:
-        include: "rules/cataloging_ind.smk"
+    include: "rules/cataloging.smk"
 
-    if "all" in CATALOGING_MODE:
-        include: "rules/cataloging_all.smk"
+    # A single cataloging rule is created, as multiple cataloging modes can be combined
+    #rule all:
+#        input:
+    #        *([expand(f"{OUTPUT_DIR}/cataloging/final/{{sample}}.tsv", sample=samples)] if "individual" in CATALOGING_MODE else []),
+#            *([f"{OUTPUT_DIR}/cataloging/final/all.tsv"] if "all" in CATALOGING_MODE else [])
+
+#    if "individual" in CATALOGING_MODE:
+#        include: "rules/cataloging_ind.smk"
+#
+#    if "all" in CATALOGING_MODE:
+#        include: "rules/cataloging_all.smk"
