@@ -25,8 +25,8 @@ rule assembly:
         outputdir=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}"
     threads: 8
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) * 24) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 200) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly])) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 20) * 2 ** (attempt - 1))
     shell:
         """
         module load {params.megahit_module}
