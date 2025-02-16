@@ -13,7 +13,9 @@ drakkar preprocessing -f input_info.tsv -o drakkar_test
 ## Modules
 
 * **Preprocessing**: quality-filters the reads and optionally removes host DNA.
+`drakkar preprocessing`
 * **Cataloging**: assembles and bins the metagenomic reads using multiple strategies.
+`drakkar cataloging`
 * **Dereplicating**: dereplicates bins using multiple criteria.
 * **Annotating**: taxonomicallt and functionally annotates bins using multiple databases.
 
