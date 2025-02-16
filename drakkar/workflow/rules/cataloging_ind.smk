@@ -150,7 +150,7 @@ rule individual_assembly_maxbin:
             with open(output[0], "w") as f:
                 f.write("")
 
-rule individual_binette:
+rule individual_assembly_binette:
     input:
         metabat2=f"{OUTPUT_DIR}/cataloging/metabat2/{{sample}}/{{sample}}.tsv",
         maxbin2=f"{OUTPUT_DIR}/cataloging/maxbin2/{{sample}}/{{sample}}.tsv",
@@ -168,5 +168,24 @@ rule individual_binette:
     shell:
         """
         module load {params.checkm2_module} {params.binette_module}
-        binette --bin_dirs {input.metabat2} {input.maxbin2} --contigs {input.fasta} --outdir {params.outdir}
+        binette --contig2bin_tables {input.maxbin2} {input.metabat2} --contigs {input.assembly} --outdir {params.outdir}
+        """
+
+rule individual_assembly_final:
+    input:
+        f"{OUTPUT_DIR}/cataloging/binette/{{sample}}/final_bins_quality_reports.tsv"
+    output:
+        f"{OUTPUT_DIR}/cataloging/final/{{sample}}.tsv"
+    params:
+        binette=f"{OUTPUT_DIR}/cataloging/binette/{{sample}}",
+        final=f"{OUTPUT_DIR}/cataloging/final/{{sample}}"
+    threads: 1
+    resources:
+        mem_mb=8*1024,
+        runtime=10
+    shell:
+        """
+        mkdir {params.final}
+        mv {params.binette}/final_bins/* {params.final}
+        mv {input} {output}
         """

@@ -23,7 +23,7 @@ rule all_assembly:
     params:
         megahit_module={MEGAHIT_MODULE},
         outputdir=f"{OUTPUT_DIR}/cataloging/megahit/all"
-    threads: 8
+    threads: 24
     resources:
         mem_mb=64*1024,
         runtime=240
@@ -152,3 +152,43 @@ rule all_assembly_maxbin:
         except:
             with open(output[0], "w") as f:
                 f.write("")
+
+rule all_assembly_binette:
+    input:
+        assembly=f"{OUTPUT_DIR}/cataloging/megahit/all/all.fna",
+        maxbin2=f"{OUTPUT_DIR}/cataloging/maxbin2/all/all.tsv",
+        metabat2=f"{OUTPUT_DIR}/cataloging/metabat2/all/all.tsv"
+    output:
+        f"{OUTPUT_DIR}/cataloging/binette/all/final_bins_quality_reports.tsv"
+    params:
+        checkm2_module={CHECKM2_MODULE},
+        binette_module={BINETTE_MODULE},
+        outdir=f"{OUTPUT_DIR}/cataloging/binette/all"
+    threads: 1
+    resources:
+        mem_mb=24*1024,
+        runtime=60
+    shell:
+        """
+        module load {params.checkm2_module} {params.binette_module}
+        binette --contig2bin_tables {input.maxbin2} {input.metabat2} --contigs {input.assembly} --outdir {params.outdir}
+        """
+
+rule all_assembly_final:
+    input:
+        f"{OUTPUT_DIR}/cataloging/binette/all/final_bins_quality_reports.tsv"
+    output:
+        f"{OUTPUT_DIR}/cataloging/final/all.tsv"
+    params:
+        binette=f"{OUTPUT_DIR}/cataloging/binette/all",
+        final=f"{OUTPUT_DIR}/cataloging/final/all"
+    threads: 1
+    resources:
+        mem_mb=24*1024,
+        runtime=10
+    shell:
+        """
+        mkdir {params.final}
+        mv {params.binette}/final_bins/* {params.final}
+        mv {input} {output}
+        """

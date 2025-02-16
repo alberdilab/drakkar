@@ -126,10 +126,8 @@ if WORKFLOW == "cataloging":
     # A single cataloging rule is created, as multiple cataloging modes can be combined
     rule all:
         input:
-            *([expand(f"{OUTPUT_DIR}/cataloging/metabat2/{{sample}}/{{sample}}.tsv", sample=samples)] if "individual" in CATALOGING_MODE else []),
-            *([expand(f"{OUTPUT_DIR}/cataloging/maxbin2/{{sample}}/{{sample}}.tsv", sample=samples)] if "individual" in CATALOGING_MODE else []),
-            *([f"{OUTPUT_DIR}/cataloging/metabat2/all/all.tsv"] if "all" in CATALOGING_MODE else []),
-            *([f"{OUTPUT_DIR}/cataloging/maxbin2/all/all.tsv"] if "all" in CATALOGING_MODE else [])
+            *([expand(f"{OUTPUT_DIR}/cataloging/final/{{sample}}.tsv", sample=samples)] if "individual" in CATALOGING_MODE else []),
+            *([f"{OUTPUT_DIR}/cataloging/final/all.tsv"] if "all" in CATALOGING_MODE else [])
 
     if "individual" in CATALOGING_MODE:
         include: "rules/cataloging_ind.smk"
