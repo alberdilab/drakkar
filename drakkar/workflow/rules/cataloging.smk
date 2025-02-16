@@ -102,7 +102,7 @@ rule assembly_map_depth:
 rule assembly_metabat:
     input:
         assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}.fna",
-        depth=f"{OUTPUT_DIR}/cataloging/bowtie2/{{assembly}}/{{assembly}}.depth"
+        depth=f"{OUTPUT_DIR}/cataloging/metabat2/{{assembly}}/{{assembly}}.depth"
     output:
         f"{OUTPUT_DIR}/cataloging/metabat2/{{assembly}}/{{assembly}}.tsv"
     params:
