@@ -246,41 +246,29 @@ def main():
             print(f"Both sample info file and input directory were provided.")
             print(f"DRAKKAR will continue with the information provided in the input directory.")
             argument_preprocessed_to_json(args.input,args.output)
-
-            with open(f"{args.output}/data/preprocessed_to_reads1.json", "r") as f:
-                PREPROCESSED_TO_READS1 = json.load(f)
-
         elif args.file and not args.input:
             print(f"")
             print(f"DRAKKAR will run with the information provided in the sample info file.")
-            file_samples_to_json(args.file,args.output)
-
-            with open(f"{args.output}/data/sample_to_reads1.json", "r") as f:
-                PREPROCESSED_TO_READS1 = json.load(f)
-
+            file_preprocessed_to_json(args.file,args.output)
         elif args.input and not args.file:
             print(f"")
             print(f"No sample info file was provided.")
             print(f"DRAKKAR will run with the files in the input directory.")
             argument_preprocessed_to_json(args.input,args.output)
-
-            with open(f"{args.output}/data/preprocessed_to_reads1.json", "r") as f:
-                PREPROCESSED_TO_READS1 = json.load(f)
-
         else:
             print(f"")
             print(f"No input information was provided. DRAKKAR will try to guess the location of the preprocessing data")
             if any(os.scandir(f"{args.output}/preprocessed/final")):
                 argument_preprocessed_to_json(f"{args.output}/preprocessed/final",args.output)
-
-                with open(f"{args.output}/data/preprocessed_to_reads1.json", "r") as f:
-                    PREPROCESSED_TO_READS1 = json.load(f)
             else:
                 print(f"ERROR: No preprocessed data was found in the output directory.")
                 print(f"    Please, provide an input directory or sample info file to proceed")
                 return
 
         # Generate the assembly dictionary
+
+        with open(f"{args.output}/data/preprocessed_to_reads1.json", "r") as f:
+            PREPROCESSED_TO_READS1 = json.load(f)
 
         samples = list(PREPROCESSED_TO_READS1.keys())
 

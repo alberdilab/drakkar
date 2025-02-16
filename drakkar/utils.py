@@ -232,8 +232,32 @@ def argument_references_to_json(argument, sample_to_reads, output):
     with open(f"{output}/data/sample_to_reference.json", "w") as f:
         json.dump(SAMPLE_TO_REFERENCE, f, indent=4)
 
+def file_preprocessed_to_json(infofile, output):
+    # Load sample info file
+    df = pd.read_csv(infofile, sep="\t")
+
+    # Initialize dictionaries with lists
+    SAMPLE_TO_READS1 = defaultdict(list)
+    SAMPLE_TO_READS2 = defaultdict(list)
+
+    # Populate the dictionaries
+    for _, row in df.iterrows():
+        SAMPLE_TO_READS1[row["sample"]].append(str(Path(row["rawreads1"]).resolve()))
+        SAMPLE_TO_READS2[row["sample"]].append(str(Path(row["rawreads2"]).resolve()))
+
+    # Convert defaultdict to standard dict (optional)
+    SAMPLE_TO_READS1 = dict(SAMPLE_TO_READS1)
+    SAMPLE_TO_READS2 = dict(SAMPLE_TO_READS2)
+
+    # Save dictionaries to JSON files
+    os.makedirs(f"{output}/data", exist_ok=True)
+    with open(f"{output}/data/preprocessed_to_reads1.json", "w") as f:
+        json.dump(SAMPLE_TO_READS1, f)
+
+    with open(f"{output}/data/preprocessed_to_reads2.json", "w") as f:
+        json.dump(SAMPLE_TO_READS2, f)
+
 def argument_preprocessed_to_json(argument, output):
-    print("It's running")
     # Define the directory containing the raw reads
     PREPROCESSED_DIR = Path(argument).resolve()
 
