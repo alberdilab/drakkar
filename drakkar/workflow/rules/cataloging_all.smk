@@ -16,8 +16,8 @@ BINETTE_MODULE = config["BINETTE_MODULE"]
 
 rule all_assembly:
     input:
-        r1=expand(f"{PREPROCESS_DIR}/{{sample}}_1.fq.gz", sample=samples),
-        r2=expand(f"{PREPROCESS_DIR}/{{sample}}_2.fq.gz", sample=samples)
+        r1=expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz", sample=samples),
+        r2=expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz", sample=samples)
     output:
         f"{OUTPUT_DIR}/cataloging/megahit/all/all.fna"
     params:
@@ -66,8 +66,8 @@ rule all_assembly_index:
 rule all_assembly_map:
     input:
         index=f"{OUTPUT_DIR}/cataloging/megahit/all/all.rev.2.bt2",
-        r1=f"{PREPROCESS_DIR}/{{sample}}_1.fq.gz",
-        r2=f"{PREPROCESS_DIR}/{{sample}}_2.fq.gz"
+        r1=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz",
+        r2=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz"
     output:
         f"{OUTPUT_DIR}/cataloging/bowtie2/all/{{sample}}.bam"
     params:
