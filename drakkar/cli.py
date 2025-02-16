@@ -284,8 +284,9 @@ def main():
             if args.file:
             else:
                 print(f"")
-                print(f"ERROR: No assembly mode (-m) or sample info file (-f) has been provided.")
-                print(f"    Please, provide an assembly mode or sample info file to proceed.")
+                print(f"No assembly mode (-m) or sample info file (-f) has been provided.")
+                print(f"    In consequence, DRAKKAR will run individual assemblies.")
+                INDIVIDUAL_MODE=True
                 return
 
         file_assemblies_to_json(args.file,samples,INDIVIDUAL_MODE,ALL_MODE,args.output)
