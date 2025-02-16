@@ -93,6 +93,18 @@ def check_reference_columns(file_path):
         return False
     return True
 
+def check_assembly_column(file_path):
+    """Checks if a file contains the column 'assembly' with non-NA values."""
+    # Read the file (assumed to be TSV, change sep="," for CSV)
+    df = pd.read_csv(file_path, sep="\t")
+    # Check if required columns exist
+    required_columns = {"assembly"}
+    if not required_columns.issubset(df.columns):
+        return False
+    # Check if both columns have at least one non-NA value
+    if df["assembly"].dropna().empty:
+        return False
+    return True
 
 def file_samples_to_json(infofile, output):
     # Load sample info file
@@ -222,3 +234,27 @@ def argument_preprocessed_to_json(argument, output):
 
     with open(f"{output}/data/preprocessed_to_reads2.json", "w") as f:
         json.dump(PREPROCESSED_TO_READS2, f)
+
+def file_assemblies_to_json(df=None, samples=None, individual=False, all=False, output):
+    assemblies = defaultdict(list)
+
+    if df is not None:
+        for _, row in df.iterrows():
+            sample = row['sample']
+            assembly_list = row['assembly'].split(',')
+
+            for assembly in assembly_list:
+                assemblies[assembly].append(sample)
+
+    if samples:
+        if individual:
+            for sample in samples:
+                assemblies[sample].append(sample)
+
+        if all:
+            assemblies["all"].extend(samples)
+
+    ASSEMBLY_TO_SAMPLE = dict(assemblies)
+    os.makedirs(f"{output}/data", exist_ok=True)
+    with open(f"{output}/data/assembly_to_samples.json", "w") as f:
+        json.dump(ASSEMBLY_TO_SAMPLE, f)

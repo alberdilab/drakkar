@@ -10,6 +10,7 @@ drakkar complete -f input_info.tsv -o drakkar_output
 ```
 
 ## Modules
+**DRAKKAR** is a modular software that allows executing each section of the genome-resolved metagenomic pipeline independently.
 
 * **Preprocessing**: quality-filters the reads and optionally removes host DNA.
 ```

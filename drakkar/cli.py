@@ -30,7 +30,7 @@ config_vars = load_config()
 # Define workflow launching functions
 ###
 
-def run_snakemake_complete(workflow, input_dir, output_dir):
+def run_snakemake_complete(workflow, input_dir, output_dir, reference, mode, profile):
 
     """ Run the complete workflow """
 
@@ -42,8 +42,7 @@ def run_snakemake_complete(workflow, input_dir, output_dir):
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config workflow={workflow} reads_dir={input_dir} output_dir={output_dir} reference={reference} cataloging_mode={mode}"
-        f"--quiet rules"
+        f"--config workflow={workflow} output_dir={output_dir} reference={reference} cataloging_mode={mode} "
     ]
 
     subprocess.run(snakemake_command, shell=False, check=True)
@@ -269,6 +268,25 @@ def main():
                 print(f"    Please, provide an input directory or sample info file to proceed")
                 return
 
+        # Generate the assembly dictionary
+
+        with open(f"{OUTPUT_DIR}/data/preprocessed_to_reads1.json", "r") as f:
+            PREPROCESSED_TO_READS1 = json.load(f)
+
+        samples = list(PREPROCESSED_TO_READS1.keys())
+
+        if args.mode == "individual":
+            INDIVIDUAL_MODE=True
+            ALL_MODE=False
+        elif args.mode == "all":
+            INDIVIDUAL_MODE=False
+            ALL_MODE=True
+        else:
+            INDIVIDUAL_MODE=False
+            ALL_MODE=True
+
+        file_assemblies_to_json(args.input,samples,INDIVIDUAL_MODE,ALL_MODE,args.output)
+
     ###
     # Launch snakemake commands
     ###
@@ -278,7 +296,7 @@ def main():
 
     # Relative paths are turned into absolute paths
     if args.command == "complete":
-        run_snakemake_complete(args.command, args.input, args.output, args.reference)
+        run_snakemake_complete(args.command, args.input, args.output, args.reference, args.mode if args.mode else ["individual", args.profile if args.profile else "slurm")
     elif args.command == "preprocessing":
         run_snakemake_preprocessing(args.command, Path(args.output).resolve(), REFERENCE, args.profile if args.profile else "slurm")
     elif args.command == "cataloging":

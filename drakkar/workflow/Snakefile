@@ -118,6 +118,9 @@ if WORKFLOW == "cataloging":
     with open(f"{OUTPUT_DIR}/data/preprocessed_to_reads2.json", "r") as f:
         PREPROCESSED_TO_READS2 = json.load(f)
 
+    with open(f"{OUTPUT_DIR}/data/assembly_to_samples.json", "r") as f:
+        ASSEMBLY_TO_SAMPLES = json.load(f)
+
     preprocessed_mb = calculate_file_sizes(PREPROCESSED_TO_READS1)
     preprocessed_mb_total = sum(preprocessed_mb.values())
 
