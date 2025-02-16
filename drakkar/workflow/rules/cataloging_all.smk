@@ -25,8 +25,9 @@ rule all_assembly:
         outputdir=f"{OUTPUT_DIR}/cataloging/megahit/all"
     threads: 24
     resources:
-        mem_mb=64*1024,
-        runtime=240
+        mem_mb=lambda wildcards, attempt: max(8 * 24,int(64 * 1024 * 2 ** (attempt - 1))),
+        runtime=lambda wildcards, attempt: max(30,int((preprocessed_mb_total / 4 * 2 ** (attempt - 1))))
+    message: "Generating coassembly with all samples..."
     shell:
         """
         module load {params.megahit_module}
@@ -57,6 +58,7 @@ rule all_assembly_index:
     resources:
         mem_mb=32*1024,
         runtime=60
+    message: "Indexing coassembly of all samples..."
     shell:
         """
         module load {params.bowtie2_module}
@@ -78,6 +80,7 @@ rule all_assembly_map:
     resources:
         mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocessed_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, attempt: max(10, int(preprocessed_mb.get(wildcards.sample, 1) / 1024 * 150) * 2 ** (attempt - 1))
+    message: "Mapping {wildcards.sample} against coassembly of all samples..."
     shell:
         """
         module load {params.bowtie2_module} {params.samtools_module}
@@ -96,6 +99,7 @@ rule all_assembly_map_depth:
     resources:
         mem_mb=16*1024,
         runtime=60
+    message: "Extracting mapping data from the coassembly of all samples..."
     shell:
         """
         module load {params.metabat2_module}
@@ -115,6 +119,7 @@ rule all_assembly_metabat:
     resources:
         mem_mb=24*1024,
         runtime=120
+    message: "Running metabat2 binning from the coassembly of all samples..."
     shell:
         """
         module load {params.metabat2_module}
@@ -134,6 +139,7 @@ rule all_assembly_maxbin:
     resources:
         mem_mb=24*1024,
         runtime=120
+    message: "Running maxbin2 binning from the coassembly of all samples..."
     run: # Rule run using python to ensure the pipeline does not crush if no bins are generated
         import os
         import subprocess
@@ -168,6 +174,7 @@ rule all_assembly_binette:
     resources:
         mem_mb=24*1024,
         runtime=60
+    message: "Running binette binr refinement from the coassembly of all samples..."
     shell:
         """
         module load {params.checkm2_module} {params.binette_module}
@@ -186,6 +193,7 @@ rule all_assembly_final:
     resources:
         mem_mb=24*1024,
         runtime=10
+    message: "Generating final bins from the coassembly of all samples..."
     shell:
         """
         mkdir {params.final}

@@ -5,6 +5,7 @@ rule concatenate_or_link_reads:
     output:
         r1=f"{OUTPUT_DIR}/data/reads/{{sample}}_1.fq.gz",
         r2=f"{OUTPUT_DIR}/data/reads/{{sample}}_2.fq.gz"
+    message: "Preparing input of {wildcards.sample}..."
     shell:
         """
         if [ $(echo {input.r1} | wc -w) -gt 1 ]; then
@@ -25,6 +26,7 @@ rule prepare_reference:
         lambda wildcards: REFERENCE_TO_FILE[wildcards.reference]
     output:
         f"{OUTPUT_DIR}/data/references/{{reference}}.fna"
+    message: "Preparing reference genome of {wildcards.reference}..."
     shell:
         """
         cp {input} {output}
@@ -37,6 +39,7 @@ rule concatenate_or_link_preprocessed:
     output:
         r1=f"{OUTPUT_DIR}/preprocessed/final/{{sample}}_1.fq.gz",
         r2=f"{OUTPUT_DIR}/preprocessed/final/{{sample}}_2.fq.gz"
+    message: "Preparing input of {wildcards.sample}..."
     shell:
         """
         if [ $(echo {input.r1} | wc -w) -gt 1 ]; then
