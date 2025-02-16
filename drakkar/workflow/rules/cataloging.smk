@@ -169,9 +169,9 @@ rule assembly_binette:
     output:
         f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}/final_bins_quality_reports.tsv"
     params:
-        diamond_module={DIAMOND_MODULE},
-        checkm2_module={CHECKM2_MODULE},
-        binette_module={BINETTE_MODULE},
+        diamond_module=DIAMOND_MODULE,
+        checkm2_module=CHECKM2_MODULE,
+        binette_module=BINETTE_MODULE,
         outdir=f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}"
     threads: 1
     resources:
@@ -182,26 +182,32 @@ rule assembly_binette:
         """
         module load {params.diamond_module} {params.checkm2_module} {params.binette_module}
 
+        # Define input files
+        METABAT2="{input.metabat2}"
+        MAXBIN2="{input.maxbin2}"
+
         # Remove empty input files from the list
-        VALID_TSV_FILES=()
-        for TSV in {input.metabat2} {input.maxbin2}; do
-            if [ -s "$TSV" ]; then
-                VALID_TSV_FILES+=("$TSV")
-            fi
-        done
+        VALID_TSV_FILES=""
+        if [ -s "$METABAT2" ]; then
+            VALID_TSV_FILES="$VALID_TSV_FILES $METABAT2"
+        fi
+        if [ -s "$MAXBIN2" ]; then
+            VALID_TSV_FILES="$VALID_TSV_FILES $MAXBIN2"
+        fi
 
         # Ensure at least one valid TSV file exists
-        if [ ${#VALID_TSV_FILES[@]} -eq 0 ]; then
+        if [ -z "$VALID_TSV_FILES" ]; then
             echo "Error: No valid TSV input files for binette." >&2
             exit 1
         fi
 
         # Run binette only with non-empty TSV files
-        binette --contig2bin_tables "${VALID_TSV_FILES[@]}" \
+        binette --contig2bin_tables $VALID_TSV_FILES \
                 --contigs {input.fasta} \
                 --outdir {params.outdir} \
                 --checkm2_db /maps/datasets/globe_databases/checkm2/20250215/CheckM2_database/uniref100.KO.1.dmnd
         """
+
 
 
 rule assembly_final:
