@@ -271,15 +271,12 @@ def main():
             PREPROCESSED_TO_READS1 = json.load(f)
 
         samples = list(PREPROCESSED_TO_READS1.keys())
+        INDIVIDUAL_MODE=False
+        ALL_MODE=False
 
         if "individual" in args.mode:
             INDIVIDUAL_MODE=True
-            ALL_MODE=False
         if "all" in args.mode:
-            INDIVIDUAL_MODE=False
-            ALL_MODE=True
-        else:
-            INDIVIDUAL_MODE=False
             ALL_MODE=True
 
         file_assemblies_to_json(args.file,samples,INDIVIDUAL_MODE,ALL_MODE,args.output)
