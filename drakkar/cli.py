@@ -270,7 +270,7 @@ def main():
 
         # Generate the assembly dictionary
 
-        with open(f"{OUTPUT_DIR}/data/preprocessed_to_reads1.json", "r") as f:
+        with open(f"{args.output}/data/preprocessed_to_reads1.json", "r") as f:
             PREPROCESSED_TO_READS1 = json.load(f)
 
         samples = list(PREPROCESSED_TO_READS1.keys())
