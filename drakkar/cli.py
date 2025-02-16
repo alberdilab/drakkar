@@ -272,10 +272,10 @@ def main():
 
         samples = list(PREPROCESSED_TO_READS1.keys())
 
-        if args.mode == "individual":
+        if "individual" in args.mode:
             INDIVIDUAL_MODE=True
             ALL_MODE=False
-        elif args.mode == "all":
+        if "all" in args.mode:
             INDIVIDUAL_MODE=False
             ALL_MODE=True
         else:
