@@ -295,7 +295,9 @@ def argument_preprocessed_to_json(argument, output):
     with open(f"{output}/data/preprocessed_to_reads2.json", "w") as f:
         json.dump(PREPROCESSED_TO_READS2, f)
 
-def file_assemblies_to_json(df=None, samples=None, individual=False, all=False, output=False):
+def file_assemblies_to_json(file=None, samples=None, individual=False, all=False, output=False):
+
+    df = pd.DataFrame(file)
 
     assemblies = defaultdict(list)
 
