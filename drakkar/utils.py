@@ -270,7 +270,8 @@ def argument_preprocessed_to_json(argument, output):
     with open(f"{output}/data/preprocessed_to_reads2.json", "w") as f:
         json.dump(PREPROCESSED_TO_READS2, f)
 
-def file_assemblies_to_json(df=None, samples=None, individual=False, all=False, output):
+def file_assemblies_to_json(df=None, samples=None, individual=False, all=False, output=False):
+    
     assemblies = defaultdict(list)
 
     if df is not None:
