@@ -52,7 +52,12 @@ def display_drakkar():
     ascii_intro = r"""
 
     By Antton Alberdi [antton.alberdi@sund.ku.dk]
-    DRAKKAR is a snakemake-based genome-resolved metagenomics pipeline optimised for Mjolnir.
+    DRAKKAR is a snakemake-based genome-resolved metagenomics pipeline optimised for Mjolnir. Snakemake
+    works along with Slurm to conduct the long pipeline using the optimal memory and time resources.
+    This means that while running DRAKKAR, many Slurm jobs will be automatically sent to the Mjolnir queue.
+    Depending on how busy the server is, the pipeline will run faster or slower. While running, Snakemake will
+    show the progress on screen. DRAKKAR has multiple usage modes, so make sure you read the documentation
+    properly before using it in https://github.com/alberdilab/drakkar.
     """
 
     print(ascii_ship)
