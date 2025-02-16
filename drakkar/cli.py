@@ -281,14 +281,11 @@ def main():
             if "all" in args.mode:
                 ALL_MODE=True
         else:
-            if args.file:
-                print(f"")
-            else:
+            if not args.file:
                 print(f"")
                 print(f"No assembly mode (-m) or sample info file (-f) has been provided.")
                 print(f"    In consequence, DRAKKAR will run individual assemblies.")
                 INDIVIDUAL_MODE=True
-                return
 
         file_assemblies_to_json(args.file,samples,INDIVIDUAL_MODE,ALL_MODE,args.output)
 
