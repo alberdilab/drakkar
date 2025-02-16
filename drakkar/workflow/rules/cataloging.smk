@@ -27,7 +27,7 @@ rule assembly:
     resources:
         mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly])) * 5 * 2 ** (attempt - 1)),
         runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 50) * 2 ** (attempt - 1))
-    message: f"Assembling {wildcards.assembly}..."
+    message: f"Assembling {{assembly}}..."
     shell:
         """
         module load {params.megahit_module}
@@ -81,7 +81,7 @@ rule assembly_map:
     resources:
         mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 150) * 2 ** (attempt - 1))
-    message: f"Mapping reads to assembly {wildcards.assembly}..."
+    message: f"Mapping reads to assembly {{assembly}}..."
     shell:
         """
         mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
