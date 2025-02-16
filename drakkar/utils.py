@@ -233,6 +233,7 @@ def argument_references_to_json(argument, sample_to_reads, output):
         json.dump(SAMPLE_TO_REFERENCE, f, indent=4)
 
 def argument_preprocessed_to_json(argument, output):
+    print("It's running")
     # Define the directory containing the raw reads
     PREPROCESSED_DIR = Path(argument).resolve()
 
@@ -271,7 +272,7 @@ def argument_preprocessed_to_json(argument, output):
         json.dump(PREPROCESSED_TO_READS2, f)
 
 def file_assemblies_to_json(df=None, samples=None, individual=False, all=False, output=False):
-    
+
     assemblies = defaultdict(list)
 
     if df is not None:
