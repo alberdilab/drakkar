@@ -316,7 +316,8 @@ def file_assemblies_to_json(infofile=None, samples=None, individual=False, all=F
         if all:
             assemblies["all"].extend(samples)
 
-    ASSEMBLY_TO_SAMPLE = dict(assemblies)
+    ASSEMBLY_TO_SAMPLE = {key: list(set(value)) for key, value in assemblies.items()} # remove duplicates
+    
     os.makedirs(f"{output}/data", exist_ok=True)
     with open(f"{output}/data/assembly_to_samples.json", "w") as f:
         json.dump(ASSEMBLY_TO_SAMPLE, f)
