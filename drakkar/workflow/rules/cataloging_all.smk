@@ -25,8 +25,8 @@ rule all_assembly:
         outputdir=f"{OUTPUT_DIR}/cataloging/megahit/all"
     threads: 8
     resources:
-        mem_mb=lambda wildcards, attempt: max(1,int(preprocess_mb_total * 1024 / 40 * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, attempt: max(15,int((preprocess_mb_total / 10 * 2 ** (attempt - 1))))
+        mem_mb=max(8 * 1024,int(preprocessed_mb_total * 1024 / 40 * 2 ** (attempt - 1))),
+        runtime=max(60,int((preprocessed_mb_total / 10 * 2 ** (attempt - 1))))
     shell:
         """
         module load {params.megahit_module}
@@ -76,8 +76,8 @@ rule all_assembly_map:
         basename=f"{OUTPUT_DIR}/cataloging/megahit/all/all"
     threads: 8
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(preprocess_mb.get(wildcards.sample, 1) / 1024 * 150) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocessed_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, attempt: max(10, int(preprocessed_mb.get(wildcards.sample, 1) / 1024 * 150) * 2 ** (attempt - 1))
     shell:
         """
         module load {params.bowtie2_module} {params.samtools_module}

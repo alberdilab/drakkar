@@ -25,8 +25,8 @@ rule individual_assembly:
         outputdir=f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}"
     threads: 8
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 24) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(preprocess_mb.get(wildcards.sample, 1) / 1024 * 200) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocessed_mb.get(wildcards.sample, 1) * 24) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, attempt: max(10, int(preprocessed_mb.get(wildcards.sample, 1) / 1024 * 200) * 2 ** (attempt - 1))
     shell:
         """
         module load {params.megahit_module}
@@ -73,8 +73,8 @@ rule individual_assembly_map:
         basename=f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}/{{sample}}"
     threads: 8
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(preprocess_mb.get(wildcards.sample, 1) / 1024 * 150) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocessed_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, attempt: max(10, int(preprocessed_mb.get(wildcards.sample, 1) / 1024 * 150) * 2 ** (attempt - 1))
     shell:
         """
         module load {params.bowtie2_module} {params.samtools_module}
@@ -91,8 +91,8 @@ rule individual_assembly_map_depth:
         metabat2_module={METABAT2_MODULE}
     threads: 1
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(preprocess_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocessed_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, attempt: max(10, int(preprocessed_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
     shell:
         """
         module load {params.metabat2_module}
@@ -110,8 +110,8 @@ rule individual_assembly_metabat:
         metabat2_module={METABAT2_MODULE}
     threads: 1
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(preprocess_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocessed_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, attempt: max(10, int(preprocessed_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
     shell:
         """
         module load {params.metabat2_module}
@@ -129,8 +129,8 @@ rule individual_assembly_maxbin:
         basename=f"{OUTPUT_DIR}/cataloging/maxbin2/{{sample}}/{{sample}}"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(preprocess_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocessed_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, attempt: max(10, int(preprocessed_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
     run: # Rule run using python to ensure the pipeline does not crush if no bins are generated
         import os
         import subprocess
@@ -163,8 +163,8 @@ rule individual_binette:
         outdir=f"{OUTPUT_DIR}/cataloging/binette/{{sample}}"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocess_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(preprocess_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, attempt: max(8*1024, int(preprocessed_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, attempt: max(10, int(preprocessed_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
     shell:
         """
         module load {params.checkm2_module} {params.binette_module}
