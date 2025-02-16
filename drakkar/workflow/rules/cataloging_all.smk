@@ -25,8 +25,8 @@ rule all_assembly:
         outputdir=f"{OUTPUT_DIR}/cataloging/megahit/all"
     threads: 8
     resources:
-        mem_mb=lambda, attempt: max(8 * 1024,int(preprocessed_mb_total * 1024 / 40 * 2 ** (attempt - 1))),
-        runtime=lambda, attempt: max(60,int((preprocessed_mb_total / 10 * 2 ** (attempt - 1))))
+        mem_mb=64*1024,
+        runtime=240
     shell:
         """
         module load {params.megahit_module}
