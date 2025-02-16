@@ -77,7 +77,6 @@ def run_snakemake_cataloging(workflow, output_dir, mode, profile):
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
         f"--config workflow={workflow} output_dir={output_dir} cataloging_mode={mode} "
-        f"--quiet rules"
     ]
 
     subprocess.run(snakemake_command, shell=False, check=True)
