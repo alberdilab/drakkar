@@ -6,19 +6,33 @@
 
 ```
 module load drakkar/1.0.0
-drakkar preprocessing -i spider_data -o drakkar_test -r spider_data/GCA_044660205.1_ASM4466020v1_genomic.fna
-drakkar preprocessing -f input_info.tsv -o drakkar_test
+drakkar complete -f input_info.tsv -o drakkar_output
 ```
 
 ## Modules
 
 * **Preprocessing**: quality-filters the reads and optionally removes host DNA.
 ```
-drakkar preprocessing
+drakkar preprocessing {arguments}
 ```
 * **Cataloging**: assembles and bins the metagenomic reads using multiple strategies.
+```
+drakkar cataloging {arguments}
+```
 * **Dereplicating**: dereplicates bins using multiple criteria.
+```
+drakkar dereplicating {arguments}
+```
 * **Annotating**: taxonomicallt and functionally annotates bins using multiple databases.
+```
+drakkar annotating {arguments}
+```
+
+## Complete mode
+All the modules of **DRAKKAR** can be run together by using the ***complete*** mode.
+```
+drakkar complete {arguments}
+```
 
 ## Preprocessing module
 
