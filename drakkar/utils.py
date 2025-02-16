@@ -64,6 +64,41 @@ def display_drakkar():
     print(ascii_text)
     print(ascii_intro)
 
+def display_end():
+    ascii_dragon = r"""
+
+                                         =
+                                       .=*.-+
+                                  .:----+**+==-.
+                         :-: .:-===++====*#*==+*+:
+                         :*#*****=+++++*=+++=+++++
+                             .=***+++=----=+**#*=--=.
+                              -+++=--=+**++=++=++===+=+++-
+                             -+++=-=****+***=+*++=#**++**+
+                            .=++=:+##*+*+=+++*#%#-=++***-
+                            :=+-:=####*+===+*##+++   +#.
+                           .+#+--+#####+-==++## :+.   .
+                           :-=+*-+####     =+**:   -
+                           :=++++=+**-      :+**+:
+                           -+***+=+**+.       -:
+                           =++**+****+
+                           =+++***##=
+                           =*++***##=             CONGRATULATIONS!
+                           =*+*+*###+             DRAKKAR finished successfully.
+                           =*++***##+             Check the output directory to
+                           =*+****#**             find your results.
+                           -++*****#*
+                           -+=**+###*.            If you don't find what you need
+                           :++++***##:            read the documentation in
+                           .+++******+            https://github.com/alberdilab/drakkar
+                            =+*******+.
+                            -*+******+-
+                            :+*+****+++.
+                             =+++*++=++=
+
+    """
+    print(ascii_dragon)
+
 def check_screen_session():
     """Checks if the script is running inside a 'screen' session. If not, warns the user and asks for confirmation."""
     if "STY" not in os.environ:

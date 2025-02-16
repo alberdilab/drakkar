@@ -299,6 +299,7 @@ def main():
         run_snakemake_complete(args.command, args.input, args.output, args.reference, args.mode if args.mode else ["individual", args.profile if args.profile else "slurm")
     elif args.command == "preprocessing":
         run_snakemake_preprocessing(args.command, Path(args.output).resolve(), REFERENCE, args.profile if args.profile else "slurm")
+        display_end()
     elif args.command == "cataloging":
         run_snakemake_cataloging(args.command, Path(args.output).resolve(), args.mode if args.mode else ["individual"], args.profile if args.profile else "slurm")
     elif args.command == "annotation":
