@@ -282,7 +282,7 @@ def main():
             INDIVIDUAL_MODE=False
             ALL_MODE=True
 
-        file_assemblies_to_json(args.input,samples,INDIVIDUAL_MODE,ALL_MODE,args.output)
+        file_assemblies_to_json(args.file,samples,INDIVIDUAL_MODE,ALL_MODE,args.output)
 
     ###
     # Launch snakemake commands
