@@ -275,10 +275,11 @@ def main():
         INDIVIDUAL_MODE=False
         ALL_MODE=False
 
-        if "individual" in args.mode:
-            INDIVIDUAL_MODE=True
-        elif "all" in args.mode:
-            ALL_MODE=True
+        if args.mode:
+            if "individual" in args.mode:
+                INDIVIDUAL_MODE=True
+            if "all" in args.mode:
+                ALL_MODE=True
         else:
             if args.file:
             else:
