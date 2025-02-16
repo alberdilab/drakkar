@@ -295,13 +295,12 @@ def argument_preprocessed_to_json(argument, output):
     with open(f"{output}/data/preprocessed_to_reads2.json", "w") as f:
         json.dump(PREPROCESSED_TO_READS2, f)
 
-def file_assemblies_to_json(file=None, samples=None, individual=False, all=False, output=False):
-
-    df = pd.DataFrame(file)
+def file_assemblies_to_json(infofile=None, samples=None, individual=False, all=False, output=False):
 
     assemblies = defaultdict(list)
 
-    if df is not None:
+    if infofile is not None:
+        df = pd.read_csv(infofile, sep="\t")
         for _, row in df.iterrows():
             sample = row['sample']
             assembly_list = row['assembly'].split(',')
