@@ -35,7 +35,7 @@ rule prepare_reference:
 rule concatenate_or_link_preprocessed:
     input:
         r1=lambda wildcards: PREPROCESSED_TO_READS1[wildcards.sample],
-        r2=lambda wildcards: PREPROCESSED_TO_READS1[wildcards.sample]
+        r2=lambda wildcards: PREPROCESSED_TO_READS2[wildcards.sample]
     output:
         r1=f"{OUTPUT_DIR}/preprocessed/final/{{sample}}_1.fq.gz",
         r2=f"{OUTPUT_DIR}/preprocessed/final/{{sample}}_2.fq.gz"
