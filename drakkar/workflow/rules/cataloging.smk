@@ -26,7 +26,7 @@ rule assembly:
     threads: 8
     resources:
         mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly])) * 5 * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 50) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 100) * 2 ** (attempt - 1))
     message: "Assembling {wildcards.assembly}..."
     shell:
         """
@@ -84,8 +84,8 @@ rule assembly_map:
     message: "Mapping reads to assembly {wildcards.assembly}..."
     shell:
         """
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 150) * 2 ** (attempt - 1))
+        module load {params.bowtie2_module} {params.samtools_module}
+        bowtie2 -x {params.basename} -1 {input.r1} -2 {input.r2} | samtools view -bS - | samtools sort -o {output}
         """
 
 rule assembly_map_depth:
