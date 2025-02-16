@@ -179,7 +179,7 @@ rule assembly_binette:
     shell:
         """
         module load {params.checkm2_module} {params.binette_module}
-        binette --contig2bin_tables {input.maxbin2} {input.metabat2} --contigs {input.assembly} --outdir {params.outdir}
+        binette --contig2bin_tables {input.maxbin2} {input.metabat2} --contigs {input.fasta} --outdir {params.outdir}
         """
 
 rule assembly_final:
