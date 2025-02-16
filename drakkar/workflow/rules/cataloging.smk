@@ -181,8 +181,28 @@ rule assembly_binette:
     shell:
         """
         module load {params.diamond_module} {params.checkm2_module} {params.binette_module}
-        binette --contig2bin_tables {input.maxbin2} {input.metabat2} --contigs {input.fasta} --outdir {params.outdir} --checkm2_db /maps/datasets/globe_databases/checkm2/20250215/CheckM2_database/uniref100.KO.1.dmnd
+
+        # Remove empty input files from the list
+        VALID_TSV_FILES=()
+        for TSV in {input.metabat2} {input.maxbin2}; do
+            if [ -s "$TSV" ]; then
+                VALID_TSV_FILES+=("$TSV")
+            fi
+        done
+
+        # Ensure at least one valid TSV file exists
+        if [ ${#VALID_TSV_FILES[@]} -eq 0 ]; then
+            echo "Error: No valid TSV input files for binette." >&2
+            exit 1
+        fi
+
+        # Run binette only with non-empty TSV files
+        binette --contig2bin_tables "${VALID_TSV_FILES[@]}" \
+                --contigs {input.fasta} \
+                --outdir {params.outdir} \
+                --checkm2_db /maps/datasets/globe_databases/checkm2/20250215/CheckM2_database/uniref100.KO.1.dmnd
         """
+
 
 rule assembly_final:
     input:
