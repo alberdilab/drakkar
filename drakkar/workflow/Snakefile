@@ -112,11 +112,16 @@ if WORKFLOW == "preprocessing":
 
 if WORKFLOW == "cataloging":
 
-    samples, = glob_wildcards(f"{PREPROCESS_DIR}/{{sample}}_1.fq.gz")
+    with open(f"{OUTPUT_DIR}/data/preprocessed_to_reads1.json", "r") as f:
+        PREPROCESSED_TO_READS1 = json.load(f)
 
-    preprocess_mb = calculate_file_sizes(PREPROCESS_DIR)
-    preprocess_mb = {key.replace('_1.fq.gz', ''): value for key, value in preprocess_mb.items()}
-    preprocess_mb_total = sum(preprocess_mb.values())
+    with open(f"{OUTPUT_DIR}/data/preprocessed_to_reads2.json", "r") as f:
+        PREPROCESSED_TO_READS2 = json.load(f)
+
+    preprocessed_mb = calculate_file_sizes(PREPROCESSED_TO_READS1)
+    preprocessed_mb_total = sum(preprocessed_mb.values())
+
+    samples = list(PREPROCESSED_TO_READS1.keys())
 
     # A single cataloging rule is created, as multiple cataloging modes can be combined
     rule all:

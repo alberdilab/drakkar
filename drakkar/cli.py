@@ -246,8 +246,8 @@ def main():
         if args.file and args.input:
             print(f"")
             print(f"Both sample info file and input directory were provided.")
-            print(f"DRAKKAR will continue with the information provided in the sample info file.")
-            file_samples_to_json(args.file,args.output)
+            print(f"DRAKKAR will continue with the information provided in the input directory.")
+            argument_preprocessed_to_json(args.input,args.output)
 
         elif args.file and not args.input:
             print(f"")
