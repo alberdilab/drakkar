@@ -61,7 +61,6 @@ def run_snakemake_preprocessing(workflow, output_dir, reference, profile):
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
         f"--config workflow={workflow} output_dir={output_dir} reference={reference} "
-        f"--quiet rules"
     ]
 
     subprocess.run(snakemake_command, shell=False, check=True)
