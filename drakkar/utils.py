@@ -180,4 +180,40 @@ def argument_references_to_json(argument, sample_to_reads, output):
     with open(f"{output}/data/sample_to_reference.json", "w") as f:
         json.dump(SAMPLE_TO_REFERENCE, f, indent=4)
 
-#def argument_assemblies_to_json(argument):
+def argument_preprocessed_to_json(argument, output):
+    # Define the directory containing the raw reads
+    PREPROCESSED_DIR = Path(argument).resolve()
+
+    # Initialize dictionaries
+    PREPROCESSED_TO_READS1 = defaultdict(list)
+    PREPROCESSED_TO_READS2 = defaultdict(list)
+
+    # Regular expression to capture sample names
+    pattern = re.compile(r"^(.*)_\d\.fq\.gz$")  # Captures everything before "_1.fq.gz" or "_2.fq.gz"
+
+    # Scan the directory
+    for filename in os.listdir(PREPROCESSED_DIR):
+        if filename.endswith(".fq.gz"):
+            full_path = os.path.join(PREPROCESSED_DIR, filename)
+
+            # Extract sample name using regex
+            match = pattern.match(filename)
+            if match:
+                sample_name = match.group(1)  # Everything before _1.fq.gz or _2.fq.gz
+
+                # Sort into forward and reverse reads
+                if "_1.fq.gz" in filename:
+                    PREPROCESSED_TO_READS1[sample_name].append(full_path)
+                elif "_2.fq.gz" in filename:
+                    PREPROCESSED_TO_READS2[sample_name].append(full_path)
+
+    # Convert defaultdict to standard dict (optional)
+    PREPROCESSED_TO_READS1 = dict(PREPROCESSED_TO_READS1)
+    PREPROCESSED_TO_READS2 = dict(PREPROCESSED_TO_READS2)
+
+    os.makedirs(f"{output}/data", exist_ok=True)
+    with open(f"{output}/data/preprocessed_to_reads1.json", "w") as f:
+        json.dump(PREPROCESSED_TO_READS1, f)
+
+    with open(f"{output}/data/preprocessed_to_reads2.json", "w") as f:
+        json.dump(PREPROCESSED_TO_READS2, f)

@@ -16,8 +16,8 @@ BINETTE_MODULE = config["BINETTE_MODULE"]
 
 rule individual_assembly:
     input:
-        r1=f"{PREPROCESS_DIR}/{{sample}}_1.fq.gz",
-        r2=f"{PREPROCESS_DIR}/{{sample}}_2.fq.gz"
+        r1=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz",
+        r2=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz"
     output:
         f"{OUTPUT_DIR}/cataloging/megahit/{{sample}}/{{sample}}.fna"
     params:

@@ -29,3 +29,25 @@ rule prepare_reference:
         """
         cp {input} {output}
         """
+
+rule concatenate_or_link_preprocessed:
+    input:
+        r1=lambda wildcards: PREPROCESSED_TO_READS1[wildcards.sample],
+        r2=lambda wildcards: PREPROCESSED_TO_READS1[wildcards.sample]
+    output:
+        r1=f"{OUTPUT_DIR}/preprocessed/final/{{sample}}_1.fq.gz",
+        r2=f"{OUTPUT_DIR}/preprocessed/final/{{sample}}_2.fq.gz"
+    shell:
+        """
+        if [ $(echo {input.r1} | wc -w) -gt 1 ]; then
+            cat {input.r1} > {output.r1};
+        else
+            ln -s $(realpath {input.r1}) {output.r1};
+        fi
+
+        if [ $(echo {input.r2} | wc -w) -gt 1 ]; then
+            cat {input.r2} > {output.r2};
+        else
+            ln -s $(realpath {input.r2}) {output.r2};
+        fi
+        """

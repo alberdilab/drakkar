@@ -66,7 +66,7 @@ def run_snakemake_preprocessing(workflow, output_dir, reference, profile):
 
     subprocess.run(snakemake_command, shell=False, check=True)
 
-def run_snakemake_cataloging(workflow, input_dir, output_dir, mode, profile):
+def run_snakemake_cataloging(workflow, output_dir, mode, profile):
 
     """ Run the cataloging workflow """
 
@@ -78,7 +78,7 @@ def run_snakemake_cataloging(workflow, input_dir, output_dir, mode, profile):
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config workflow={workflow} preprocess_dir={input_dir} output_dir={output_dir} cataloging_mode={mode} "
+        f"--config workflow={workflow} output_dir={output_dir} cataloging_mode={mode} "
         f"--quiet rules"
     ]
 
@@ -176,63 +176,99 @@ def main():
     check_screen_session()
 
     ###
-    # Generate raw data dictionaries
+    # Preprocessing
     ###
 
-    if args.file and args.input:
-        print(f"")
-        print(f"Both sample info file and input directory were provided.")
-        print(f"DRAKKAR will continue with the information provided in the sample info file.")
-        file_samples_to_json(args.file,args.output)
+    args.command == "preprocessing":
 
-    elif args.file and not args.input:
-        print(f"")
-        print(f"DRAKKAR will run with the information provided in the sample info file.")
-        file_samples_to_json(args.file,args.output)
+        # Generate raw data dictionaries
 
-    elif args.input and not args.file:
-        print(f"")
-        print(f"No sample info file was provided.")
-        print(f"DRAKKAR will run with the files in the input directory.")
-        argument_samples_to_json(args.input,args.output)
-
-    else:
-        print(f"")
-        print(f"Please provide either an input directory (-i) or a sample info file (-f)")
-        return
-
-
-    ###
-    # Generate reference genome dictionaries
-    ###
-
-    if args.file and args.reference:
-        if check_reference_columns(args.file):
+        if args.file and args.input:
             print(f"")
-            print(f"Both sample info file and reference genome file were provided.")
+            print(f"Both sample info file and input directory were provided.")
             print(f"DRAKKAR will continue with the information provided in the sample info file.")
-            file_references_to_json(args.file,args.output)
-            REFERENCE = True
+            file_samples_to_json(args.file,args.output)
 
-    elif args.file and not args.reference:
-        if check_reference_columns(args.file):
+        elif args.file and not args.input:
             print(f"")
-            print(f"DRAKKAR will extract the reference genome information from the sample info file.")
-            file_references_to_json(args.file,args.output)
-            REFERENCE = True
+            print(f"DRAKKAR will run with the information provided in the sample info file.")
+            file_samples_to_json(args.file,args.output)
 
-    elif args.reference and not args.file:
-        if check_reference_columns(args.file):
+        elif args.input and not args.file:
             print(f"")
             print(f"No sample info file was provided.")
-            print(f"DRAKKAR will use the reference genome file.")
-            argument_references_to_json(args.reference,f"{args.output}/data/sample_to_reads1.json",args.output)
-            REFERENCE = True
+            print(f"DRAKKAR will run with the files in the input directory.")
+            argument_samples_to_json(args.input,args.output)
 
-    else:
-        print(f"")
-        print(f"Running DRAKKAR without mapping against a reference genome")
-        REFERENCE = False
+        else:
+            print(f"")
+            print(f"Please provide either an input directory (-i) or a sample info file (-f)")
+            return
+
+        # Generate reference genome dictionaries
+
+        if args.file and args.reference:
+            if check_reference_columns(args.file):
+                print(f"")
+                print(f"Both sample info file and reference genome file were provided.")
+                print(f"DRAKKAR will continue with the information provided in the sample info file.")
+                file_references_to_json(args.file,args.output)
+                REFERENCE = True
+
+        elif args.file and not args.reference:
+            if check_reference_columns(args.file):
+                print(f"")
+                print(f"DRAKKAR will extract the reference genome information from the sample info file.")
+                file_references_to_json(args.file,args.output)
+                REFERENCE = True
+
+        elif args.reference and not args.file:
+            if check_reference_columns(args.file):
+                print(f"")
+                print(f"No sample info file was provided.")
+                print(f"DRAKKAR will use the reference genome file.")
+                argument_references_to_json(args.reference,f"{args.output}/data/sample_to_reads1.json",args.output)
+                REFERENCE = True
+
+        else:
+            print(f"")
+            print(f"Running DRAKKAR without mapping against a reference genome")
+            REFERENCE = False
+
+    ###
+    # Cataloging
+    ###
+
+    args.command == "cataloging":
+
+        # Generate preprocessing data dictionaries
+
+        if args.file and args.input:
+            print(f"")
+            print(f"Both sample info file and input directory were provided.")
+            print(f"DRAKKAR will continue with the information provided in the sample info file.")
+            file_samples_to_json(args.file,args.output)
+
+        elif args.file and not args.input:
+            print(f"")
+            print(f"DRAKKAR will run with the information provided in the sample info file.")
+            file_samples_to_json(args.file,args.output)
+
+        elif args.input and not args.file:
+            print(f"")
+            print(f"No sample info file was provided.")
+            print(f"DRAKKAR will run with the files in the input directory.")
+            argument_preprocessed_to_json(args.input,args.output)
+
+        else:
+            print(f"")
+            print(f"No input information was provided. DRAKKAR will try to guess the location of the preprocessing data")
+            if any(os.scandir(f"{args.output}/preprocessed/final")):
+                argument_preprocessed_to_json(f"{args.output}/preprocessed/final",args.output)
+            else:
+                print(f"ERROR: No preprocessed data was found in the output directory.")
+                print(f"    Please, provide an input directory or sample info file to proceed")
+                return
 
     ###
     # Launch snakemake commands
@@ -247,7 +283,7 @@ def main():
     elif args.command == "preprocessing":
         run_snakemake_preprocessing(args.command, Path(args.output).resolve(), REFERENCE, args.profile if args.profile else "slurm")
     elif args.command == "cataloging":
-        run_snakemake_cataloging(args.command, Path(args.input).resolve(), Path(args.output).resolve(), args.mode if args.mode else ["individual"], args.profile if args.profile else "slurm")
+        run_snakemake_cataloging(args.command, Path(args.output).resolve(), args.mode if args.mode else ["individual"], args.profile if args.profile else "slurm")
     elif args.command == "annotation":
         run_snakemake_annotation(args.command, args.assembly, args.output)
     elif args.command == "quantification":
