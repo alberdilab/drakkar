@@ -282,7 +282,7 @@ def main():
                 ALL_MODE=True
         else:
             if args.file:
-                
+                print(f"")
             else:
                 print(f"")
                 print(f"No assembly mode (-m) or sample info file (-f) has been provided.")
