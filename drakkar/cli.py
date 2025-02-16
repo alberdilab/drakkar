@@ -179,7 +179,7 @@ def main():
     # Preprocessing
     ###
 
-    args.command == "preprocessing":
+    if args.command == "preprocessing":
 
         # Generate raw data dictionaries
 
@@ -239,7 +239,7 @@ def main():
     # Cataloging
     ###
 
-    args.command == "cataloging":
+    if args.command == "cataloging":
 
         # Generate preprocessing data dictionaries
 
