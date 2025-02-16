@@ -25,8 +25,8 @@ rule assembly:
         outputdir=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}"
     threads: 8
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in assembly_dict_1[wildcards.assembly]) * 24) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in assembly_dict_1[wildcards.assembly]) / 1024 * 200) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) * 24) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 200) * 2 ** (attempt - 1))
     shell:
         """
         module load {params.megahit_module}
@@ -72,12 +72,12 @@ rule assembly_map:
         basename=lambda wildcards: f"{OUTPUT_DIR}/cataloging/megahit/{wildcards.assembly}/{wildcards.assembly}"
     threads: 8
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in assembly_dict_1[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in assembly_dict_1[wildcards.assembly]) / 1024 * 150) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 150) * 2 ** (attempt - 1))
     shell:
         """
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in assembly_dict_1[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in assembly_dict_1[wildcards.assembly]) / 1024 * 150) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 150) * 2 ** (attempt - 1))
         """
 
 rule assembly_map_depth:
@@ -90,8 +90,8 @@ rule assembly_map_depth:
         metabat2_module={METABAT2_MODULE}
     threads: 1
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in assembly_dict_1[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in assembly_dict_1[wildcards.assembly]) / 1024 * 150) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 150) * 2 ** (attempt - 1))
     shell:
         """
         module load {params.metabat2_module}
@@ -109,8 +109,8 @@ rule assembly_metabat:
         metabat2_module={METABAT2_MODULE}
     threads: 1
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in assembly_dict_1[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in assembly_dict_1[wildcards.assembly]) / 1024 * 150) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 150) * 2 ** (attempt - 1))
     shell:
         """
         module load {params.metabat2_module}
@@ -128,8 +128,8 @@ rule assembly_maxbin:
         basename=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in assembly_dict_1[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in assembly_dict_1[wildcards.assembly]) / 1024 * 150) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 150) * 2 ** (attempt - 1))
     run: # Rule run using python to ensure the pipeline does not crush if no bins are generated
         import os
         import subprocess
@@ -162,8 +162,8 @@ rule assembly_binette:
         outdir=f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in assembly_dict_1[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in assembly_dict_1[wildcards.assembly]) / 1024 * 150) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 150) * 2 ** (attempt - 1))
     shell:
         """
         module load {params.checkm2_module} {params.binette_module}
