@@ -31,11 +31,16 @@ rule assembly:
         """
         module load {params.megahit_module}
         rm -rf {params.outputdir}
+
+        # Convert input list to a comma-separated string
+        R1_FILES=$(echo {input.r1} | tr ' ' ',')
+        R2_FILES=$(echo {input.r2} | tr ' ' ',')
+
         megahit \
             -t {threads} \
             --verbose \
             --min-contig-len 1500 \
-            -1 {input.r1} -2 {input.r2} \
+            -1 $R1_FILES -2 $R2_FILES \
             -o {params.outputdir}
         mv {params.outputdir}/final.contigs.fa {output}
         """
