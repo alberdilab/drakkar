@@ -81,7 +81,7 @@ rule assembly_map:
     resources:
         mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 150) * 2 ** (attempt - 1))
-    message: lambda wildcards: f"Mapping to assembly {wildcards.assembly} the following samples: {', '.join(ASSEMBLY_TO_SAMPLES[wildcards.assembly])}"
+#    message: lambda wildcards: f"Mapping to assembly {wildcards.assembly} the following samples: {', '.join(ASSEMBLY_TO_SAMPLES[wildcards.assembly])}"
     shell:
         """
         mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
