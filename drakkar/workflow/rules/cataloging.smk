@@ -7,6 +7,7 @@ BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 METABAT2_MODULE = config["METABAT2_MODULE"]
 MAXBIN2_MODULE = config["MAXBIN2_MODULE"]
+DIAMOND_MODULE = config["DIAMOND_MODULE"]
 CHECKM2_MODULE = config["CHECKM2_MODULE"]
 BINETTE_MODULE = config["BINETTE_MODULE"]
 
@@ -168,6 +169,7 @@ rule assembly_binette:
     output:
         f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}/final_bins_quality_reports.tsv"
     params:
+        diamond_module={DIAMOND_MODULE},
         checkm2_module={CHECKM2_MODULE},
         binette_module={BINETTE_MODULE},
         outdir=f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}"
@@ -178,8 +180,8 @@ rule assembly_binette:
     message: "Refining bins from assembly {wildcards.assembly} using binette..."
     shell:
         """
-        module load {params.checkm2_module} {params.binette_module}
-        binette --contig2bin_tables {input.maxbin2} {input.metabat2} --contigs {input.fasta} --outdir {params.outdir}
+        module load {params.diamond_module} {params.checkm2_module} {params.binette_module}
+        binette --contig2bin_tables {input.maxbin2} {input.metabat2} --contigs {input.fasta} --outdir {params.outdir} --checkm2_db /maps/datasets/globe_databases/checkm2/20250215/CheckM2_database/uniref100.KO.1.dmnd
         """
 
 rule assembly_final:
