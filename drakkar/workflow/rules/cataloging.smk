@@ -27,6 +27,7 @@ rule assembly:
     resources:
         mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly])) * 5 * 2 ** (attempt - 1)),
         runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 20) * 2 ** (attempt - 1))
+    message: lambda wildcards: f"Assembling {wildcards.assembly} with samples: {', '.join(ASSEMBLY_TO_SAMPLES[wildcards.assembly])}"
     shell:
         """
         module load {params.megahit_module}
@@ -57,6 +58,7 @@ rule assembly_index:
     resources:
         mem_mb=32*1024,
         runtime=60
+    message: "Indexing assembly {wildcards.assembly}..."
     shell:
         """
         module load {params.bowtie2_module}
@@ -79,6 +81,7 @@ rule assembly_map:
     resources:
         mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 150) * 2 ** (attempt - 1))
+    message: lambda wildcards: f"Mapping to assembly {wildcards.assembly} the following samples: {', '.join(ASSEMBLY_TO_SAMPLES[wildcards.assembly])}"
     shell:
         """
         mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
@@ -97,6 +100,7 @@ rule assembly_map_depth:
     resources:
         mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 150) * 2 ** (attempt - 1))
+    message: "Calculating mapping states of assembly {wildcards.assembly}..."
     shell:
         """
         module load {params.metabat2_module}
@@ -116,6 +120,7 @@ rule assembly_metabat:
     resources:
         mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 150) * 2 ** (attempt - 1))
+    message: "Binning contigs from assembly {wildcards.assembly} using metabat2..."
     shell:
         """
         module load {params.metabat2_module}
@@ -135,6 +140,7 @@ rule assembly_maxbin:
     resources:
         mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 150) * 2 ** (attempt - 1))
+    message: "Binning contigs from assembly {wildcards.assembly} using maxbin2..."
     run: # Rule run using python to ensure the pipeline does not crush if no bins are generated
         import os
         import subprocess
@@ -169,6 +175,7 @@ rule assembly_binette:
     resources:
         mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 150) * 2 ** (attempt - 1))
+    message: "Refining bins from assembly {wildcards.assembly} using binette..."
     shell:
         """
         module load {params.checkm2_module} {params.binette_module}
@@ -187,6 +194,7 @@ rule assembly_final:
     resources:
         mem_mb=8*1024,
         runtime=10
+    message: "Outputing final bins from assembly {wildcards.assembly}..."
     shell:
         """
         mkdir {params.final}
