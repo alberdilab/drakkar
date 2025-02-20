@@ -81,18 +81,18 @@ def run_snakemake_cataloging(workflow, output_dir, mode, profile):
 
     subprocess.run(snakemake_command, shell=False, check=True)
 
-def run_snakemake_dereplicating(workflow, assembly_dir, output_dir):
-    """ Run the dereplicating workflow """
-    snakemake_command = [
-        f"module load {SNAKEMAKE_MODULE}",
-        "snakemake",
-        "-s", str(Path(__file__).parent / "workflow" / "Snakefile"),
-        "--config",
-            f"workflow={workflow}",
-            f"assembly_dir={assembly_dir}",
-            f"output_dir={output_dir}"
+def run_snakemake_profiling(workflow, bins_dir, profiling_type, output_dir):
+    """ Run the profiling workflow """
+        "/bin/bash", "-c",  # Ensures the module system works properly
+        f"module load {config_vars['SNAKEMAKE_MODULE']} && "
+        "snakemake "
+        f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
+        f"--directory {output_dir} "
+        f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
+        f"--configfile {CONFIG_PATH} "
+        f"--config workflow={workflow} bins_dir={bins_dir} profiling_type={profiling_type} output_dir={output_dir}"
     ]
-    subprocess.run(" && ".join(snakemake_command), shell=True, check=True)
+    subprocess.run(snakemake_command, shell=False, check=True)
 
 def run_snakemake_annotation(workflow, assembly_dir, output_dir):
     """ Run the annotation workflow """
@@ -153,17 +153,10 @@ def main():
     subparser_cataloging.add_argument("-m", "--mode", required=False, help="Comma-separated list of cataloging modes (e.g. individual,all)")
     subparser_cataloging.add_argument("-p", "--profile", required=False, help="Snakemake profile")
 
-    subparser_dereplication = subparsers.add_parser("dereplication", help="Run the dereplication workflow")
-    subparser_dereplication.add_argument("-b", "--bins", required=True, help="Bins directory")
-    subparser_dereplication.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
-
-    subparser_annotation = subparsers.add_parser("annotation", help="Run the annotation workflow")
-    subparser_annotation.add_argument("-a", "--assembly", required=True, help="Assembly directory")
-    subparser_annotation.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
-
-    subparser_quantification = subparsers.add_parser("quantification", help="Run the quantification workflow")
-    subparser_quantification.add_argument("-a", "--assembly", required=True, help="Assembly directory")
-    subparser_quantification.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
+    subparser_profiling = subparsers.add_parser("profiling", help="Run the profiling workflow")
+    subparser_profiling.add_argument("-b", "--bins", required=True, help="Bins directory")
+    subparser_profiling.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
+    subparser_profiling.add_argument("-t", "--type", required=False, default="genomes", help="Either genomes or pangenomes profiling type. Default: genomes")
 
     args = parser.parse_args()
 
@@ -298,15 +291,15 @@ def main():
     # Relative paths are turned into absolute paths
     if args.command == "complete":
         run_snakemake_complete(args.command, args.input, args.output, args.reference, args.mode if args.mode else ["individual"], args.profile if args.profile else "slurm")
+        display_end()
     elif args.command == "preprocessing":
         run_snakemake_preprocessing(args.command, Path(args.output).resolve(), REFERENCE, args.profile if args.profile else "slurm")
         display_end()
     elif args.command == "cataloging":
         run_snakemake_cataloging(args.command, Path(args.output).resolve(), args.mode if args.mode else ["individual"], args.profile if args.profile else "slurm")
-    elif args.command == "annotation":
-        run_snakemake_annotation(args.command, args.assembly, args.output)
-    elif args.command == "quantification":
-        run_snakemake_quantification(args.command, args.assembly, args.output)
+        display_end()
+    elif args.command == "profiling":
+        run_snakemake_profiling(args.command, args.bins, args.type, args.output)
     else:
         parser.print_help()
 

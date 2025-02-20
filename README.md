@@ -20,13 +20,9 @@ drakkar preprocessing {arguments}
 ```
 drakkar cataloging {arguments}
 ```
-* **Dereplicating**: dereplicates bins using multiple criteria.
+* **Profiling**: annotates the bins and conducts genome- or pangenome-based quantitative analyses.
 ```
-drakkar dereplicating {arguments}
-```
-* **Annotating**: taxonomicallt and functionally annotates bins using multiple databases.
-```
-drakkar annotating {arguments}
+drakkar profiling {arguments}
 ```
 
 ## Complete mode
@@ -47,7 +43,7 @@ drakkar complete -i {input_path} -o {output_path}
 
 **-i**: path to the folder where the metagenomic sequencing reads are stored.
 **-o**: path in which the DRAKKAR outputs will be stored.
-Metagenomic reads are not mapped to a host genome, and individual assemblies are performed.
+Metagenomic reads are not mapped to a host genome, individual assemblies are performed, and genome-based profiling is conducted.
 
 #### With reference genome
 
@@ -58,19 +54,19 @@ drakkar complete -i {input_path} -o {output_path} -r {genome_path}
 **-i**: path to the folder where the metagenomic sequencing reads are stored.
 **-o**: path in which the DRAKKAR outputs will be stored.
 **-r**: path to the reference genome.
-Metagenomic reads are  mapped to the host genome, and individual assemblies are performed.
+Metagenomic reads are mapped to the host genome individual assemblies are performed, and genome-based profiling is conducted.
 
 #### With reference genome and assembly mode
 
 ```
-drakkar complete -i {input_path} -o {output_path} -r {genome_path} -m individual,all
+drakkar complete -i {input_path} -o {output_path} -r {genome_path} -m individual,all -t genomes,pangenomes
 ```
 
 **-i**: path to the folder where the metagenomic sequencing reads are stored.
 **-o**: path in which the DRAKKAR outputs will be stored.
 **-r**: path to the reference genome.
 **-m**: comma-separated list of assembly modes
-Metagenomic reads are mapped to the host genome, and individual assemblies as well as a single coassembly including all samples are performed.
+Metagenomic reads are mapped to the host genome, individual assemblies as well as a single coassembly including all samples are performed, and both genome- and pangenome-based profiling is conducted.
 
 ### With sample info file
 
@@ -98,9 +94,19 @@ drakkar complete -f {info_file} -o {output_path} -m individual
 Individual assemblies are also conducted on top of the assemblies specified in the sample info file.
 
 
-## Preprocessing module
+## DRAKKAR modules
+
+### Preprocessing
 
 - Quality-filtering using fastp
 - Reference genome indexing
 - Reference genome mapping
 - Metagenomic and host genomic data outputting
+
+### Cataloging
+
+Documentation to be added.
+
+### Profiling
+
+Documentation to be added.

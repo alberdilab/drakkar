@@ -208,13 +208,12 @@ rule assembly_binette:
                 --checkm2_db /maps/datasets/globe_databases/checkm2/20250215/CheckM2_database/uniref100.KO.1.dmnd
         """
 
-
-
 rule assembly_final:
     input:
         f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}/final_bins_quality_reports.tsv"
     output:
-        f"{OUTPUT_DIR}/cataloging/final/{{assembly}}.tsv"
+        metadata=f"{OUTPUT_DIR}/cataloging/final/{{assembly}}.tsv",
+        paths=f"{OUTPUT_DIR}/cataloging/final/{{assembly}}.txt"
     params:
         binette=f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}",
         final=f"{OUTPUT_DIR}/cataloging/final/{{assembly}}"
@@ -227,5 +226,6 @@ rule assembly_final:
         """
         mkdir {params.final}
         mv {params.binette}/final_bins/* {params.final}
-        mv {input} {output}
+        mv {input} {output.metadata}
+        find {params.final} -type f -name "*.fna" -print > {output.paths}
         """
