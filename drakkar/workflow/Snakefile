@@ -12,7 +12,6 @@ configfile: "workflow/config.yaml"
 WORKFLOW = config.get("workflow", None)
 OUTPUT_DIR = config.get("output_dir", None)
 REFERENCE = config.get("reference", None)
-CATALOGING_MODE = config["cataloging_mode"].split(",") if "cataloging_mode" in config else []
 PROFILING_TYPE = config["profiling_type"].split(",") if "profiling_type" in config else []
 
 ####

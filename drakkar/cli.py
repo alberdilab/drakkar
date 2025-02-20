@@ -42,7 +42,7 @@ def run_snakemake_complete(workflow, input_dir, output_dir, reference, mode, pro
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config workflow={workflow} output_dir={output_dir} reference={reference} cataloging_mode={mode} "
+        f"--config workflow={workflow} output_dir={output_dir} reference={reference} "
     ]
 
     subprocess.run(snakemake_command, shell=False, check=True)
@@ -76,7 +76,7 @@ def run_snakemake_cataloging(workflow, output_dir, mode, profile):
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config workflow={workflow} output_dir={output_dir} cataloging_mode={mode} "
+        f"--config workflow={workflow} output_dir={output_dir} "
     ]
 
     subprocess.run(snakemake_command, shell=False, check=True)
@@ -292,13 +292,13 @@ def main():
 
     # Relative paths are turned into absolute paths
     if args.command == "complete":
-        run_snakemake_complete(args.command, args.input, args.output, args.reference, args.mode if args.mode else "individual", args.profile if args.profile else "slurm")
+        run_snakemake_complete(args.command, args.input, args.output, args.reference, args.profile if args.profile else "slurm")
         display_end()
     elif args.command == "preprocessing":
         run_snakemake_preprocessing(args.command, Path(args.output).resolve(), REFERENCE, args.profile if args.profile else "slurm")
         display_end()
     elif args.command == "cataloging":
-        run_snakemake_cataloging(args.command, Path(args.output).resolve(), args.mode if args.mode else "individual", args.profile if args.profile else "slurm")
+        run_snakemake_cataloging(args.command, Path(args.output).resolve(), args.profile if args.profile else "slurm")
         display_end()
     elif args.command == "profiling":
         run_snakemake_profiling(args.command, args.bins, args.type, args.output)
