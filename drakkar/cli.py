@@ -83,6 +83,8 @@ def run_snakemake_cataloging(workflow, output_dir, mode, profile):
 
 def run_snakemake_profiling(workflow, bins_dir, profiling_type, output_dir):
     """ Run the profiling workflow """
+
+    snakemake_command = [
         "/bin/bash", "-c",  # Ensures the module system works properly
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
         "snakemake "
