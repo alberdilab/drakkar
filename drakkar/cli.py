@@ -81,7 +81,7 @@ def run_snakemake_cataloging(workflow, output_dir, mode, profile):
 
     subprocess.run(snakemake_command, shell=False, check=True)
 
-def run_snakemake_profiling(workflow, bins_dir, profiling_type, output_dir):
+def run_snakemake_profiling(workflow, bins_dir, output_dir):
     """ Run the profiling workflow """
 
     snakemake_command = [
