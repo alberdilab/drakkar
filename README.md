@@ -35,7 +35,44 @@ All the modules of **DRAKKAR** can be run together by using the ***complete*** m
 drakkar complete {arguments}
 ```
 
-## Sample info file
+## Usage examples
+
+### Without sample info file
+
+#### Minimum usage
+
+```
+drakkar complete -i {input_path} -o {output_path}
+```
+
+**-i**: path to the folder where the metagenomic sequencing reads are stored.
+**-o**: path in which the DRAKKAR outputs will be stored.
+Metagenomic reads are not mapped to a host genome, and individual assemblies are performed.
+
+#### With reference genome
+
+```
+drakkar complete -i {input_path} -o {output_path} -r {genome_path}
+```
+
+**-i**: path to the folder where the metagenomic sequencing reads are stored.
+**-o**: path in which the DRAKKAR outputs will be stored.
+**-r**: path to the reference genome.
+Metagenomic reads are  mapped to the host genome, and individual assemblies are performed.
+
+#### With reference genome and assembly mode
+
+```
+drakkar complete -i {input_path} -o {output_path} -r {genome_path} -m individual,all
+```
+
+**-i**: path to the folder where the metagenomic sequencing reads are stored.
+**-o**: path in which the DRAKKAR outputs will be stored.
+**-r**: path to the reference genome.
+**-m**: comma-separated list of assembly modes
+Metagenomic reads are mapped to the host genome, and individual assemblies as well as a single coassembly including all samples are performed.
+
+### With sample info file
 
 |sample|rawreads1|rawreads2|reference_name|reference_path|assembly|
 |---|---|---|---|---|---|
@@ -45,6 +82,21 @@ drakkar complete {arguments}
 |sample3|path/sample3_1.fq.gz|path/sample3_2.fq.gz|ref2|path/ref2.fna|assembly2,all|
 |sample4|path/sample4_1.fq.gz|path/sample4_2.fq.gz|ref2|path/ref2.fna|assembly2,all|
 |sample4|path/sample4_1.fq.gz|path/sample4_2.fq.gz|ref2|path/ref2.fna|assembly2,all|
+
+#### Minimum usage
+
+```
+drakkar complete -f {info_file} -o {output_path}
+```
+All the required information is extracted from the sample info file.
+
+#### Minimum usage
+
+```
+drakkar complete -f {info_file} -o {output_path} -m individual
+```
+Individual assemblies are also conducted on top of the assemblies specified in the sample info file.
+
 
 ## Preprocessing module
 

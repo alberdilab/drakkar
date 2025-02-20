@@ -90,8 +90,6 @@ if WORKFLOW == "complete":
         input:
             expand(f"{OUTPUT_DIR}/cataloging/final/{{assembly}}.tsv", assembly=assemblies)
 
-    include: "rules/preparing.smk"
-
     if REFERENCE:
         include: "rules/preparing.smk"
         include: "rules/preprocessing_ref.smk"
