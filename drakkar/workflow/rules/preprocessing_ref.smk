@@ -127,7 +127,7 @@ rule preprocessings_stats:
         reads_metagenomic=expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metareads", sample=samples),
         bases_metagenomic=expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metabases", sample=samples)
         reads_host=expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostreads", sample=samples),
-        bases_host=expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostbases, sample=samples)
+        bases_host=expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostbases", sample=samples)
     output:
         f"{OUTPUT_DIR}/preprocessing.tsv"
     params:
