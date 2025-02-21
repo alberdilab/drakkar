@@ -136,7 +136,7 @@ rule host_reads:
         module load {params.bowtie2_module} {params.samtools_module}
         samtools view -b -F12 -@ {threads} {input} | samtools sort -@ {threads} -o {output.bam} -
         samtools view -b -F12 -@ {threads} {input} | samtools view -c {input} > {output.reads}
-        samtools view -b -F12 -@ {threads} {input} | awk '{sum += length($10)} END {print sum}' > {output.bases}
+        samtools view -b -F12 -@ {threads} {input} | samtools stats - | grep "^SN" | grep "bases mapped (cigar)" | cut -f3 > {output.bases}
         """
 
 rule preprocessings_stats:
