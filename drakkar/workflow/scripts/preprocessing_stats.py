@@ -4,7 +4,6 @@ import pandas as pd
 import argparse
 import glob
 import gzip
-import pysam
 
 def extract_fastp_data(json_files):
     """Extract total reads before and after filtering from Fastp JSON files."""
