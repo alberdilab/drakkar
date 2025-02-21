@@ -46,7 +46,7 @@ rule fastp:
             --adapter_sequence_r2 AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
         """
 
-rule fastp_stats:
+rule preprocessings_stats:
     input:
         expand(f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}.json", sample=samples)
     output:
@@ -55,5 +55,5 @@ rule fastp_stats:
     message: "Creating preprocessing stats..."
     shell:
         """
-        python workflow/scripts/fastp_stats.py -i {input} -o {output}
+        python workflow/scripts/preprocessing_stats.py -f "{input}" -o {output}
         """

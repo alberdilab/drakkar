@@ -128,3 +128,17 @@ rule host_reads:
         module load {params.bowtie2_module} {params.samtools_module}
         samtools view -b -F12 -@ {threads} {input} | samtools sort -@ {threads} -o {output} -
         """
+
+rule preprocessings_stats:
+    input:
+        fastp=expand(f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}.json", sample=samples),
+        metagenomic=expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz", sample=samples),
+        genomic=expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam", sample=samples)
+    output:
+        f"{OUTPUT_DIR}/preprocessing.tsv"
+    threads: 4
+    message: "Creating preprocessing stats..."
+    shell:
+        """
+        python workflow/scripts/preprocessing_stats.py -f "{input.fastp}" -m "{input.metagenomic}" -g "{input.genomic}" -o {output}
+        """

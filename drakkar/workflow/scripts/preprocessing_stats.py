@@ -51,7 +51,7 @@ def extract_fastq_data(fastq_files):
 
             data_dict[sample_name] = {
                 "reads_metagenomic": read_count,
-                "bases_metagenomic": base_count
+                "bases_metagenomic": base_count * 2 # doubled for also considering the reverse reads
             }
 
         except Exception as e:
@@ -88,7 +88,7 @@ def main():
     parser = argparse.ArgumentParser(description="Extract sequencing statistics from Fastp JSON, FASTQ, and BAM files")
     parser.add_argument("-f", "--fastp", required=True, help="Glob pattern for Fastp JSON files (e.g., 'fastp_results/*.json')")
     parser.add_argument("-m", "--metagenomic", required=True, help="Glob pattern for FASTQ files (e.g., 'fastq_files/*_1.fq.gz')")
-    parser.add_argument("-b", "--bam", required=True, help="Glob pattern for BAM files (e.g., 'bam_files/*.bam')")
+    parser.add_argument("-g", "--genomic", required=True, help="Glob pattern for BAM files (e.g., 'bam_files/*.bam')")
     parser.add_argument("-o", "--output", required=True, help="Output filename (e.g., 'fastp_summary.tsv')")
 
     args = parser.parse_args()
@@ -96,7 +96,7 @@ def main():
     # Collect data
     json_files = glob.glob(args.fastp)
     fastq_files = glob.glob(args.metagenomic)
-    bam_files = glob.glob(args.bam)
+    bam_files = glob.glob(args.genomic)
 
     if not json_files:
         print("No JSON files found!")
