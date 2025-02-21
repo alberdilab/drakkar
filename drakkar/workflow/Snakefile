@@ -129,11 +129,11 @@ if WORKFLOW == "preprocessing":
                 expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz", sample=samples),
                 expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz", sample=samples),
                 expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam", sample=samples),
-                expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metareads", sample=samples),
-                expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metabases", sample=samples),
-                expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostreads", sample=samples),
-                expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostbases", sample=samples)
-                #f"{OUTPUT_DIR}/preprocessing.tsv"
+                #expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metareads", sample=samples),
+                #expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metabases", sample=samples),
+                #expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostreads", sample=samples),
+                #expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostbases", sample=samples)
+                f"{OUTPUT_DIR}/preprocessing.tsv"
 
         include: "rules/preparing.smk"
         include: "rules/preprocessing_ref.smk"

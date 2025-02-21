@@ -124,8 +124,10 @@ rule split_reads:
 rule preprocessings_stats:
     input:
         fastp=expand(f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}.json", sample=samples),
-        metagenomic=expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz", sample=samples),
-        genomic=expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam", sample=samples)
+        reads_metagenomic=expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metareads", sample=samples),
+        bases_metagenomic=expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metabases", sample=samples)
+        reads_host=expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostreads", sample=samples),
+        bases_host=expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostbases, sample=samples)
     output:
         f"{OUTPUT_DIR}/preprocessing.tsv"
     params:
@@ -137,5 +139,5 @@ rule preprocessings_stats:
     message: "Creating preprocessing stats..."
     shell:
         """
-        python {params.package_dir}/workflow/scripts/preprocessing_stats.py -f "{input.fastp}" -m "{input.metagenomic}" -g "{input.genomic}" -o {output}
+        python {params.package_dir}/workflow/scripts/preprocessing_stats.py -p "{input.fastp}" -m "{input.bases_metagenomic}" -M "{input.reads_metagenomic}" -g "{input.bases_host}" -G "{input.reads_host}" -o {output}
         """
