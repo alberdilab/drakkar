@@ -93,14 +93,17 @@ rule reference_map:
         bowtie2 -x {params.basename} -1 {input.r1} -2 {input.r2} -p {threads} | samtools view -bS - | samtools sort -o {output}
         """
 
-rule metagenomic_reads:
+rule split_reads:
     input:
         f"{OUTPUT_DIR}/preprocessing/bowtie2/{{sample}}.bam"
     output:
         r1=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz",
         r2=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz",
         reads=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metareads",
-        bases=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metabases"
+        bases=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metabases",
+        bam=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam",
+        reads=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostreads",
+        bases=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostbases"
     params:
         bowtie2_module={BOWTIE2_MODULE},
         samtools_module={SAMTOOLS_MODULE}
@@ -115,30 +118,11 @@ rule metagenomic_reads:
         samtools view -b -f12 -@ {threads} {input} | samtools fastq -@ {threads} -1 {output.r1} -2 {output.r2} - && \
         samtools view -b -f12 -@ {threads} {input} | samtools view -c {input} > {output.reads} && \
         samtools view -b -f12 -@ {threads} {input} | samtools stats - | grep "^SN" | grep "bases mapped (cigar)" | cut -f3 > {output.bases}
-        """
-
-rule host_reads:
-    input:
-        f"{OUTPUT_DIR}/preprocessing/bowtie2/{{sample}}.bam"
-    output:
-        bam=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam",
-        reads=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostreads",
-        bases=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostbases"
-    params:
-        bowtie2_module={BOWTIE2_MODULE},
-        samtools_module={SAMTOOLS_MODULE}
-    threads: 1
-    resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 100) * 2 ** (attempt - 1))
-    message: "Extracting host reads of {wildcards.sample}..."
-    shell:
-        """
-        module load {params.bowtie2_module} {params.samtools_module}
         samtools view -b -F12 -@ {threads} {input} | samtools sort -@ {threads} -o {output.bam} - && \
         samtools view -b -F12 -@ {threads} {input} | samtools view -c {input} > {output.reads} && \
         samtools view -b -F12 -@ {threads} {input} | samtools stats - | grep "^SN" | grep "bases mapped (cigar)" | cut -f3 > {output.bases}
         """
+
 
 rule preprocessings_stats:
     input:
