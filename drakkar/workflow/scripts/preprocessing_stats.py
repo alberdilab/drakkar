@@ -88,23 +88,32 @@ def main():
 
     # Collect data
     json_files = glob.glob(args.fastp)
+    fastp_data = extract_fastp_data(json_files)
     if args.fastq:
         fastq_files = glob.glob(args.fastq)
+        fastq_data = extract_fastq_data(fastq_files)
+    else:
+        fastq_data = {}
     if args.metagenomic_bases:
         metagenomic_bases_files = glob.glob(args.metagenomic_bases)
+        metagenomic_bases_data = extract_text_data(metagenomic_bases_files)
+    else:
+        metagenomic_bases_data = {}
     if args.metagenomic_reads:
         metagenomic_reads_files = glob.glob(args.metagenomic_reads)
+        metagenomic_reads_data = extract_text_data(metagenomic_reads_files)
+    else:
+        metagenomic_reads_data = {}
     if args.genomic_bases:
         genomic_bases_files = glob.glob(args.genomic_bases)
+        genomic_bases_data = extract_text_data(genomic_bases_files)
+    else:
+        genomic_bases_data = {}
     if args.genomic_reads:
         genomic_reads_files = glob.glob(args.genomic_reads)
-
-    fastp_data = extract_fastp_data(json_files)
-    fastq_data = extract_fastq_data(fastq_files) if fastq_files else {}
-    metagenomic_bases_data = extract_text_data(metagenomic_bases_files) if fastq_files else {}
-    metagenomic_reads_data = extract_text_data(metagenomic_reads_files) if fastq_files else {}
-    genomic_bases_data = extract_text_data(genomic_bases_files) if fastq_files else {}
-    genomic_reads_data = extract_text_data(genomic_reads_files) if fastq_files else {}
+        genomic_reads_data = extract_text_data(genomic_reads_files)
+    else:
+        genomic_reads_data = {}
 
     # Combine data
     all_samples = set(fastp_data.keys()) | set(metareads_data.keys()) | set(metabases_data.keys()) | set(hostreads_data.keys()) | set(hostbases_data.keys())
