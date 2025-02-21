@@ -88,11 +88,16 @@ def main():
 
     # Collect data
     json_files = glob.glob(args.fastp)
-    fastq_files = glob.glob(args.fastq)
-    metagenomic_bases_files = glob.glob(args.metagenomic_bases)
-    metagenomic_reads_files = glob.glob(args.metagenomic_reads)
-    genomic_bases_files = glob.glob(args.genomic_bases)
-    genomic_reads_files = glob.glob(args.genomic_reads)
+    if args.fastq:
+        fastq_files = glob.glob(args.fastq)
+    if args.metagenomic_bases:
+        metagenomic_bases_files = glob.glob(args.metagenomic_bases)
+    if args.metagenomic_reads:
+        metagenomic_reads_files = glob.glob(args.metagenomic_reads)
+    if args.genomic_bases:
+        genomic_bases_files = glob.glob(args.genomic_bases)
+    if args.genomic_reads:
+        genomic_reads_files = glob.glob(args.genomic_reads)
 
     fastp_data = extract_fastp_data(json_files)
     fastq_data = extract_fastq_data(fastq_files) if fastq_files else {}
