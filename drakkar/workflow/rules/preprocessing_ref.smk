@@ -136,7 +136,10 @@ rule preprocessings_stats:
         genomic=expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam", sample=samples)
     output:
         f"{OUTPUT_DIR}/preprocessing.tsv"
-    threads: 4
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 100) * 2 ** (attempt - 1))
     message: "Creating preprocessing stats..."
     shell:
         """

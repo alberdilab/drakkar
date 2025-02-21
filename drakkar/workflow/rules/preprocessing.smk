@@ -50,8 +50,11 @@ rule preprocessings_stats:
     input:
         expand(f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}.json", sample=samples)
     output:
-        f"{OUTPUT_DIR}/preprocessing/preprocessing.tsv"
-    threads: 4
+        f"{OUTPUT_DIR}/preprocessing.tsv"
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(1*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 100) * 2 ** (attempt - 1))
     message: "Creating preprocessing stats..."
     shell:
         """
