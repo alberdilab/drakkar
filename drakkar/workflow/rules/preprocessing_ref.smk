@@ -99,11 +99,11 @@ rule split_reads:
     output:
         r1=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz",
         r2=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz",
-        reads=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metareads",
-        bases=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metabases",
+        metareads=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metareads",
+        metabases=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metabases",
         bam=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam",
-        reads=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostreads",
-        bases=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostbases"
+        hostreads=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostreads",
+        hostbases=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostbases"
     params:
         bowtie2_module={BOWTIE2_MODULE},
         samtools_module={SAMTOOLS_MODULE}
@@ -116,11 +116,11 @@ rule split_reads:
         """
         module load {params.bowtie2_module} {params.samtools_module}
         samtools view -b -f12 -@ {threads} {input} | samtools fastq -@ {threads} -1 {output.r1} -2 {output.r2} - && \
-        samtools view -b -f12 -@ {threads} {input} | samtools view -c {input} > {output.reads} && \
-        samtools view -b -f12 -@ {threads} {input} | samtools stats - | grep "^SN" | grep "bases mapped (cigar)" | cut -f3 > {output.bases}
+        samtools view -b -f12 -@ {threads} {input} | samtools view -c {input} > {output.metareads} && \
+        samtools view -b -f12 -@ {threads} {input} | samtools stats - | grep "^SN" | grep "bases mapped (cigar)" | cut -f3 > {output.metabases}
         samtools view -b -F12 -@ {threads} {input} | samtools sort -@ {threads} -o {output.bam} - && \
-        samtools view -b -F12 -@ {threads} {input} | samtools view -c {input} > {output.reads} && \
-        samtools view -b -F12 -@ {threads} {input} | samtools stats - | grep "^SN" | grep "bases mapped (cigar)" | cut -f3 > {output.bases}
+        samtools view -b -F12 -@ {threads} {input} | samtools view -c {input} > {output.hostreads} && \
+        samtools view -b -F12 -@ {threads} {input} | samtools stats - | grep "^SN" | grep "bases mapped (cigar)" | cut -f3 > {output.hostbases}
         """
 
 
