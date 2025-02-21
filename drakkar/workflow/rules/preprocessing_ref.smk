@@ -111,8 +111,8 @@ rule metagenomic_reads:
     shell:
         """
         module load {params.bowtie2_module} {params.samtools_module}
-        samtools view -b -f12 -@ {threads} {input} | samtools fastq -@ {threads} -1 {output.r1} -2 {output.r2} -
-        samtools view -b -f12 -@ {threads} {input} | samtools view -c {input} > {output.reads}
+        samtools view -b -f12 -@ {threads} {input} | samtools fastq -@ {threads} -1 {output.r1} -2 {output.r2} - && \
+        samtools view -b -f12 -@ {threads} {input} | samtools view -c {input} > {output.reads} && \
         samtools view -b -f12 -@ {threads} {input} | samtools stats - | grep "^SN" | grep "bases mapped (cigar)" | cut -f3 > {output.bases}
         """
 
@@ -134,8 +134,8 @@ rule host_reads:
     shell:
         """
         module load {params.bowtie2_module} {params.samtools_module}
-        samtools view -b -F12 -@ {threads} {input} | samtools sort -@ {threads} -o {output.bam} -
-        samtools view -b -F12 -@ {threads} {input} | samtools view -c {input} > {output.reads}
+        samtools view -b -F12 -@ {threads} {input} | samtools sort -@ {threads} -o {output.bam} - && \
+        samtools view -b -F12 -@ {threads} {input} | samtools view -c {input} > {output.reads} && \
         samtools view -b -F12 -@ {threads} {input} | samtools stats - | grep "^SN" | grep "bases mapped (cigar)" | cut -f3 > {output.bases}
         """
 
