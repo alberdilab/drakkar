@@ -15,11 +15,14 @@ def extract_fastp_data(json_files):
             sample_name = os.path.basename(json_file).replace(".json", "")
             reads_raw = report["summary"]["before_filtering"]["total_reads"]
             reads_postfiltering = report["summary"]["after_filtering"]["total_reads"]
+            bases_raw = report["summary"]["before_filtering"]["total_bases"]
+            bases_postfiltering = report["summary"]["after_filtering"]["total_bases"]
 
             data_list.append({
                 "sample": sample_name,
                 "reads_raw": reads_raw,
-                "reads_postfiltering": reads_postfiltering
+                "reads_discarded": reads_raw - reads_postfiltering,
+                "bases_discarded": bases_raw - bases_postfiltering
             })
 
         except (KeyError, json.JSONDecodeError) as e:
@@ -29,7 +32,9 @@ def extract_fastp_data(json_files):
 
 def main():
     parser = argparse.ArgumentParser(description="Extract read counts from Fastp JSON reports")
-    parser.add_argument("-i", "--input", required=True, help="Glob pattern for input JSON files (e.g., 'fastp_results/*.json')")
+    parser.add_argument("-f", "--fastp", required=True, help="Glob pattern for input JSON files (e.g., 'fastp_results/*.json')")
+    parser.add_argument("-m", "--metagenome", required=False, help="Glob pattern for input JSON files (e.g., 'metagenome/*_1.fq.gz')")
+    parser.add_argument("-g", "--genome", required=False, help="Glob pattern for input JSON files (e.g., 'genome/*.bam')")
     parser.add_argument("-o", "--output", required=True, help="Output filename (e.g., 'fastp_summary.tsv')")
 
     args = parser.parse_args()
