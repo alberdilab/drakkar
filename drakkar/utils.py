@@ -220,7 +220,7 @@ def argument_samples_to_json(argument, output):
         json.dump(SAMPLE_TO_READS2, f)
 
 def argument_references_to_json(argument, sample_to_reads, output):
-    REFERENCE_TO_FILE = {"reference": [f"2{argument}"]}
+    REFERENCE_TO_FILE = {"reference": [f"{argument}"]}
     os.makedirs(f"{output}/data", exist_ok=True)
     with open(f"{output}/data/reference_to_file.json", "w") as f:
         json.dump(REFERENCE_TO_FILE, f, indent=4)
@@ -317,7 +317,7 @@ def file_assemblies_to_json(infofile=None, samples=None, individual=False, all=F
             assemblies["all"].extend(samples)
 
     ASSEMBLY_TO_SAMPLE = {key: list(set(value)) for key, value in assemblies.items()} # remove duplicates
-    
+
     os.makedirs(f"{output}/data", exist_ok=True)
     with open(f"{output}/data/assembly_to_samples.json", "w") as f:
         json.dump(ASSEMBLY_TO_SAMPLE, f)
