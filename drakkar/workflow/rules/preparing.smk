@@ -29,7 +29,11 @@ rule prepare_reference:
     message: "Preparing reference genome of {wildcards.reference}..."
     shell:
         """
-        cp {input} {output}
+        if [[ {input} == *.gz ]]; then
+            gunzip -c {input} > {output}
+        else
+            cp {input} {output}
+        fi
         """
 
 rule concatenate_or_link_preprocessed:
