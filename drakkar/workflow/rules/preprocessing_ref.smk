@@ -23,8 +23,8 @@ rule fastp:
         fastp_module={FASTP_MODULE}
     threads: 4
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 5) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(reads_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 1024 * 3) * 2 ** (attempt - 1))
     message: "Quality-filtering sample {wildcards.sample}..."
     shell:
         """
@@ -55,8 +55,8 @@ rule reference_index:
         basename=f"{OUTPUT_DIR}/data/references/{{reference}}"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(reference_mb.get(wildcards.reference, 1) * 10 * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, attempt: max(15, int(reference_mb.get(wildcards.reference, 1) / 20 * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 20) * 2 ** (attempt - 1))
     message: "Indexing reference genome {wildcards.reference}..."
     shell:
         """
@@ -81,8 +81,8 @@ rule reference_map:
         basename=lambda wildcards: f"{OUTPUT_DIR}/data/references/{SAMPLE_TO_REFERENCE[wildcards.sample]}"
     threads: 16
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 2 * 1024 / 500) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(reads_mb.get(wildcards.sample, 1) / 1024 *  1024 / 10) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 20) * 2 ** (attempt - 1))
     message: "Mapping {wildcards.sample} against reference genome..."
     shell:
         """
@@ -101,8 +101,8 @@ rule metagenomic_reads:
         samtools_module={SAMTOOLS_MODULE}
     threads: 1
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(reads_mb.get(wildcards.sample, 1) / 1024 * 30) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 100) * 2 ** (attempt - 1))
     message: "Extracting metagenomic reads of {wildcards.sample}..."
     shell:
         """
@@ -120,8 +120,8 @@ rule host_reads:
         samtools_module={SAMTOOLS_MODULE}
     threads: 1
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(reads_mb.get(wildcards.sample, 1) / 1024 * 10) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 100) * 2 ** (attempt - 1))
     message: "Extracting host reads of {wildcards.sample}..."
     shell:
         """

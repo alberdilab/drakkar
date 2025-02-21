@@ -107,25 +107,21 @@ if WORKFLOW == "preprocessing":
     with open(f"{OUTPUT_DIR}/data/sample_to_reads2.json", "r") as f:
         SAMPLE_TO_READS2 = json.load(f)
 
-    with open(f"{OUTPUT_DIR}/data/reference_to_file.json", "r") as f:
-        REFERENCE_TO_FILE = json.load(f)
-
-    with open(f"{OUTPUT_DIR}/data/sample_to_reference.json", "r") as f:
-        SAMPLE_TO_REFERENCE = json.load(f)
-
     samples = list(SAMPLE_TO_READS1.keys())
-    references = list(REFERENCE_TO_FILE.keys())
-
-    reads_mb = calculate_file_sizes(SAMPLE_TO_READS1)
-    reads_mb_total = sum(reads_mb.values())
-
-    reference_mb = calculate_file_sizes(REFERENCE_TO_FILE)
-    reference_mb_total = sum(reference_mb.values())
 
     # The rules reference_index, reference_map, metagenomic_reads and host_reads are only run if
     # the reference genome file is provided. Otherwise, the fastp rule already outputs the final files.
 
     if REFERENCE:
+
+        with open(f"{OUTPUT_DIR}/data/reference_to_file.json", "r") as f:
+            REFERENCE_TO_FILE = json.load(f)
+
+        with open(f"{OUTPUT_DIR}/data/sample_to_reference.json", "r") as f:
+            SAMPLE_TO_REFERENCE = json.load(f)
+
+        references = list(REFERENCE_TO_FILE.keys())
+
         rule all:
             input:
                 expand(f"{OUTPUT_DIR}/data/references/{{reference}}.fna", reference=references),
