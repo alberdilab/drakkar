@@ -7,8 +7,6 @@ FASTP_MODULE = config["FASTP_MODULE"]
 BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 
-localrules: metagenomic_reads, host_reads
-
 ####
 # Run preprocessing rules
 ####
@@ -117,12 +115,11 @@ rule split_reads:
         module load {params.bowtie2_module} {params.samtools_module}
         samtools view -b -f12 -@ {threads} {input} | samtools fastq -@ {threads} -1 {output.r1} -2 {output.r2} - && \
         samtools view -b -f12 -@ {threads} {input} | samtools view -c - > {output.metareads} && \
-        samtools view -b -f12 -@ {threads} {input} | samtools stats - | grep "^SN" | grep "bases mapped (cigar)" | cut -f3 > {output.metabases}
+        samtools view -b -f12 -@ {threads} {input} | awk '{{sum += length($10)}} END {{print sum}}' > {output.metabases}
         samtools view -b -F12 -@ {threads} {input} | samtools sort -@ {threads} -o {output.bam} - && \
         samtools view -b -F12 -@ {threads} {input} | samtools view -c - > {output.hostreads} && \
-        samtools view -b -F12 -@ {threads} {input} | samtools stats - | grep "^SN" | grep "bases mapped (cigar)" | cut -f3 > {output.hostbases}
+        samtools view -b -F12 -@ {threads} {input} | awk '{{sum += length($10)}} END {{print sum}}' > {output.hostbases}
         """
-
 
 rule preprocessings_stats:
     input:
