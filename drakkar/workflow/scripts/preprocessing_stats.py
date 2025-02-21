@@ -116,7 +116,7 @@ def main():
         genomic_reads_data = {}
 
     # Combine data
-    all_samples = set(fastp_data.keys()) | set(fastq_data.keys()) | set(metareads_data.keys()) | set(metabases_data.keys()) | set(hostreads_data.keys()) | set(hostbases_data.keys())
+    all_samples = set(fastp_data.keys()) | set(fastq_data.keys()) | set(metagenomic_bases_data.keys()) | set(metagenomic_reads_data.keys()) | set(genomic_bases_data.keys()) | set(genomic_reads_data.keys())
     summary_list = []
 
     for sample in all_samples:
