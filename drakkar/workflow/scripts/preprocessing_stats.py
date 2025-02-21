@@ -96,27 +96,27 @@ def main():
         fastq_data = {}
     if args.metagenomic_bases:
         metagenomic_bases_files = glob.glob(args.metagenomic_bases)
-        metagenomic_bases_data = extract_text_data(metagenomic_bases_files)
+        metagenomic_bases_data = extract_text_data(metagenomic_bases_files,".metabases")
     else:
         metagenomic_bases_data = {}
     if args.metagenomic_reads:
         metagenomic_reads_files = glob.glob(args.metagenomic_reads)
-        metagenomic_reads_data = extract_text_data(metagenomic_reads_files)
+        metagenomic_reads_data = extract_text_data(metagenomic_reads_files,".metareads")
     else:
         metagenomic_reads_data = {}
     if args.genomic_bases:
         genomic_bases_files = glob.glob(args.genomic_bases)
-        genomic_bases_data = extract_text_data(genomic_bases_files)
+        genomic_bases_data = extract_text_data(genomic_bases_files,".hostbases")
     else:
         genomic_bases_data = {}
     if args.genomic_reads:
         genomic_reads_files = glob.glob(args.genomic_reads)
-        genomic_reads_data = extract_text_data(genomic_reads_files)
+        genomic_reads_data = extract_text_data(genomic_reads_files,".hostreads")
     else:
         genomic_reads_data = {}
 
     # Combine data
-    all_samples = set(fastp_data.keys()) | set(metareads_data.keys()) | set(metabases_data.keys()) | set(hostreads_data.keys()) | set(hostbases_data.keys())
+    all_samples = set(fastp_data.keys()) | set(fastq_data.keys()) | set(metareads_data.keys()) | set(metabases_data.keys()) | set(hostreads_data.keys()) | set(hostbases_data.keys())
     summary_list = []
 
     for sample in all_samples:
