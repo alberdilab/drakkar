@@ -59,58 +59,51 @@ def extract_fastq_data(fastq_files):
 
     return data_dict
 
-def extract_bam_data(bam_files):
-    """Extract the number of reads and bases from BAM files."""
+def extract_text_data(text_files, suffix):
+    """Extract numbers from sample-specific text files."""
     data_dict = {}
 
-    for bam_file in bam_files:
-        sample_name = os.path.basename(bam_file).replace(".bam", "")
-        read_count = 0
-        base_count = 0
-
+    for text_file in text_files:
         try:
-            with pysam.AlignmentFile(bam_file, "rb") as bam:
-                for read in bam:
-                    read_count += 1
-                    base_count += read.query_length if read.query_length else 0
-
-            data_dict[sample_name] = {
-                "reads_genomic": read_count,
-                "bases_genomic": base_count
-            }
+            sample_name = os.path.basename(text_file).replace(suffix, "")
+            with open(text_file, "r") as f:
+                value = f.readline().strip()  # Read the first line (expected number)
+                data_dict[sample_name] = int(value)
 
         except Exception as e:
-            print(f"Error processing {bam_file}: {e}")
+            print(f"Error processing {text_file}: {e}")
 
     return data_dict
 
 def main():
     parser = argparse.ArgumentParser(description="Extract sequencing statistics from Fastp JSON, FASTQ, and BAM files")
-    parser.add_argument("-f", "--fastp", required=True, help="Glob pattern for Fastp JSON files (e.g., 'fastp_results/*.json')")
-    parser.add_argument("-m", "--metagenomic", required=True, help="Glob pattern for FASTQ files (e.g., 'fastq_files/*_1.fq.gz')")
-    parser.add_argument("-g", "--genomic", required=True, help="Glob pattern for BAM files (e.g., 'bam_files/*.bam')")
+    parser.add_argument("-p", "--fastp", required=True, help="Glob pattern for Fastp JSON files (e.g., 'fastp_results/*.json')")
+    parser.add_argument("-f", "--fastq", required=False, help="Glob pattern for FASTQ files (e.g., 'fastq_files/*_1.fq.gz')")
+    parser.add_argument("-m", "--metagenomic_bases", required=False, help="Glob pattern for FASTQ files (e.g., 'fastq_files/*_1.fq.gz')")
+    parser.add_argument("-M", "--metagenomic_reads", required=False, help="Glob pattern for FASTQ files (e.g., 'fastq_files/*_1.fq.gz')")
+    parser.add_argument("-g", "--genomic_bases", required=False, help="Glob pattern for BAM files (e.g., 'bam_files/*.bam')")
+    parser.add_argument("-G", "--genomic_reads", required=False, help="Glob pattern for BAM files (e.g., 'bam_files/*.bam')")
     parser.add_argument("-o", "--output", required=True, help="Output filename (e.g., 'fastp_summary.tsv')")
 
     args = parser.parse_args()
 
     # Collect data
     json_files = glob.glob(args.fastp)
-    fastq_files = glob.glob(args.metagenomic)
-    bam_files = glob.glob(args.genomic)
-
-    if not json_files:
-        print("No JSON files found!")
-    if not fastq_files:
-        print("No FASTQ files found!")
-    if not bam_files:
-        print("No BAM files found!")
+    fastq_files = glob.glob(args.fastq)
+    metagenomic_bases_files = glob.glob(args.metagenomic_bases)
+    metagenomic_reads_files = glob.glob(args.metagenomic_reads)
+    genomic_bases_files = glob.glob(args.genomic_bases)
+    genomic_reads_files = glob.glob(args.genomic_reads)
 
     fastp_data = extract_fastp_data(json_files)
     fastq_data = extract_fastq_data(fastq_files) if fastq_files else {}
-    bam_data = extract_bam_data(bam_files) if bam_files else {}
+    metagenomic_bases_data = extract_text_data(metagenomic_bases_files) if fastq_files else {}
+    metagenomic_reads_data = extract_text_data(metagenomic_reads_files) if fastq_files else {}
+    genomic_bases_data = extract_text_data(genomic_bases_files) if fastq_files else {}
+    genomic_reads_data = extract_text_data(genomic_reads_files) if fastq_files else {}
 
     # Combine data
-    all_samples = set(fastp_data.keys()) | set(fastq_data.keys()) | set(bam_data.keys())
+    all_samples = set(fastp_data.keys()) | set(metareads_data.keys()) | set(metabases_data.keys()) | set(hostreads_data.keys()) | set(hostbases_data.keys())
     summary_list = []
 
     for sample in all_samples:
@@ -122,13 +115,14 @@ def main():
             "bases_discarded": fastp_data.get(sample, {}).get("bases_discarded", "NA"),
             "reads_metagenomic": fastq_data.get(sample, {}).get("reads_metagenomic", "NA"),
             "bases_metagenomic": fastq_data.get(sample, {}).get("bases_metagenomic", "NA"),
-            "reads_genomic": bam_data.get(sample, {}).get("reads_genomic", "NA"),
-            "bases_genomic": bam_data.get(sample, {}).get("bases_genomic", "NA")
+            "reads_metagenomic": metagenomic_reads_data.get(sample, "NA"),
+            "bases_metagenomic": metagenomic_bases_data.get(sample, "NA"),
+            "reads_host": genomic_reads_data.get(sample, "NA"),
+            "bases_host": genomic_bases_data.get(sample, "NA")
         })
 
     df = pd.DataFrame(summary_list)
     df.to_csv(args.output, sep="\t", index=False)
-    print(f"Summary saved to {args.output}")
 
 if __name__ == "__main__":
     main()
