@@ -98,7 +98,7 @@ rule metagenomic_reads:
     output:
         r1=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz",
         r2=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz",
-        reads=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metareads"
+        reads=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metareads",
         bases=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metabases"
     params:
         bowtie2_module={BOWTIE2_MODULE},
@@ -121,7 +121,7 @@ rule host_reads:
         f"{OUTPUT_DIR}/preprocessing/bowtie2/{{sample}}.bam"
     output:
         bam=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam",
-        reads=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostreads"
+        reads=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostreads",
         bases=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostbases"
     params:
         bowtie2_module={BOWTIE2_MODULE},
