@@ -61,6 +61,17 @@ def run_snakemake_preprocessing(workflow, output_dir, reference, profile):
         f"--configfile {CONFIG_PATH} "
         f"--config package_dir={PACKAGE_DIR} workflow={workflow} output_dir={output_dir} reference={reference} "
     ]
+
+    unlock_command = [
+        "/bin/bash", "-c",  # Ensures the module system works properly
+        f"module load {config_vars['SNAKEMAKE_MODULE']} && "
+        "snakemake "
+        f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
+        f"--directory {output_dir} "
+        f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
+        f"--unlock"
+    ]
+
     try:
         subprocess.run(snakemake_command, shell=False, check=True)
     except subprocess.CalledProcessError as e:

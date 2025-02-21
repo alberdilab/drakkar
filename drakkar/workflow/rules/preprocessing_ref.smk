@@ -97,7 +97,9 @@ rule metagenomic_reads:
         f"{OUTPUT_DIR}/preprocessing/bowtie2/{{sample}}.bam"
     output:
         r1=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz",
-        r2=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz"
+        r2=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz",
+        reads=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metareads"
+        bases=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metabases"
     params:
         bowtie2_module={BOWTIE2_MODULE},
         samtools_module={SAMTOOLS_MODULE}
@@ -110,13 +112,17 @@ rule metagenomic_reads:
         """
         module load {params.bowtie2_module} {params.samtools_module}
         samtools view -b -f12 -@ {threads} {input} | samtools fastq -@ {threads} -1 {output.r1} -2 {output.r2} -
+        samtools view -b -f12 -@ {threads} {input} | samtools view -c {input} > {output.reads}
+        samtools view -b -f12 -@ {threads} {input} | awk '{sum += length($10)} END {print sum}' > {output.bases}
         """
 
 rule host_reads:
     input:
         f"{OUTPUT_DIR}/preprocessing/bowtie2/{{sample}}.bam"
     output:
-        f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam"
+        bam=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam",
+        reads=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostreads"
+        bases=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostbases"
     params:
         bowtie2_module={BOWTIE2_MODULE},
         samtools_module={SAMTOOLS_MODULE}
@@ -128,7 +134,9 @@ rule host_reads:
     shell:
         """
         module load {params.bowtie2_module} {params.samtools_module}
-        samtools view -b -F12 -@ {threads} {input} | samtools sort -@ {threads} -o {output} -
+        samtools view -b -F12 -@ {threads} {input} | samtools sort -@ {threads} -o {output.bam} -
+        samtools view -b -F12 -@ {threads} {input} | samtools view -c {input} > {output.reads}
+        samtools view -b -F12 -@ {threads} {input} | awk '{sum += length($10)} END {print sum}' > {output.bases}
         """
 
 rule preprocessings_stats:
