@@ -175,8 +175,8 @@ rule assembly_binette:
         outdir=f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 150) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, input.size_mb * 1024 * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, input.size_mb * 10 * 2 ** (attempt - 1))
     message: "Refining bins from assembly {wildcards.assembly} using binette..."
     shell:
         """
