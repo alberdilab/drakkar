@@ -2,6 +2,7 @@
 # Define config variables
 ####
 
+PACKAGE_DIR = config["package_dir"]
 FASTP_MODULE = config["FASTP_MODULE"]
 
 ####
@@ -51,6 +52,8 @@ rule preprocessings_stats:
         expand(f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}.json", sample=samples)
     output:
         f"{OUTPUT_DIR}/preprocessing.tsv"
+    params:
+        package_dir={PACKAGE_DIR}
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: max(1*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
@@ -58,5 +61,5 @@ rule preprocessings_stats:
     message: "Creating preprocessing stats..."
     shell:
         """
-        python workflow/scripts/preprocessing_stats.py -f "{input}" -o {output}
+        python {params.package_dir}/workflow/scripts/preprocessing_stats.py -f "{input}" -o {output}
         """

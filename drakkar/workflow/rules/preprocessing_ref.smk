@@ -2,9 +2,11 @@
 # Define config variables
 ####
 
+PACKAGE_DIR = config["package_dir"]
 FASTP_MODULE = config["FASTP_MODULE"]
 BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
+
 
 ####
 # Run preprocessing rules
@@ -136,6 +138,8 @@ rule preprocessings_stats:
         genomic=expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam", sample=samples)
     output:
         f"{OUTPUT_DIR}/preprocessing.tsv"
+    params:
+        package_dir={PACKAGE_DIR}
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
@@ -143,5 +147,5 @@ rule preprocessings_stats:
     message: "Creating preprocessing stats..."
     shell:
         """
-        python workflow/scripts/preprocessing_stats.py -f "{input.fastp}" -m "{input.metagenomic}" -g "{input.genomic}" -o {output}
+        python {params.package_dir}/workflow/scripts/preprocessing_stats.py -f "{input.fastp}" -m "{input.metagenomic}" -g "{input.genomic}" -o {output}
         """
