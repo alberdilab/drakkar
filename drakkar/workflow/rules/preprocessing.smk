@@ -45,3 +45,15 @@ rule fastp:
             --adapter_sequence AGATCGGAAGAGCACACGTCTGAACTCCAGTCA \
             --adapter_sequence_r2 AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
         """
+
+rule fastp_stats:
+    input:
+        expand(f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}.json", sample=samples)
+    output:
+        f"{OUTPUT_DIR}/preprocessing/preprocessing.tsv"
+    threads: 4
+    message: "Creating preprocessing stats..."
+    shell:
+        """
+        python workflow/scripts/fastp_stats.py -i {input} -o {output}
+        """

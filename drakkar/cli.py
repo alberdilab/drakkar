@@ -61,8 +61,13 @@ def run_snakemake_preprocessing(workflow, output_dir, reference, profile):
         f"--configfile {CONFIG_PATH} "
         f"--config workflow={workflow} output_dir={output_dir} reference={reference} "
     ]
-
-    subprocess.run(snakemake_command, shell=False, check=True)
+    try:
+        subprocess.run(snakemake_command, shell=False, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"")
+        print(f"ERROR: Snakemake failed with exit code {e.returncode}!", file=sys.stderr)
+        print(f"ERROR: Check the Snakemake logs for more details.", file=sys.stderr)
+        sys.exit(1)
 
 def run_snakemake_cataloging(workflow, output_dir, profile):
 
