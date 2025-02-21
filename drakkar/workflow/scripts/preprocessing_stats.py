@@ -86,15 +86,15 @@ def extract_bam_data(bam_files):
 
 def main():
     parser = argparse.ArgumentParser(description="Extract sequencing statistics from Fastp JSON, FASTQ, and BAM files")
-    parser.add_argument("-i", "--input", required=True, help="Glob pattern for Fastp JSON files (e.g., 'fastp_results/*.json')")
-    parser.add_argument("-o", "--output", required=True, help="Output filename (e.g., 'fastp_summary.tsv')")
+    parser.add_argument("-f", "--fastp", required=True, help="Glob pattern for Fastp JSON files (e.g., 'fastp_results/*.json')")
     parser.add_argument("-m", "--metagenomic", required=True, help="Glob pattern for FASTQ files (e.g., 'fastq_files/*_1.fq.gz')")
     parser.add_argument("-b", "--bam", required=True, help="Glob pattern for BAM files (e.g., 'bam_files/*.bam')")
+    parser.add_argument("-o", "--output", required=True, help="Output filename (e.g., 'fastp_summary.tsv')")
 
     args = parser.parse_args()
 
     # Collect data
-    json_files = glob.glob(args.input)
+    json_files = glob.glob(args.fastp)
     fastq_files = glob.glob(args.metagenomic)
     bam_files = glob.glob(args.bam)
 
@@ -106,8 +106,8 @@ def main():
         print("No BAM files found!")
 
     fastp_data = extract_fastp_data(json_files)
-    fastq_data = extract_fastq_data(fastq_files)
-    bam_data = extract_bam_data(bam_files)
+    fastq_data = extract_fastq_data(fastq_files) if fastq_files else {}
+    bam_data = extract_bam_data(bam_files) if bam_files else {}
 
     # Combine data
     all_samples = set(fastp_data.keys()) | set(fastq_data.keys()) | set(bam_data.keys())
