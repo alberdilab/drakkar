@@ -7,6 +7,7 @@ FASTP_MODULE = config["FASTP_MODULE"]
 BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 
+localrules: metagenomic_reads, host_reads
 
 ####
 # Run preprocessing rules
