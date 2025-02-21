@@ -207,6 +207,9 @@ def main():
                 print(f"DRAKKAR will continue with the information provided in the sample info file.")
                 file_references_to_json(args.file,args.output)
                 REFERENCE = True
+            else:
+                argument_references_to_json(args.reference,f"{args.output}/data/sample_to_reads1.json",args.output)
+                REFERENCE = True
 
         elif args.file and not args.reference:
             if check_reference_columns(args.file):
@@ -214,6 +217,11 @@ def main():
                 print(f"DRAKKAR will extract the reference genome information from the sample info file.")
                 file_references_to_json(args.file,args.output)
                 REFERENCE = True
+            else:
+                print(f"")
+                print(f"No reference genome information was provided in the info file.")
+                print(f"DRAKKAR will run without mapping against a reference genome.")
+                REFERENCE = False
 
         elif args.reference and not args.file:
             if check_reference_columns(args.file):
