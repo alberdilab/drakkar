@@ -116,10 +116,10 @@ rule split_reads:
         """
         module load {params.bowtie2_module} {params.samtools_module}
         samtools view -b -f12 -@ {threads} {input} | samtools fastq -@ {threads} -1 {output.r1} -2 {output.r2} - && \
-        samtools view -b -f12 -@ {threads} {input} | samtools view -c {input} > {output.metareads} && \
+        samtools view -b -f12 -@ {threads} {input} | samtools view -c - > {output.metareads} && \
         samtools view -b -f12 -@ {threads} {input} | samtools stats - | grep "^SN" | grep "bases mapped (cigar)" | cut -f3 > {output.metabases}
         samtools view -b -F12 -@ {threads} {input} | samtools sort -@ {threads} -o {output.bam} - && \
-        samtools view -b -F12 -@ {threads} {input} | samtools view -c {input} > {output.hostreads} && \
+        samtools view -b -F12 -@ {threads} {input} | samtools view -c - > {output.hostreads} && \
         samtools view -b -F12 -@ {threads} {input} | samtools stats - | grep "^SN" | grep "bases mapped (cigar)" | cut -f3 > {output.hostbases}
         """
 
