@@ -37,20 +37,20 @@ def generate_html_chunk(df, bar_height=28):
     # Create figure for relative abundances
     fig_relative = go.Figure()
     fig_relative.add_trace(go.Bar(
-        y=sample_names, x=pct_discarded, name="Discarded Bases",
+        y=sample_names, x=pct_discarded, name="Discarded",
         orientation='h', marker=dict(color="red"),
         hoverinfo='x+name'
     ))
 
     if has_host:
         fig_relative.add_trace(go.Bar(
-            y=sample_names, x=pct_host, name="Host Bases",
+            y=sample_names, x=pct_host, name="Host",
             orientation='h', marker=dict(color="orange"),
             hoverinfo='x+name'
         ))
 
     fig_relative.add_trace(go.Bar(
-        y=sample_names, x=pct_metagenomic, name="Metagenomic Bases",
+        y=sample_names, x=pct_metagenomic, name="Metagenomic",
         orientation='h', marker=dict(color="green"),
         hoverinfo='x+name'
     ))
@@ -69,20 +69,20 @@ def generate_html_chunk(df, bar_height=28):
     # Create figure for raw base counts in Gb
     fig_raw = go.Figure()
     fig_raw.add_trace(go.Bar(
-        y=sample_names, x=bases_discarded_gb, name="Discarded Bases (Gb)",
+        y=sample_names, x=bases_discarded_gb, name="Discarded",
         orientation='h', marker=dict(color="red"),
         hoverinfo='x+name'
     ))
 
     if has_host:
         fig_raw.add_trace(go.Bar(
-            y=sample_names, x=bases_host_gb, name="Host Bases (Gb)",
+            y=sample_names, x=bases_host_gb, name="Host",
             orientation='h', marker=dict(color="orange"),
             hoverinfo='x+name'
         ))
 
     fig_raw.add_trace(go.Bar(
-        y=sample_names, x=bases_metagenomic_gb, name="Metagenomic Bases (Gb)",
+        y=sample_names, x=bases_metagenomic_gb, name="Metagenomic",
         orientation='h', marker=dict(color="green"),
         hoverinfo='x+name'
     ))
