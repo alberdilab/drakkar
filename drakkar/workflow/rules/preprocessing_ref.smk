@@ -209,5 +209,3 @@ rule preprocessing_report:
         python {params.package_dir}/workflow/scripts/preprocessing_report.py -i {input.data} -r {input.report} -o {input.report}
         touch {output.done}
         """
-    run:
-        always_run()
