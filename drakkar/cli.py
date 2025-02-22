@@ -172,7 +172,7 @@ def main():
     ###
 
     if args.command == "unlock":
-        run_unlock(args.command, args.output)
+        run_unlock(args.command, args.output, args.profile)
     else:
         project_name = os.path.basename(os.path.normpath(args.output))
 
