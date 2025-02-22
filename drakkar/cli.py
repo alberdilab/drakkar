@@ -133,28 +133,31 @@ def main():
     subparser_complete.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_complete.add_argument("-r", "--reference", required=False, help="Reference host genome")
     subparser_complete.add_argument("-m", "--mode", required=False, help="Comma-separated list of cataloging modes (e.g. individual,all)")
+    subparser_complete.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile")
 
     subparser_preprocessing = subparsers.add_parser("preprocessing", help="Run the preprocessing workflow (quality-filtering and host removal)")
     subparser_preprocessing.add_argument("-i", "--input", required=False, help="Input directory (required if no sample detail file is provided)")
     subparser_preprocessing.add_argument("-f", "--file", required=False, help="Sample detail file (required if no input directory is provided)")
     subparser_preprocessing.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_preprocessing.add_argument("-r", "--reference", required=False, help="Reference host genome file (fna.gz)")
-    subparser_preprocessing.add_argument("-p", "--profile", required=False, help="Snakemake profile")
+    subparser_preprocessing.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile")
 
     subparser_cataloging = subparsers.add_parser("cataloging", help="Run the cataloging workflow (assemly and binning)")
     subparser_cataloging.add_argument("-i", "--input", required=False, help="Input directory (required if no sample detail file is provided)")
     subparser_cataloging.add_argument("-f", "--file", required=False, help="Sample detail file (required if no input directory is provided)")
     subparser_cataloging.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_cataloging.add_argument("-m", "--mode", required=False, help="Comma-separated list of cataloging modes (e.g. individual,all)")
-    subparser_cataloging.add_argument("-p", "--profile", required=False, help="Snakemake profile")
+    subparser_cataloging.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile")
 
     subparser_profiling = subparsers.add_parser("profiling", help="Run the profiling workflow")
     subparser_profiling.add_argument("-b", "--bins", required=True, help="Bins directory")
     subparser_profiling.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_profiling.add_argument("-t", "--type", required=False, default="genomes", help="Either genomes or pangenomes profiling type. Default: genomes")
+    subparser_profiling.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile")
 
     subparser_unlock = subparsers.add_parser("unlock", help="Unlock snakemake")
     subparser_unlock.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
+    subparser_unlock.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile")
 
     args = parser.parse_args()
 
@@ -304,14 +307,14 @@ def main():
 
     # Relative paths are turned into absolute paths
     if args.command == "complete":
-        run_snakemake_complete(args.command, project_name, args.input, args.output, args.reference, args.profile if args.profile else "slurm")
+        run_snakemake_complete(args.command, project_name, args.input, args.output, args.reference, args.profile)
         display_end()
     elif args.command == "preprocessing":
-        run_snakemake_preprocessing(args.command, project_name, Path(args.output).resolve(), REFERENCE, args.profile if args.profile else "slurm")
+        run_snakemake_preprocessing(args.command, project_name, Path(args.output).resolve(), REFERENCE, args.profile)
         display_end()
         preprocessing_summary(f"{args.output}/preprocessing.tsv")
     elif args.command == "cataloging":
-        run_snakemake_cataloging(args.command, project_name, Path(args.output).resolve(), args.profile if args.profile else "slurm")
+        run_snakemake_cataloging(args.command, project_name, Path(args.output).resolve(), args.profile)
         display_end()
     elif args.command == "profiling":
         run_snakemake_profiling(args.command, project_name, args.bins, args.type, args.output)
