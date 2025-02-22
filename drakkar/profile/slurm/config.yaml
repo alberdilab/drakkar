@@ -3,6 +3,7 @@ jobs: 20
 latency-wait: 60
 use-conda: true
 rerun-incomplete: true
+rerun-trigger: mtime
 keep-going: false
 retries: 3
 

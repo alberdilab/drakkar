@@ -56,7 +56,6 @@ def run_snakemake_complete(workflow, project_name, input_dir, output_dir, refere
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"–-rerun-trigger mtime "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} reference={reference} "
     ]
 
@@ -74,7 +73,6 @@ def run_snakemake_preprocessing(workflow, project_name, output_dir, reference, p
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"–rerun-trigger mtime "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} reference={reference} "
     ]
 
@@ -98,7 +96,6 @@ def run_snakemake_cataloging(workflow, project_name, output_dir, profile):
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"–-rerun-trigger mtime "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} "
     ]
 
@@ -115,7 +112,6 @@ def run_snakemake_profiling(workflow, bins_dir, output_dir):
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"–-rerun-trigger mtime "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} bins_dir={bins_dir} profiling_type={profiling_type} output_dir={output_dir}"
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
