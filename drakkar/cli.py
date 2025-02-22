@@ -42,7 +42,7 @@ def run_snakemake_complete(workflow, input_dir, output_dir, reference, mode, pro
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} workflow={workflow} output_dir={output_dir} reference={reference} "
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} reference={reference} "
     ]
 
     subprocess.run(snakemake_command, shell=False, check=True)
@@ -59,7 +59,7 @@ def run_snakemake_preprocessing(workflow, output_dir, reference, profile):
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} workflow={workflow} output_dir={output_dir} reference={reference} "
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} reference={reference} "
     ]
 
     unlock_command = [
@@ -92,7 +92,7 @@ def run_snakemake_cataloging(workflow, output_dir, profile):
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} workflow={workflow} output_dir={output_dir} "
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} "
     ]
 
     subprocess.run(snakemake_command, shell=False, check=True)
@@ -108,7 +108,7 @@ def run_snakemake_profiling(workflow, bins_dir, output_dir):
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} workflow={workflow} bins_dir={bins_dir} profiling_type={profiling_type} output_dir={output_dir}"
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} bins_dir={bins_dir} profiling_type={profiling_type} output_dir={output_dir}"
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
 
@@ -183,6 +183,9 @@ def main():
 
     # Check screen session
     check_screen_session()
+
+    # Extract project name from output path
+    project_name = os.path.basename(os.path.normpath(output_path))
 
     ###
     # Preprocessing

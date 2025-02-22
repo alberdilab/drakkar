@@ -121,7 +121,7 @@ rule split_reads:
         samtools view -F12 -@ {threads} {input} | awk '{{sum += length($10)}} END {{print sum}}' > {output.hostbases}
         """
 
-rule preprocessings_stats:
+rule preprocessing_stats:
     input:
         fastp=expand(f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}.json", sample=samples),
         reads_metagenomic=expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metareads", sample=samples),
@@ -142,3 +142,25 @@ rule preprocessings_stats:
         """
         python {params.package_dir}/workflow/scripts/preprocessing_stats.py -p {input.fastp} -m {input.bases_metagenomic} -M {input.reads_metagenomic} -g {input.bases_host} -G {input.reads_host} -o {output}
         """
+
+rule preprocessing_report:
+    input:
+        f"{OUTPUT_DIR}/preprocessing.tsv"
+    output:
+        html=f"{OUTPUT_DIR}/drakkar_report.html",
+        done=f"{OUTPUT_DIR}/data/preprocessing_report.done"
+    localrule: True
+    params:
+        package_dir={PACKAGE_DIR}
+    threads: 1
+    resources:
+        mem_mb=1*1024,
+        runtime=5
+    message: "Creating preprocessing stats..."
+    shell:
+        """
+        python {params.package_dir}/workflow/scripts/preprocessing_report.py -i {input} -r {output.html} -o {output.html}
+        touch {output.done}
+        """
+    run:
+        always_run()

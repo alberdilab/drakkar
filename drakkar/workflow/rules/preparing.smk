@@ -1,3 +1,27 @@
+####
+# Define config variables
+####
+
+PACKAGE_DIR = config["package_dir"]
+project_name = config["project_name"]
+
+rule create_report:
+    output:
+        f"{OUTPUT_DIR}/drakkar_report.html"
+    localrule: True
+    params:
+        package_dir={PACKAGE_DIR},
+        project_name={project_name}
+    threads: 1
+    resources:
+        mem_mb=1*1024,
+        runtime=5
+    message: "Initialising DRAKKAR report..."
+    shell:
+        """
+        python {params.package_dir}/workflow/scripts/create_report.py -p {params.project_name} -o {output}
+        """
+
 rule concatenate_or_link_reads:
     input:
         r1=lambda wildcards: SAMPLE_TO_READS1[wildcards.sample],

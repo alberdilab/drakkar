@@ -13,7 +13,7 @@ setup(
         "pandas",
         "argparse",
         "PyYAML",
-        "pysam"
+        "plotly"
     ],
     entry_points={
         "console_scripts": [
