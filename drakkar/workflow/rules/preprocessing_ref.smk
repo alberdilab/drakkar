@@ -192,9 +192,9 @@ rule preprocessing_stats:
 
 rule preprocessing_report:
     input:
-        f"{OUTPUT_DIR}/preprocessing.tsv"
+        data=f"{OUTPUT_DIR}/preprocessing.tsv",
+        report=f"{OUTPUT_DIR}/drakkar_report.html"
     output:
-        html=f"{OUTPUT_DIR}/drakkar_report.html",
         done=f"{OUTPUT_DIR}/data/preprocessing_report.done"
     localrule: True
     params:
@@ -206,7 +206,7 @@ rule preprocessing_report:
     message: "Creating preprocessing stats..."
     shell:
         """
-        python {params.package_dir}/workflow/scripts/preprocessing_report.py -i {input} -r {output.html} -o {output.html}
+        python {params.package_dir}/workflow/scripts/preprocessing_report.py -i {input.data} -r {input.report} -o {input.report}
         touch {output.done}
         """
     run:
