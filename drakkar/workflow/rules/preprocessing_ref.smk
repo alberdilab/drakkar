@@ -121,6 +121,53 @@ rule split_reads:
         samtools view -F12 -@ {threads} {input} | awk '{{sum += length($10)}} END {{print sum}}' > {output.hostbases}
         """
 
+rule singlem:
+    input:
+        r1=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz",
+        r2=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz"
+    output:
+        otu=f"{OUTPUT_DIR}/preprocessing/singlem/{{sample}}_OTU.tsv",
+        condense=f"{OUTPUT_DIR}/preprocessing/singlem/{{sample}}_cond.tsv"
+    params:
+        singlem_module={SINGLEM_MODULE}
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 100) * 2 ** (attempt - 1))
+    shell:
+        """
+        module load {params.singlem_module}
+        singlem pipe \
+            -1 {input.r1} \
+            -2 {input.r2} \
+            --otu-table {output.otu} \
+            --taxonomic-profile {output.condense} \
+            --threads {threads}
+        """
+
+rule singlem_mf:
+    input:
+        r1=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz",
+        r2=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz",
+        profile=f"{OUTPUT_DIR}/preprocessing/singlem/{{sample}}_cond.tsv"
+    output:
+        f"{OUTPUT_DIR}/preprocessing/singlem/{{sample}}_smf.tsv"
+    params:
+        singlem_module={SINGLEM_MODULE}
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 100) * 2 ** (attempt - 1))
+    shell:
+        """
+        module load {params.singlem_module}
+        singlem microbial_fraction \
+            -1 {input.r1} \
+            -2 {input.r2} \
+            --input-profile {input.profile} \
+            --output-tsv {output}
+        """
+
 rule preprocessing_stats:
     input:
         fastp=expand(f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}.json", sample=samples),

@@ -161,6 +161,10 @@ rule assembly_maxbin:
             with open(output[0], "w") as f:
                 f.write("")
 
+#rule assembly_semibin:
+
+#rule assembly_metacoder:
+
 rule assembly_binette:
     input:
         metabat2=f"{OUTPUT_DIR}/cataloging/metabat2/{{assembly}}/{{assembly}}.tsv",
