@@ -6,6 +6,7 @@ PACKAGE_DIR = config["package_dir"]
 FASTP_MODULE = config["FASTP_MODULE"]
 BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
+SINGLEM_MODULE = config["SINGLEM_MODULE"]
 
 ####
 # Run preprocessing rules
