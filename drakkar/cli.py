@@ -30,6 +30,20 @@ config_vars = load_config()
 # Define workflow launching functions
 ###
 
+def run_unlock(workflow, output_dir, profile):
+
+    unlock_command = [
+        "/bin/bash", "-c",  # Ensures the module system works properly
+        f"module load {config_vars['SNAKEMAKE_MODULE']} && "
+        "snakemake "
+        f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
+        f"--directory {output_dir} "
+        f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
+        f"--unlock"
+    ]
+
+    subprocess.run(unlock_command, shell=False, check=True)
+
 def run_snakemake_complete(workflow, input_dir, output_dir, reference, mode, profile):
 
     """ Run the complete workflow """
@@ -42,6 +56,7 @@ def run_snakemake_complete(workflow, input_dir, output_dir, reference, mode, pro
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
+        f"–-rerun-trigger mtime "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} reference={reference} "
     ]
 
@@ -59,17 +74,8 @@ def run_snakemake_preprocessing(workflow, output_dir, reference, profile):
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
+        f"–rerun-trigger mtime "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} reference={reference} "
-    ]
-
-    unlock_command = [
-        "/bin/bash", "-c",  # Ensures the module system works properly
-        f"module load {config_vars['SNAKEMAKE_MODULE']} && "
-        "snakemake "
-        f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
-        f"--directory {output_dir} "
-        f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
-        f"--unlock"
     ]
 
     try:
@@ -92,6 +98,7 @@ def run_snakemake_cataloging(workflow, output_dir, profile):
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
+        f"–-rerun-trigger mtime "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} "
     ]
 
@@ -108,35 +115,10 @@ def run_snakemake_profiling(workflow, bins_dir, output_dir):
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
+        f"–-rerun-trigger mtime "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} bins_dir={bins_dir} profiling_type={profiling_type} output_dir={output_dir}"
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
-
-def run_snakemake_annotation(workflow, assembly_dir, output_dir):
-    """ Run the annotation workflow """
-    snakemake_command = [
-        f"module load {SNAKEMAKE_MODULE}",
-        "snakemake",
-        "-s", str(Path(__file__).parent / "workflow" / "Snakefile"),
-        "--config",
-            f"workflow={workflow}",
-            f"assembly_dir={assembly_dir}",
-            f"output_dir={output_dir}"
-    ]
-    subprocess.run(" && ".join(snakemake_command), shell=True, check=True)
-
-def run_snakemake_quantification(workflow, assembly_dir, output_dir):
-    """ Run the quantification workflow """
-    snakemake_command = [
-        f"module load {SNAKEMAKE_MODULE}",
-        "snakemake",
-        "-s", str(Path(__file__).parent / "workflow" / "Snakefile"),
-        "--config",
-            f"workflow={workflow}",
-            f"assembly_dir={assembly_dir}",
-            f"output_dir={output_dir}"
-    ]
-    subprocess.run(" && ".join(snakemake_command), shell=True, check=True)
 
 ###
 # Main function to launch workflows
@@ -148,7 +130,6 @@ def main():
         formatter_class=argparse.RawTextHelpFormatter
     )
     subparsers = parser.add_subparsers(dest="command", help="Available workflows")
-
 
     # Define subcommands for each workflow
     subparser_complete = subparsers.add_parser("complete", help="Run the complete workflow")
@@ -176,6 +157,8 @@ def main():
     subparser_profiling.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_profiling.add_argument("-t", "--type", required=False, default="genomes", help="Either genomes or pangenomes profiling type. Default: genomes")
 
+    subparser_unlock = subparsers.add_parser("unlock", help="Unlock snakemake")
+
     args = parser.parse_args()
 
     # Display ASCII logo before running any command or showing help
@@ -190,6 +173,9 @@ def main():
     ###
     # Preprocessing
     ###
+
+    if args.command == "unlock":
+        run_unlock(args.command, args.input, args.output)
 
     if args.command == "preprocessing":
 
