@@ -168,7 +168,7 @@ def main():
     check_screen_session()
 
     # Extract project name from output path
-    project_name = os.path.basename(os.path.normpath(output_path))
+    project_name = os.path.basename(os.path.normpath(args.output))
 
     ###
     # Preprocessing
