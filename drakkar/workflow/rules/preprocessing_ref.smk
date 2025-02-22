@@ -130,14 +130,15 @@ rule preprocessings_stats:
         bases_host=expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostbases", sample=samples)
     output:
         f"{OUTPUT_DIR}/preprocessing.tsv"
+    localrule: True
     params:
         package_dir={PACKAGE_DIR}
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 1024) * 2 ** (attempt - 1))
+        mem_mb=1*1024,
+        runtime=5
     message: "Creating preprocessing stats..."
     shell:
         """
-        python {params.package_dir}/workflow/scripts/preprocessing_stats.py -p "{input.fastp}" -m "{input.bases_metagenomic}" -M "{input.reads_metagenomic}" -g "{input.bases_host}" -G "{input.reads_host}" -o {output}
+        python {params.package_dir}/workflow/scripts/preprocessing_stats.py -p {input.fastp} -m {input.bases_metagenomic} -M {input.reads_metagenomic} -g {input.bases_host} -G {input.reads_host} -o {output}
         """

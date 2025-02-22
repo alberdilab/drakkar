@@ -53,14 +53,15 @@ rule preprocessings_stats:
         fastq=expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz", sample=samples),
     output:
         f"{OUTPUT_DIR}/preprocessing.tsv"
+    localrule: True
     params:
         package_dir={PACKAGE_DIR}
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 1024) * 2 ** (attempt - 1))
+        mem_mb= 1*1024,
+        runtime= 5
     message: "Creating preprocessing stats..."
     shell:
         """
-        python {params.package_dir}/workflow/scripts/preprocessing_stats.py -p "{input.fastp}" -f "{input.fastq}" -o {output}
+        python {params.package_dir}/workflow/scripts/preprocessing_stats.py -p {input.fastp} -f {input.fastq} -o {output}
         """

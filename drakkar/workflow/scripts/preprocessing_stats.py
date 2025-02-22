@@ -76,44 +76,23 @@ def extract_text_data(text_files, suffix):
 
 def main():
     parser = argparse.ArgumentParser(description="Extract sequencing statistics from Fastp JSON, FASTQ, and BAM files")
-    parser.add_argument("-p", "--fastp", required=True, help="Glob pattern for Fastp JSON files (e.g., 'fastp_results/*.json')")
-    parser.add_argument("-f", "--fastq", required=False, help="Glob pattern for FASTQ files (e.g., 'fastq_files/*_1.fq.gz')")
-    parser.add_argument("-m", "--metagenomic_bases", required=False, help="Glob pattern for FASTQ files (e.g., 'fastq_files/*_1.fq.gz')")
-    parser.add_argument("-M", "--metagenomic_reads", required=False, help="Glob pattern for FASTQ files (e.g., 'fastq_files/*_1.fq.gz')")
-    parser.add_argument("-g", "--genomic_bases", required=False, help="Glob pattern for BAM files (e.g., 'bam_files/*.bam')")
-    parser.add_argument("-G", "--genomic_reads", required=False, help="Glob pattern for BAM files (e.g., 'bam_files/*.bam')")
+    parser.add_argument("-p", "--fastp", required=True, nargs='+', help="Space-separated fastp JSON files")
+    parser.add_argument("-f", "--fastq", required=False, nargs='+', help="Space-separated fastq files")
+    parser.add_argument("-m", "--metagenomic_bases", required=False, nargs='+', help="Space-separated metabases files")
+    parser.add_argument("-M", "--metagenomic_reads", required=False, nargs='+', help="Space-separated metareads files")
+    parser.add_argument("-g", "--genomic_bases", required=False, nargs='+', help="Space-separated hostbases files")
+    parser.add_argument("-G", "--genomic_reads", required=False, nargs='+', help="Space-separated hostreads files")
     parser.add_argument("-o", "--output", required=True, help="Output filename (e.g., 'fastp_summary.tsv')")
 
     args = parser.parse_args()
 
     # Collect data
-    json_files = glob.glob(args.fastp)
-    fastp_data = extract_fastp_data(json_files)
-    if args.fastq:
-        fastq_files = glob.glob(args.fastq)
-        fastq_data = extract_fastq_data(fastq_files)
-    else:
-        fastq_data = {}
-    if args.metagenomic_bases:
-        metagenomic_bases_files = glob.glob(args.metagenomic_bases)
-        metagenomic_bases_data = extract_text_data(metagenomic_bases_files,".metabases")
-    else:
-        metagenomic_bases_data = {}
-    if args.metagenomic_reads:
-        metagenomic_reads_files = glob.glob(args.metagenomic_reads)
-        metagenomic_reads_data = extract_text_data(metagenomic_reads_files,".metareads")
-    else:
-        metagenomic_reads_data = {}
-    if args.genomic_bases:
-        genomic_bases_files = glob.glob(args.genomic_bases)
-        genomic_bases_data = extract_text_data(genomic_bases_files,".hostbases")
-    else:
-        genomic_bases_data = {}
-    if args.genomic_reads:
-        genomic_reads_files = glob.glob(args.genomic_reads)
-        genomic_reads_data = extract_text_data(genomic_reads_files,".hostreads")
-    else:
-        genomic_reads_data = {}
+    fastp_data = extract_fastp_data(args.fastp)
+    fastq_data = extract_fastq_data(args.fastq) if args.fastq else {}
+    metagenomic_bases_data = extract_text_data(args.metagenomic_bases,".metabases") if args.metagenomic_bases else {}
+    metagenomic_reads_data = extract_text_data(args.metagenomic_reads,".metareads") if args.metagenomic_reads else {}
+    genomic_bases_data = extract_text_data(args.genomic_bases,".hostbases") if args.genomic_bases else {}
+    genomic_reads_data = extract_text_data(args.genomic_reads,".hostreads") if args.genomic_reads else {}
 
     # Combine data
     all_samples = set(fastp_data.keys()) | set(fastq_data.keys()) | set(metagenomic_bases_data.keys()) | set(metagenomic_reads_data.keys()) | set(genomic_bases_data.keys()) | set(genomic_reads_data.keys())
@@ -123,15 +102,15 @@ def main():
         summary_list.append({
             "sample": sample,
             "reads_raw": fastp_data.get(sample, {}).get("reads_raw", "NA"),
-            "bases_raw": fastp_data.get(sample, {}).get("bases_raw", "NA"),
             "reads_discarded": fastp_data.get(sample, {}).get("reads_discarded", "NA"),
-            "bases_discarded": fastp_data.get(sample, {}).get("bases_discarded", "NA"),
-            "reads_metagenomic": fastq_data.get(sample, {}).get("reads_metagenomic", "NA"),
-            "bases_metagenomic": fastq_data.get(sample, {}).get("bases_metagenomic", "NA"),
-            "reads_metagenomic": metagenomic_reads_data.get(sample, "NA"),
-            "bases_metagenomic": metagenomic_bases_data.get(sample, "NA"),
             "reads_host": genomic_reads_data.get(sample, "NA"),
-            "bases_host": genomic_bases_data.get(sample, "NA")
+            "reads_metagenomic": fastq_data.get(sample, {}).get("reads_metagenomic", "NA"),
+            "reads_metagenomic": metagenomic_reads_data.get(sample, "NA"),
+            "bases_raw": fastp_data.get(sample, {}).get("bases_raw", "NA"),
+            "bases_discarded": fastp_data.get(sample, {}).get("bases_discarded", "NA"),
+            "bases_host": genomic_bases_data.get(sample, "NA"),
+            "bases_metagenomic": fastq_data.get(sample, {}).get("bases_metagenomic", "NA"),
+            "bases_metagenomic": metagenomic_bases_data.get(sample, "NA")
         })
 
     df = pd.DataFrame(summary_list)
