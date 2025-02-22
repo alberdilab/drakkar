@@ -26,8 +26,8 @@ rule assembly:
         outputdir=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}"
     threads: 8
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly])) * 5 * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 100) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 50) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb) * 2 ** (attempt - 1))
     message: "Assembling {wildcards.assembly}..."
     shell:
         """
@@ -57,8 +57,8 @@ rule assembly_index:
         basename=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}"
     threads: 1
     resources:
-        mem_mb=32*1024,
-        runtime=60
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 5) * 2 ** (attempt - 1))
     message: "Indexing assembly {wildcards.assembly}..."
     shell:
         """
@@ -80,8 +80,8 @@ rule assembly_map:
         basename=lambda wildcards: f"{OUTPUT_DIR}/cataloging/megahit/{wildcards.assembly}/{wildcards.assembly}"
     threads: 8
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 150) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 5) * 2 ** (attempt - 1))
     message: "Mapping reads to assembly {wildcards.assembly}..."
     shell:
         """
@@ -99,8 +99,8 @@ rule assembly_map_depth:
         metabat2_module={METABAT2_MODULE}
     threads: 1
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 150) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 20) * 2 ** (attempt - 1))
     message: "Calculating mapping states of assembly {wildcards.assembly}..."
     shell:
         """
@@ -119,8 +119,8 @@ rule assembly_metabat:
         metabat2_module={METABAT2_MODULE}
     threads: 1
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 150) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 5) * 2 ** (attempt - 1))
     message: "Binning contigs from assembly {wildcards.assembly} using metabat2..."
     shell:
         """
@@ -139,8 +139,8 @@ rule assembly_maxbin:
         basename=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(sum(preprocessed_mb.get(sample, 1) for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]) / 1024 * 150) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 5) * 2 ** (attempt - 1))
     message: "Binning contigs from assembly {wildcards.assembly} using maxbin2..."
     run: # Rule run using python to ensure the pipeline does not crush if no bins are generated
         import os
@@ -175,8 +175,8 @@ rule assembly_binette:
         outdir=f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, input.size_mb * 1024 * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(15, input.size_mb * 10 * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 5) * 2 ** (attempt - 1))
     message: "Refining bins from assembly {wildcards.assembly} using binette..."
     shell:
         """
@@ -227,5 +227,5 @@ rule assembly_final:
         mkdir {params.final}
         mv {params.binette}/final_bins/* {params.final}
         mv {input} {output.metadata}
-        find {params.final} -type f -name "*.fna" -print > {output.paths}
+        find {params.final} -type f -name "*.fa" -print > {output.paths}
         """

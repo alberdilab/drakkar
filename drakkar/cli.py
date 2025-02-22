@@ -321,6 +321,7 @@ def main():
     elif args.command == "preprocessing":
         run_snakemake_preprocessing(args.command, Path(args.output).resolve(), REFERENCE, args.profile if args.profile else "slurm")
         display_end()
+        preprocessing_summary(f"{args.output}/preprocessing.tsv")
     elif args.command == "cataloging":
         run_snakemake_cataloging(args.command, Path(args.output).resolve(), args.profile if args.profile else "slurm")
         display_end()

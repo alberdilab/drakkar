@@ -321,3 +321,42 @@ def file_assemblies_to_json(infofile=None, samples=None, individual=False, all=F
     os.makedirs(f"{output}/data", exist_ok=True)
     with open(f"{output}/data/assembly_to_samples.json", "w") as f:
         json.dump(ASSEMBLY_TO_SAMPLE, f)
+
+def preprocessing_summary(summary_table, bar_width=50):
+    """
+    Prints a single horizontal stacked barplot representing the AVERAGE percentage of
+    bases_discarded, bases_host, and bases_metagenomic across all samples.
+
+    Uses:
+    - '░' (light block) for discarded bases
+    - '▒' (medium block) for host bases
+    - '█' (full block) for metagenomic bases
+    - '│' (vertical separator) between categories
+    """
+
+    # Compute total sums
+    total_discarded = df["bases_discarded"].sum()
+    total_host = df["bases_host"].sum()
+    total_metagenomic = df["bases_metagenomic"].sum()
+
+    total_bases = total_discarded + total_host + total_metagenomic
+    if total_bases == 0:
+        print("No data available")
+        return
+
+    # Compute AVERAGE percentages
+    pct_discarded = (total_discarded / total_bases) * 100
+    pct_host = (total_host / total_bases) * 100
+    pct_metagenomic = (total_metagenomic / total_bases) * 100
+
+    # Compute character count for each section
+    discarded_chars = round((pct_discarded / 100) * bar_width)
+    host_chars = round((pct_host / 100) * bar_width)
+    metagenomic_chars = bar_width - discarded_chars - host_chars  # Ensure total width matches
+
+    # Construct the visual bar
+    bar = "░" * discarded_chars + "│" + "▒" * host_chars + "│" + "█" * metagenomic_chars
+
+    # Print the averages and the stacked barplot
+    print(f"░ Discarded: {pct_discarded:.1f}%, ▒ Host: {pct_host:.1f}%, █ Metagenomic: {pct_metagenomic:.1f}%")
+    print(f"│{bar}│")
