@@ -38,6 +38,7 @@ def run_unlock(workflow, output_dir, profile):
         "snakemake "
         f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
         f"--directory {output_dir} "
+        f"--configfile {CONFIG_PATH} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--unlock"
     ]
