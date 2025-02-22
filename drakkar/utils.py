@@ -334,6 +334,8 @@ def preprocessing_summary(summary_table, bar_width=50):
     - '│' (vertical separator) between categories
     """
 
+    df = pd.read_csv(summary_table, sep="\t")
+
     # Compute total sums
     total_discarded = df["bases_discarded"].sum()
     total_host = df["bases_host"].sum()
