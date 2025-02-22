@@ -30,7 +30,7 @@ config_vars = load_config()
 # Define workflow launching functions
 ###
 
-def run_unlock(workflow, project_name, output_dir, profile):
+def run_unlock(workflow, output_dir, profile):
 
     unlock_command = [
         "/bin/bash", "-c",  # Ensures the module system works properly
@@ -154,6 +154,7 @@ def main():
     subparser_profiling.add_argument("-t", "--type", required=False, default="genomes", help="Either genomes or pangenomes profiling type. Default: genomes")
 
     subparser_unlock = subparsers.add_parser("unlock", help="Unlock snakemake")
+    subparser_unlock.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
 
     args = parser.parse_args()
 
@@ -164,14 +165,16 @@ def main():
     check_screen_session()
 
     # Extract project name from output path
-    project_name = os.path.basename(os.path.normpath(args.output))
+
 
     ###
     # Preprocessing
     ###
 
     if args.command == "unlock":
-        run_unlock(args.command, args.input, args.output)
+        run_unlock(args.command, args.output)
+    else:
+        project_name = os.path.basename(os.path.normpath(args.output))
 
     if args.command == "preprocessing":
 
