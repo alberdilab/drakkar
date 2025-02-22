@@ -30,7 +30,7 @@ config_vars = load_config()
 # Define workflow launching functions
 ###
 
-def run_unlock(workflow, output_dir, profile):
+def run_unlock(workflow, project_name, output_dir, profile):
 
     unlock_command = [
         "/bin/bash", "-c",  # Ensures the module system works properly
@@ -44,7 +44,7 @@ def run_unlock(workflow, output_dir, profile):
 
     subprocess.run(unlock_command, shell=False, check=True)
 
-def run_snakemake_complete(workflow, input_dir, output_dir, reference, mode, profile):
+def run_snakemake_complete(workflow, project_name, input_dir, output_dir, reference, mode, profile):
 
     """ Run the complete workflow """
 
@@ -62,7 +62,7 @@ def run_snakemake_complete(workflow, input_dir, output_dir, reference, mode, pro
 
     subprocess.run(snakemake_command, shell=False, check=True)
 
-def run_snakemake_preprocessing(workflow, output_dir, reference, profile):
+def run_snakemake_preprocessing(workflow, project_name, output_dir, reference, profile):
 
     """ Run the preprocessing workflow """
 
@@ -305,17 +305,17 @@ def main():
 
     # Relative paths are turned into absolute paths
     if args.command == "complete":
-        run_snakemake_complete(args.command, args.input, args.output, args.reference, args.profile if args.profile else "slurm")
+        run_snakemake_complete(args.command, project_name, args.input, args.output, args.reference, args.profile if args.profile else "slurm")
         display_end()
     elif args.command == "preprocessing":
-        run_snakemake_preprocessing(args.command, Path(args.output).resolve(), REFERENCE, args.profile if args.profile else "slurm")
+        run_snakemake_preprocessing(args.command, project_name, Path(args.output).resolve(), REFERENCE, args.profile if args.profile else "slurm")
         display_end()
         preprocessing_summary(f"{args.output}/preprocessing.tsv")
     elif args.command == "cataloging":
-        run_snakemake_cataloging(args.command, Path(args.output).resolve(), args.profile if args.profile else "slurm")
+        run_snakemake_cataloging(args.command, project_name, Path(args.output).resolve(), args.profile if args.profile else "slurm")
         display_end()
     elif args.command == "profiling":
-        run_snakemake_profiling(args.command, args.bins, args.type, args.output)
+        run_snakemake_profiling(args.command, project_name, args.bins, args.type, args.output)
     else:
         parser.print_help()
 
