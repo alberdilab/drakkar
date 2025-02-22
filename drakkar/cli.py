@@ -86,7 +86,7 @@ def run_snakemake_preprocessing(workflow, project_name, output_dir, reference, p
         print(f"ERROR: Check the Snakemake logs for more details.", file=sys.stderr)
         sys.exit(1)
 
-def run_snakemake_cataloging(workflow, output_dir, profile):
+def run_snakemake_cataloging(workflow, project_name, output_dir, profile):
 
     """ Run the cataloging workflow """
 
