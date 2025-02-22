@@ -167,9 +167,7 @@ if WORKFLOW == "cataloging":
 
     rule all:
         input:
-            expand(f"{OUTPUT_DIR}/cataloging/final/{{assembly}}.tsv", assembly=assemblies),
-            f"{OUTPUT_DIR}/drakkar_report.html",
-            f"{OUTPUT_DIR}/data/cataloging_report.done"
+            expand(f"{OUTPUT_DIR}/cataloging/final/{{assembly}}.tsv", assembly=assemblies)
 
     include: "rules/cataloging.smk"
 
