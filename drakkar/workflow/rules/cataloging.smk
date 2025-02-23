@@ -228,7 +228,7 @@ rule rename_bins:
     output:
         f"{OUTPUT_DIR}/cataloging/final/{{assembly}}/{{assembly}}_bin_{{bin_id}}.fa"
     params:
-        assembly=f"{wildcards.assembly}"
+        assembly="{wildcards.assembly}"
     threads: 1
     resources:
         mem_mb=8*1024,
