@@ -46,7 +46,6 @@ rule gtdbtk:
         gtdbtk classify_wf \
             --batchfile {input} \
             --out_dir {params.outdir} \
-            --tmpdir {params.tmpdir} \
             --cpus {threads} \
             --skip_ani_screen
         """
