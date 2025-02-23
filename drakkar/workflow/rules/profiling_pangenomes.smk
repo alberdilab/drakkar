@@ -3,7 +3,8 @@
 ####
 
 DREP_MODULE = config["DREP_MODULE"]
-PRODIGAL_MODULE =
+BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
+SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 
 rule prodigal:
     input:

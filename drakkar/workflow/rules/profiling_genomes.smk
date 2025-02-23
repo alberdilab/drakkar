@@ -3,10 +3,12 @@
 ####
 
 DREP_MODULE = config["DREP_MODULE"]
+BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
+SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 
 rule dereplicate:
     input:
-         expand("{bin_path}", bin_path=BINS_TO_FILES.values()) 
+         expand("{bin_path}", bin_path=BINS_TO_FILES.values())
     output:
         dir=directory(f"{OUTPUT_DIR}/profiling_genomes/drep/dereplicated_genomes"),
         Cdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Cdb.csv",
