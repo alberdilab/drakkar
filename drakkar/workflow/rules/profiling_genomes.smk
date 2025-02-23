@@ -15,8 +15,7 @@ checkpoint dereplicate:
         Bdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Bdb.csv",
         Wdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Wdb.csv"
     params:
-        drep_module={DREP_MODULE},
-        checkm2_module={CHECKM2_MODULE},
+        drep_module={DREP_MODULE}
         outdir=f"{OUTPUT_DIR}/profiling_genomes/drep/"
     threads: 8
     resources:
