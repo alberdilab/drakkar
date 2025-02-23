@@ -30,6 +30,7 @@ rule gtdbtk:
         f"{OUTPUT_DIR}/annotating/gtdbtk/classify/gtdbtk.bac120.summary.tsv"
     params:
         gtdbtk_module={GTDBTK_MODULE},
+        data=f"/datasets/globe_databases/gtdbtk_db/20241001"
         outdir=f"{OUTPUT_DIR}/profiling_genomes/gtdbtk/",
         tmpdir=f"{OUTPUT_DIR}/profiling_genomes/tmp/"
     threads: 8
@@ -40,6 +41,7 @@ rule gtdbtk:
     shell:
         """
         module load {params.gtdbtk_module}
+        export GTDBTK_DATA_PATH={params.data}
         mkdir {params.tmpdir}
         gtdbtk classify_wf \
             --batchfile {input} \
