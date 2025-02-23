@@ -2,23 +2,20 @@
 # Define config variables
 ####
 
-DIAMOND_MODULE = config["DIAMOND_MODULE"]
-CHECKM2_MODULE = config["CHECKM2_MODULE"]
 DREP_MODULE = config["DREP_MODULE"]
 BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 
 checkpoint dereplicate:
     input:
-         expand("{bin_path}", bin_path=BINS_TO_FILES.values())
+        genomes=expand("{bin_path}", bin_path=BINS_TO_FILES.values()),
+        metadata=f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv"
     output:
         Cdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Cdb.csv",
         Bdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Bdb.csv",
         Wdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Wdb.csv"
     params:
-        drep_module={DREP_MODULE},
-        checkm2_module={CHECKM2_MODULE},
-        diamond_module={DIAMOND_MODULE}
+        drep_module={DREP_MODULE}
     threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
@@ -26,8 +23,9 @@ checkpoint dereplicate:
     message: "Dereplicating bins using dRep..."
     shell:
         """
-        module load {params.diamond_module} {params.checkm2_module} {params.drep_module}
-        dRep dereplicate {output.dir} -p {threads} -g {input} -sa 0.98
+        module load {params.drep_module}
+        rm -rf {params.outdir}
+        dRep dereplicate {params.outdir} -p {threads} -g {input.genomes} -sa 0.95 --genomeInfo {input.metadata}
         """
 
 # Functions to define the input files dynamically.
