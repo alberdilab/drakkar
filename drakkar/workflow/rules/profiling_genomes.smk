@@ -58,6 +58,10 @@ rule index_catalogue:
     params:
         bowtie2_module={BOWTIE2_MODULE},
         basename=f"{OUTPUT_DIR}/profiling_genomes/catalogue/genome_catalogue"
+    threads: 8
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 1024 * 5) * 2 ** (attempt - 1))
     shell:
         """
         module load {params.bowtie2_module}
