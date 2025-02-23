@@ -2,6 +2,8 @@
 # Define config variables
 ####
 
+DIAMOND_MODULE = config["DIAMOND_MODULE"]
+CHECKM2_MODULE = config["CHECKM2_MODULE"]
 DREP_MODULE = config["DREP_MODULE"]
 BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
@@ -15,7 +17,8 @@ rule dereplicate:
         Bdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Bdb.csv",
         Wdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Wdb.csv"
     params:
-        drep_module={DREP_MODULE}
+        drep_module={DREP_MODULE},
+        checkm2_module={CHECKM2_MODULE}
     threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
@@ -23,8 +26,8 @@ rule dereplicate:
     message: "Dereplicating bins using dRep..."
     shell:
         """
-        module load {params.drep_module}
-        dRep dereplicate {output.dir} -p {threads} -g {input}
+        module load {params.diamond_module} {params.checkm2_module} {params.drep_module}
+        dRep dereplicate {output.dir} -p {threads} -g {input} -sa 0.98
         """
 
 rule merge_catalogue:
