@@ -30,7 +30,7 @@ rule gtdbtk:
         f"{OUTPUT_DIR}/annotating/gtdbtk/classify/gtdbtk.bac120.summary.tsv"
     params:
         gtdbtk_module={GTDBTK_MODULE},
-        data=f"/datasets/globe_databases/gtdbtk_db/20241001"
+        data=f"/datasets/globe_databases/gtdbtk_db/20241001",
         outdir=f"{OUTPUT_DIR}/profiling_genomes/gtdbtk/",
         tmpdir=f"{OUTPUT_DIR}/profiling_genomes/tmp/"
     threads: 8
