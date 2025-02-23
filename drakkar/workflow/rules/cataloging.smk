@@ -2,6 +2,7 @@
 # Define config variables
 ####
 
+PACKAGE_DIR = config["package_dir"]
 MEGAHIT_MODULE = config["MEGAHIT_MODULE"]
 BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
