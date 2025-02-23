@@ -17,8 +17,8 @@ def create_mag_table(names, paths, output_tsv):
     df = pd.DataFrame({"path": paths, "name": names})
 
     # Save as TSV file
-    df.to_csv(output_tsv, sep="\t", index=False)
-    
+    df.to_csv(output_tsv, sep="\t", index=False, header=False)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate a two-column TSV file with paths and names.")
     parser.add_argument("--names", nargs="+", required=True, help="List of MAG names.")
