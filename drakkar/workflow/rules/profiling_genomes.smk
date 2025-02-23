@@ -96,6 +96,8 @@ rule quantify_reads_catalogue:
         expand(f"{OUTPUT_DIR}/profiling_genomes/bowtie2/{{sample}}.bam", sample=samples)
     output:
         f"{OUTPUT_DIR}/profiling_genomes/coverm/coverm.tsv"
+    params:
+        coverm_module={COVERM_MODULE}
     threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb / 5) * 2 ** (attempt - 1)),
@@ -104,6 +106,7 @@ rule quantify_reads_catalogue:
         "Generating mapping statistics with..."
     shell:
         """
+        module load {params.coverm_module}
         coverm genome \
             -b {input} \
             -s ^ \
