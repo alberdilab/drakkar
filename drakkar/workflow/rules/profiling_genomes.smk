@@ -91,7 +91,7 @@ rule map_to_catalogue:
         bowtie2 -x {params.basename} -1 {input.r1} -2 {input.r2} -p {threads} | samtools view -bS - | samtools sort -o {output}
         """
 
-rule quantify_reads:
+rule quantify_reads_catalogue:
     input:
         expand(f"{OUTPUT_DIR}/profiling_genomes/bowtie2/{{sample}}.bam", sample=samples)
     output:
