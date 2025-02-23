@@ -229,7 +229,6 @@ rule rename_bins:
     output:
         bin=f"{OUTPUT_DIR}/cataloging/final/{{assembly}}/{{assembly}}_bin_{{bin_id}}.fa"
     params:
-        assembly="{wildcards.assembly}",
         package_dir={PACKAGE_DIR}
     threads: 1
     resources:
@@ -238,7 +237,7 @@ rule rename_bins:
     message: "Renaming final bins from assembly {wildcards.assembly}..."
     shell:
         """
-        python {params.package_dir}/workflow/scripts/rename_bins.py {params.assembly} {input.bin} {output.bin}
+        python {params.package_dir}/workflow/scripts/rename_bins.py {wildcards.assembly} {input.bin} {output.bin}
         """
 
 rule move_metadata:
