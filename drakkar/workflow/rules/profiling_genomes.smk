@@ -18,7 +18,8 @@ rule dereplicate:
         Wdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Wdb.csv"
     params:
         drep_module={DREP_MODULE},
-        checkm2_module={CHECKM2_MODULE}
+        checkm2_module={CHECKM2_MODULE},
+        diamond_module={DIAMOND_MODULE}
     threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
