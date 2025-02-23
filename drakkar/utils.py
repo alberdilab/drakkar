@@ -323,7 +323,7 @@ def file_assemblies_to_json(infofile=None, samples=None, individual=False, all=F
         json.dump(ASSEMBLY_TO_SAMPLE, f)
 
 # Create dictionary of bin names and paths from the input file
-def file_bins_to_json(file=None, output=False):
+def file_bins_to_json(paths_file=None, output=False):
     fasta_dict = {}
 
     # Read the paths file
@@ -343,7 +343,7 @@ def file_bins_to_json(file=None, output=False):
     with open(f"{output}/data/bins_to_files.json", "w") as f:
         json.dump(fasta_dict, f, indent=4)
 
-def path_bins_to_json(file=None, output=False):
+def path_bins_to_json(folder_path=None, output=False):
     fasta_dict = {}
 
     # Ensure folder exists
