@@ -6,7 +6,7 @@ DREP_MODULE = config["DREP_MODULE"]
 
 rule dereplicate:
     input:
-         expand("{bin_path}", bin_path=bins_dict.values()) 
+         expand("{bin_path}", bin_path=BINS_TO_FILES.values()) 
     output:
         dir=directory(f"{OUTPUT_DIR}/profiling_genomes/drep/dereplicated_genomes"),
         Cdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Cdb.csv",
