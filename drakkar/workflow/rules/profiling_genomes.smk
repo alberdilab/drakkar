@@ -36,7 +36,7 @@ def get_mag_ids_from_drep(csv_path):
 def get_mag_fna(wildcards):
     checkpoint_output = checkpoints.dereplicate.get(**wildcards).output[0]
     selected_bins = get_mag_ids_from_drep(checkpoint_output)
-    return expand(f"{OUTPUT_DIR}/profiling/drep/dereplicated_genomes/{{bin_id}}", bin_id=selected_bins)
+    return expand(f"{OUTPUT_DIR}/profiling_genomes/drep/dereplicated_genomes/{{bin_id}}", bin_id=selected_bins)
 
 rule merge_catalogue:
     input:
