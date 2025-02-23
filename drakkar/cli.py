@@ -436,7 +436,7 @@ def main():
         run_snakemake_profiling(args.command, project_name, args.type, args.output, args.profile)
         display_end()
     elif args.command == "annotating":
-        run_snakemake_annotating(args.command, project_name, args.type, args.output, args.profile)
+        run_snakemake_annotating(args.command, project_name, args.output, args.profile)
         display_end()
     else:
         parser.print_help()
