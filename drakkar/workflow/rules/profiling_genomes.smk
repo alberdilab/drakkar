@@ -10,7 +10,8 @@ SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 
 checkpoint dereplicate:
     input:
-         expand("{bin_path}", bin_path=BINS_TO_FILES.values())
+        genomes=expand("{bin_path}", bin_path=BINS_TO_FILES.values()),
+        metadata=f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv"
     output:
         Cdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Cdb.csv", #change to the proper table for final bins
         Bdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Bdb.csv",
@@ -27,7 +28,7 @@ checkpoint dereplicate:
     shell:
         """
         module load {params.diamond_module} {params.checkm2_module} {params.drep_module}
-        dRep dereplicate {output.dir} -p {threads} -g {input} -sa 0.98
+        dRep dereplicate {output.dir} -p {threads} -g {input.genomes} -sa 0.98 --genomeInfo {input.metadata}
         """
 
 # Functions to define the input files dynamically.

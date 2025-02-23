@@ -255,7 +255,7 @@ rule move_metadata:
         cp {input} {output}
         """
 
-rule all_bin_paths:
+rule all_bins:
     input:
         expand(f"{OUTPUT_DIR}/cataloging/final/{{assembly}}.tsv", assembly=assemblies)
     output:
