@@ -326,7 +326,7 @@ def main():
             path_bins_to_json(args.input,args.output)
         else:
             print(f"")
-            print(f"No input information was provided. DRAKKAR will try to guess the location of the profiling data")
+            print(f"No input information was provided. DRAKKAR will try to guess the location of the MAGs.")
             if os.path.exists(f"{args.output}/cataloging/final/all_bin_paths.txt"):
                 file_bins_to_json(f"{args.output}/cataloging/final/all_bin_paths.txt",args.output)
             else:
@@ -352,9 +352,9 @@ def main():
             path_bins_to_json(args.input,args.output)
         else:
             print(f"")
-            print(f"No input information was provided. DRAKKAR will try to guess the location of the profiling data")
-            if os.path.exists(f"{args.output}/cataloging/final/all_bin_paths.txt"):                     # guess preprocessed
-                file_bins_to_json(f"{args.output}/cataloging/final/all_bin_paths.txt",args.output)      # guess preprocessed
+            print(f"No input information was provided. DRAKKAR will try to guess the location of the reads.")
+            if any(os.scandir(f"{args.output}/preprocessed/final")):
+                argument_preprocessed_to_json(f"{args.output}/preprocessed/final",args.output)
             else:
                 print(f"ERROR: No bin data was found in the output directory.")
                 print(f"Make sure that the preprocessing and cataloging modules were run in this directory.")

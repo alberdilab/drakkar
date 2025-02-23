@@ -109,7 +109,7 @@ rule quantify_reads_catalogue:
         module load {params.coverm_module}
         coverm genome \
             -b {input} \
-            -s ^ \
+            -s @ \
             -m count covered_bases \
             -t {threads} \
             --min-covered-fraction 0 \
