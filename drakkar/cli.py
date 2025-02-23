@@ -151,8 +151,10 @@ def main():
     subparser_cataloging.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile")
 
     subparser_profiling = subparsers.add_parser("profiling", help="Run the profiling workflow")
-    subparser_profiling.add_argument("-i", "--input", required=False, help="Directory in which bins (.fa or .fna) are stored")
-    subparser_profiling.add_argument("-f", "--file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
+    subparser_profiling.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
+    subparser_profiling.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
+    subparser_profiling.add_argument("-r", "--reads_dir", required=False, help="Directory in which metagenomic reads are stored")
+    subparser_profiling.add_argument("-R", "--reads_file", required=False, help="Sample detail file")
     subparser_profiling.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_profiling.add_argument("-t", "--type", required=False, default="genomes", help="Either genomes or pangenomes profiling type. Default: genomes")
     subparser_profiling.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile")
@@ -307,16 +309,17 @@ def main():
 
     if args.command == "profiling":
 
-        if args.file and args.input:
+        # Prepare bin dictionaries
+        if args.bins_dir and args.bins_file:
             print(f"")
             print(f"Both bin path file and input directory were provided.")
             print(f"DRAKKAR will continue with the information provided in the path file.")
             file_bins_to_json(args.input,args.output)
-        elif args.file and not args.input:
+        elif args.bins_file and not args.bins_dir:
             print(f"")
             print(f"DRAKKAR will run with the information provided in the sample info file.")
             file_bins_to_json(args.file,args.output)
-        elif args.input and not args.file:
+        elif args.bins_dir and not args.bins_file:
             print(f"")
             print(f"No sample info file was provided.")
             print(f"DRAKKAR will run with the files in the input directory.")
@@ -331,6 +334,33 @@ def main():
                 print(f"Make sure that the preprocessing and cataloging modules were run in this directory.")
                 print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
                 return
+
+        # Prepare read dictionaries
+        if args.reads_dir and args.reads_file:
+            print(f"")
+            print(f"Both bin path file and input directory were provided.")
+            print(f"DRAKKAR will use the reads provided in the file.")
+            file_bins_to_json(args.input,args.output)
+        elif args.reads_file and not args.reads_dir:
+            print(f"")
+            print(f"DRAKKAR will use the reads provided in the file.")
+            file_bins_to_json(args.file,args.output)
+        elif args.reads_dir and not args.reads_file:
+            print(f"")
+            print(f"No sample info file was provided.")
+            print(f"DRAKKAR will use the reads from the input directory.")
+            path_bins_to_json(args.input,args.output)
+        else:
+            print(f"")
+            print(f"No input information was provided. DRAKKAR will try to guess the location of the profiling data")
+            if os.path.exists(f"{args.output}/cataloging/final/all_bin_paths.txt"):                     # guess preprocessed
+                file_bins_to_json(f"{args.output}/cataloging/final/all_bin_paths.txt",args.output)      # guess preprocessed
+            else:
+                print(f"ERROR: No bin data was found in the output directory.")
+                print(f"Make sure that the preprocessing and cataloging modules were run in this directory.")
+                print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
+                return
+
     ###
     # Launch snakemake commands
     ###
@@ -351,6 +381,9 @@ def main():
         display_end()
     elif args.command == "profiling":
         run_snakemake_profiling(args.command, project_name, args.type, args.output, args.profile)
+        display_end()
+    elif args.command == "annotating":
+        run_snakemake_annotating(args.command, project_name, args.type, args.output, args.profile)
         display_end()
     else:
         parser.print_help()

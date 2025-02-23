@@ -61,7 +61,7 @@ rule index_catalogue:
     threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 1024 * 5) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 1024 * 50) * 2 ** (attempt - 1))
     shell:
         """
         module load {params.bowtie2_module}
@@ -71,8 +71,8 @@ rule index_catalogue:
 rule map_to_catalogue:
     input:
         index=f"{OUTPUT_DIR}/profiling_genomes/catalogue/genome_catalogue.rev.1.bt2",
-        r1=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz",
-        r2=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz"
+        r1=lambda wildcards: SAMPLE_TO_READS1[wildcards.sample],
+        r2=lambda wildcards: SAMPLE_TO_READS2[wildcards.sample]
     output:
         f"{OUTPUT_DIR}/profiling_genomes/bowtie2/{{sample}}.bam"
     params:
