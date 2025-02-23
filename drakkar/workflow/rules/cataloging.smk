@@ -243,7 +243,7 @@ rule move_metadata:
     input:
         f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}/final_bins_quality_reports.tsv"
     output:
-        f"{OUTPUT_DIR}/cataloging/final/{{assembly}}/.tsv"
+        f"{OUTPUT_DIR}/cataloging/final/{{assembly}}.tsv"
     threads: 1
     resources:
         mem_mb=8*1024,
