@@ -40,7 +40,7 @@ def get_mag_fna(wildcards):
 
 rule merge_catalogue:
     input:
-        get_mag_fna(wildcards)
+        get_mag_fna
     output:
         f"{OUTPUT_DIR}/profiling_genomes/catalogue/genome_catalogue.fna"
     localrule: True
