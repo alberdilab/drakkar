@@ -225,7 +225,7 @@ def get_bin_fna_sep(wildcards):                                                 
 
 rule rename_bins:
     input:
-        bin=lambda wildcards: get_bin_fna_sep(wildcards)  # it is probably fine if it's bin=f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}/final_bins/_bin_{{bin_id}}.fa"
+        bin=lambda wildcards: get_bin_fna_sep(wildcards)
     output:
         bin=f"{OUTPUT_DIR}/cataloging/final/{{assembly}}/{{assembly}}_bin_{{bin_id}}.fa"
     params:
