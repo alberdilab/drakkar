@@ -42,7 +42,7 @@ rule gtdbtk:
         """
         module load {params.gtdbtk_module}
         export GTDBTK_DATA_PATH={params.data}
-        mkdir {params.tmpdir}
+        mkdir -p {params.tmpdir}
         gtdbtk classify_wf \
             --batchfile {input} \
             --out_dir {params.outdir} \
