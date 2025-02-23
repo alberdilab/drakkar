@@ -31,7 +31,7 @@ rule gtdbtk:
     params:
         gtdbtk_module={GTDBTK_MODULE},
         outdir=f"{OUTPUT_DIR}/profiling_genomes/gtdbtk/",
-        tmpdir=f"{OUTPUT_DIR}/profiling_genomes/gtdbtk/tmp"
+        tmpdir=f"{OUTPUT_DIR}/profiling_genomes/tmp/"
     threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 100) * 2 ** (attempt - 1)),
@@ -40,7 +40,6 @@ rule gtdbtk:
     shell:
         """
         module load {params.gtdbtk_module}
-        mkdir {params.outdir}
         mkdir {params.tmpdir}
         gtdbtk classify_wf \
             --batchfile {input} \
