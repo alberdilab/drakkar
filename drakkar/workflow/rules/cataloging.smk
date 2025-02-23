@@ -224,9 +224,11 @@ def get_bin_fna_sep(wildcards):
 
 rule rename_bins:
     input:
-        lambda wildcards: get_bin_fna_sep(wildcards)
+        bin=lambda wildcards: get_bin_fna_sep(wildcards),
+        meta=f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}/final_bins_quality_reports.tsv"
     output:
-        f"{OUTPUT_DIR}/cataloging/final/{{assembly}}/{{assembly}}_bin_{{bin_id}}.fa"
+        bin=f"{OUTPUT_DIR}/cataloging/final/{{assembly}}/{{assembly}}_bin_{{bin_id}}.fa",
+        meta=f"{OUTPUT_DIR}/cataloging/final/{{assembly}}.tsv"
     params:
         assembly="{wildcards.assembly}"
     threads: 1
@@ -236,5 +238,6 @@ rule rename_bins:
     message: "Renaming final bins from assembly {wildcards.assembly}..."
     shell:
         """
-        python {params.package_dir}/workflow/scripts/rename_bins.py {params.assembly} {input} {output}
+        python {params.package_dir}/workflow/scripts/rename_bins.py {params.assembly} {input.bin} {output.bin}
+        cp {input.meta} {output.meta}
         """
