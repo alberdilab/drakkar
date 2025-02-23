@@ -8,6 +8,50 @@ DREP_MODULE = config["DREP_MODULE"]
 BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 
+checkpoint dereplicate:
+    input:
+         expand("{bin_path}", bin_path=BINS_TO_FILES.values())
+    output:
+        Cdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Cdb.csv",
+        Bdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Bdb.csv",
+        Wdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Wdb.csv"
+    params:
+        drep_module={DREP_MODULE},
+        checkm2_module={CHECKM2_MODULE},
+        diamond_module={DIAMOND_MODULE}
+    threads: 8
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 1024 * 20) * 2 ** (attempt - 1))
+    message: "Dereplicating bins using dRep..."
+    shell:
+        """
+        module load {params.diamond_module} {params.checkm2_module} {params.drep_module}
+        dRep dereplicate {output.dir} -p {threads} -g {input} -sa 0.98
+        """
+
+# Functions to define the input files dynamically.
+def get_cluster_ids_from_drep(csv_path):
+    df = pd.read_csv(csv_path)
+    return df["secondary_cluster"].unique()
+
+def get_mag_fna(wildcards):
+    checkpoint_output = checkpoints.dereplicate.get(**wildcards).output[0]
+    cluster_ids = get_cluster_ids_from_drep(checkpoint_output)
+    return expand(f"{OUTPUT_DIR}/profiling/drep/dereplicated_genomes/{{cluster_id}}.fna", cluster_id=cluster_ids)
+
+rule merge_catalogue:
+    input:
+        get_mag_fna(wildcards)
+    output:
+        f"{OUTPUT_DIR}/profiling_genomes/catalogue/genome_catalogue.fna"
+    localrule: True
+    message: "Merging genomes into a single catalogue..."
+    shell:
+        """
+        cat {input} > {output}
+        """
+
 rule prodigal:
     input:
         f"{GENOME_DIR}/{{genome}}.fna"

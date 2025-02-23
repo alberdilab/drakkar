@@ -214,18 +214,18 @@ checkpoint assembly_binette:
         """
 
 # Functions to define the input files dynamically.
-def get_bin_ids_from_tsv(tsv_path):
-    df = pd.read_csv(tsv_path, sep="\t")
-    return df["bin_id"].unique()
+def get_bin_ids_from_tsv(tsv_path):                                                                     #
+    df = pd.read_csv(tsv_path, sep="\t")                                                                #
+    return df["bin_id"].unique()                                                                        #
 
-def get_bin_fna_sep(wildcards):
-    checkpoint_output = checkpoints.assembly_binette.get(**wildcards).output[0]
-    cluster_ids = get_bin_ids_from_tsv(checkpoint_output)
+def get_bin_fna_sep(wildcards):                                                                         # all this is probably unnecessary
+    checkpoint_output = checkpoints.assembly_binette.get(**wildcards).output[0]                         # and the rename_bins input can be
+    cluster_ids = get_bin_ids_from_tsv(checkpoint_output)                                               # simplified, as bin_id is created in the main Snakemake
     return f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}/final_bins/bin_{wildcards.bin_id}.fa"
 
 rule rename_bins:
     input:
-        bin=lambda wildcards: get_bin_fna_sep(wildcards)
+        bin=lambda wildcards: get_bin_fna_sep(wildcards)  # it is probably fine if it's bin=f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}/final_bins/_bin_{{bin_id}}.fa"
     output:
         bin=f"{OUTPUT_DIR}/cataloging/final/{{assembly}}/{{assembly}}_bin_{{bin_id}}.fa"
     params:
@@ -259,7 +259,8 @@ rule all_bin_paths:
     input:
         expand(f"{OUTPUT_DIR}/cataloging/final/{{assembly}}.tsv", assembly=assemblies)
     output:
-        f"{OUTPUT_DIR}/cataloging/final/all_bin_paths.txt"
+        paths=f"{OUTPUT_DIR}/cataloging/final/all_bin_paths.txt",
+        metadata=f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv"
     params:
         package_dir={PACKAGE_DIR}
     threads: 1
@@ -269,5 +270,6 @@ rule all_bin_paths:
     message: "Generating bin path file..."
     shell:
         """
-        python {params.package_dir}/workflow/scripts/all_bin_paths.py {input} -o {output}
+        python {params.package_dir}/workflow/scripts/all_bin_paths.py {input} -o {output.paths}
+        python {params.package_dir}/workflow/scripts/all_bin_metadata.py {input} -o {output.metadata}
         """

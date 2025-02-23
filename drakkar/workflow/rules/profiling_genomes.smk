@@ -8,12 +8,11 @@ DREP_MODULE = config["DREP_MODULE"]
 BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 
-rule dereplicate:
+checkpoint dereplicate:
     input:
          expand("{bin_path}", bin_path=BINS_TO_FILES.values())
     output:
-        dir=directory(f"{OUTPUT_DIR}/profiling_genomes/drep/dereplicated_genomes"),
-        Cdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Cdb.csv",
+        Cdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Cdb.csv", #change to the proper table for final bins
         Bdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Bdb.csv",
         Wdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Wdb.csv"
     params:
@@ -31,15 +30,26 @@ rule dereplicate:
         dRep dereplicate {output.dir} -p {threads} -g {input} -sa 0.98
         """
 
+# Functions to define the input files dynamically.
+def get_mag_ids_from_drep(csv_path):
+    df = pd.read_csv(csv_path)
+    return df["secondary_cluster"].unique()
+
+def get_mag_fna(wildcards):
+    checkpoint_output = checkpoints.dereplicate.get(**wildcards).output[0]
+    cluster_ids = get_mag_ids_from_drep(checkpoint_output)
+    return expand(f"{OUTPUT_DIR}/profiling/drep/dereplicated_genomes/{{cluster_id}}.fna", cluster_id=cluster_ids)
+
 rule merge_catalogue:
     input:
-        directory(f"{OUTPUT_DIR}/profiling_genomes/drep/dereplicated_genomes")
+        get_mag_fna(wildcards)
     output:
         f"{OUTPUT_DIR}/profiling_genomes/catalogue/genome_catalogue.fna"
+    localrule: True
     message: "Merging genomes into a single catalogue..."
     shell:
         """
-        cat {input}/* > {output}
+        cat {input} > {output}
         """
 
 rule index_catalogue:
