@@ -32,26 +32,26 @@ checkpoint dereplicate:
         """
 
 # Functions to define the input files dynamically.
-def get_mag_ids_from_drep(csv_path):
-    df = pd.read_csv(csv_path)
-    return df["secondary_cluster"].unique()
+#def get_mag_ids_from_drep(csv_path):
+#    df = pd.read_csv(csv_path)
+#    return df["secondary_cluster"].unique()
 
-def get_mag_fna(wildcards):
-    checkpoint_output = checkpoints.dereplicate.get(**wildcards).output[0]
-    cluster_ids = get_mag_ids_from_drep(checkpoint_output)
-    return expand(f"{OUTPUT_DIR}/profiling/drep/dereplicated_genomes/{{cluster_id}}.fna", cluster_id=cluster_ids)
+#def get_mag_fna(wildcards):
+#    checkpoint_output = checkpoints.dereplicate.get(**wildcards).output[0]
+#    cluster_ids = get_mag_ids_from_drep(checkpoint_output)
+#    return expand(f"{OUTPUT_DIR}/profiling/drep/dereplicated_genomes/{{cluster_id}}.fna", cluster_id=cluster_ids)
 
-rule merge_catalogue:
-    input:
-        get_mag_fna(wildcards)
-    output:
-        f"{OUTPUT_DIR}/profiling_genomes/catalogue/genome_catalogue.fna"
-    localrule: True
-    message: "Merging genomes into a single catalogue..."
-    shell:
-        """
-        cat {input} > {output}
-        """
+#rule merge_catalogue:
+#    input:
+#        get_mag_fna(wildcards)
+#    output:
+#        f"{OUTPUT_DIR}/profiling_genomes/catalogue/genome_catalogue.fna"
+#    localrule: True
+#    message: "Merging genomes into a single catalogue..."
+#    shell:
+#        """
+#        cat {input} > {output}
+#        """
 
 rule index_catalogue:
     input:
