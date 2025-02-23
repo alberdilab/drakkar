@@ -23,7 +23,7 @@ rule dereplicate:
     message: "Dereplicating bins using dRep..."
     shell:
         """
-        conda deactivate drakkar
+        conda deactivate
         module load {params.drep_module}
         dRep dereplicate {output.dir} -p {threads} -g {input}
         """
