@@ -2,8 +2,6 @@
 # Define config variables
 ####
 
-DIAMOND_MODULE = config["DIAMOND_MODULE"]
-CHECKM2_MODULE = config["CHECKM2_MODULE"]
 DREP_MODULE = config["DREP_MODULE"]
 BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]

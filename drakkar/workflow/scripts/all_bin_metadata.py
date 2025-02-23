@@ -25,7 +25,7 @@ def process_tsv_files(tsv_files, output_csv):
                 raise ValueError(f"Missing required columns in {tsv_file}")
 
             # Create the 'genome' column
-            df["genome"] = df["bin_id"].astype(str).apply(lambda x: f"{assembly_id}_{x}")
+            df["genome"] = df["bin_id"].astype(str).apply(lambda x: f"{assembly_id}_{x}.fa")
 
             # Select only the required columns
             df_selected = df[["genome", "completeness", "contamination","score","size","N50","contig_count"]]
