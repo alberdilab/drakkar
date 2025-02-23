@@ -11,16 +11,15 @@ checkpoint dereplicate:
         genomes=expand("{bin_path}", bin_path=BINS_TO_FILES.values()),
         metadata=f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv"
     output:
-        Cdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Cdb.csv", #change to the proper table for final bins
-        Bdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Bdb.csv",
-        Wdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Wdb.csv"
+        Wdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Wdb.csv",
+        Cdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Cdb.csv"
     params:
         drep_module={DREP_MODULE},
         outdir=f"{OUTPUT_DIR}/profiling_genomes/drep/"
     threads: 8
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 1024 * 20) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 1024 * 5) * 2 ** (attempt - 1))
     message: "Dereplicating bins using dRep..."
     shell:
         """
@@ -30,26 +29,26 @@ checkpoint dereplicate:
         """
 
 # Functions to define the input files dynamically.
-#def get_mag_ids_from_drep(csv_path):
-#    df = pd.read_csv(csv_path)
-#    return df["secondary_cluster"].unique()
+def get_mag_ids_from_drep(csv_path):
+    df = pd.read_csv(csv_path)
+    return df["genome"].unique()
 
-#def get_mag_fna(wildcards):
-#    checkpoint_output = checkpoints.dereplicate.get(**wildcards).output[0]
-#    cluster_ids = get_mag_ids_from_drep(checkpoint_output)
-#    return expand(f"{OUTPUT_DIR}/profiling/drep/dereplicated_genomes/{{cluster_id}}.fna", cluster_id=cluster_ids)
+def get_mag_fna(wildcards):
+    checkpoint_output = checkpoints.dereplicate.get(**wildcards).output[0]
+    selected_bins = get_mag_ids_from_drep(checkpoint_output)
+    return expand(f"{OUTPUT_DIR}/profiling/drep/dereplicated_genomes/{{bin_id}}.fna", bin_id=selected_bins)
 
-#rule merge_catalogue:
-#    input:
-#        get_mag_fna(wildcards)
-#    output:
-#        f"{OUTPUT_DIR}/profiling_genomes/catalogue/genome_catalogue.fna"
-#    localrule: True
-#    message: "Merging genomes into a single catalogue..."
-#    shell:
-#        """
-#        cat {input} > {output}
-#        """
+rule merge_catalogue:
+    input:
+        get_mag_fna(wildcards)
+    output:
+        f"{OUTPUT_DIR}/profiling_genomes/catalogue/genome_catalogue.fna"
+    localrule: True
+    message: "Merging genomes into a single catalogue..."
+    shell:
+        """
+        cat {input} > {output}
+        """
 
 rule index_catalogue:
     input:
