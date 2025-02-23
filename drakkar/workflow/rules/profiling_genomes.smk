@@ -98,7 +98,7 @@ rule quantify_reads_catalogue:
         f"{OUTPUT_DIR}/profiling_genomes/coverm/coverm.tsv"
     threads: 8
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb / 5) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 1024) * 2 ** (attempt - 1))
     message:
         "Generating mapping statistics with..."
