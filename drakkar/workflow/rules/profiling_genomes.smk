@@ -28,6 +28,7 @@ checkpoint dereplicate:
     shell:
         """
         module load {params.drep_module}
+        rm -rf {params.outdir}
         dRep dereplicate {params.outdir} -p {threads} -g {input.genomes} -sa 0.98 --genomeInfo {input.metadata}
         """
 
