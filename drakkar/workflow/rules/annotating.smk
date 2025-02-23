@@ -6,13 +6,12 @@ PACKAGE_DIR = config["package_dir"]
 GTDBTK_MODULE = config["GTDBTK_MODULE"]
 
 rule gtdbtk_input:
-    input:
-        names=expand("{bin_name}", bin_name=BINS_TO_FILES.keys()),
-        paths=expand("{bin_path}", bin_path=BINS_TO_FILES.values())
     output:
         f"{OUTPUT_DIR}/annotating/gtdbtk/mag_input.tsv"
     params:
-        package_dir={PACKAGE_DIR}
+        package_dir={PACKAGE_DIR},
+        names=expand("{bin_name}", bin_name=BINS_TO_FILES.keys()),
+        paths=expand("{bin_path}", bin_path=BINS_TO_FILES.values())
     localrule: True
     threads: 1
     resources:
@@ -21,7 +20,7 @@ rule gtdbtk_input:
     message: "Generating bin path file..."
     shell:
         """
-        python {params.package_dir}/workflow/scripts/gtdbtk_input.py --names {input.names} --paths {input.paths} --output {output}
+        python {params.package_dir}/workflow/scripts/gtdbtk_input.py --names {params.names} --paths {params.paths} --output {output}
         """
 
 rule gtdbtk:
