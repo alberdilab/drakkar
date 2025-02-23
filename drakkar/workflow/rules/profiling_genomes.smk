@@ -101,7 +101,7 @@ rule quantify_reads_catalogue:
     threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb / 5) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 1024) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 1024 / 5) * 2 ** (attempt - 1))
     message:
         "Generating mapping statistics with..."
     shell:
@@ -114,4 +114,23 @@ rule quantify_reads_catalogue:
             -t {threads} \
             --min-covered-fraction 0 \
             > {output}
+        """
+
+rule split_coverm:
+    input:
+        f"{OUTPUT_DIR}/profiling_genomes/coverm/coverm.tsv"
+    output:
+        counts=f"{OUTPUT_DIR}/profiling_genomes/final/counts.tsv",
+        breadth=f"{OUTPUT_DIR}/profiling_genomes/final/bases.tsv"
+    params:
+        package_dir={PACKAGE_DIR}
+    localrule: True
+    threads: 1
+    resources:
+        mem_mb=1*1024 * 2 ** (attempt - 1)),
+        runtime=5 * 2 ** (attempt - 1))
+    message: "Generating count and breadth files..."
+    shell:
+        """
+        python {params.package_dir}/workflow/scripts/split_coverm.py {input} {output.counts} {output.breadth}
         """
