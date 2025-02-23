@@ -81,8 +81,8 @@ rule map_to_catalogue:
         basename=f"{OUTPUT_DIR}/profiling_genomes/catalogue/genome_catalogue"
     threads: 16
     resources:
-        mem_mb=lambda wildcards, attempt: max(8*1024, int(reads_mb.get(wildcards.sample, 1) * 2 * 1024 / 500) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: max(10, int(reads_mb.get(wildcards.sample, 1) / 1024 *  1024 / 10) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 5) * 2 ** (attempt - 1))
     message: "Mapping {wildcards.sample} against genome catalogue..."
     shell:
         """
