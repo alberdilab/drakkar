@@ -19,11 +19,10 @@ rule dereplicate:
     threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 1024 * 10) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 1024 * 20) * 2 ** (attempt - 1))
     message: "Dereplicating bins using dRep..."
     shell:
         """
-        source deactivate
         module load {params.drep_module}
         dRep dereplicate {output.dir} -p {threads} -g {input}
         """
