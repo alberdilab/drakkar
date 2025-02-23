@@ -169,7 +169,7 @@ if WORKFLOW == "cataloging":
         input:
             expand(f"{OUTPUT_DIR}/cataloging/final/{{assembly}}.tsv", assembly=assemblies),
             expand(f"{OUTPUT_DIR}/cataloging/final/{{assembly}}/{{assembly}}_bin_{{bin_id}}.fa",
-               assembly=ASSEMBLIES, bin_id=lambda wildcards: get_bin_ids_from_tsv(f"{OUTPUT_DIR}/cataloging/binette/{wildcards.assembly}/final_bins_quality_reports.tsv")),
+               assembly=assemblies, bin_id=lambda wildcards: get_bin_ids_from_tsv(f"{OUTPUT_DIR}/cataloging/binette/{wildcards.assembly}/final_bins_quality_reports.tsv")),
 
     include: "rules/cataloging.smk"
 
