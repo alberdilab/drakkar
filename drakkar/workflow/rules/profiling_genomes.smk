@@ -5,6 +5,7 @@
 DREP_MODULE = config["DREP_MODULE"]
 BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
+COVERM_MODULE = config["COVERM_MODULE"]
 
 checkpoint dereplicate:
     input:
@@ -82,7 +83,7 @@ rule map_to_catalogue:
     threads: 16
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 5) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 20) * 2 ** (attempt - 1))
     message: "Mapping {wildcards.sample} against genome catalogue..."
     shell:
         """
@@ -94,45 +95,20 @@ rule quantify_reads:
     input:
         expand(f"{OUTPUT_DIR}/profiling_genomes/bowtie2/{{sample}}.bam", sample=samples)
     output:
-        count_table = "3_Outputs/10_Final_tables/unfiltered_count_table.txt",
-        mapping_rate = "3_Outputs/10_Final_tables/mapping_rate.txt"
-    params:
-        BAMs = "3_Outputs/9_MAG_catalogue_mapping/BAMs",
-    conda:
-        "conda_envs/2_Assembly_Binning.yaml"
-    threads:
-        8
+        f"{OUTPUT_DIR}/profiling_genomes/coverm/coverm.tsv"
+    threads: 8
     resources:
-        mem_gb=64,
-        time='02:00:00'
-    benchmark:
-        "3_Outputs/0_Logs/coverm.benchmark.tsv"
-    log:
-        "3_Outputs/0_Logs/coverm.log"
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 20) * 2 ** (attempt - 1))
     message:
-        "Creating the count table with CoverM"
+        "Generating mapping statistics with..."
     shell:
         """
         coverm genome \
             -b {input} \
             -s ^ \
-            -m count covered_fraction length \
+            -m count covered_bases \
             -t {threads} \
             --min-covered-fraction 0 \
-            > {output.count_table}
-
-        #relative abundance for report
-        coverm genome \
-            -b {params.BAMs}/*.bam \
-            -s ^ \
-            -m relative_abundance \
-            -t {threads} \
-            --min-covered-fraction 0 \
-            > {output.mapping_rate}
+            > {output}
         """
-
-rule gtdb:
-
-rule kegg:
-
-rule gems:

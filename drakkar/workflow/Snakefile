@@ -195,7 +195,7 @@ if WORKFLOW == "profiling":
 
     rule all:
         input:
-            *([expand(f"{OUTPUT_DIR}/profiling_genomes/bowtie2/{{sample}}.bam",sample=samples)] if "genomes" in PROFILING_TYPE else []),
+            *([f"{OUTPUT_DIR}/profiling_genomes/coverm/coverm.tsv"] if "genomes" in PROFILING_TYPE else []),
             *([f"{OUTPUT_DIR}/profiling_pangenomes/final/final.tsv"] if "pangenomes" in PROFILING_TYPE else [])
 
     if "genomes" in PROFILING_TYPE:
