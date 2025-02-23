@@ -114,6 +114,7 @@ rule quantify_reads:
             --min-covered-fraction 0 \
             > {output.mapping_rate}
         """
+        
 rule gtdb:
 
 rule kegg:
