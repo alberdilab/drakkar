@@ -34,12 +34,14 @@ rule gtdbtk:
         tmpdir=f"{OUTPUT_DIR}/profiling_genomes/gtdbtk/tmp"
     threads: 8
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 1024 * 5) * 2 ** (attempt - 1))
-    message: "Dereplicating bins using dRep..."
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 100) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 1024) * 2 ** (attempt - 1))
+    message: "Annotating taxonomy using GTDBTK..."
     shell:
         """
         module load {params.gtdbtk_module}
+        mkdir {params.outdir}
+        mkdir {params.tmpdir}
         gtdbtk classify_wf \
             --batchfile {input} \
             --out_dir {params.outdir} \
