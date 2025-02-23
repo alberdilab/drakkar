@@ -117,6 +117,21 @@ def run_snakemake_profiling(workflow, project_name, profiling_type, output_dir, 
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
 
+def run_snakemake_annotating(workflow, project_name, output_dir, profile):
+    """ Run the profiling workflow """
+
+    snakemake_command = [
+        "/bin/bash", "-c",  # Ensures the module system works properly
+        f"module load {config_vars['SNAKEMAKE_MODULE']} && "
+        "snakemake "
+        f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
+        f"--directory {output_dir} "
+        f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
+        f"--configfile {CONFIG_PATH} "
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir}"
+    ]
+    subprocess.run(snakemake_command, shell=False, check=True)
+
 ###
 # Main function to launch workflows
 ###
@@ -157,6 +172,12 @@ def main():
     subparser_profiling.add_argument("-R", "--reads_file", required=False, help="Sample detail file")
     subparser_profiling.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_profiling.add_argument("-t", "--type", required=False, default="genomes", help="Either genomes or pangenomes profiling type. Default: genomes")
+    subparser_profiling.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile")
+
+    subparser_annotating = subparsers.add_parser("annotating", help="Run the cataloging workflow (assemly and binning)")
+    subparser_profiling.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
+    subparser_profiling.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
+    subparser_profiling.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_profiling.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile")
 
     subparser_unlock = subparsers.add_parser("unlock", help="Unlock snakemake")
@@ -355,6 +376,38 @@ def main():
             print(f"No input information was provided. DRAKKAR will try to guess the location of the reads.")
             if any(os.scandir(f"{args.output}/preprocessing/final")):
                 argument_preprocessed_to_json(f"{args.output}/preprocessing/final",args.output)
+            else:
+                print(f"ERROR: No bin data was found in the output directory.")
+                print(f"Make sure that the preprocessing and cataloging modules were run in this directory.")
+                print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
+                return
+
+    ###
+    # Annotating
+    ###
+
+    if args.command == "annotating":
+
+        # Prepare bin dictionaries
+        if args.bins_dir and args.bins_file:
+            print(f"")
+            print(f"Both bin path file and input directory were provided.")
+            print(f"DRAKKAR will continue with the information provided in the path file.")
+            file_bins_to_json(args.input,args.output)
+        elif args.bins_file and not args.bins_dir:
+            print(f"")
+            print(f"DRAKKAR will run with the information provided in the sample info file.")
+            file_bins_to_json(args.file,args.output)
+        elif args.bins_dir and not args.bins_file:
+            print(f"")
+            print(f"No sample info file was provided.")
+            print(f"DRAKKAR will run with the files in the input directory.")
+            path_bins_to_json(args.input,args.output)
+        else:
+            print(f"")
+            print(f"No input information was provided. DRAKKAR will try to guess the location of the MAGs.")
+            if os.path.exists(f"{args.output}/cataloging/final/all_bin_paths.txt"):
+                file_bins_to_json(f"{args.output}/cataloging/final/all_bin_paths.txt",args.output)
             else:
                 print(f"ERROR: No bin data was found in the output directory.")
                 print(f"Make sure that the preprocessing and cataloging modules were run in this directory.")

@@ -204,3 +204,12 @@ if WORKFLOW == "profiling":
 
     if "pangenomes" in PROFILING_TYPE:
         include: "rules/profiling_pangenomes.smk"
+
+if WORKFLOW == "annotating":
+
+    with open(f"{OUTPUT_DIR}/data/bins_to_files.json", "r") as f:
+        BINS_TO_FILES = json.load(f)
+
+    rule all:
+        input:
+            f"{OUTPUT_DIR}/profiling_genomes/gtdbtk/classify/gtdbtk.bac120.summary.tsv"
