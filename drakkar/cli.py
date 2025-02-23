@@ -102,7 +102,7 @@ def run_snakemake_cataloging(workflow, project_name, output_dir, profile):
 
     subprocess.run(snakemake_command, shell=False, check=True)
 
-def run_snakemake_profiling(workflow, bins_dir, output_dir):
+def run_snakemake_profiling(workflow, project_name, profiling_type, output_dir, profile):
     """ Run the profiling workflow """
 
     snakemake_command = [
@@ -113,7 +113,7 @@ def run_snakemake_profiling(workflow, bins_dir, output_dir):
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} bins_dir={bins_dir} profiling_type={profiling_type} output_dir={output_dir}"
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} profiling_type={profiling_type} output_dir={output_dir}"
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
 
@@ -151,7 +151,8 @@ def main():
     subparser_cataloging.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile")
 
     subparser_profiling = subparsers.add_parser("profiling", help="Run the profiling workflow")
-    subparser_profiling.add_argument("-b", "--bins", required=True, help="Bins directory")
+    subparser_profiling.add_argument("-i", "--input", required=False, help="Directory in which bins (.fa or .fna) are stored")
+    subparser_profiling.add_argument("-f", "--file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
     subparser_profiling.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_profiling.add_argument("-t", "--type", required=False, default="genomes", help="Either genomes or pangenomes profiling type. Default: genomes")
     subparser_profiling.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile")
@@ -349,7 +350,8 @@ def main():
         run_snakemake_cataloging(args.command, project_name, Path(args.output).resolve(), args.profile)
         display_end()
     elif args.command == "profiling":
-        run_snakemake_profiling(args.command, project_name, args.bins, args.type, args.output)
+        run_snakemake_profiling(args.command, project_name, args.type, args.output, args.profile)
+        display_end()
     else:
         parser.print_help()
 

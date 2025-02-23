@@ -6,7 +6,7 @@ DREP_MODULE = config["DREP_MODULE"]
 
 rule dereplicate:
     input:
-        f"{OUTPUT_DIR}/data/final_bins.txt"
+        list(BINS_TO_FILES.values)
     output:
         dir=directory(f"{OUTPUT_DIR}/profiling_genomes/drep/dereplicated_genomes"),
         Cdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Cdb.csv",
@@ -14,11 +14,15 @@ rule dereplicate:
         Wdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Wdb.csv"
     params:
         drep_module={DREP_MODULE}
+    threads: 8
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 1024) * 2 ** (attempt - 1))
     message: "Dereplicating bins using dRep..."
     shell:
         """
         module load {params.drep_module}
-        dRep dereplicate {output.dir} -g {input}
+        dRep dereplicate {output.dir} -g {input} -p {threads}
         """
 
 rule merge_catalogue:
