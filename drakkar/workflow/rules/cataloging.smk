@@ -238,3 +238,18 @@ rule rename_bins:
         """
         python {params.package_dir}/workflow/scripts/rename_bins.py {params.assembly} {input.bin} {output.bin}
         """
+
+rule move_metadata:
+    input:
+        f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}/final_bins_quality_reports.tsv"
+    output:
+        f"{OUTPUT_DIR}/cataloging/final/{{assembly}}/.tsv"
+    threads: 1
+    resources:
+        mem_mb=8*1024,
+        runtime=10
+    message: "Exporting bin metadata from assembly {wildcards.assembly}..."
+    shell:
+        """
+        cp {input} {output}
+        """
