@@ -220,7 +220,7 @@ def get_bin_ids_from_tsv(tsv_path):
 def get_bin_fna_sep(wildcards):
     checkpoint_output = checkpoints.assembly_binette.get(**wildcards).output[0]
     cluster_ids = get_bin_ids_from_tsv(checkpoint_output)
-    return f"{CLUSTER_DIR}/cataloging/binette/{{assembly}}/final_bins/bin_{wildcards.bin_id}.fa"
+    return f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}/final_bins/bin_{wildcards.bin_id}.fa"
 
 rule rename_bins:
     input:
