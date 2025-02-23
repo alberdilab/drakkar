@@ -71,8 +71,8 @@ rule index_catalogue:
 rule map_to_catalogue:
     input:
         index=f"{OUTPUT_DIR}/profiling_genomes/catalogue/genome_catalogue.rev.1.bt2",
-        r1=lambda wildcards: SAMPLE_TO_READS1[wildcards.sample],
-        r2=lambda wildcards: SAMPLE_TO_READS2[wildcards.sample]
+        r1=lambda wildcards: PREPROCESSED_TO_READS1[wildcards.sample],
+        r2=lambda wildcards: PREPROCESSED_TO_READS2[wildcards.sample]
     output:
         f"{OUTPUT_DIR}/profiling_genomes/bowtie2/{{sample}}.bam"
     params:

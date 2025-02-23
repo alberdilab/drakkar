@@ -185,6 +185,9 @@ if WORKFLOW == "profiling":
     with open(f"{OUTPUT_DIR}/data/preprocessed_to_reads1.json", "r") as f:
         PREPROCESSED_TO_READS1 = json.load(f)
 
+    with open(f"{OUTPUT_DIR}/data/preprocessed_to_reads2.json", "r") as f:
+        PREPROCESSED_TO_READS2 = json.load(f)
+
     samples = list(PREPROCESSED_TO_READS1.keys())
 
     with open(f"{OUTPUT_DIR}/data/bins_to_files.json", "r") as f:
