@@ -213,3 +213,5 @@ if WORKFLOW == "annotating":
     rule all:
         input:
             f"{OUTPUT_DIR}/annotating/gtdbtk/classify/gtdbtk.bac120.summary.tsv"
+
+    include: "rules/annotating.smk"

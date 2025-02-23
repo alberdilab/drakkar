@@ -7,8 +7,7 @@ GTDBTK_MODULE = config["GTDBTK_MODULE"]
 
 rule gtdbtk_input:
     input:
-        json=f"{OUTPUT_DIR}/data/bins_to_files.json",
-        names=expand("{bin_name}", bin_path=BINS_TO_FILES.keys()),
+         names=expand("{bin_name}", bin_path=BINS_TO_FILES.keys()),
         paths=expand("{bin_path}", bin_path=BINS_TO_FILES.values())
     output:
         f"{OUTPUT_DIR}/annotating/gtdbtk/mag_input.tsv"
