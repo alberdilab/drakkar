@@ -4,6 +4,7 @@
 
 PACKAGE_DIR = config["package_dir"]
 FASTP_MODULE = config["FASTP_MODULE"]
+SINGLEM_MODULE = config["SINGLEM_MODULE"]
 
 ####
 # Run preprocessing rules

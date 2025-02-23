@@ -165,7 +165,7 @@ rule assembly_maxbin:
 
 #rule assembly_metacoder:
 
-rule assembly_binette:
+checkpoint assembly_binette:
     input:
         metabat2=f"{OUTPUT_DIR}/cataloging/metabat2/{{assembly}}/{{assembly}}.tsv",
         maxbin2=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}.tsv",
@@ -179,8 +179,8 @@ rule assembly_binette:
         outdir=f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 5) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 40) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 4) * 2 ** (attempt - 1))
     message: "Refining bins from assembly {wildcards.assembly} using binette..."
     shell:
         """
@@ -212,24 +212,29 @@ rule assembly_binette:
                 --checkm2_db /maps/datasets/globe_databases/checkm2/20250215/CheckM2_database/uniref100.KO.1.dmnd
         """
 
-rule assembly_final:
+# Functions to define the input files dynamically.
+def get_bin_ids_from_tsv(tsv_path):
+    df = pd.read_csv(tsv_path, sep="\t")
+    return df["bin_id"].unique()
+
+def get_bin_fna_sep(wildcards):
+    checkpoint_output = checkpoints.assembly_binette.get(**wildcards).output[0]
+    cluster_ids = get_bin_ids_from_tsv(checkpoint_output)
+    return f"{CLUSTER_DIR}/cataloging/binette/{{assembly}}/final_bins/bin_{wildcards.bin_id}.fa"
+
+rule rename_bins:
     input:
-        f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}/final_bins_quality_reports.tsv"
+        lambda wildcards: get_bin_fna_sep(wildcards)
     output:
-        metadata=f"{OUTPUT_DIR}/cataloging/final/{{assembly}}.tsv",
-        paths=f"{OUTPUT_DIR}/cataloging/final/{{assembly}}.txt"
+        f"{OUTPUT_DIR}/cataloging/final/{{assembly}}/{{assembly}}_bin_{{bin_id}}.fa"
     params:
-        binette=f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}",
-        final=f"{OUTPUT_DIR}/cataloging/final/{{assembly}}"
+        assembly=f"{wildcards.assembly}"
     threads: 1
     resources:
         mem_mb=8*1024,
         runtime=10
-    message: "Outputing final bins from assembly {wildcards.assembly}..."
+    message: "Renaming final bins from assembly {wildcards.assembly}..."
     shell:
         """
-        mkdir {params.final}
-        mv {params.binette}/final_bins/* {params.final}
-        mv {input} {output.metadata}
-        find {params.final} -type f -name "*.fa" -print > {output.paths}
+        python {params.package_dir}/workflow/scripts/rename_bins.py {params.assembly} {input} {output}
         """
