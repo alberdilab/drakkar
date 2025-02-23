@@ -212,4 +212,4 @@ if WORKFLOW == "annotating":
 
     rule all:
         input:
-            f"{OUTPUT_DIR}/profiling_genomes/gtdbtk/classify/gtdbtk.bac120.summary.tsv"
+            f"{OUTPUT_DIR}/annotating/gtdbtk/classify/gtdbtk.bac120.summary.tsv"

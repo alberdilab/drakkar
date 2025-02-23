@@ -28,7 +28,7 @@ rule gtdbtk:
     input:
         f"{OUTPUT_DIR}/annotating/gtdbtk/mag_input.tsv"
     output:
-        f"{OUTPUT_DIR}/profiling_genomes/gtdbtk/classify/gtdbtk.bac120.summary.tsv"
+        f"{OUTPUT_DIR}/annotating/gtdbtk/classify/gtdbtk.bac120.summary.tsv"
     params:
         gtdbtk_module={GTDBTK_MODULE},
         outdir=f"{OUTPUT_DIR}/profiling_genomes/gtdbtk/",
