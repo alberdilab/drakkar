@@ -124,11 +124,10 @@ rule split_coverm:
         breadth=f"{OUTPUT_DIR}/profiling_genomes/final/bases.tsv"
     params:
         package_dir={PACKAGE_DIR}
-    localrule: True
     threads: 1
     resources:
-        mem_mb=1*1024 * 2 ** (attempt - 1)),
-        runtime=5 * 2 ** (attempt - 1))
+        mem_mb = 1*1024,
+        runtime = 5
     message: "Generating count and breadth files..."
     shell:
         """
