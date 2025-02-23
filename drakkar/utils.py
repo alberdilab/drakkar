@@ -322,6 +322,46 @@ def file_assemblies_to_json(infofile=None, samples=None, individual=False, all=F
     with open(f"{output}/data/assembly_to_samples.json", "w") as f:
         json.dump(ASSEMBLY_TO_SAMPLE, f)
 
+# Create dictionary of bin names and paths from the input file
+def file_bins_to_json(file=None, output=False):
+    fasta_dict = {}
+
+    # Read the paths file
+    with open(paths_file, "r") as f:
+        for line in f:
+            full_path = line.strip()
+            if not full_path:
+                continue
+
+            # Extract filename without path and extension
+            filename = os.path.splitext(os.path.basename(full_path))[0]
+
+            # Store in dictionary
+            fasta_dict[filename] = full_path
+
+    os.makedirs(f"{output}/data", exist_ok=True)
+    with open(f"{output}/data/bins_to_files.json", "w") as f:
+        json.dump(fasta_dict, f, indent=4)
+
+def path_bins_to_json(file=None, output=False):
+    fasta_dict = {}
+
+    # Ensure folder exists
+    if not os.path.isdir(folder_path):
+        raise FileNotFoundError(f"❌ Folder not found: {folder_path}")
+
+    # Iterate over all files in the folder
+    for file_name in os.listdir(folder_path):
+        if file_name.endswith((".fna", ".fa")):
+            full_path = os.path.join(folder_path, file_name)
+            file_id = os.path.splitext(file_name)[0]  # Remove extension
+            fasta_dict[file_id] = full_path
+
+    os.makedirs(f"{output}/data", exist_ok=True)
+    with open(f"{output}/data/bins_to_files.json", "w") as f:
+        json.dump(fasta_dict, f, indent=4)
+
+
 def preprocessing_summary(summary_table, bar_width=50):
     """
     Prints a single horizontal stacked barplot representing the AVERAGE percentage of

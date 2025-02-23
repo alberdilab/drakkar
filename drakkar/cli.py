@@ -299,6 +299,37 @@ def main():
 
         file_assemblies_to_json(args.file,samples,INDIVIDUAL_MODE,ALL_MODE,args.output)
 
+
+    ###
+    # Profiling
+    ###
+
+    if args.command == "profiling":
+
+        if args.file and args.input:
+            print(f"")
+            print(f"Both bin path file and input directory were provided.")
+            print(f"DRAKKAR will continue with the information provided in the path file.")
+            file_bins_to_json(args.input,args.output)
+        elif args.file and not args.input:
+            print(f"")
+            print(f"DRAKKAR will run with the information provided in the sample info file.")
+            file_bins_to_json(args.file,args.output)
+        elif args.input and not args.file:
+            print(f"")
+            print(f"No sample info file was provided.")
+            print(f"DRAKKAR will run with the files in the input directory.")
+            path_bins_to_json(args.input,args.output)
+        else:
+            print(f"")
+            print(f"No input information was provided. DRAKKAR will try to guess the location of the profiling data")
+            if os.path.exists(f"{args.output}/cataloging/final/all_bin_paths.txt"):
+                file_bins_to_json(f"{args.output}/cataloging/final/all_bin_paths.txt",args.output)
+            else:
+                print(f"ERROR: No bin data was found in the output directory.")
+                print(f"Make sure that the preprocessing and cataloging modules were run in this directory.")
+                print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
+                return
     ###
     # Launch snakemake commands
     ###
