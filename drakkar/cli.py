@@ -272,8 +272,8 @@ def main():
         else:
             print(f"")
             print(f"No input information was provided. DRAKKAR will try to guess the location of the preprocessing data")
-            if any(os.scandir(f"{args.output}/preprocessed/final")):
-                argument_preprocessed_to_json(f"{args.output}/preprocessed/final",args.output)
+            if any(os.scandir(f"{args.output}/preprocessing/final")):
+                argument_preprocessed_to_json(f"{args.output}/preprocessing/final",args.output)
             else:
                 print(f"ERROR: No preprocessed data was found in the output directory.")
                 print(f"    Please, provide an input directory or sample info file to proceed.")
@@ -353,8 +353,8 @@ def main():
         else:
             print(f"")
             print(f"No input information was provided. DRAKKAR will try to guess the location of the reads.")
-            if any(os.scandir(f"{args.output}/preprocessed/final")):
-                argument_preprocessed_to_json(f"{args.output}/preprocessed/final",args.output)
+            if any(os.scandir(f"{args.output}/preprocessing/final")):
+                argument_preprocessed_to_json(f"{args.output}/preprocessing/final",args.output)
             else:
                 print(f"ERROR: No bin data was found in the output directory.")
                 print(f"Make sure that the preprocessing and cataloging modules were run in this directory.")
