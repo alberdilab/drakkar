@@ -232,9 +232,9 @@ rule rename_bins:
         package_dir={PACKAGE_DIR}
     threads: 1
     resources:
-        mem_mb=8*1024,
-        runtime=10
-    message: "Renaming final bins from assembly {wildcards.assembly}..."
+        mem_mb=lambda wildcards, input, attempt: max(1*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(2, int(input.size_mb) * 2 ** (attempt - 1))
+    message: "Renaming bin {wildcards.bin_id} from assembly {wildcards.assembly}..."
     shell:
         """
         python {params.package_dir}/workflow/scripts/rename_bins.py {wildcards.assembly} {input.bin} {output.bin}
@@ -253,4 +253,19 @@ rule move_metadata:
     shell:
         """
         cp {input} {output}
+        """
+
+rule all_bin_paths:
+    input:
+        expand(f"{OUTPUT_DIR}/cataloging/final/{{assembly}}.tsv", assembly=assemblies)
+    output:
+        f"{OUTPUT_DIR}/cataloging/final/all_bin_paths.txt"
+    threads: 1
+    resources:
+        mem_mb=8*1024,
+        runtime=10
+    message: "Generating bin path file..."
+    shell:
+        """
+        python {params.package_dir}/workflow/scripts/all_bin_paths.py {input} -o {output}
         """

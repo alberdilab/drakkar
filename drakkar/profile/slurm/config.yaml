@@ -1,5 +1,5 @@
 executor: slurm
-jobs: 20
+jobs: 50
 latency-wait: 60
 use-conda: true
 rerun-incomplete: true
