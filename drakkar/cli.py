@@ -175,10 +175,10 @@ def main():
     subparser_profiling.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile")
 
     subparser_annotating = subparsers.add_parser("annotating", help="Run the cataloging workflow (assemly and binning)")
-    subparser_profiling.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
-    subparser_profiling.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
-    subparser_profiling.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
-    subparser_profiling.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile")
+    subparser_annotating.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
+    subparser_annotating.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
+    subparser_annotating.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
+    subparser_annotating.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile")
 
     subparser_unlock = subparsers.add_parser("unlock", help="Unlock snakemake")
     subparser_unlock.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
