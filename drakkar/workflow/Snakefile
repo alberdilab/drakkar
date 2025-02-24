@@ -207,14 +207,14 @@ if WORKFLOW == "profiling":
 
 if WORKFLOW == "annotating":
 
-    with open(f"{OUTPUT_DIR}/data/bins_to_files.json", "r") as f:
-        BINS_TO_FILES = json.load(f)
+    with open(f"{OUTPUT_DIR}/data/mags_to_files.json", "r") as f:
+        MAGS_TO_FILES = json.load(f)
 
-    bins = list(BINS_TO_FILES.keys())
+    mags = list(MAGS_TO_FILES.keys())
 
     rule all:
         input:
             f"{OUTPUT_DIR}/annotating/gtdbtk/classify/gtdbtk.bac120.summary.tsv",
-            expand(f"{OUTPUT_DIR}/annotating/prodigal/{{bin}}.faa", bin=bins)
+            expand(f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa", mag=mags)
 
     include: "rules/annotating.smk"

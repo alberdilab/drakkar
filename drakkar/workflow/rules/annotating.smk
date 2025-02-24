@@ -11,8 +11,8 @@ rule gtdbtk_input:
         f"{OUTPUT_DIR}/annotating/gtdbtk/mag_input.tsv"
     params:
         package_dir={PACKAGE_DIR},
-        names=expand("{bin_name}", bin_name=BINS_TO_FILES.keys()),
-        paths=expand("{bin_path}", bin_path=BINS_TO_FILES.values())
+        names=expand("{mag_name}", mag_name=MAGS_TO_FILES.keys()),
+        paths=expand("{mag_path}", mag_path=MAGS_TO_FILES.values())
     localrule: True
     threads: 1
     resources:
@@ -53,10 +53,10 @@ rule gtdbtk:
 
 rule prodigal:
     input:
-        lambda wildcards: BINS_TO_FILES[wildcards.bin]
+        lambda wildcards: BINS_TO_FILES[wildcards.mag]
     output:
-        nt=f"{OUTPUT_DIR}/annotating/prodigal/{{bin}}.fna",
-        aa=f"{OUTPUT_DIR}/annotating/prodigal/{{bin}}.faa"
+        nt=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.fna",
+        aa=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
     params:
         prodigal_module={PRODIGAL_MODULE}
     resources:
