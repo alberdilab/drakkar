@@ -215,6 +215,6 @@ if WORKFLOW == "annotating":
     rule all:
         input:
             f"{OUTPUT_DIR}/annotating/gtdbtk/classify/gtdbtk.bac120.summary.tsv",
-            expand(f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa", mag=mags)
+            f"{OUTPUT_DIR}/annotating/kofams/kegg.csv"
 
     include: "rules/annotating.smk"

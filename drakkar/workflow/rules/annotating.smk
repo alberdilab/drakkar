@@ -69,3 +69,38 @@ rule prodigal:
         module load {params.prodigal_module}
         prodigal -i {input} -d {output.nt} -a {output.aa}
         """
+
+rule kofams:
+    input:
+        f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
+    output:
+        txt=f"{OUTPUT_DIR}/annotating/kofams/{{mag}}.txt",
+        tsv=f"{OUTPUT_DIR}/annotating/kofams/{{mag}}.tsv"
+    params:
+        database="/maps/datasets/globe_databases/dram/20240606/kofam_profiles.hmm"
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 50) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 1024 * 5) * 2 ** (attempt - 1))
+    threads: 1
+    message: "Annotating KEGG orthologs of MAG {wildcards.mag}..."
+    shell:
+        """
+        hmmscan -o {output.txt} --tblout {output.tsv} -E 1e-10 --noali {params.database} {input}
+        """
+
+rule select_kegg:
+    input:
+        expand(f"{OUTPUT_DIR}/annotating/kofams/{{mag}}.tsv",mag=mags)
+    output:
+        tsv=f"{OUTPUT_DIR}/annotating/kofams/kegg.tsv",
+        csv=f"{OUTPUT_DIR}/annotating/kofams/kegg.csv"
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, attempt: 1*1024 * 2 ** (attempt - 1),
+        runtime=lambda wildcards, attempt: 10 * 2 ** (attempt - 1)
+    message: "Selecting and merging all KOs..."
+    shell:
+        """
+        cat {input} > {output.tsv}
+        python {params.package_dir}/workflow/scripts/select_ko.py {output.tsv} {output.csv}
+        """
