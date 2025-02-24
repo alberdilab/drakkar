@@ -53,7 +53,7 @@ rule gtdbtk:
 
 rule prodigal:
     input:
-        lambda wildcards: BINS_TO_FILES[wildcards.mag]
+        lambda wildcards: MAGS_TO_FILES[wildcards.mag]
     output:
         nt=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.fna",
         aa=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
