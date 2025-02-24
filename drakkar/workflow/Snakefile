@@ -210,8 +210,11 @@ if WORKFLOW == "annotating":
     with open(f"{OUTPUT_DIR}/data/bins_to_files.json", "r") as f:
         BINS_TO_FILES = json.load(f)
 
+    bins = list(BINS_TO_FILES.keys())
+
     rule all:
         input:
-            f"{OUTPUT_DIR}/annotating/gtdbtk/classify/gtdbtk.bac120.summary.tsv"
+            f"{OUTPUT_DIR}/annotating/gtdbtk/classify/gtdbtk.bac120.summary.tsv",
+            expand(f"{OUTPUT_DIR}/annotating/prodigal/{{bin}}.faa", bin=bins)
 
     include: "rules/annotating.smk"

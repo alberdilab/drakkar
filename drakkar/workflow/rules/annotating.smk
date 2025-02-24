@@ -4,6 +4,7 @@
 
 PACKAGE_DIR = config["package_dir"]
 GTDBTK_MODULE = config["GTDBTK_MODULE"]
+PRODIGAL_MODULE = config["PRODIGAL_MODULE"]
 
 rule gtdbtk_input:
     output:
@@ -35,8 +36,8 @@ rule gtdbtk:
         tmpdir=f"{OUTPUT_DIR}/profiling_genomes/tmp/"
     threads: 8
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(64*1024, int(input.size_mb * 1024 * 1024) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(60, int(input.size_mb * 1024) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, input, attempt: 128*1024 * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: 120 * 2 ** (attempt - 1))
     message: "Annotating taxonomy using GTDBTK..."
     shell:
         """
@@ -48,4 +49,23 @@ rule gtdbtk:
             --out_dir {params.outdir} \
             --cpus {threads} \
             --skip_ani_screen
+        """
+
+rule prodigal:
+    input:
+        lambda wildcards: BINS_TO_FILES[wildcards.bin]
+    output:
+        nt=f"{OUTPUT_DIR}/annotating/prodigal/{{bin}}.fna",
+        aa=f"{OUTPUT_DIR}/annotating/prodigal/{{bin}}.faa"
+    params:
+        prodigal_module={PRODIGAL_MODULE}
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(1*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 1024) * 2 ** (attempt - 1))
+    threads: 1
+    message: "Predicting genes using Prodigal..."
+    shell:
+        """
+        module load {params.prodigal_module}
+        prodigal -i {input} -d {output.nt} -a {output.aa}
         """
