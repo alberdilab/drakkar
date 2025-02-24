@@ -36,8 +36,8 @@ rule gtdbtk:
         tmpdir=f"{OUTPUT_DIR}/profiling_genomes/tmp/"
     threads: 8
     resources:
-        mem_mb=lambda wildcards, input, attempt: 128*1024 * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: 120 * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, input, attempt: 128*1024 * 2 ** (attempt - 1),
+        runtime=lambda wildcards, input, attempt: 120 * 2 ** (attempt - 1)
     message: "Annotating taxonomy using GTDBTK..."
     shell:
         """
