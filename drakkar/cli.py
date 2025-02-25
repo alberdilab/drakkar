@@ -117,6 +117,8 @@ def run_snakemake_cataloging(workflow, project_name, output_dir, profile):
         else:
             print(f"\nERROR: Snakemake failed with exit code {process.returncode}!", file=sys.stderr)
             sys.exit(1)
+    else:
+        display_end()
 
 def run_snakemake_profiling(workflow, project_name, profiling_type, output_dir, profile):
     """ Run the profiling workflow """
@@ -447,7 +449,6 @@ def main():
         preprocessing_summary(f"{args.output}/preprocessing.tsv")
     elif args.command == "cataloging":
         run_snakemake_cataloging(args.command, project_name, Path(args.output).resolve(), args.profile)
-        display_end()
     elif args.command == "profiling":
         run_snakemake_profiling(args.command, project_name, args.type, args.output, args.profile)
         display_end()
