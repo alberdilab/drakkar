@@ -104,7 +104,16 @@ def run_snakemake_cataloging(workflow, project_name, output_dir, profile):
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} "
     ]
 
-    subprocess.run(snakemake_command, shell=False, check=True)
+    try:
+        subprocess.run(snakemake_command, shell=False, check=True)
+    except subprocess.CalledProcessError as e:
+        error_message = e.stderr
+        if "LockException" in error_message:
+            display_unlock()
+        else:
+            print(f"\nERROR: Snakemake failed with exit code {e.returncode}!", file=sys.stderr)
+            print(f"ERROR: Check the Snakemake logs for more details.", file=sys.stderr)
+            sys.exit(1)
 
 def run_snakemake_profiling(workflow, project_name, profiling_type, output_dir, profile):
     """ Run the profiling workflow """
