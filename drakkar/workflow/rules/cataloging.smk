@@ -169,27 +169,6 @@ rule semibin2:
         SemiBin2 single_easy_bin -i {input.assembly} --depth-metabat2 {input.depth} -o {output} -m 1500
         """
 
-#not active currently
-rule basalt:
-    input:
-        assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}.fna",
-        r1=f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/{{assembly}}.depth",
-        r2=
-    output:
-        f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/recluster_bins_info.tsv"
-    params:
-        metabat2_module={METABAT2_MODULE}
-    threads: 32
-    resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 5) * 2 ** (attempt - 1))
-    message: "Binning contigs from assembly {wildcards.assembly} using metabat2..."
-    shell:
-        """
-        module load {params.semibin2_module}
-        BASALT -a {input.assembly} -s  -t {threads} -qc checkm2 --min-cpn 50 --max-ctn 10 --module refinement
-        """
-
 checkpoint assembly_binette:
     input:
         metabat2=f"{OUTPUT_DIR}/cataloging/metabat2/{{assembly}}/{{assembly}}.tsv",
