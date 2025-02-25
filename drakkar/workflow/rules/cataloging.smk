@@ -1,8 +1,10 @@
 ####
-# Define config variables
+# Config variables
 ####
 
 PACKAGE_DIR = config["package_dir"]
+
+# Software modules
 MEGAHIT_MODULE = config["MEGAHIT_MODULE"]
 BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
@@ -15,8 +17,11 @@ DIAMOND_MODULE = config["DIAMOND_MODULE"]
 CHECKM2_MODULE = config["CHECKM2_MODULE"]
 BINETTE_MODULE = config["BINETTE_MODULE"]
 
+# Databases
+CHECKM2_DB = config["CHECKM2_DB"]
+
 ####
-# Run rules
+# Workflow rules
 ####
 
 rule assembly:
@@ -83,7 +88,7 @@ rule assembly_map:
         basename=lambda wildcards: f"{OUTPUT_DIR}/cataloging/megahit/{wildcards.assembly}/{wildcards.assembly}"
     threads: 8
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 3) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 5) * 2 ** (attempt - 1))
     message: "Mapping reads to assembly {wildcards.assembly}..."
     shell:
@@ -152,7 +157,7 @@ rule maxbin2:
     shell:
         """
         module load {params.maxbin2_module} {params.bowtie2_module}
-        rm -rf {params.basename}/*
+        rm -rf {params.basename}*
         run_MaxBin.pl -contig {input.assembly} -abund {input.depth} -max_iteration 10 -out {params.basename} -min_contig_length 1500
         """
 
@@ -181,26 +186,26 @@ rule semibin2:
             for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]
             ]
     output:
-        f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/recluster_bins_info.tsv"
+        f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/contig_bins.tsv"
     params:
         semibin2_module={SEMIBIN2_MODULE},
         hmmer_module={HMMER_MODULE},
         bedtools_module={BEDTOOLS_MODULE},
         outdir=f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}"
-    threads: 1
+    threads: 8
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 5) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 50) * 2 ** (attempt - 1))
     message: "Binning contigs from assembly {wildcards.assembly} using semibin2..."
     shell:
         """
         module load {params.semibin2_module} {params.bedtools_module} {params.hmmer_module}
-        SemiBin2 single_easy_bin -i {input.assembly} -b {input.bam} -o {params.outdir} -m 1500 -t {threads}
+        SemiBin2 single_easy_bin -i {input.assembly} -b {input.bam} -o {params.outdir} -m 1500 -t {threads} --compression none
         """
 
 rule semibin2_table:
     input:
-        f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/recluster_bins_info.tsv"
+        f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/contig_bins.tsv"
     output:
         f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/{{assembly}}.tsv"
     params:
@@ -212,20 +217,22 @@ rule semibin2_table:
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 5) * 2 ** (attempt - 1))
     shell:
         """
-        python {params.package_dir}/workflow/scripts/fastas_to_bintable.py -d {params.fastadir} -e fa -o {output}
+        tail -n +2 {input} > {output}
         """
 
-checkpoint assembly_binette:
+checkpoint binette:
     input:
         metabat2=f"{OUTPUT_DIR}/cataloging/metabat2/{{assembly}}/{{assembly}}.tsv",
         maxbin2=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}.tsv",
+        semibin2=f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/{{assembly}}.tsv",
         fasta=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}.fna"
     output:
         f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}/final_bins_quality_reports.tsv"
     params:
-        diamond_module=DIAMOND_MODULE,
-        checkm2_module=CHECKM2_MODULE,
-        binette_module=BINETTE_MODULE,
+        checkm_db = {CHECKM2_DB},
+        diamond_module = {DIAMOND_MODULE},
+        checkm2_module = {CHECKM2_MODULE},
+        binette_module = {BINETTE_MODULE},
         outdir=f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}"
     threads: 1
     resources:
@@ -239,6 +246,7 @@ checkpoint assembly_binette:
         # Define input files
         METABAT2="{input.metabat2}"
         MAXBIN2="{input.maxbin2}"
+        SEMIBIN2="{input.semibin2}"
 
         # Remove empty input files from the list
         VALID_TSV_FILES=""
@@ -247,6 +255,9 @@ checkpoint assembly_binette:
         fi
         if [ -s "$MAXBIN2" ]; then
             VALID_TSV_FILES="$VALID_TSV_FILES $MAXBIN2"
+        fi
+        if [ -s "$SEMIBIN2" ]; then
+            VALID_TSV_FILES="$VALID_TSV_FILES $SEMIBIN2"
         fi
 
         # Ensure at least one valid TSV file exists
@@ -259,24 +270,25 @@ checkpoint assembly_binette:
         binette --contig2bin_tables $VALID_TSV_FILES \
                 --contigs {input.fasta} \
                 --outdir {params.outdir} \
-                --checkm2_db /maps/datasets/globe_databases/checkm2/20250215/CheckM2_database/uniref100.KO.1.dmnd
+                --checkm2_db {params.checkm_db}
         """
 
 # Functions to define the input files dynamically.
-def get_bin_ids_from_tsv(tsv_path):                                                                     #
-    df = pd.read_csv(tsv_path, sep="\t")                                                                #
-    return df["bin_id"].unique()                                                                        #
+#def get_bin_ids_from_tsv(tsv_path):                                                                     #
+#    df = pd.read_csv(tsv_path, sep="\t")                                                                #
+#    return df["bin_id"].unique()                                                                        #
 
-def get_bin_fna_sep(wildcards):                                                                         # all this is probably unnecessary
-    checkpoint_output = checkpoints.assembly_binette.get(**wildcards).output[0]                         # and the rename_bins input can be
-    cluster_ids = get_bin_ids_from_tsv(checkpoint_output)                                               # simplified, as bin_id is created in the main Snakemake
-    return f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}/final_bins/bin_{wildcards.bin_id}.fa"
+#def get_bin_fna_sep(wildcards):                                                                         # all this is probably unnecessary
+#    checkpoint_output = checkpoints.binette.get(**wildcards).output[0]                         # and the rename_bins input can be
+#    cluster_ids = get_bin_ids_from_tsv(checkpoint_output)                                               # simplified, as bin_id is created in the main Snakemake
+#    return f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}/final_bins/bin_{wildcards.bin_id}.fa"
 
 rule rename_bins:
     input:
-        bin=lambda wildcards: get_bin_fna_sep(wildcards)
+        f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}/final_bins/bin_{{bin_id}}.fa"
+        #lambda wildcards: get_bin_fna_sep(wildcards)
     output:
-        bin=f"{OUTPUT_DIR}/cataloging/final/{{assembly}}/{{assembly}}_bin_{{bin_id}}.fa"
+        f"{OUTPUT_DIR}/cataloging/final/{{assembly}}/{{assembly}}_bin_{{bin_id}}.fa"
     params:
         package_dir={PACKAGE_DIR}
     threads: 1
@@ -286,7 +298,7 @@ rule rename_bins:
     message: "Renaming bin {wildcards.bin_id} from assembly {wildcards.assembly}..."
     shell:
         """
-        python {params.package_dir}/workflow/scripts/rename_bins.py {wildcards.assembly} {input.bin} {output.bin}
+        python {params.package_dir}/workflow/scripts/rename_bins.py {wildcards.assembly} {input} {output}
         """
 
 rule move_metadata:

@@ -1,11 +1,17 @@
 ####
-# Define config variables
+# Config variables
 ####
 
 PACKAGE_DIR = config["package_dir"]
+
+# Software modules
 DREP_MODULE = config["DREP_MODULE"]
 BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
+
+####
+# Workflow rules
+####
 
 checkpoint dereplicate:
     input:

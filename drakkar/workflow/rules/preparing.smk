@@ -1,9 +1,13 @@
 ####
-# Define config variables
+# Config variables
 ####
 
 PACKAGE_DIR = config["package_dir"]
 project_name = config["project_name"]
+
+####
+# Workflow rules
+####
 
 rule create_report:
     output:

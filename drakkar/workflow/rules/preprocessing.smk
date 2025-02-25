@@ -1,13 +1,15 @@
 ####
-# Define config variables
+# Config variables
 ####
 
 PACKAGE_DIR = config["package_dir"]
+
+# Software modules
 FASTP_MODULE = config["FASTP_MODULE"]
 SINGLEM_MODULE = config["SINGLEM_MODULE"]
 
 ####
-# Run preprocessing rules
+# Workflow rules
 ####
 
 # The rules reference_index, reference_map, metagenomic_reads and host_reads are only run if

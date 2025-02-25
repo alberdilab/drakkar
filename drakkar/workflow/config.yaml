@@ -1,3 +1,4 @@
+# Software
 SNAKEMAKE_MODULE: "snakemake/8.16.0"
 FASTP_MODULE: "fastp/0.23.4"
 BOWTIE2_MODULE: "bowtie2/2.4.2"
@@ -16,3 +17,13 @@ COVERM_MODULE: "coverm/0.7.0"
 GTDBTK_MODULE: "gtdbtk/2.4.0"
 PRODIGAL_MODULE: "prodigal/2.6.3"
 HMMER_MODULE: "hmmer/3.3.2"
+MMSEQS2_MODULE: "mmseqs2/14.7e284"
+
+# Annotation databases
+CHECKM2_DB: "/maps/datasets/globe_databases/checkm2/20250215/CheckM2_database/uniref100.KO.1.dmnd"
+GTDB_DB: "/datasets/globe_databases/gtdbtk_db/20241001"
+KEGG_DB: "/projects/alberdilab/data/databases/drakkar/kofams"
+CAZY_DB: "/projects/alberdilab/data/databases/drakkar/cazy"
+AMR_DB: "/projects/alberdilab/data/databases/drakkar/amr"
+PFAM_DB: "/projects/alberdilab/data/databases/drakkar/pfam"
+VFDB_DB: "/projects/alberdilab/data/databases/drakkar/vfdb"
