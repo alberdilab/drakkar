@@ -106,8 +106,26 @@ def run_snakemake_cataloging(workflow, project_name, output_dir, profile):
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} "
     ]
 
+    subprocess.run(snakemake_command, shell=False, check=True)
+
+
+def run_snakemake_cataloging2(workflow, project_name, output_dir, profile):
+
+    """ Run the cataloging workflow """
+
+    snakemake_command = [
+        "/bin/bash", "-c",  # Ensures the module system works properly
+        f"module load {config_vars['SNAKEMAKE_MODULE']} && "
+        "snakemake "
+        f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
+        f"--directory {output_dir} "
+        f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
+        f"--configfile {CONFIG_PATH} "
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} "
+    ]
+
     process = subprocess.Popen(snakemake_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    
+
     for line in process.stdout:
         print(line, end="")  # Print each line as it comes
 
