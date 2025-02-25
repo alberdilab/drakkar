@@ -174,7 +174,7 @@ if WORKFLOW == "cataloging":
         input:
             f"{OUTPUT_DIR}/cataloging/final/all_bin_paths.txt",
             f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv",
-            [f"{OUTPUT_DIR}/cataloging/final/{assembly}/{assembly}_bin_{bin_id}.fa"
+            [f"{OUTPUT_DIR}/cataloging/final/{assembly}/{assembly}_bin_{bin_id}.fa",
             for assembly in assemblies
             for bin_id in get_bin_ids_from_tsv(f"{OUTPUT_DIR}/cataloging/binette/{assembly}/final_bins_quality_reports.tsv")]
             [f"{OUTPUT_DIR}/cataloging/semibin2/{assembly}/recluster_bins_info.tsv" #only while testing semibin
