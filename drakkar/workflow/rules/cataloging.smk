@@ -8,6 +8,8 @@ BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 METABAT2_MODULE = config["METABAT2_MODULE"]
 MAXBIN2_MODULE = config["MAXBIN2_MODULE"]
+BEDTOOLS_MODULE = config["BEDTOOLS_MODULE"]
+HMMER_MODULE = config["HMMER_MODULE"]
 SEMIBIN2_MODULE = config["SEMIBIN2_MODULE"]
 DIAMOND_MODULE = config["DIAMOND_MODULE"]
 CHECKM2_MODULE = config["CHECKM2_MODULE"]
@@ -139,6 +141,7 @@ rule maxbin2:
         f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}.tsv"
     params:
         maxbin2_module={MAXBIN2_MODULE},
+        bowtie2_module={BOWTIE2_MODULE}
         basename=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}"
     threads: 1
     resources:
@@ -147,7 +150,7 @@ rule maxbin2:
     message: "Binning contigs from assembly {wildcards.assembly} using maxbin2..."
     shell:
         """
-        module load {params.maxbin2_module}
+        module load {params.maxbin2_module} {params.bowtie2_module}
         run_MaxBin.pl -contig {input.assembly} -abund {input.depth} -max_iteration 10 -out {params.basename} -min_contig_length 1500
         """
 
@@ -159,7 +162,9 @@ rule semibin2:
     output:
         f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/recluster_bins_info.tsv"
     params:
-        semibin2_module={SEMIBIN2_MODULE}
+        semibin2_module={SEMIBIN2_MODULE},
+        hmmer_module={HMMER_MODULE},
+        bedtools_module={BEDTOOLS_MODULE}
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
@@ -167,7 +172,7 @@ rule semibin2:
     message: "Binning contigs from assembly {wildcards.assembly} using metabat2..."
     shell:
         """
-        module load {params.semibin2_module}
+        module load {params.semibin2_module} {params.bedtools_module} {params.hmmer_module}
         SemiBin2 single_easy_bin -i {input.assembly} --depth-metabat2 {input.depth} -o {output} -m 1500
         """
 
