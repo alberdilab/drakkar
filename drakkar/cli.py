@@ -44,6 +44,8 @@ def run_unlock(workflow, output_dir, profile):
     ]
 
     subprocess.run(unlock_command, shell=False, check=True)
+    print(f"The output directory {output_dir} has been succesfully unlocked")
+    print(f"You can now rerun a new workflow using any drakkar command:")
 
 def run_snakemake_complete(workflow, project_name, input_dir, output_dir, reference, mode, profile):
 
@@ -167,21 +169,21 @@ def main():
     subparser_complete.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_complete.add_argument("-r", "--reference", required=False, help="Reference host genome")
     subparser_complete.add_argument("-m", "--mode", required=False, help="Comma-separated list of cataloging modes (e.g. individual,all)")
-    subparser_complete.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile")
+    subparser_unlock.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
     subparser_preprocessing = subparsers.add_parser("preprocessing", help="Run the preprocessing workflow (quality-filtering and host removal)")
     subparser_preprocessing.add_argument("-i", "--input", required=False, help="Input directory (required if no sample detail file is provided)")
     subparser_preprocessing.add_argument("-f", "--file", required=False, help="Sample detail file (required if no input directory is provided)")
     subparser_preprocessing.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_preprocessing.add_argument("-r", "--reference", required=False, help="Reference host genome file (fna.gz)")
-    subparser_preprocessing.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile")
+    subparser_unlock.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
     subparser_cataloging = subparsers.add_parser("cataloging", help="Run the cataloging workflow (assemly and binning)")
     subparser_cataloging.add_argument("-i", "--input", required=False, help="Input directory (required if no sample detail file is provided)")
     subparser_cataloging.add_argument("-f", "--file", required=False, help="Sample detail file (required if no input directory is provided)")
     subparser_cataloging.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_cataloging.add_argument("-m", "--mode", required=False, help="Comma-separated list of cataloging modes (e.g. individual,all)")
-    subparser_cataloging.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile")
+    subparser_unlock.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
     subparser_profiling = subparsers.add_parser("profiling", help="Run the profiling workflow")
     subparser_profiling.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
@@ -196,11 +198,11 @@ def main():
     subparser_annotating.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
     subparser_annotating.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
     subparser_annotating.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
-    subparser_annotating.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile")
+    subparser_unlock.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
     subparser_unlock = subparsers.add_parser("unlock", help="Unlock snakemake")
     subparser_unlock.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
-    subparser_unlock.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile")
+    subparser_unlock.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
     args = parser.parse_args()
 
