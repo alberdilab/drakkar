@@ -111,7 +111,7 @@ def run_snakemake_cataloging(workflow, project_name, output_dir, profile):
         if "LockException" in error_message:
             display_unlock()
         else:
-            print(f"\nERROR: Snakemake failed with exit code {e.returncode}!", file=sys.stderr)
+            print(f"\nERROR: Snakemake failed with exit code {e.returncode} {e.cmd} {e.output} {e.stdout} {e.stderr}!", file=sys.stderr)
             print(f"ERROR: Check the Snakemake logs for more details.", file=sys.stderr)
             sys.exit(1)
 
