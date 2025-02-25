@@ -171,7 +171,6 @@ rule maxbin2_table:
         python {params.package_dir}/workflow/scripts/fastas_to_bintable.py -d {params.fastadir} -e fasta -o {output}
         """
 
-#not active currently
 rule semibin2:
     input:
         assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}.fna",
@@ -192,6 +191,23 @@ rule semibin2:
         """
         module load {params.semibin2_module} {params.bedtools_module} {params.hmmer_module}
         SemiBin2 single_easy_bin -i {input.assembly} --depth-metabat2 {input.depth} -o {params.outdir} -m 1500 -t {threads}
+        """
+
+rule semibin2_table:
+    input:
+        f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/recluster_bins_info.tsv"
+    output:
+        f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/{{assembly}}.tsv"
+    params:
+        package_dir={PACKAGE_DIR},
+        fastadir=f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/output_bins"
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 5) * 2 ** (attempt - 1))
+    shell:
+        """
+        python {params.package_dir}/workflow/scripts/fastas_to_bintable.py -d {params.fastadir} -e fa -o {output}
         """
 
 checkpoint assembly_binette:

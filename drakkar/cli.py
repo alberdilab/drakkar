@@ -106,6 +106,9 @@ def run_snakemake_cataloging(workflow, project_name, output_dir, profile):
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} "
     ]
 
+    for line in process.stdout:
+        print(line, end="")  # Print each line as it comes
+
     process = subprocess.Popen(snakemake_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
     # Wait for the process to finish
