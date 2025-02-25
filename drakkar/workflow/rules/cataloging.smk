@@ -141,7 +141,7 @@ rule maxbin2:
         f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}.tsv"
     params:
         maxbin2_module={MAXBIN2_MODULE},
-        bowtie2_module={BOWTIE2_MODULE}
+        bowtie2_module={BOWTIE2_MODULE},
         basename=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}"
     threads: 1
     resources:
