@@ -80,8 +80,8 @@ def run_snakemake_preprocessing(workflow, project_name, output_dir, reference, p
     try:
         subprocess.run(snakemake_command, shell=False, check=True)
     except subprocess.CalledProcessError as e:
-        error_message = str(e)
-        if "Error: Directory cannot be locked" in error_message:
+        error_message = e.stderr
+        if "LockException" in error_message:
             display_unlock()
         else:
             print(f"\nERROR: Snakemake failed with exit code {e.returncode}!", file=sys.stderr)
