@@ -8,6 +8,7 @@ BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 METABAT2_MODULE = config["METABAT2_MODULE"]
 MAXBIN2_MODULE = config["MAXBIN2_MODULE"]
+SEMIBIN2_MODULE = config["SEMIBIN2_MODULE"]
 DIAMOND_MODULE = config["DIAMOND_MODULE"]
 CHECKM2_MODULE = config["CHECKM2_MODULE"]
 BINETTE_MODULE = config["BINETTE_MODULE"]
@@ -67,7 +68,6 @@ rule assembly_index:
         bowtie2-build {input} {params.basename}
         """
 
-
 rule assembly_map:
     input:
         index=lambda wildcards: f"{OUTPUT_DIR}/cataloging/megahit/{wildcards.assembly}/{wildcards.assembly}.rev.2.bt2",
@@ -110,7 +110,7 @@ rule assembly_map_depth:
         cut -f1,3 {output.metabat2} | tail -n+2 > {output.maxbin2}
         """
 
-rule assembly_metabat:
+rule metabat2:
     input:
         assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}.fna",
         depth=f"{OUTPUT_DIR}/cataloging/metabat2/{{assembly}}/{{assembly}}.depth"
@@ -129,7 +129,7 @@ rule assembly_metabat:
         metabat2 -i {input.assembly} -a {input.depth} -o {output} -m 1500 --saveCls --noBinOut
         """
 
-rule assembly_maxbin:
+rule maxbin2:
     input:
         assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}.fna",
         depth=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}.depth"
@@ -143,28 +143,52 @@ rule assembly_maxbin:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 5) * 2 ** (attempt - 1))
     message: "Binning contigs from assembly {wildcards.assembly} using maxbin2..."
-    run: # Rule run using python to ensure the pipeline does not crush if no bins are generated
-        import os
-        import subprocess
-        try:
-            subprocess.run(
-                f"module load {params.maxbin2_module} && "
-                f"run_MaxBin.pl -contig {input.assembly} -abund {input.depth} "
-                f"-max_iteration 10 -out {params.basename} -min_contig_length 1500",
-                shell=True,
-                check=True
-            )
-            if os.path.exists(f"{params.basename}.summary"):
-                os.rename(f"{params.basename}.summary", output[0])
-            else:
-                raise FileNotFoundError
-        except:
-            with open(output[0], "w") as f:
-                f.write("")
+    shell:
+        """
+        module load {params.maxbin2_module}
+        run_MaxBin.pl -contig {input.assembly} -abund {input.depth} -max_iteration 10 -out {params.basename} -min_contig_length 1500
+        """
 
-#rule assembly_semibin:
+#not active currently
+rule semibin2:
+    input:
+        assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}.fna",
+        depth=f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/{{assembly}}.depth"
+    output:
+        f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/recluster_bins_info.tsv"
+    params:
+        semibin2_module={SEMIBIN2_MODULE}
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 5) * 2 ** (attempt - 1))
+    message: "Binning contigs from assembly {wildcards.assembly} using metabat2..."
+    shell:
+        """
+        module load {params.semibin2_module}
+        SemiBin2 single_easy_bin -i {input.assembly} --depth-metabat2 {input.depth} -o {output} -m 1500
+        """
 
-#rule assembly_metacoder:
+#not active currently
+rule basalt:
+    input:
+        assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}.fna",
+        r1=f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/{{assembly}}.depth",
+        r2=
+    output:
+        f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/recluster_bins_info.tsv"
+    params:
+        metabat2_module={METABAT2_MODULE}
+    threads: 32
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 5) * 2 ** (attempt - 1))
+    message: "Binning contigs from assembly {wildcards.assembly} using metabat2..."
+    shell:
+        """
+        module load {params.semibin2_module}
+        BASALT -a {input.assembly} -s  -t {threads} -qc checkm2 --min-cpn 50 --max-ctn 10 --module refinement
+        """
 
 checkpoint assembly_binette:
     input:
