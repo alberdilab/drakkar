@@ -76,7 +76,7 @@ rule assembly_map:
         r1=lambda wildcards: [f"{OUTPUT_DIR}/preprocessing/final/{sample}_1.fq.gz" for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]],
         r2=lambda wildcards: [f"{OUTPUT_DIR}/preprocessing/final/{sample}_2.fq.gz" for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]]
     output:
-        f"{OUTPUT_DIR}/cataloging/bowtie2/{{assembly}}/{{assembly}}.bam"
+        f"{OUTPUT_DIR}/cataloging/bowtie2/{{assembly}}/{{sample}}.bam"
     params:
         bowtie2_module={BOWTIE2_MODULE},
         samtools_module={SAMTOOLS_MODULE},
@@ -94,24 +94,22 @@ rule assembly_map:
 
 rule assembly_map_depth:
     input:
-        f"{OUTPUT_DIR}/cataloging/bowtie2/{{assembly}}/{{assembly}}.bam"
+        expand(f"{OUTPUT_DIR}/cataloging/bowtie2/{{assembly}}/{{sample}}.bam",sample=samples)
     output:
         metabat2=f"{OUTPUT_DIR}/cataloging/metabat2/{{assembly}}/{{assembly}}.depth",
-        maxbin2=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}.depth",
-        semibin2=f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/{{assembly}}.depth"
+        maxbin2=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}.depth"
     params:
         metabat2_module={METABAT2_MODULE}
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 20) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 100) * 2 ** (attempt - 1))
     message: "Calculating mapping states of assembly {wildcards.assembly}..."
     shell:
         """
         module load {params.metabat2_module}
         jgi_summarize_bam_contig_depths --outputDepth {output.metabat2} {input}
         cut -f1,3 {output.metabat2} | tail -n+2 > {output.maxbin2}
-        cut -f1,3 {output.metabat2} | tail -n+2 > {output.semibin2}
         """
 
 rule metabat2:
@@ -151,6 +149,7 @@ rule maxbin2:
     shell:
         """
         module load {params.maxbin2_module} {params.bowtie2_module}
+        rm -rf {params.basename}/*
         run_MaxBin.pl -contig {input.assembly} -abund {input.depth} -max_iteration 10 -out {params.basename} -min_contig_length 1500
         """
 
@@ -174,7 +173,7 @@ rule maxbin2_table:
 rule semibin2:
     input:
         assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}.fna",
-        depth=f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/{{assembly}}.depth"
+        bam=f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/{{assembly}}.depth"
     output:
         f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/recluster_bins_info.tsv"
     params:
@@ -190,7 +189,7 @@ rule semibin2:
     shell:
         """
         module load {params.semibin2_module} {params.bedtools_module} {params.hmmer_module}
-        SemiBin2 single_easy_bin -i {input.assembly} --depth-metabat2 {input.depth} -o {params.outdir} -m 1500 -t {threads}
+        SemiBin2 single_easy_bin -i {input.assembly} -b {input.bam} -o {params.outdir} -m 1500 -t {threads}
         """
 
 rule semibin2_table:
