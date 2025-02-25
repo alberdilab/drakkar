@@ -176,7 +176,10 @@ rule maxbin2_table:
 rule semibin2:
     input:
         assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}.fna",
-        bam=lambda wildcards: expand(f"{OUTPUT_DIR}/cataloging/bowtie2/{wildcards.assembly}/{{sample}}.bam",sample=samples)
+        bam=lambda wildcards: [
+            f"{OUTPUT_DIR}/cataloging/bowtie2/{wildcards.assembly}/{sample}.bam"
+            for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]
+            ]
     output:
         f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/recluster_bins_info.tsv"
     params:
