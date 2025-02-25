@@ -138,7 +138,7 @@ rule maxbin2:
         assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}.fna",
         depth=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}.depth"
     output:
-        f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}.tsv"
+        f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}.summary"
     params:
         maxbin2_module={MAXBIN2_MODULE},
         bowtie2_module={BOWTIE2_MODULE},
@@ -154,6 +154,23 @@ rule maxbin2:
         run_MaxBin.pl -contig {input.assembly} -abund {input.depth} -max_iteration 10 -out {params.basename} -min_contig_length 1500
         """
 
+rule maxbin2_table:
+    input:
+        f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}.summary"
+    output:
+        f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}.tsv"
+    params:
+        package_dir={PACKAGE_DIR},
+        fastadir=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}"
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 5) * 2 ** (attempt - 1))
+    shell:
+        """
+        python {params.package_dir}/workflow/scripts/fastas_to_bintable.py -d {params.fastadir} -e fasta -o {output}
+        """
+
 #not active currently
 rule semibin2:
     input:
@@ -164,16 +181,17 @@ rule semibin2:
     params:
         semibin2_module={SEMIBIN2_MODULE},
         hmmer_module={HMMER_MODULE},
-        bedtools_module={BEDTOOLS_MODULE}
+        bedtools_module={BEDTOOLS_MODULE},
+        outdir=f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}"
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 5) * 2 ** (attempt - 1))
-    message: "Binning contigs from assembly {wildcards.assembly} using metabat2..."
+    message: "Binning contigs from assembly {wildcards.assembly} using semibin2..."
     shell:
         """
         module load {params.semibin2_module} {params.bedtools_module} {params.hmmer_module}
-        SemiBin2 single_easy_bin -i {input.assembly} --depth-metabat2 {input.depth} -o {output} -m 1500
+        SemiBin2 single_easy_bin -i {input.assembly} --depth-metabat2 {input.depth} -o {params.outdir} -m 1500 -t {threads}
         """
 
 checkpoint assembly_binette:
