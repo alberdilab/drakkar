@@ -94,7 +94,7 @@ rule assembly_map:
 
 rule assembly_map_depth:
     input:
-        expand(f"{OUTPUT_DIR}/cataloging/bowtie2/{{assembly}}/{{sample}}.bam",sample=samples)
+        lambda wildcards: expand(f"{OUTPUT_DIR}/cataloging/bowtie2/{wildcards.assembly}/{{sample}}.bam",sample=samples)
     output:
         metabat2=f"{OUTPUT_DIR}/cataloging/metabat2/{{assembly}}/{{assembly}}.depth",
         maxbin2=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}.depth"
