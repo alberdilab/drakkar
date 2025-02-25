@@ -73,8 +73,8 @@ rule assembly_index:
 rule assembly_map:
     input:
         index=lambda wildcards: f"{OUTPUT_DIR}/cataloging/megahit/{wildcards.assembly}/{wildcards.assembly}.rev.2.bt2",
-        r1=lambda wildcards: [f"{OUTPUT_DIR}/preprocessing/final/{sample}_1.fq.gz" for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]],
-        r2=lambda wildcards: [f"{OUTPUT_DIR}/preprocessing/final/{sample}_2.fq.gz" for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]]
+        r1=lambda wildcards: f"{OUTPUT_DIR}/preprocessing/final/{wildcards.sample}_1.fq.gz",
+        r2=lambda wildcards: f"{OUTPUT_DIR}/preprocessing/final/{wildcards.sample}_2.fq.gz"
     output:
         f"{OUTPUT_DIR}/cataloging/bowtie2/{{assembly}}/{{sample}}.bam"
     params:
