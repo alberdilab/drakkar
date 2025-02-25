@@ -107,7 +107,7 @@ def run_snakemake_cataloging(workflow, project_name, output_dir, profile):
     try:
         subprocess.run(snakemake_command, shell=False, check=True)
     except subprocess.CalledProcessError as e:
-        error_message = e.stderr
+        error_message = str(e)
         if "LockException" in error_message:
             display_unlock()
         else:
