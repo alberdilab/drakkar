@@ -95,7 +95,8 @@ rule assembly_map_depth:
         f"{OUTPUT_DIR}/cataloging/bowtie2/{{assembly}}/{{assembly}}.bam"
     output:
         metabat2=f"{OUTPUT_DIR}/cataloging/metabat2/{{assembly}}/{{assembly}}.depth",
-        maxbin2=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}.depth"
+        maxbin2=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}.depth",
+        semibin2=f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/{{assembly}}.depth"
     params:
         metabat2_module={METABAT2_MODULE}
     threads: 1
@@ -108,6 +109,7 @@ rule assembly_map_depth:
         module load {params.metabat2_module}
         jgi_summarize_bam_contig_depths --outputDepth {output.metabat2} {input}
         cut -f1,3 {output.metabat2} | tail -n+2 > {output.maxbin2}
+        cut -f1,3 {output.metabat2} | tail -n+2 > {output.semibin2}
         """
 
 rule metabat2:
