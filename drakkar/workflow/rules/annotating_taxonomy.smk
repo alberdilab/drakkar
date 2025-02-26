@@ -58,3 +58,30 @@ rule gtdbtk:
             --cpus {threads} \
             --skip_ani_screen
         """
+
+rule gtdbtk_table:
+    input:
+        f"{OUTPUT_DIR}/annotating/gtdbtk/classify/gtdbtk.bac120.summary.tsv"
+    output:
+        f"{OUTPUT_DIR}/annotating/genome_taxonomy.tsv"
+    params:
+        archaea=f"{OUTPUT_DIR}/annotating/gtdbtk/classify/gtdbtk.ar53.summary.tsv"
+        archaea2=f"{OUTPUT_DIR}/annotating/gtdbtk/classify/ar53.tsv"
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, input, attempt: 1*1024 * 2 ** (attempt - 1),
+        runtime=lambda wildcards, input, attempt: 5 * 2 ** (attempt - 1)
+    message: "Annotating taxonomy using GTDBTK..."
+    shell:
+        """
+        # Create a merged summary output for DRAM:
+        if [ -s {params.archaea} ]
+        then
+        sed '1d;' {params.archaea} > {params.archaea2}
+        cat {input} {params.archaea2} > {output}
+        rm {params.archaea2}
+        # Otherwise, just use the bacterial summary (if no archaeal bins)
+        else
+        cat {input} > {output}
+        fi
+        """
