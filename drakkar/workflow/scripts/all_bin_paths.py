@@ -19,7 +19,7 @@ def extract_fasta_paths(tsv_files, output_file):
 
             # Generate paths
             for bin_id in bin_ids:
-                fasta_path = f"cataloging/binette/{assembly_id}/final_bins/{assembly_id}_bin_{bin_id}.fa"
+                fasta_path = f"cataloging/final/{assembly_id}/{assembly_id}_bin_{bin_id}.fa"
                 fasta_paths.append(fasta_path)
 
         except Exception as e:
