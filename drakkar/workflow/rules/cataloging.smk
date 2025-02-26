@@ -104,8 +104,8 @@ rule assembly_map_depth:
             for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]
         ]
     output:
-        metabat2=f"{OUTPUT_DIR}/cataloging/metabat2/{{assembly}}/{{assembly}}.depth",
-        maxbin2=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}.depth"
+        metabat2=f"{OUTPUT_DIR}/cataloging/bowtie2/{{assembly}}_metabat.depth",
+        maxbin2=f"{OUTPUT_DIR}/cataloging/bowtie2/{{assembly}}_maxbin.depth"
     params:
         metabat2_module={METABAT2_MODULE}
     threads: 1
@@ -123,7 +123,7 @@ rule assembly_map_depth:
 rule metabat2:
     input:
         assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}.fna",
-        depth=f"{OUTPUT_DIR}/cataloging/metabat2/{{assembly}}/{{assembly}}.depth"
+        depth=f"{OUTPUT_DIR}/cataloging/bowtie2/{{assembly}}_metabat.depth"
     output:
         f"{OUTPUT_DIR}/cataloging/metabat2/{{assembly}}/{{assembly}}.tsv"
     params:
@@ -142,7 +142,7 @@ rule metabat2:
 rule maxbin2:
     input:
         assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}.fna",
-        depth=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}.depth"
+        depth=f"{OUTPUT_DIR}/cataloging/bowtie2/{{assembly}}_maxbin.depth"
     output:
         f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}.summary"
     params:
@@ -213,8 +213,8 @@ rule semibin2_table:
         fastadir=f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/output_bins"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 5) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, input, attempt: max(1*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(5, int(input.size_mb / 5) * 2 ** (attempt - 1))
     shell:
         """
         tail -n +2 {input} > {output}
