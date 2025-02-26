@@ -201,10 +201,13 @@ if WORKFLOW == "profiling":
     with open(f"{OUTPUT_DIR}/data/bins_to_files.json", "r") as f:
         BINS_TO_FILES = json.load(f)
 
+    bins = list(BINS_TO_FILES.keys())
+
     rule all:
         input:
             *([f"{OUTPUT_DIR}/profiling_genomes/final/counts.tsv"] if "genomes" in PROFILING_TYPE else []),
             *([f"{OUTPUT_DIR}/profiling_genomes/final/bases.tsv"] if "genomes" in PROFILING_TYPE else []),
+            *([f"{OUTPUT_DIR}/profiling_genomes/genome_gene.csv"] if "pangenomes" in PROFILING_TYPE else [])
             *([f"{OUTPUT_DIR}/profiling_pangenomes/final/final.tsv"] if "pangenomes" in PROFILING_TYPE else [])
 
     if "genomes" in PROFILING_TYPE:

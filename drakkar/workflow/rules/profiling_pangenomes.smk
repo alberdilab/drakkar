@@ -13,57 +13,13 @@ SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 # Workflow rules
 ####
 
-checkpoint dereplicate:
-    input:
-        genomes=expand("{bin_path}", bin_path=BINS_TO_FILES.values()),
-        metadata=f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv"
-    output:
-        Cdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Cdb.csv",
-        Bdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Bdb.csv",
-        Wdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Wdb.csv"
-    params:
-        drep_module={DREP_MODULE},
-        outdir=f"{OUTPUT_DIR}/profiling_genomes/drep/"
-    threads: 8
-    resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 1024 * 20) * 2 ** (attempt - 1))
-    message: "Dereplicating bins using dRep..."
-    shell:
-        """
-        module load {params.drep_module}
-        rm -rf {params.outdir}
-        dRep dereplicate {params.outdir} -p {threads} -g {input.genomes} -sa 0.95 --genomeInfo {input.metadata}
-        """
-
-# Functions to define the input files dynamically.
-def get_cluster_ids_from_drep(csv_path):
-    df = pd.read_csv(csv_path)
-    return df["secondary_cluster"].unique()
-
-def get_mag_fna(wildcards):
-    checkpoint_output = checkpoints.dereplicate.get(**wildcards).output[0]
-    cluster_ids = get_cluster_ids_from_drep(checkpoint_output)
-    return expand(f"{OUTPUT_DIR}/profiling/drep/dereplicated_genomes/{{cluster_id}}.fna", cluster_id=cluster_ids)
-
-rule merge_catalogue:
-    input:
-        get_mag_fna(wildcards)
-    output:
-        f"{OUTPUT_DIR}/profiling_genomes/catalogue/genome_catalogue.fna"
-    localrule: True
-    message: "Merging genomes into a single catalogue..."
-    shell:
-        """
-        cat {input} > {output}
-        """
-
+# Predict genes from all MAGs
 rule prodigal:
     input:
-        f"{GENOME_DIR}/{{genome}}.fna"
+        lambda wildcards: BINS_TO_FILES[wildcards.bin]
     output:
-        nt=f"{PRODIGAL_DIR}/{{genome}}.fna",
-        aa=f"{PRODIGAL_DIR}/{{genome}}.faa"
+        nt=f"{OUTPUT_DIR}/profiling_pangenomes/prodigal/{{bin}}.fna",
+        aa=f"{OUTPUT_DIR}/profiling_pangenomes/prodigal/{{bin}}.faa"
     params:
         prodigal_module={PRODIGAL_MODULE}
     resources:
@@ -76,30 +32,38 @@ rule prodigal:
         prodigal -i {input} -d {output.nt} -a {output.aa}
         """
 
-rule DRAM:
+# Create a reference table with genome and gene names to trace origin of genes
+rule create_genome_gene_table:
     input:
-        f"{OUTPUT_DIR}/data/final_bins.txt"
+        expand(f"{OUTPUT_DIR}/profiling_pangenomes/prodigal/{{bin}}.fna", bin=bins)
     output:
-        dir=directory(f"{OUTPUT_DIR}/dereplicating/drep/"),
-        Cdb=f"{OUTPUT_DIR}/dereplicating/drep/data_tables/Cdb.csv"
+        f"{OUTPUT_DIR}/profiling_pangenomes/genome_gene.csv"
+    shell:
+        """
+        python {params.package_dir}/workflow/scripts/genome_gene_table.py {input} {output}
+        """
+
+checkpoint dereplicate:
+    input:
+        genomes=expand("{bin_path}", bin_path=BINS_TO_FILES.values()),
+        metadata=f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv"
+    output:
+        Cdb=f"{OUTPUT_DIR}/profiling_pangenomes/drep/data_tables/Cdb.csv",
+        Bdb=f"{OUTPUT_DIR}/profiling_pangenomes/drep/data_tables/Bdb.csv",
+        Wdb=f"{OUTPUT_DIR}/profiling_pangenomes/drep/data_tables/Wdb.csv"
     params:
-        drep_module={DREP_MODULE}
+        drep_module={DREP_MODULE},
+        outdir=f"{OUTPUT_DIR}/profiling_pangenomes/drep/"
+    threads: 8
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 1024 * 20) * 2 ** (attempt - 1))
     message: "Dereplicating bins using dRep..."
     shell:
         """
         module load {params.drep_module}
-        dRep compare {output.dir} -g {input}
-        """
-
-# Create a reference table with genome and gene names to trace orgigin of genes
-rule create_genome_gene_table:
-    input:
-        expand(f"{PRODIGAL_DIR}/{{genome}}.fna", genome=genomes)
-    output:
-        f"{FINAL_DIR}/genome_gene.csv"
-    shell:
-        """
-        python workflow/scripts/genome_gene_table.py {input} {output}
+        rm -rf {params.outdir}
+        dRep compare {params.outdir} -p {threads} -g {input.genomes} -sa 0.95 --genomeInfo {input.metadata}
         """
 
 # Cluster original genomes into group of genomes to be dereplicated using mmseqs
@@ -111,11 +75,11 @@ rule create_genome_gene_table:
 
 checkpoint cluster_genomes:
     input:
-        csv=f"{DREP_DIR}/data_tables/Cdb.csv",
-        nt=expand(f"{PRODIGAL_DIR}/{{genome}}.fna", genome=genomes),
-        aa=expand(f"{PRODIGAL_DIR}/{{genome}}.faa", genome=genomes)
+        csv=f"{OUTPUT_DIR}/profiling_pangenomes/drep/data_tables/Cdb.csv",
+        nt=expand(f"{OUTPUT_DIR}/profiling_pangenomes/prodigal/{{bin}}.fna", bin=bins),
+        aa=expand(f"{OUTPUT_DIR}/profiling_pangenomes/prodigal/{{bin}}.faa", bin=bins)
     output:
-        directory(CLUSTER_DIR)
+        directory(f"{OUTPUT_DIR}/profiling_pangenomes/clusters")
     run:
         import pandas as pd
         import os
@@ -129,7 +93,7 @@ checkpoint cluster_genomes:
         # Create cluster files by concatenating genomes
         for cluster_id, genome_list in cluster_dict.items():
             # Generate nucleotide sequences
-            cluster_file_nt = f"{CLUSTER_DIR}/cluster_{cluster_id}.fna"
+            cluster_file_nt = f"{OUTPUT_DIR}/profiling_pangenomes/clusters/cluster_{cluster_id}.fna"
             with open(cluster_file_nt, "w") as out_file:
                 for genome_id in genome_list:
                     prodigal_file = f"{PRODIGAL_DIR}/{genome_id}"
@@ -137,7 +101,7 @@ checkpoint cluster_genomes:
                         with open(prodigal_file, "r") as f:
                             out_file.write(f.read())
             # Generate amino acid sequences
-            cluster_file_aa = f"{CLUSTER_DIR}/cluster_{cluster_id}.faa"
+            cluster_file_aa = f"{OUTPUT_DIR}/profiling_pangenomes/clusters/cluster_{cluster_id}.faa"
             with open(cluster_file_aa, "w") as out_file:
                 for genome_id in genome_list:
                     genome_id_aa = genome_id.replace(".fna", ".faa")
@@ -156,44 +120,44 @@ def get_cluster_ids_from_csv(csv_path):
 
 def get_cluster_fna_sep(wildcards):
     checkpoint_output = checkpoints.cluster_genomes.get(**wildcards).output[0]
-    cluster_ids = get_cluster_ids_from_csv(f"{DREP_DIR}/data_tables/Cdb.csv")
+    cluster_ids = get_cluster_ids_from_csv(f"{OUTPUT_DIR}/profiling_pangenomes/drep/data_tables/Cdb.csv")
     return f"{CLUSTER_DIR}/cluster_{wildcards.cluster_id}.fna"
 
 def get_gene_fna_sep(wildcards):
     checkpoint_output = checkpoints.cluster_genomes.get(**wildcards).output[0]
-    cluster_ids = get_cluster_ids_from_csv(f"{DREP_DIR}/data_tables/Cdb.csv")
+    cluster_ids = get_cluster_ids_from_csv(f"{OUTPUT_DIR}/profiling_pangenomes/drep/data_tables/Cdb.csv")
     return f"{MMSEQS_DIR}/cluster_{wildcards.cluster_id}.fna"
 
 def get_gene_faa_sep(wildcards):
     checkpoint_output = checkpoints.cluster_genomes.get(**wildcards).output[0]
-    cluster_ids = get_cluster_ids_from_csv(f"{DREP_DIR}/data_tables/Cdb.csv")
+    cluster_ids = get_cluster_ids_from_csv(f"{OUTPUT_DIR}/profiling_pangenomes/drep/data_tables/Cdb.csv")
     return f"{MMSEQS_DIR}/cluster_{wildcards.cluster_id}.faa"
 
 def get_gene_tsv_sep(wildcards):
     checkpoint_output = checkpoints.cluster_genomes.get(**wildcards).output[0]
-    cluster_ids = get_cluster_ids_from_csv(f"{DREP_DIR}/data_tables/Cdb.csv")
+    cluster_ids = get_cluster_ids_from_csv(f"{OUTPUT_DIR}/profiling_pangenomes/drep/data_tables/Cdb.csv")
     return f"{MMSEQS_DIR}/cluster_{wildcards.cluster_id}.tsv"
 
 ## These functions return a list of all desired files, and can be called directly in the input
 
 def get_gene_fna(wildcards):
     checkpoint_output = checkpoints.cluster_genomes.get(**wildcards).output[0]
-    cluster_ids = get_cluster_ids_from_csv(f"{DREP_DIR}/data_tables/Cdb.csv")
-    return expand(f"{MMSEQS_DIR}/cluster_{{cluster_id}}.fna", cluster_id=cluster_ids)
+    cluster_ids = get_cluster_ids_from_csv(f"{OUTPUT_DIR}/profiling_pangenomes/drep/data_tables/Cdb.csv")
+    return expand(f"{OUTPUT_DIR}/profiling_pangenomes/mmseqs/cluster_{{cluster_id}}.fna", cluster_id=cluster_ids)
 
 def get_gene_faa(wildcards):
     checkpoint_output = checkpoints.cluster_genomes.get(**wildcards).output[0]
-    cluster_ids = get_cluster_ids_from_csv(f"{DREP_DIR}/data_tables/Cdb.csv")
-    return expand(f"{MMSEQS_DIR}/cluster_{{cluster_id}}.faa", cluster_id=cluster_ids)
+    cluster_ids = get_cluster_ids_from_csv(f"{OUTPUT_DIR}/profiling_pangenomes/drep/data_tables/Cdb.csv")
+    return expand(f"{OUTPUT_DIR}/profiling_pangenomes/mmseqs/cluster_{{cluster_id}}.faa", cluster_id=cluster_ids)
 
 def get_gene_tsv(wildcards):
     checkpoint_output = checkpoints.cluster_genomes.get(**wildcards).output[0]
-    cluster_ids = get_cluster_ids_from_csv(f"{DREP_DIR}/data_tables/Cdb.csv")
-    return expand(f"{MMSEQS_DIR}/cluster_{{cluster_id}}.tsv", cluster_id=cluster_ids)
+    cluster_ids = get_cluster_ids_from_csv(f"{OUTPUT_DIR}/profiling_pangenomes/drep/data_tables/Cdb.csv")
+    return expand(f"{OUTPUT_DIR}/profiling_pangenomes/mmseqs/cluster_{{cluster_id}}.tsv", cluster_id=cluster_ids)
 
 def get_kofams_tsv(wildcards):
     checkpoint_output = checkpoints.cluster_genomes.get(**wildcards).output[0]
-    cluster_ids = get_cluster_ids_from_csv(f"{DREP_DIR}/data_tables/Cdb.csv")
+    cluster_ids = get_cluster_ids_from_csv(f"{OUTPUT_DIR}/profiling_pangenomes/drep/data_tables/Cdb.csv")
     return expand(f"{KOFAMS_DIR}/cluster_{{cluster_id}}.tsv", cluster_id=cluster_ids)
 
 ####
@@ -205,10 +169,10 @@ rule run_mmseqs:
     input:
         cluster_genes=lambda wildcards: get_cluster_fna_sep(wildcards)
     output:
-        fna=f"{MMSEQS_DIR}/cluster_{{cluster_id}}.fna",
-        tsv=f"{MMSEQS_DIR}/cluster_{{cluster_id}}.tsv"
+        fna=f"{OUTPUT_DIR}/profiling_pangenomes/mmseqs/cluster_{{cluster_id}}.fna",
+        tsv=f"{OUTPUT_DIR}/profiling_pangenomes/mmseqs/cluster_{{cluster_id}}.tsv"
     params:
-        tmp=f"{MMSEQS_DIR}/cluster_{{cluster_id}}_tmp"
+        tmp=f"{OUTPUT_DIR}/profiling_pangenomes/mmseqs/cluster_{{cluster_id}}_tmp"
     conda:
         "environments/clustering.yml"
     shell:
