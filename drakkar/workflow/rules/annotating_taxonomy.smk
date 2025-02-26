@@ -44,8 +44,8 @@ rule gtdbtk:
         tmpdir=f"{OUTPUT_DIR}/profiling_genomes/tmp/"
     threads: 24
     resources:
-        mem_mb=lambda wildcards, input, attempt: 128*1024 * 2 ** (attempt - 1),
-        runtime=lambda wildcards, input, attempt: 120 * 2 ** (attempt - 1)
+        mem_mb=lambda wildcards, attempt: 128*1024 * 2 ** (attempt - 1),
+        runtime=lambda wildcards, attempt: 120 * 2 ** (attempt - 1)
     message: "Annotating taxonomy using GTDBTK..."
     shell:
         """
@@ -69,8 +69,8 @@ rule gtdbtk_table:
         archaea2=f"{OUTPUT_DIR}/annotating/gtdbtk/classify/ar53.tsv"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: 1*1024 * 2 ** (attempt - 1),
-        runtime=lambda wildcards, input, attempt: 5 * 2 ** (attempt - 1)
+        mem_mb=lambda wildcards, attempt: 1*1024 * 2 ** (attempt - 1),
+        runtime=lambda wildcards, attempt: 5 * 2 ** (attempt - 1)
     message: "Annotating taxonomy using GTDBTK..."
     shell:
         """
