@@ -108,7 +108,7 @@ def run_snakemake_cataloging(workflow, project_name, output_dir, profile):
 
     subprocess.run(snakemake_command, shell=False, check=True)
 
-
+#Screen output control
 def run_snakemake_cataloging2(workflow, project_name, output_dir, profile):
 
     """ Run the cataloging workflow """
@@ -158,7 +158,7 @@ def run_snakemake_profiling(workflow, project_name, profiling_type, output_dir, 
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
 
-def run_snakemake_annotating(workflow, project_name, output_dir, profile):
+def run_snakemake_annotating(workflow, project_name, annotating_type, output_dir, profile):
     """ Run the profiling workflow """
 
     snakemake_command = [
@@ -169,7 +169,7 @@ def run_snakemake_annotating(workflow, project_name, output_dir, profile):
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir}"
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} annotating_type={annotating_type} output_dir={output_dir}"
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
 
@@ -219,6 +219,7 @@ def main():
     subparser_annotating.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
     subparser_annotating.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
     subparser_annotating.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
+    subparser_annotating.add_argument("-t", "--type", required=False, default="taxonomy,function", help="Taxonomic and/or functional annotations. Default: taxonomy,function")
     subparser_annotating.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
     subparser_unlock = subparsers.add_parser("unlock", help="Unlock snakemake")
@@ -476,7 +477,7 @@ def main():
         run_snakemake_profiling(args.command, project_name, args.type, args.output, args.profile)
         display_end()
     elif args.command == "annotating":
-        run_snakemake_annotating(args.command, project_name, args.output, args.profile)
+        run_snakemake_annotating(args.command, project_name,  args.type, args.output, args.profile)
         display_end()
     else:
         parser.print_help()

@@ -13,6 +13,7 @@ WORKFLOW = config.get("workflow", None)
 OUTPUT_DIR = config.get("output_dir", None)
 REFERENCE = config.get("reference", None)
 PROFILING_TYPE = config["profiling_type"].split(",") if "profiling_type" in config else []
+ANNOTATING_TYPE = config["annotating_type"].split(",") if "annotating_type" in config else []
 
 ####
 # Calculate optimal resources for computing
@@ -90,14 +91,15 @@ if WORKFLOW == "complete":
         input:
             expand(f"{OUTPUT_DIR}/cataloging/final/{{assembly}}.tsv", assembly=assemblies)
 
+    include: "rules/preparing.smk"
     if REFERENCE:
-        include: "rules/preparing.smk"
         include: "rules/preprocessing_ref.smk"
         include: "rules/cataloging.smk"
     if not REFERENCE:
-        include: "rules/preparing.smk"
         include: "rules/preprocessing.smk"
         include: "rules/cataloging.smk"
+    include: "rules/cataloging.smk"
+    include: "rules/annotating.smk"
 
 if WORKFLOW == "preprocessing":
 
@@ -178,9 +180,9 @@ if WORKFLOW == "cataloging":
             [f"{OUTPUT_DIR}/cataloging/bowtie2/{assembly}/{sample}.bam"
             for assembly, samples in ASSEMBLY_TO_SAMPLES.items()
             for sample in samples],
-            #[f"{OUTPUT_DIR}/cataloging/final/{assembly}/{assembly}_bin_{bin_id}.fa"
-            #for assembly in assemblies
-            #for bin_id in get_bin_ids_from_tsv(f"{OUTPUT_DIR}/cataloging/binette/{assembly}/final_bins_quality_reports.tsv")],
+            [f"{OUTPUT_DIR}/cataloging/final/{assembly}/{assembly}_bin_{bin_id}.fa"
+            for assembly in assemblies
+            for bin_id in get_bin_ids_from_tsv(f"{OUTPUT_DIR}/cataloging/binette/{assembly}/final_bins_quality_reports.tsv")],
             [f"{OUTPUT_DIR}/cataloging/semibin2/{assembly}/recluster_bins_info.tsv" #only while testing semibin
             for assembly in assemblies] #only while testing semibin
 
@@ -220,7 +222,11 @@ if WORKFLOW == "annotating":
 
     rule all:
         input:
-            f"{OUTPUT_DIR}/annotating/gtdbtk/classify/gtdbtk.bac120.summary.tsv",
-            f"{OUTPUT_DIR}/annotating/kofams/kegg.csv"
+            *([f"{OUTPUT_DIR}/annotating/gene_annotations.tsv.xz"] if "function" in ANNOTATING_TYPE else []),
+            *([f"{OUTPUT_DIR}/annotating/gtdbtk/classify/gtdbtk.bac120.summary.tsv"] if "taxonomy" in ANNOTATING_TYPE else []
 
-    include: "rules/annotating.smk"
+    if "taxonomy" in ANNOTATING_TYPE:
+        include: "rules/annotating_taxonomy.smk"
+
+    if "function" in ANNOTATING_TYPE:
+        include: "rules/annotating_function.smk"
