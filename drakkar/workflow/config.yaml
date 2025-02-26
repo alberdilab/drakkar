@@ -18,6 +18,10 @@ GTDBTK_MODULE: "gtdbtk/2.4.0"
 PRODIGAL_MODULE: "prodigal/2.6.3"
 HMMER_MODULE: "hmmer/3.3.2"
 MMSEQS2_MODULE: "mmseqs2/14.7e284"
+EMAPPER_MODULE: "eggnog-mapper/2.1.12"
+PATHWAYTOOLS_MODULE: "pathway-tools/27.0"
+BLAST_MODULE: "blast/2.13.0"
+M2M_MODULE: "metage2metabo/1.5.3"
 
 # Annotation databases
 CHECKM2_DB: "/maps/datasets/globe_databases/checkm2/20250215/CheckM2_database/uniref100.KO.1.dmnd"
