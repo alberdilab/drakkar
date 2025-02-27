@@ -203,7 +203,7 @@ rule final_annotation_table:
     input:
         expand(f"{OUTPUT_DIR}/annotating/final/{{mag}}.tsv",mag=mags)
     output:
-        f"{OUTPUT_DIR}/annotating/gene_annotations.tsv.xz
+        f"{OUTPUT_DIR}/annotating/gene_annotations.tsv.xz"
     threads:
         1
     resources:
