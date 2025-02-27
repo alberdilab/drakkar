@@ -193,7 +193,7 @@ rule merge_annotations:
             -pfam {input.pfam} \
             -ec {params.ec} \
             -cazy {input.cazy} \
-            -vf {input.vfdb} \
+            -vf {input.vf} \
             -vfdb {params.vf} \
             -amr {input.amr} \
             -amrdb {params.amr} \
