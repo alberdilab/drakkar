@@ -65,7 +65,7 @@ rule gtdbtk_table:
     output:
         f"{OUTPUT_DIR}/annotating/genome_taxonomy.tsv"
     params:
-        archaea=f"{OUTPUT_DIR}/annotating/gtdbtk/classify/gtdbtk.ar53.summary.tsv"
+        archaea=f"{OUTPUT_DIR}/annotating/gtdbtk/classify/gtdbtk.ar53.summary.tsv",
         archaea2=f"{OUTPUT_DIR}/annotating/gtdbtk/classify/ar53.tsv"
     threads: 1
     resources:

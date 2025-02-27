@@ -273,20 +273,15 @@ checkpoint binette:
                 --checkm2_db {params.checkm_db}
         """
 
-# Functions to define the input files dynamically.
-#def get_bin_ids_from_tsv(tsv_path):                                                                     #
-#    df = pd.read_csv(tsv_path, sep="\t")                                                                #
-#    return df["bin_id"].unique()                                                                        #
-
-#def get_bin_fna_sep(wildcards):                                                                         # all this is probably unnecessary
-#    checkpoint_output = checkpoints.binette.get(**wildcards).output[0]                         # and the rename_bins input can be
-#    cluster_ids = get_bin_ids_from_tsv(checkpoint_output)                                               # simplified, as bin_id is created in the main Snakemake
-#    return f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}/final_bins/bin_{wildcards.bin_id}.fa"
+# Regenerate the bin_id wildcard based on the checkpoint results
+def get_bin_fna_sep(wildcards):
+    checkpoint_output = checkpoints.binette.get(**wildcards).output[0]
+    cluster_ids = get_bin_ids_from_tsv(checkpoint_output)
+    return f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}/final_bins/bin_{wildcards.bin_id}.fa"
 
 rule rename_bins:
     input:
-        f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}/final_bins/bin_{{bin_id}}.fa"
-        #lambda wildcards: get_bin_fna_sep(wildcards)
+        lambda wildcards: get_bin_fna_sep(wildcards)
     output:
         f"{OUTPUT_DIR}/cataloging/final/{{assembly}}/{{assembly}}_bin_{{bin_id}}.fa"
     params:
