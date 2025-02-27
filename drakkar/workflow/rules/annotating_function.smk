@@ -136,7 +136,7 @@ rule vfdb:
     message: "Annotating virulence factors of MAG {wildcards.mag}..."
     shell:
         """
-        module load m{params.mmseqs2_module}
+        module load {params.mmseqs2_module}
         mmseqs easy-search {input} {params.db} {output} {params.tmp}
         """
 
