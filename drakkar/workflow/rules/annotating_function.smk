@@ -34,7 +34,7 @@ rule prodigal:
         mem_mb=lambda wildcards, input, attempt: max(1*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 1024) * 2 ** (attempt - 1))
     threads: 1
-    message: "Predicting genes of MAG {wildards.mag}..."
+    message: "Predicting genes of MAG {wildcards.mag}..."
     shell:
         """
         module load {params.prodigal_module}
