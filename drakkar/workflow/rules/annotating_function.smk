@@ -123,11 +123,11 @@ rule vfdb:
     input:
         f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
     output:
-        f"{OUTPUT_DIR}/annotating/pfam/{{mag}}.txt"
+        f"{OUTPUT_DIR}/annotating/vfdb/{{mag}}.txt"
     params:
         mmseqs2_module={MMSEQS2_MODULE},
         db={VFDB_DB},
-        tmp=f"{OUTPUT_DIR}/annotating/pfam/{{mag}}"
+        tmp=f"{OUTPUT_DIR}/annotating/vfdb/{{mag}}"
     threads:
         1
     resources:
