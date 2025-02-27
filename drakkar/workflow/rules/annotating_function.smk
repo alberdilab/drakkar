@@ -170,7 +170,7 @@ rule merge_annotations:
         amrdb=f"{OUTPUT_DIR}/annotating/amr/{{mag}}.tsv"
         #sp="results/signalp/{genome}.txt"
     output:
-        f"{OUTPUT_DIR}/annotating/final/{{mag}}.tsv
+        f"{OUTPUT_DIR}/annotating/final/{{mag}}.tsv"
     params:
         package_dir={PACKAGE_DIR},
         kegg=f"{KEGG_DB}.json",
