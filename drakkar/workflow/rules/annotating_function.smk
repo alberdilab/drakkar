@@ -125,8 +125,8 @@ rule vfdb:
         f"{OUTPUT_DIR}/annotating/pfam/{{mag}}.txt"
     params:
         mmseqs2_module={MMSEQS2_MODULE},
-        db={VFDB_DB}
-        tmp=f"{OUTPUT_DIR}/annotating/pfam/{{mag}}
+        db={VFDB_DB},
+        tmp=f"{OUTPUT_DIR}/annotating/pfam/{wildcards.mag}""
     threads:
         1
     resources:
