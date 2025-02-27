@@ -8,6 +8,7 @@ PACKAGE_DIR = config["package_dir"]
 GTDBTK_MODULE = config["GTDBTK_MODULE"]
 PRODIGAL_MODULE = config["PRODIGAL_MODULE"]
 HMMER_MODULE = config["HMMER_MODULE"]
+MMSEQS2_MODULE= config["MMSEQS2_MODULE"]
 
 # Annotation databases
 KEGG_DB = config["KEGG_DB"]
