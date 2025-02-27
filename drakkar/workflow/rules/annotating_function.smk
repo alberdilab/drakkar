@@ -23,7 +23,7 @@ VFDB_DB = config["VFDB_DB"]
 
 rule prodigal:
     input:
-        lambda wildcards: MAGS_TO_FILES[wildcards.mag]
+        "{mag_path}", bin_path=MAGS_TO_FILES.values())
     output:
         nt=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.fna",
         aa=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa",
