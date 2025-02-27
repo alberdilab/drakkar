@@ -52,7 +52,7 @@ rule kegg:
         db={KEGG_DB}
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 10) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 60) * 2 ** (attempt - 1))
     threads: 1
     message: "Annotating KEGG orthologs of MAG {wildcards.mag}..."
     shell:
@@ -167,8 +167,8 @@ rule merge_annotations:
         kegg=f"{OUTPUT_DIR}/annotating/kegg/{{mag}}.tsv",
         cazy=f"{OUTPUT_DIR}/annotating/cazy/{{mag}}.tsv",
         pfam=f"{OUTPUT_DIR}/annotating/pfam/{{mag}}.tsv",
-        vfdb=f"{OUTPUT_DIR}/annotating/vfdb/{{mag}}.txt",
-        amrdb=f"{OUTPUT_DIR}/annotating/amr/{{mag}}.tsv"
+        vf=f"{OUTPUT_DIR}/annotating/vfdb/{{mag}}.txt",
+        amr=f"{OUTPUT_DIR}/annotating/amr/{{mag}}.tsv"
         #sp="results/signalp/{genome}.txt"
     output:
         f"{OUTPUT_DIR}/annotating/final/{{mag}}.tsv"
