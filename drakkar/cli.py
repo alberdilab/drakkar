@@ -298,12 +298,11 @@ def main():
                 REFERENCE = False
 
         elif args.reference and not args.file:
-            if check_reference_columns(args.file):
-                print(f"")
-                print(f"No sample info file was provided.")
-                print(f"DRAKKAR will use the reference genome file.")
-                argument_references_to_json(args.reference,f"{args.output}/data/sample_to_reads1.json",args.output)
-                REFERENCE = True
+            print(f"")
+            print(f"No sample info file was provided.")
+            print(f"DRAKKAR will use the reference genome file.")
+            argument_references_to_json(args.reference,f"{args.output}/data/sample_to_reads1.json",args.output)
+            REFERENCE = True
 
         else:
             print(f"")
