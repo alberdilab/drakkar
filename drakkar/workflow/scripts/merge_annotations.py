@@ -30,7 +30,7 @@ def append_suffix_to_seqid(row):
 # Main function #
 #################
 
-def merge_annotations(gff_file, kofamsdb_file, kofams_file, pfam_file, cazy_file, ec_file, vfdb_file, vf_file, amrdb_file, amr_file, signalp_file, output_file):
+def merge_annotations(gff_file, kegg_file, keggdb_file, pfam_file, cazy_file, ec_file, vf_file, vfdb_file, amr_file, amrdb_file, signalp_file, output_file):
 
     ##############
     # Load genes #
@@ -57,14 +57,14 @@ def merge_annotations(gff_file, kofamsdb_file, kofams_file, pfam_file, cazy_file
     pfam_to_ec = pfam_to_ec.groupby('pfam', group_keys=False)[['pfam','ec','confidence']].apply(select_highest_confidence, include_groups=False)
 
     #Entry to VF
-    entry_to_vf = pd.read_csv(vf_file, sep='\t', comment='#', header=0)
+    entry_to_vf = pd.read_csv(vfdb_file, sep='\t', comment='#', header=0)
 
     #AMR to class
-    amr_to_class = pd.read_csv(amr_file, sep='\t', header=0)
+    amr_to_class = pd.read_csv(amrdb_file, sep='\t', header=0)
     amr_to_class = amr_to_class.rename(columns={'#hmm_accession': 'accession'})
 
     #KEGG hierarchy
-    kegg_json=json.load(open(kofams_file))
+    kegg_json=json.load(open(keggdb_file))
     kegg_df = []
     for main in kegg_json['children']:
         for broad in main['children']:
@@ -95,11 +95,11 @@ def merge_annotations(gff_file, kofamsdb_file, kofams_file, pfam_file, cazy_file
     hmm_attribs = ['accession', 'bitscore', 'evalue', 'id', 'overlap_num', 'region_num']
     evalue_threshold=0.00001
 
-    # Parse KOFAMS
-    kofams_hits = defaultdict(list)
+    # Parse keggdb
+    keggdb_hits = defaultdict(list)
     query_ids = []
 
-    with open(kofamsdb_file) as handle:
+    with open(kegg_file) as handle:
         for queryresult in SearchIO.parse(handle, 'hmmer3-tab'):
             query_id = queryresult.id  # Capture the query result id
             query_ids.extend([query_id] * len(queryresult.hits))  # Extend query_ids list to match the number of hits
@@ -108,17 +108,17 @@ def merge_annotations(gff_file, kofamsdb_file, kofams_file, pfam_file, cazy_file
                 for attrib in hmm_attribs:
                     # Use `getattr` to fetch the attribute value from the hit object
                     value = getattr(hit, attrib, None)  # Use `None` as a default if the attribute does not exist
-                    kofams_hits[attrib].append(value)
+                    keggdb_hits[attrib].append(value)
 
-    kofams_hits['query_id'] = query_ids
-    kofams_df = pd.DataFrame.from_dict(kofams_hits)
-    kofams_df = kofams_df.rename(columns={'query_id': 'gene'})
-    kofams_df['evalue'] = pd.to_numeric(kofams_df['evalue'], errors='coerce')
-    kofams_df = kofams_df[kofams_df['evalue'] < evalue_threshold]
-    kofams_df = kofams_df.rename(columns={'id': 'kegg'})
-    kofams_df = pd.merge(kofams_df, kegg_hierachy[['kegg', 'ec']], on='kegg', how='left')
-    kofams_df = kofams_df.groupby('gene', group_keys=False)[['gene','kegg','ec','evalue']].apply(select_lowest_evalue, include_groups=False)
-    kofams_df['ec'] = kofams_df['ec'].str.replace('EC:', '', regex=False)
+    keggdb_hits['query_id'] = query_ids
+    keggdb_df = pd.DataFrame.from_dict(keggdb_hits)
+    keggdb_df = keggdb_df.rename(columns={'query_id': 'gene'})
+    keggdb_df['evalue'] = pd.to_numeric(keggdb_df['evalue'], errors='coerce')
+    keggdb_df = keggdb_df[keggdb_df['evalue'] < evalue_threshold]
+    keggdb_df = keggdb_df.rename(columns={'id': 'kegg'})
+    keggdb_df = pd.merge(keggdb_df, kegg_hierachy[['kegg', 'ec']], on='kegg', how='left')
+    keggdb_df = keggdb_df.groupby('gene', group_keys=False)[['gene','kegg','ec','evalue']].apply(select_lowest_evalue, include_groups=False)
+    keggdb_df['ec'] = keggdb_df['ec'].str.replace('EC:', '', regex=False)
 
     # Parse PFAM
     pfam_hits = defaultdict(list)
@@ -173,7 +173,7 @@ def merge_annotations(gff_file, kofamsdb_file, kofams_file, pfam_file, cazy_file
     amr_hits = defaultdict(list)
     query_ids = []
 
-    with open(amrdb_file) as handle:
+    with open(amr_file) as handle:
         for queryresult in SearchIO.parse(handle, 'hmmer3-tab'):
             query_id = queryresult.id  # Capture the query result id
             query_ids.extend([query_id] * len(queryresult.hits))  # Extend query_ids list to match the number of hits
@@ -196,7 +196,7 @@ def merge_annotations(gff_file, kofamsdb_file, kofams_file, pfam_file, cazy_file
     amr_df = amr_df.rename(columns={'subclass': 'resistance_target'})
 
     # Parse VFDB
-    vfdb_df = pd.read_csv(vfdb_file, sep='\t', comment='#', header=None,
+    vfdb_df = pd.read_csv(vf_file, sep='\t', comment='#', header=None,
                      names=['gene', 'entry', 'identity', 'length', 'mismatches',
                             'gaps', 'query_start', 'query_end', 'target_start', 'target_end', 'evalue', 'bitscore'])
     vfdb_df['evalue'] = pd.to_numeric(vfdb_df['evalue'], errors='coerce')
@@ -213,7 +213,7 @@ def merge_annotations(gff_file, kofamsdb_file, kofams_file, pfam_file, cazy_file
     # Merge annotations #
     #####################
 
-    annotations = pd.merge(annotations, kofams_df[['gene', 'kegg', 'ec']], on='gene', how='left')
+    annotations = pd.merge(annotations, keggdb_df[['gene', 'kegg', 'ec']], on='gene', how='left')
     # Perform the merge, adding 'ec' from pfam_df as 'pfam_ec' to avoid conflict
     annotations = pd.merge(annotations, pfam_df[['gene', 'pfam', 'ec']], on='gene', how='left', suffixes=('', '_pfam'))
     # Update 'ec' column in annotations only where it is empty
@@ -234,15 +234,15 @@ def main():
     # Set up argument parsing
     parser = argparse.ArgumentParser(description='Compare GFF and PFAM files and output the results.')
     parser.add_argument('-gff', required=True, type=str, help='Path to the GFF file')
-    parser.add_argument('-kofamsdb', required=True, type=str, help='Path to the KOFAMSDB file')
-    parser.add_argument('-kofams', required=True, type=str, help='Path to the KOFAMS file')
+    parser.add_argument('-kegg', required=True, type=str, help='Path to the kegg file')
+    parser.add_argument('-keggdb', required=True, type=str, help='Path to the keggdb file')
     parser.add_argument('-pfam', required=True, type=str, help='Path to the PFAM file')
     parser.add_argument('-ec', required=True, type=str, help='Path to the EC file')
     parser.add_argument('-cazy', required=True, type=str, help='Path to the CAZY file')
-    parser.add_argument('-vfdb', required=True, type=str, help='Path to the VFDB file')
     parser.add_argument('-vf', required=True, type=str, help='Path to the VF file')
-    parser.add_argument('-amrdb', required=True, type=str, help='Path to the AMRDB file')
+    parser.add_argument('-vfdb', required=True, type=str, help='Path to the VFDB file')
     parser.add_argument('-amr', required=True, type=str, help='Path to the AMR file')
+    parser.add_argument('-amrdb', required=True, type=str, help='Path to the AMRDB file')
     parser.add_argument('-signalp', required=True, type=str, help='Path to the SIGNALP file')
     parser.add_argument('-o', required=True, type=str, help='Path to the OUTPUT file')
 
@@ -250,7 +250,7 @@ def main():
     args = parser.parse_args()
 
     # Process the files
-    merge_annotations(args.gff, args.kofamsdb, args.kofams, args.pfam, args.cazy, args.ec, args.vfdb, args.vf, args.amrdb, args.amr, args.signalp, args.o)
+    merge_annotations(args.gff, args.kegg, args.keggdb, args.pfam, args.cazy, args.ec, args.vf, args.vfdb, args.amr, args.amrdb, args.signalp, args.o)
 
 if __name__ == '__main__':
     main()
