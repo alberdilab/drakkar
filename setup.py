@@ -13,7 +13,8 @@ setup(
         "pandas",
         "argparse",
         "PyYAML",
-        "plotly"
+        "plotly",
+        "biopython"
     ],
     entry_points={
         "console_scripts": [
