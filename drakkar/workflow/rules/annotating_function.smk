@@ -168,17 +168,18 @@ rule signalp:
     output:
         f"{OUTPUT_DIR}/annotating/signalp/{{mag}}.txt"
     params:
-        signalp_module={SIGNALP_MODULE}
+        signalp_module={SIGNALP_MODULE},
+        tmp=f"{OUTPUT_DIR}/annotating/signalp/{{mag}}"
     threads:
-        1
+        4
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 10) * 2 ** (attempt - 1))
     shell:
         """
         module load {params.signalp_module}
-        signalp6 --fastafile {input} --output_dir {params.outputdir} --write_procs {threads}
-        cat {params.outputdir}/output.gff3  | cut -f1,3,6 | awk -F' # |[ \t]+' '!/^#/ {{print $1, $6, $7}}' OFS='\t' > {output}
+        signalp6 --fastafile {input} --output_dir {params.tmp} --write_procs {threads}
+        cat {params.outputdir}/output.gff3 | cut -f1,3,6 | awk -F' # |[ \t]+' '!/^#/ {{print $1, $6, $7}}' OFS='\t' > {output}
         """
 
 rule merge_annotations:
