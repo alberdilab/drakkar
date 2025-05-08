@@ -186,7 +186,7 @@ rule merge_annotations:
     message: "Merging annotations of MAG {wildcards.mag}..."
     shell:
         """
-        python {params.package_dir}/scripts/merge_annotations.py \
+        python {params.package_dir}/workflow/scripts/merge_annotations.py \
             -gff {input.gff} \
             -keggdb {params.kegg} \
             -kegg {input.kegg} \
