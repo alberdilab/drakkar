@@ -8,7 +8,8 @@ PACKAGE_DIR = config["package_dir"]
 GTDBTK_MODULE = config["GTDBTK_MODULE"]
 PRODIGAL_MODULE = config["PRODIGAL_MODULE"]
 HMMER_MODULE = config["HMMER_MODULE"]
-MMSEQS2_MODULE= config["MMSEQS2_MODULE"]
+MMSEQS2_MODULE = config["MMSEQS2_MODULE"]
+SIGNALP_MODULE = config["SIGNALP_MODULE"]
 
 # Annotation databases
 KEGG_DB = config["KEGG_DB"]
@@ -161,6 +162,25 @@ rule amr:
         hmmscan -o {output.txt} --tblout {output.tsv} --noali {params.db} {input}
         """
 
+rule signalp:
+    input:
+        f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
+    output:
+        f"{OUTPUT_DIR}/annotating/signalp/{{mag}}.txt"
+    params:
+        signalp_module={SIGNALP_MODULE}
+    threads:
+        1
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 10) * 2 ** (attempt - 1))
+    shell:
+        """
+        module load {params.signalp_module}
+        signalp6 --fastafile {input} --output_dir {params.outputdir} --write_procs {threads}
+        cat {params.outputdir}/output.gff3  | cut -f1,3,6 | awk -F' # |[ \t]+' '!/^#/ {{print $1, $6, $7}}' OFS='\t' > {output}
+        """
+
 rule merge_annotations:
     input:
         gff=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.gff",
@@ -168,8 +188,8 @@ rule merge_annotations:
         cazy=f"{OUTPUT_DIR}/annotating/cazy/{{mag}}.tsv",
         pfam=f"{OUTPUT_DIR}/annotating/pfam/{{mag}}.tsv",
         vf=f"{OUTPUT_DIR}/annotating/vfdb/{{mag}}.txt",
-        amr=f"{OUTPUT_DIR}/annotating/amr/{{mag}}.tsv"
-        #sp="results/signalp/{genome}.txt"
+        amr=f"{OUTPUT_DIR}/annotating/amr/{{mag}}.tsv",
+        sp=f"{OUTPUT_DIR}/annotating/signalp/{{mag}}.txt"
     output:
         f"{OUTPUT_DIR}/annotating/final/{{mag}}.tsv"
     params:
@@ -197,6 +217,7 @@ rule merge_annotations:
             -vfdb {params.vf} \
             -amr {input.amr} \
             -amrdb {params.amr} \
+            -signalp {input.sp} \
             -o {output}
         """
 

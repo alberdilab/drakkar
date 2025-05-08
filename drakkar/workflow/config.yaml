@@ -22,6 +22,7 @@ EMAPPER_MODULE: "eggnog-mapper/2.1.12"
 PATHWAYTOOLS_MODULE: "pathway-tools/27.0"
 BLAST_MODULE: "blast/2.13.0"
 M2M_MODULE: "metage2metabo/1.5.3"
+SIGNALP_MODULE: "signalp/6h"
 
 # Annotation databases
 CHECKM2_DB: "/maps/datasets/globe_databases/checkm2/20250215/CheckM2_database/uniref100.KO.1.dmnd"
