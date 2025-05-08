@@ -179,7 +179,7 @@ rule signalp:
         """
         module load {params.signalp_module}
         signalp6 --fastafile {input} --output_dir {params.tmp} --write_procs {threads}
-        cat {params.outputdir}/output.gff3 | cut -f1,3,6 | awk -F' # |[ \t]+' '!/^#/ {{print $1, $6, $7}}' OFS='\t' > {output}
+        cat {params.tmp}/output.gff3 | cut -f1,3,6 | awk -F' # |[ \t]+' '!/^#/ {{print $1, $6, $7}}' OFS='\t' > {output}
         """
 
 rule merge_annotations:
