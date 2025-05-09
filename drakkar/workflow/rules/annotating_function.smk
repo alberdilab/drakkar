@@ -209,8 +209,8 @@ rule merge_annotations:
         """
         python {params.package_dir}/workflow/scripts/merge_annotations.py \
             -gff {input.gff} \
-            -keggdb {params.kegg} \
             -kegg {input.kegg} \
+            -keggdb {params.kegg} \
             -pfam {input.pfam} \
             -ec {params.ec} \
             -cazy {input.cazy} \

@@ -30,7 +30,7 @@ def append_suffix_to_seqid(row):
 # Main function #
 #################
 
-def merge_annotations(gff_file, kegg_file, keggdb_file, pfam_file, cazy_file, ec_file, vf_file, vfdb_file, amr_file, amrdb_file, signalp_file, output_file):
+def merge_annotations(gff_file, kegg_file, keggdb_file, pfam_file, ec_file, cazy_file, vf_file, vfdb_file, amr_file, amrdb_file, signalp_file, output_file):
 
     ##############
     # Load genes #
@@ -250,7 +250,7 @@ def main():
     args = parser.parse_args()
 
     # Process the files
-    merge_annotations(args.gff, args.kegg, args.keggdb, args.pfam, args.cazy, args.ec, args.vf, args.vfdb, args.amr, args.amrdb, args.signalp, args.o)
+    merge_annotations(args.gff, args.kegg, args.keggdb, args.pfam, args.ec, args.cazy, args.vf, args.vfdb, args.amr, args.amrdb, args.signalp, args.o)
 
 if __name__ == '__main__':
     main()
