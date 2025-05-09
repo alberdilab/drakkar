@@ -196,7 +196,7 @@ rule merge_annotations:
     params:
         package_dir={PACKAGE_DIR},
         kegg=f"{KEGG_DB}.json",
-        ec=f"{KEGG_DB}_ec.tsv",
+        ec=f"{PFAM_DB}_ec.tsv",
         vf=f"{VFDB_DB}.tsv",
         amr=f"{AMR_DB}.tsv"
     threads:
