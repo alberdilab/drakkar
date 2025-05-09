@@ -235,5 +235,5 @@ rule final_annotation_table:
     message: "Generating final gene annotation file..."
     shell:
         """
-        cat {input.tsv_files} | xz -c > {output}
+        cat {input} | xz -c > {output}
         """
