@@ -171,7 +171,7 @@ rule signalp:
         signalp_module={SIGNALP_MODULE},
         tmp=f"{OUTPUT_DIR}/annotating/signalp/{{mag}}"
     threads:
-        4
+        8
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 100) * 2 ** (attempt - 1))
