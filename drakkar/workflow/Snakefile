@@ -51,56 +51,6 @@ def calculate_file_sizes(file_dict):
 # Run pipelines
 ####
 
-if WORKFLOW == "complete":
-
-    with open(f"{OUTPUT_DIR}/data/sample_to_reads1.json", "r") as f:
-        SAMPLE_TO_READS1 = json.load(f)
-
-    with open(f"{OUTPUT_DIR}/data/sample_to_reads2.json", "r") as f:
-        SAMPLE_TO_READS2 = json.load(f)
-
-    with open(f"{OUTPUT_DIR}/data/reference_to_file.json", "r") as f:
-        REFERENCE_TO_FILE = json.load(f)
-
-    with open(f"{OUTPUT_DIR}/data/sample_to_reference.json", "r") as f:
-        SAMPLE_TO_REFERENCE = json.load(f)
-
-    with open(f"{OUTPUT_DIR}/data/preprocessed_to_reads1.json", "r") as f:
-        PREPROCESSED_TO_READS1 = json.load(f)
-
-    with open(f"{OUTPUT_DIR}/data/preprocessed_to_reads2.json", "r") as f:
-        PREPROCESSED_TO_READS2 = json.load(f)
-
-    with open(f"{OUTPUT_DIR}/data/assembly_to_samples.json", "r") as f:
-        ASSEMBLY_TO_SAMPLES = json.load(f)
-
-    samples = list(SAMPLE_TO_READS1.keys())
-    references = list(REFERENCE_TO_FILE.keys())
-    assemblies = list(ASSEMBLY_TO_SAMPLES.keys())
-
-    reads_mb = calculate_file_sizes(SAMPLE_TO_READS1)
-    reads_mb_total = sum(reads_mb.values())
-
-    reference_mb = calculate_file_sizes(REFERENCE_TO_FILE)
-    reference_mb_total = sum(reference_mb.values())
-
-    preprocessed_mb = calculate_file_sizes(PREPROCESSED_TO_READS1)
-    preprocessed_mb_total = sum(preprocessed_mb.values())
-
-    rule all:
-        input:
-            expand(f"{OUTPUT_DIR}/cataloging/final/{{assembly}}.tsv", assembly=assemblies)
-
-    include: "rules/preparing.smk"
-    if REFERENCE:
-        include: "rules/preprocessing_ref.smk"
-        include: "rules/cataloging.smk"
-    if not REFERENCE:
-        include: "rules/preprocessing.smk"
-        include: "rules/cataloging.smk"
-    include: "rules/cataloging.smk"
-    include: "rules/annotating.smk"
-
 if WORKFLOW == "preprocessing":
 
     with open(f"{OUTPUT_DIR}/data/sample_to_reads1.json", "r") as f:

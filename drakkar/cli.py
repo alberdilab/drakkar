@@ -47,23 +47,6 @@ def run_unlock(workflow, output_dir, profile):
     print(f"The output directory {output_dir} has been succesfully unlocked")
     print(f"You can now rerun a new workflow using any drakkar command:")
 
-def run_snakemake_complete(workflow, project_name, output_dir, reference, profile):
-
-    """ Run the complete workflow """
-
-    snakemake_command = [
-        "/bin/bash", "-c",  # Ensures the module system works properly
-        f"module load {config_vars['SNAKEMAKE_MODULE']} && "
-        "snakemake "
-        f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
-        f"--directory {output_dir} "
-        f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
-        f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} reference={reference} "
-    ]
-
-    subprocess.run(snakemake_command, shell=False, check=True)
-
 def run_snakemake_preprocessing(workflow, project_name, output_dir, reference, profile):
 
     """ Run the preprocessing workflow """
@@ -331,7 +314,7 @@ def main():
         print(f"")
         print(f"Starting Preprocessing pipeline...")
         print(f"")
-        run_snakemake_preprocessing(args.command, project_name, Path(args.output).resolve(), REFERENCE, args.profile)
+        run_snakemake_preprocessing("preprocessing", project_name, Path(args.output).resolve(), REFERENCE, args.profile)
 
     ###
     # Cataloging
@@ -391,7 +374,7 @@ def main():
         print(f"")
         print(f"Starting Cataloging pipeline...")
         print(f"")
-        run_snakemake_cataloging(args.command, project_name, Path(args.output).resolve(), args.profile)
+        run_snakemake_cataloging("cataloging", project_name, Path(args.output).resolve(), args.profile)
 
     ###
     # Profiling
@@ -454,7 +437,7 @@ def main():
         print(f"")
         print(f"Starting Profiling pipeline...")
         print(f"")
-        run_snakemake_profiling(args.command, project_name, args.type, args.output, args.profile)
+        run_snakemake_profiling("profiling", project_name, args.type, args.output, args.profile)
 
     ###
     # Annotating
@@ -491,7 +474,7 @@ def main():
         print(f"")
         print(f"Starting Annotating pipeline...")
         print(f"")
-        run_snakemake_annotating(args.command, project_name,  args.type, args.output, args.profile)
+        run_snakemake_annotating("annotating", project_name,  args.type, args.output, args.profile)
 
 if __name__ == "__main__":
     main()
