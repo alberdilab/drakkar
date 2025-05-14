@@ -203,7 +203,7 @@ def main():
 
     # Define subcommands for each workflow
     subparser_complete = subparsers.add_parser("complete", help="Run the complete workflow")
-    subparser_complete.add_argument("-i", "--input", required=True, help="Input directory")
+    subparser_complete.add_argument("-i", "--input", required=False, help="Input directory")
     subparser_complete.add_argument("-f", "--file", required=False, help="Sample detail file (required if no input directory is provided)")
     subparser_complete.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_complete.add_argument("-r", "--reference", required=False, help="Reference host genome")
