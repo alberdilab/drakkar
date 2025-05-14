@@ -47,7 +47,7 @@ def run_unlock(workflow, output_dir, profile):
     print(f"The output directory {output_dir} has been succesfully unlocked")
     print(f"You can now rerun a new workflow using any drakkar command:")
 
-def run_snakemake_complete(workflow, project_name, input_dir, output_dir, reference, mode, profile):
+def run_snakemake_complete(workflow, project_name, output_dir, reference, profile):
 
     """ Run the complete workflow """
 
@@ -204,6 +204,7 @@ def main():
     # Define subcommands for each workflow
     subparser_complete = subparsers.add_parser("complete", help="Run the complete workflow")
     subparser_complete.add_argument("-i", "--input", required=True, help="Input directory")
+    subparser_complete.add_argument("-f", "--file", required=False, help="Sample detail file (required if no input directory is provided)")
     subparser_complete.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_complete.add_argument("-r", "--reference", required=False, help="Reference host genome")
     subparser_complete.add_argument("-m", "--mode", required=False, help="Comma-separated list of cataloging modes (e.g. individual,all)")
@@ -251,11 +252,8 @@ def main():
     # Check screen session
     check_screen_session()
 
-    # Extract project name from output path
-
-
     ###
-    # Preprocessing
+    # Unlock
     ###
 
     if args.command == "unlock":
@@ -263,7 +261,11 @@ def main():
     else:
         project_name = os.path.basename(os.path.normpath(args.output))
 
-    if args.command == "preprocessing":
+    ###
+    # Preprocessing
+    ###
+
+    if args.command in ("preprocessing", "complete"):
 
         # Generate raw data dictionaries
 
@@ -326,11 +328,16 @@ def main():
             print(f"Running DRAKKAR without mapping against a reference genome")
             REFERENCE = False
 
+        print(f"")
+        print(f"Starting Preprocessing pipeline...")
+        print(f"")
+        run_snakemake_preprocessing(args.command, project_name, Path(args.output).resolve(), REFERENCE, args.profile)
+
     ###
     # Cataloging
     ###
 
-    if args.command == "cataloging":
+    if args.command in ("cataloging", "complete"):
 
         # Generate preprocessing data dictionaries
 
@@ -381,12 +388,16 @@ def main():
 
         file_assemblies_to_json(args.file,samples,INDIVIDUAL_MODE,ALL_MODE,args.output)
 
+        print(f"")
+        print(f"Starting Cataloging pipeline...")
+        print(f"")
+        run_snakemake_cataloging(args.command, project_name, Path(args.output).resolve(), args.profile)
 
     ###
     # Profiling
     ###
 
-    if args.command == "profiling":
+    if args.command in ("profiling", "complete"):
 
         # Prepare bin dictionaries
         if args.bins_dir and args.bins_file:
@@ -440,11 +451,16 @@ def main():
                 print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
                 return
 
+        print(f"")
+        print(f"Starting Profiling pipeline...")
+        print(f"")
+        run_snakemake_profiling(args.command, project_name, args.type, args.output, args.profile)
+
     ###
     # Annotating
     ###
 
-    if args.command == "annotating":
+    if args.command in ("annotating", "complete"):
 
         # Prepare bin dictionaries
         if args.bins_dir and args.bins_file:
@@ -472,31 +488,10 @@ def main():
                 print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
                 return
 
-    ###
-    # Launch snakemake commands
-    ###
-    print(f"")
-    print(f"Starting Snakemake pipeline...")
-    print(f"")
-
-    # Relative paths are turned into absolute paths
-    if args.command == "complete":
-        run_snakemake_complete(args.command, project_name, args.input, args.output, args.reference, args.profile)
-        display_end()
-    elif args.command == "preprocessing":
-        run_snakemake_preprocessing(args.command, project_name, Path(args.output).resolve(), REFERENCE, args.profile)
-        display_end()
-        preprocessing_summary(f"{args.output}/preprocessing.tsv")
-    elif args.command == "cataloging":
-        run_snakemake_cataloging(args.command, project_name, Path(args.output).resolve(), args.profile)
-    elif args.command == "profiling":
-        run_snakemake_profiling(args.command, project_name, args.type, args.output, args.profile)
-        display_end()
-    elif args.command == "annotating":
+        print(f"")
+        print(f"Starting Annotating pipeline...")
+        print(f"")
         run_snakemake_annotating(args.command, project_name,  args.type, args.output, args.profile)
-        display_end()
-    else:
-        parser.print_help()
 
 if __name__ == "__main__":
     main()
