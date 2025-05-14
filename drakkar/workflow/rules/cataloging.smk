@@ -35,7 +35,7 @@ rule assembly:
         outputdir=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}"
     threads: 8
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 50) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 20) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 10) * 2 ** (attempt - 1))
     message: "Assembling {wildcards.assembly}..."
     shell:
