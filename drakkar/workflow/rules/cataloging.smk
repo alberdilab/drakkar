@@ -10,6 +10,7 @@ BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 METABAT2_MODULE = config["METABAT2_MODULE"]
 MAXBIN2_MODULE = config["MAXBIN2_MODULE"]
+FRAGGENESCAN_MODULE = config["FRAGGENESCAN_MODULE"]
 BEDTOOLS_MODULE = config["BEDTOOLS_MODULE"]
 HMMER_MODULE = config["HMMER_MODULE"]
 SEMIBIN2_MODULE = config["SEMIBIN2_MODULE"]
@@ -148,6 +149,7 @@ rule maxbin2:
     params:
         maxbin2_module={MAXBIN2_MODULE},
         bowtie2_module={BOWTIE2_MODULE},
+        fraggenescan_module={FRAGGENESCAN_MODULE},
         basename=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}"
     threads: 1
     resources:
@@ -156,7 +158,7 @@ rule maxbin2:
     message: "Binning contigs from assembly {wildcards.assembly} using maxbin2..."
     shell:
         """
-        module load {params.maxbin2_module} {params.bowtie2_module}
+        module load {params.maxbin2_module} {params.bowtie2_module} {params.fraggenescan_module}
         rm -rf {params.basename}*
         run_MaxBin.pl -contig {input.assembly} -abund {input.depth} -max_iteration 10 -out {params.basename} -min_contig_length 1500
         """
