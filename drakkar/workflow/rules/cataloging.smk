@@ -158,6 +158,7 @@ rule maxbin2:
     message: "Binning contigs from assembly {wildcards.assembly} using maxbin2..."
     shell:
         """
+        MODULEPATH=/opt/shared_software/shared_envmodules/modules:$MODULEPATH \
         module load {params.maxbin2_module} {params.bowtie2_module} {params.fraggenescan_module}
         rm -rf {params.basename}*
         run_MaxBin.pl -contig {input.assembly} -abund {input.depth} -max_iteration 10 -out {params.basename} -min_contig_length 1500
