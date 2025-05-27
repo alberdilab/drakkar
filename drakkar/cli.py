@@ -173,6 +173,22 @@ def run_snakemake_annotating(workflow, project_name, annotating_type, output_dir
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
 
+def run_snakemake_inspecting(workflow, project_name, output_dir, profile):
+    """ Run the profiling workflow """
+
+    snakemake_command = [
+        "/bin/bash", "-c",  # Ensures the module system works properly
+        f"module load {config_vars['SNAKEMAKE_MODULE']} && "
+        "snakemake "
+        f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
+        f"--directory {output_dir} "
+        f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
+        f"--configfile {CONFIG_PATH} "
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir}"
+    ]
+    subprocess.run(snakemake_command, shell=False, check=True)
+
+
 ###
 # Main function to launch workflows
 ###
@@ -200,7 +216,7 @@ def main():
     subparser_preprocessing.add_argument("-r", "--reference", required=False, help="Reference host genome file (fna.gz)")
     subparser_preprocessing.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
-    subparser_cataloging = subparsers.add_parser("cataloging", help="Run the cataloging workflow (assemly and binning)")
+    subparser_cataloging = subparsers.add_parser("cataloging", help="Run the cataloging (assembly and binning) workflow")
     subparser_cataloging.add_argument("-i", "--input", required=False, help="Input directory (required if no sample detail file is provided)")
     subparser_cataloging.add_argument("-f", "--file", required=False, help="Sample detail file (required if no input directory is provided)")
     subparser_cataloging.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
@@ -216,11 +232,19 @@ def main():
     subparser_profiling.add_argument("-t", "--type", required=False, default="genomes", help="Either genomes or pangenomes profiling type. Default: genomes")
     subparser_profiling.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
-    subparser_annotating = subparsers.add_parser("annotating", help="Run the cataloging workflow (assemly and binning)")
+    subparser_annotating = subparsers.add_parser("annotating", help="Run the annotating workflow")
     subparser_annotating.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
     subparser_annotating.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
     subparser_annotating.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_annotating.add_argument("-t", "--type", required=False, default="taxonomy,function", help="Taxonomic, functional and/or network annotations (comma-separated). Default: taxonomy,function")
+    subparser_annotating.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
+
+    subparser_inspecting = subparsers.add_parser("inspecting", help="Run the inspecting workflow")
+    subparser_inspecting.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
+    subparser_inspecting.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
+    subparser_inspecting.add_argument("-m", "--mapping_dir", required=False, help="Directory containing the mapping (.bam) files")
+    subparser_inspecting.add_argument("-c", "--cov_file", required=False, help="Tab-separated file containing mapping coverage per genome per smaple")
+    subparser_annotating.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_annotating.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
     subparser_unlock = subparsers.add_parser("unlock", help="Unlock snakemake")
@@ -475,6 +499,43 @@ def main():
         print(f"Starting Annotating pipeline...")
         print(f"")
         run_snakemake_annotating("annotating", project_name,  args.type, args.output, args.profile)
+
+    ###
+    # Annotating
+    ###
+
+    if args.command in ("inspecting", "complete"):
+
+        # Prepare bin dictionaries
+        if args.bins_dir and args.bins_file:
+            print(f"")
+            print(f"Both bin path file and input directory were provided.")
+            print(f"DRAKKAR will continue with the information provided in the path file.")
+            file_mags_to_json(args.bins_dir,args.output)
+        elif args.bins_file and not args.bins_dir:
+            print(f"")
+            print(f"DRAKKAR will run with the information provided in the sample info file.")
+            file_mags_to_json(args.bins_file,args.output)
+        elif args.bins_dir and not args.bins_file:
+            print(f"")
+            print(f"No sample info file was provided.")
+            print(f"DRAKKAR will run with the files in the input directory.")
+            path_mags_to_json(args.bins_dir,args.output)
+        else:
+            print(f"")
+            print(f"No input information was provided. DRAKKAR will try to guess the location of the MAGs.")
+            if os.path.exists(f"{args.output}/profiling_genomes/drep/dereplicated_genomes"):
+                path_mags_to_json(f"{args.output}/profiling_genomes/drep/dereplicated_genomes",args.output)
+            else:
+                print(f"ERROR: No bin data was found in the output directory.")
+                print(f"Make sure that the preprocessing and cataloging modules were run in this directory.")
+                print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
+                return
+
+        print(f"")
+        print(f"Starting Annotating pipeline...")
+        print(f"")
+        run_snakemake_inspecting("annotating", project_name,  args.type, args.output, args.profile)
 
 if __name__ == "__main__":
     main()

@@ -451,6 +451,16 @@ def path_mags_to_json(folder_path=None, output=False):
     with open(f"{output}/data/mags_to_files.json", "w") as f:
         json.dump(fasta_dict, f, indent=4)
 
+def microdiversity_selection_to_json(coverage, mincov=0.5, minsamp=10):
+    df = pd.read_csv(csv_input, sep='\t', index_col=0)
+    genome_sample_dict = {}
+    for genome, row in df.iterrows():
+        selected = row[row > mincov].index.tolist()
+        if len(selected) >= minsamp:
+            genome_sample_dict[genome] = selected
+
+    with open(f"{output}/data/microdiversity_selection.json", "w") as f:
+        json.dump(genome_sample_dict, f, indent=4)
 
 def preprocessing_summary(summary_table, bar_width=50):
     """

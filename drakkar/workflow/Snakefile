@@ -188,3 +188,17 @@ if WORKFLOW == "annotating":
 
     if "network" in ANNOTATING_TYPE:
         include: "rules/annotating_network.smk"
+
+if WORKFLOW == "inspecting":
+
+    with open(f"{OUTPUT_DIR}/data/microdiversity_selection.json", "r") as f:
+        MICRODIVERSITY_SELECTION = json.load(f)
+
+    genomes = list(MICRODIVERSITY_SELECTION.keys())
+
+    rule all:
+        input:
+            *([f"{OUTPUT_DIR}/inspecting_microdiversity/variants/{genome}.vcf.gz" for genome in genomes] if "microdiversity" in PROFILING_TYPE else [])
+
+    if "microdiversity" in INSPECTING_TYPE:
+        include: "rules/inspecting_microdiversity.smk"
