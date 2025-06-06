@@ -148,7 +148,7 @@ rule maxbin2:
         f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}.summary"
     params:
         maxbin2_module={MAXBIN2_MODULE},
-        hmmer_module={HMMER_MODULE}
+        hmmer_module={HMMER_MODULE},
         basename=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}"
     threads: 1
     resources:
