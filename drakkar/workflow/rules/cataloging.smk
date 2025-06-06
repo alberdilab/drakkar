@@ -148,8 +148,7 @@ rule maxbin2:
         f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}.summary"
     params:
         maxbin2_module={MAXBIN2_MODULE},
-        bowtie2_module={BOWTIE2_MODULE},
-        fraggenescan_module={FRAGGENESCAN_MODULE},
+        hmmer_module={HMMER_MODULE}
         basename=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}"
     threads: 1
     resources:
@@ -159,7 +158,7 @@ rule maxbin2:
     shell:
         """
         MODULEPATH=/opt/shared_software/shared_envmodules/modules:$MODULEPATH \
-        module load {params.maxbin2_module} {params.bowtie2_module} {params.fraggenescan_module}
+        module load {params.maxbin2_module} {params.hmmer_module}
         rm -rf {params.basename}*
         run_MaxBin.pl -contig {input.assembly} -abund {input.depth} -max_iteration 10 -out {params.basename} -min_contig_length 1500
         """
