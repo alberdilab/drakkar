@@ -245,7 +245,7 @@ checkpoint binette:
         """
         module load {params.checkm2_module} {params.binette_module}
         MODULEPATH=/opt/shared_software/shared_envmodules/modules:$MODULEPATH \
-        {params.diamond_module}
+        module load {params.diamond_module}
 
         # Define input files
         METABAT2="{input.metabat2}"
