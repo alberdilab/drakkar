@@ -60,6 +60,7 @@ def run_snakemake_preprocessing(workflow, project_name, output_dir, reference, p
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} reference={reference} "
+        f"--slurm-delete-logfiles-older-than 0"
     ]
 
     subprocess.run(snakemake_command, shell=False, check=True)
