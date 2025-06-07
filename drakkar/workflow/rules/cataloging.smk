@@ -238,7 +238,7 @@ checkpoint binette:
         outdir=f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 100) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 300) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 2) * 2 ** (attempt - 1))
     message: "Refining bins from assembly {wildcards.assembly} using binette..."
     shell:
