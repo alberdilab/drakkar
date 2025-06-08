@@ -433,6 +433,7 @@ def file_mags_to_json(paths_file=None, output=False):
     with open(f"{output}/data/mags_to_files.json", "w") as f:
         json.dump(fasta_dict, f, indent=4)
 
+#updated to account for compressed genomes
 def path_mags_to_json(folder_path=None, output=False):
     fasta_dict = {}
 
@@ -440,12 +441,16 @@ def path_mags_to_json(folder_path=None, output=False):
     if not os.path.isdir(folder_path):
         raise FileNotFoundError(f"❌ Folder not found: {folder_path}")
 
+    # Compile a regex that matches .fa/.fna/.fasta, optionally followed by .gz
+    FASTA_RE = re.compile(r'\.(?:fa|fna|fasta)(?:\.gz)?$', re.IGNORECASE)
+
     # Iterate over all files in the folder
-    for file_name in os.listdir(folder_path):
-        if file_name.endswith((".fna", ".fa")):
-            full_path = os.path.join(folder_path, file_name)
-            file_id = os.path.splitext(file_name)[0]  # Remove extension
-            fasta_dict[file_id] = full_path
+    fasta_dict = {}
+    for fname in os.listdir(folder_path):
+        if FASTA_RE.search(fname):
+            full_path = os.path.join(folder_path, fname)
+            sample_id = FASTA_RE.sub('', fname)
+            fasta_dict[sample_id] = full_path
 
     os.makedirs(f"{output}/data", exist_ok=True)
     with open(f"{output}/data/mags_to_files.json", "w") as f:
