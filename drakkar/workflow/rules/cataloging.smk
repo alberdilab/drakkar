@@ -222,6 +222,15 @@ rule semibin2_table:
         tail -n +2 {input} > {output}
         """
 
+# Script to calculate resources based on the number of bins
+_row_count_cache = {}
+def row_count(path):
+    """Return number of data rows (excluding header) in a TSV, caching the result."""
+    if path not in _row_count_cache:
+        with open(path) as f:
+            _row_count_cache[path] = max(0, sum(1 for _ in f))
+    return _row_count_cache[path]
+
 checkpoint binette:
     input:
         metabat2=f"{OUTPUT_DIR}/cataloging/metabat2/{{assembly}}/{{assembly}}.tsv",
@@ -238,8 +247,8 @@ checkpoint binette:
         outdir=f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 300) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 2) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, input, attempt: max(64*1024, (row_count(input.metabat2) + row_count(input.maxbin2) + row_count(input.semibin2) * 250) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb) * 2 ** (attempt - 1))
     message: "Refining bins from assembly {wildcards.assembly} using binette..."
     shell:
         """
