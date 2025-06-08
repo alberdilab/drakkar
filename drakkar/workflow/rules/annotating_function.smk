@@ -40,7 +40,7 @@ rule prodigal:
         """
         module load {params.prodigal_module}
         if [[ "{input}" == *.gz ]]; then
-            gzip -dc {input} | prodigal -i - -d {output.nt} -a {output.aa} -o {output.gff} -f gff
+            gzip -dc {input} | prodigal -d {output.nt} -a {output.aa} -o {output.gff} -f gff
         else
             prodigal -i {input} -d {output.nt} -a {output.aa} -o {output.gff} -f gff
         fi
