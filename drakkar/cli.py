@@ -412,16 +412,16 @@ def main():
             print(f"")
             print(f"Both bin path file and input directory were provided.")
             print(f"DRAKKAR will continue with the information provided in the path file.")
-            file_bins_to_json(args.input,args.output)
+            file_bins_to_json(args.bins_file,args.output)
         elif args.bins_file and not args.bins_dir:
             print(f"")
             print(f"DRAKKAR will run with the information provided in the sample info file.")
-            file_bins_to_json(args.file,args.output)
+            file_bins_to_json(args.bins_file,args.output)
         elif args.bins_dir and not args.bins_file:
             print(f"")
             print(f"No sample info file was provided.")
             print(f"DRAKKAR will run with the files in the input directory.")
-            path_bins_to_json(args.input,args.output)
+            path_bins_to_json(args.bins_dir,args.output)
         else:
             print(f"")
             print(f"No input information was provided. DRAKKAR will try to guess the location of the MAGs.")
