@@ -245,7 +245,7 @@ checkpoint binette:
         checkm2_module = {CHECKM2_MODULE},
         binette_module = {BINETTE_MODULE},
         outdir=f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}"
-    threads: 1
+    threads: 4
     resources:
         mem_mb=lambda wildcards, input, attempt: max(64*1024, (row_count(input.metabat2) + row_count(input.maxbin2) + row_count(input.semibin2) * 10) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb) * 2 ** (attempt - 1))
@@ -283,7 +283,8 @@ checkpoint binette:
         binette --contig2bin_tables $VALID_TSV_FILES \
                 --contigs {input.fasta} \
                 --outdir {params.outdir} \
-                --checkm2_db {params.checkm_db}
+                --checkm2_db {params.checkm_db} \
+                --threads {threads}
         """
 
 # Regenerate the bin_id wildcard based on the checkpoint results

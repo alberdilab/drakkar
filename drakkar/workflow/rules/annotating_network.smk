@@ -32,7 +32,11 @@ rule prodigal:
     shell:
         """
         module load {params.prodigal_module}
-        prodigal -i {input} -d {output.nt} -a {output.aa} -o {output.gff} -f gff
+        if [[ "{input}" == *.gz ]]; then
+            gzip -dc {input} | prodigal -d {output.nt} -a {output.aa} -o {output.gff} -f gff
+        else
+            prodigal -i {input} -d {output.nt} -a {output.aa} -o {output.gff} -f gff
+        fi
         """
 
 rule emapper:
