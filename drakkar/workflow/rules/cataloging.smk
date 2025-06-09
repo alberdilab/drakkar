@@ -245,7 +245,7 @@ checkpoint binette:
         checkm2_module = {CHECKM2_MODULE},
         binette_module = {BINETTE_MODULE},
         outdir=f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}"
-    threads: 4
+    threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: max(64*1024, (row_count(input.metabat2) + row_count(input.maxbin2) + row_count(input.semibin2) * 5) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb) * 2 ** (attempt - 1))
