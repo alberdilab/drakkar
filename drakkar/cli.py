@@ -408,20 +408,29 @@ def main():
     if args.command in ("profiling", "complete"):
 
         # Prepare bin dictionaries
-        if args.bins_dir and args.bins_file:
+
+        if args.command in ("profiling"):
+            bins_dir = args.bins_dir
+            bins_file = args.bins_file
+
+        if args.command in ("complete"):
+            bins_dir = None
+            bins_file = None
+
+        if bins_dir and bins_file:
             print(f"")
             print(f"Both bin path file and input directory were provided.")
             print(f"DRAKKAR will continue with the information provided in the path file.")
-            file_bins_to_json(args.bins_file,args.output)
-        elif args.bins_file and not args.bins_dir:
+            file_bins_to_json(bins_file,args.output)
+        elif bins_file and not bins_dir:
             print(f"")
             print(f"DRAKKAR will run with the information provided in the sample info file.")
-            file_bins_to_json(args.bins_file,args.output)
-        elif args.bins_dir and not args.bins_file:
+            file_bins_to_json(bins_file,args.output)
+        elif bins_dir and not bins_file:
             print(f"")
             print(f"No sample info file was provided.")
             print(f"DRAKKAR will run with the files in the input directory.")
-            path_bins_to_json(args.bins_dir,args.output)
+            path_bins_to_json(bins_dir,args.output)
         else:
             print(f"")
             print(f"No input information was provided. DRAKKAR will try to guess the location of the MAGs.")
@@ -434,20 +443,29 @@ def main():
                 return
 
         # Prepare read dictionaries
-        if args.reads_dir and args.reads_file:
+
+        if args.command in ("profiling"):
+            reads_dir = args.reads_dir
+            reads_file = args.reads_file
+
+        if args.command in ("complete"):
+            reads_dir = None
+            reads_file = None
+
+        if reads_dir and areads_file:
             print(f"")
             print(f"Both bin path file and input directory were provided.")
             print(f"DRAKKAR will use the reads provided in the file.")
-            file_bins_to_json(args.input,args.output)
-        elif args.reads_file and not args.reads_dir:
+            file_bins_to_json(reads_file,args.output)
+        elif args.reads_file and not reads_dir:
             print(f"")
             print(f"DRAKKAR will use the reads provided in the file.")
-            file_bins_to_json(args.file,args.output)
-        elif args.reads_dir and not args.reads_file:
+            file_bins_to_json(reads_file,args.output)
+        elif reads_dir and not reads_file:
             print(f"")
             print(f"No sample info file was provided.")
             print(f"DRAKKAR will use the reads from the input directory.")
-            path_bins_to_json(args.input,args.output)
+            path_bins_to_json(reads_dir,args.output)
         else:
             print(f"")
             print(f"No input information was provided. DRAKKAR will try to guess the location of the reads.")
