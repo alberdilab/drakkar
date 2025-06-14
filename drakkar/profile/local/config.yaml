@@ -2,7 +2,7 @@ latency-wait: 60
 use-conda: true
 rerun-incomplete: true
 rerun-trigger: mtime
-keep-going: false
+keep-going: true
 
 default-resources:
     mem_mb: 8 * 1024

@@ -91,7 +91,7 @@ rule assembly_map:
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 3) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 5) * 2 ** (attempt - 1))
-    message: "Mapping reads to assembly {wildcards.assembly}..."
+    message: "Mapping {wildcards.sample} reads to assembly {wildcards.assembly}..."
     shell:
         """
         module load {params.bowtie2_module} {params.samtools_module}

@@ -1,10 +1,10 @@
 executor: slurm
-jobs: 50
+jobs: 100
 latency-wait: 60
 use-conda: true
 rerun-incomplete: true
 rerun-trigger: mtime
-keep-going: false
+keep-going: true
 retries: 3
 
 default-resources:
