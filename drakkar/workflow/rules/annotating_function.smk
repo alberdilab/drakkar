@@ -17,6 +17,7 @@ CAZY_DB = config["CAZY_DB"]
 AMR_DB = config["AMR_DB"]
 PFAM_DB = config["PFAM_DB"]
 VFDB_DB = config["VFDB_DB"]
+GENOMAD_DB = config["GENOMAD_DB"]
 
 ####
 # Workflow rules
@@ -186,7 +187,7 @@ rule signalp:
         cat {params.tmp}/output.gff3 | cut -f1,3,6 | awk -F' # |[ \t]+' '!/^#/ {{print $1, $6, $7}}' OFS='\t' > {output}
         """
 
-rule merge_annotations:
+rule merge_gene_annotations:
     input:
         gff=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.gff",
         kegg=f"{OUTPUT_DIR}/annotating/kegg/{{mag}}.tsv",
@@ -208,7 +209,7 @@ rule merge_annotations:
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 50) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 10) * 2 ** (attempt - 1))
-    message: "Merging annotations of MAG {wildcards.mag}..."
+    message: "Merging gene annotations of MAG {wildcards.mag}..."
     shell:
         """
         python {params.package_dir}/workflow/scripts/merge_annotations.py \
@@ -226,7 +227,51 @@ rule merge_annotations:
             -o {output}
         """
 
-rule final_annotation_table:
+rule carbohydrate_clusters:
+    input:
+        gff=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.gff",
+        cazy=f"{OUTPUT_DIR}/annotating/cazy/{{mag}}.tsv",
+        pfam=f"{OUTPUT_DIR}/annotating/pfam/{{mag}}.tsv"
+    output:
+        f"{OUTPUT_DIR}/annotating/cgc/{{mag}}.txt"
+    threads:
+        1
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 100) * 2 ** (attempt - 1))
+    shell:
+        """
+        python {params.package_dir}/workflow/scripts/detect_cgcs.py \
+            -cazy {input.cazy} \
+            -pfam {input.pfam}
+            -output {output}
+        """
+
+rule genomad:
+    input:
+        lambda wildcards: MAGS_TO_FILES[wildcards.mag]
+    output:
+        f"{OUTPUT_DIR}/annotating/genomad/{{mag}}/{{mag}}_summary/{{mag}}_virus_summary.tsv"
+    params:
+        outdir=f"{OUTPUT_DIR}/annotating/genomad/{{mag}}",
+        db={GENOMAD_DB}
+    threads:
+        1
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 100) * 2 ** (attempt - 1))
+    shell:
+        """
+        output/GPB_bin_000118_summary/GPB_bin_000118_virus_summary.tsv
+        module load genomad/1.11.0
+        genomad end-to-end \
+            -t {threads} \
+            {input} \
+            {params.outdir} \
+            {params.db}
+        """
+
+rule final_gene_annotation_table:
     input:
         expand(f"{OUTPUT_DIR}/annotating/final/{{mag}}.tsv",mag=mags)
     output:

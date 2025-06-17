@@ -6,6 +6,7 @@ PACKAGE_DIR = config["package_dir"]
 
 # Software modules
 GTDBTK_MODULE = config["GTDBTK_MODULE"]
+PRODIGAL_MODULE = config["PRODIGAL_MODULE"]
 
 # Annotation databases
 GTDB_DB = config["GTDB_DB"]
@@ -38,6 +39,7 @@ rule gtdbtk:
     output:
         f"{OUTPUT_DIR}/annotating/gtdbtk/classify/gtdbtk.bac120.summary.tsv"
     params:
+        prodigal_module={PRODIGAL_MODULE},
         gtdbtk_module={GTDBTK_MODULE},
         db={GTDB_DB},
         outdir=f"{OUTPUT_DIR}/profiling_genomes/gtdbtk/",
@@ -49,7 +51,7 @@ rule gtdbtk:
     message: "Annotating taxonomy using GTDBTK..."
     shell:
         """
-        module load {params.gtdbtk_module}
+        module load {params.prodigal_module} {params.gtdbtk_module}
         export GTDBTK_DATA_PATH={params.db}
         mkdir -p {params.tmpdir}
         gtdbtk classify_wf \
