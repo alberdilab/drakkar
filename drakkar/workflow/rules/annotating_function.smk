@@ -212,7 +212,7 @@ rule merge_gene_annotations:
     message: "Merging gene annotations of MAG {wildcards.mag}..."
     shell:
         """
-        conda activate drakkar
+        source activate drakkar
         python {params.package_dir}/workflow/scripts/merge_annotations.py \
             -gff {input.gff} \
             -kegg {input.kegg} \
