@@ -212,7 +212,7 @@ rule merge_gene_annotations:
     message: "Merging gene annotations of MAG {wildcards.mag}..."
     shell:
         """
-        source activate drakkar
+        export PATH="/home/jpl786/miniforge3/envs/drakkar/bin:$PATH"
         python {params.package_dir}/workflow/scripts/merge_annotations.py \
             -gff {input.gff} \
             -kegg {input.kegg} \
