@@ -196,7 +196,7 @@ rule semibin2:
         outdir=f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}"
     threads: 8
     resources:
-        mem_mb=lambda wildcards, input, attempt: min(1000*1024,max(8*1024, int(input.size_mb * 50) * 2 ** (attempt - 1))),
+        mem_mb=lambda wildcards, input, attempt: min(1000*1024,max(8*1024, int(input.size_mb * 30) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: min(20000,max(15, int(input.size_mb / 2) * 2 ** (attempt - 1)))
     message: "Binning contigs from assembly {wildcards.assembly} using semibin2..."
     shell:
@@ -247,7 +247,7 @@ checkpoint binette:
         outdir=f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}"
     threads: 8
     resources:
-        mem_mb=lambda wildcards, input, attempt: min(1000*1024,max(24*1024, (row_count(input.metabat2) + row_count(input.maxbin2) + row_count(input.semibin2) * 3) * 2 ** (attempt - 1))),
+        mem_mb=lambda wildcards, input, attempt: min(1000*1024,max(32*1024, (row_count(input.metabat2) + row_count(input.maxbin2) + row_count(input.semibin2)) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: min(20000,max(15, int(input.size_mb) * 2 ** (attempt - 1)))
     message: "Refining bins from assembly {wildcards.assembly} using binette..."
     shell:
