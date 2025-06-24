@@ -425,6 +425,7 @@ def main():
         elif bins_file and not bins_dir:
             print(f"")
             print(f"DRAKKAR will run with the information provided in the bin info file.")
+            print(bins_file)
             file_bins_to_json(bins_file,args.output)
         elif bins_dir and not bins_file:
             print(f"")
@@ -432,13 +433,13 @@ def main():
             path_bins_to_json(bins_dir,args.output)
         else:
             print(f"")
-            print(f"No input information was provided. DRAKKAR will try to guess the location of the MAGs.")
+            print(f"No bin information was provided. DRAKKAR will try to guess the location of the bins.")
             if os.path.exists(f"{args.output}/cataloging/final/all_bin_paths.txt"):
                 file_bins_to_json(f"{args.output}/cataloging/final/all_bin_paths.txt",args.output)
             else:
                 print(f"ERROR: No bin data was found in the output directory.")
                 print(f"Make sure that the preprocessing and cataloging modules were run in this directory.")
-                print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
+                print(f"If you want to start from your own bin files, make sure to indicate an bin file (-B) or directory (-b).")
                 return
 
         # Prepare read dictionaries
