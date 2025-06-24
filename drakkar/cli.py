@@ -419,17 +419,16 @@ def main():
 
         if bins_dir and bins_file:
             print(f"")
-            print(f"Both bin path file and input directory were provided.")
+            print(f"Both bin path file and bin directory were provided.")
             print(f"DRAKKAR will continue with the information provided in the path file.")
             file_bins_to_json(bins_file,args.output)
         elif bins_file and not bins_dir:
             print(f"")
-            print(f"DRAKKAR will run with the information provided in the sample info file.")
+            print(f"DRAKKAR will run with the information provided in the bin info file.")
             file_bins_to_json(bins_file,args.output)
         elif bins_dir and not bins_file:
             print(f"")
-            print(f"No sample info file was provided.")
-            print(f"DRAKKAR will run with the files in the input directory.")
+            print(f"DRAKKAR will run with the bins in the bin directory.")
             path_bins_to_json(bins_dir,args.output)
         else:
             print(f"")
