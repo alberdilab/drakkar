@@ -9,6 +9,7 @@ DREP_MODULE = config["DREP_MODULE"]
 BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 COVERM_MODULE = config["COVERM_MODULE"]
+MASH_MODULE = config["MASH_MODULE"]
 
 ####
 # Workflow rules
@@ -23,6 +24,7 @@ checkpoint dereplicate:
         Cdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Cdb.csv"
     params:
         drep_module={DREP_MODULE},
+        mash_module={MASH_MODULE},
         outdir=f"{OUTPUT_DIR}/profiling_genomes/drep/"
     threads: 8
     resources:
@@ -31,7 +33,7 @@ checkpoint dereplicate:
     message: "Dereplicating bins using dRep..."
     shell:
         """
-        module load {params.drep_module}
+        module load {params.drep_module} {params.mash_module}
         rm -rf {params.outdir}
         dRep dereplicate {params.outdir} -p {threads} -g {input.genomes} -sa 0.98 --genomeInfo {input.metadata}
         """
