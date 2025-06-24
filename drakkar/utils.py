@@ -377,6 +377,9 @@ def file_assemblies_to_json(infofile=None, samples=None, individual=False, all=F
 def file_bins_to_json(paths_file=None, output=False):
     fasta_dict = {}
 
+    if not os.path.isfile(paths_file):
+            raise FileNotFoundError(f"Bin file not found: {paths_file}")
+
     # Read the paths file
     with open(paths_file, "r") as f:
         for line in f:
