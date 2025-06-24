@@ -392,7 +392,6 @@ def file_bins_to_json(paths_file=None, output=False):
 
             # Store in dictionary
             fasta_dict[filename] = full_path
-            print(fasta_dict)
 
     os.makedirs(f"{output}/data", exist_ok=True)
     with open(f"{output}/data/bins_to_files.json", "w") as f:
