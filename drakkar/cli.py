@@ -452,7 +452,7 @@ def main():
             reads_dir = None
             reads_file = None
 
-        if reads_dir and areads_file:
+        if reads_dir and reads_file:
             print(f"")
             print(f"Both bin path file and input directory were provided.")
             print(f"DRAKKAR will use the reads provided in the file.")
