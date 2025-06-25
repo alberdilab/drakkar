@@ -27,13 +27,14 @@ checkpoint dereplicate:
         mash_module={MASH_MODULE},
         outdir=f"{OUTPUT_DIR}/profiling_genomes/drep/"
     threads: 8
+    conda:
+        "workflow/envs/profiling_genomes.yaml"
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 50) * 2 ** (attempt - 1))
     message: "Dereplicating bins using dRep..."
     shell:
         """
-        module load {params.drep_module} {params.mash_module}
         rm -rf {params.outdir}
         dRep dereplicate {params.outdir} -p {threads} -g {input.genomes} -sa 0.98 --genomeInfo {input.metadata}
         """
