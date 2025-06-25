@@ -1,0 +1,8 @@
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - drep==3.6.2
+  - bowtie2==2.5.4
+  - samtools=1.22
