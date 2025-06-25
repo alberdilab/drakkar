@@ -37,6 +37,12 @@ checkpoint dereplicate:
         """
         rm -rf {params.outdir}
         dRep dereplicate {params.outdir} -p {threads} -g {input.genomes} -sa 0.98 --genomeInfo {input.metadata}
+
+        # rename headers in every .fa under dereplicated_genomes/
+        for f in {params.outdir}/dereplicated_genomes/*.fa; do
+            genome=$(basename "$f" .fa)
+            sed -i -e "s/^>[^@]*/>$genome/" "$f"
+        done
         """
 
 # Functions to define the input files dynamically.
