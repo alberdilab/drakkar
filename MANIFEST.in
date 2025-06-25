@@ -3,4 +3,5 @@ include drakkar/profile/slurm/*
 include drakkar/profile/local/*
 include drakkar/workflow/*
 include drakkar/workflow/rules/*
+include drakkar/workflow/envs/*
 include drakkar/workflow/scripts/*
