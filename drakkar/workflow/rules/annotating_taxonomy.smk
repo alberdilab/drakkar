@@ -47,13 +47,14 @@ rule gtdbtk:
         outdir=f"{OUTPUT_DIR}/profiling_genomes/gtdbtk/",
         tmpdir=f"{OUTPUT_DIR}/profiling_genomes/tmp/"
     threads: 24
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/annotating_taxonomy.yaml"
     resources:
         mem_mb=lambda wildcards, attempt: 128*1024 * 2 ** (attempt - 1),
         runtime=lambda wildcards, attempt: 120 * 2 ** (attempt - 1)
     message: "Annotating taxonomy using GTDBTK..."
     shell:
         """
-        module load {params.prodigal_module} {params.hmmer_module} {params.gtdbtk_module}
         export GTDBTK_DATA_PATH={params.db}
         mkdir -p {params.tmpdir}
         gtdbtk classify_wf \
