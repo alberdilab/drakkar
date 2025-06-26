@@ -46,7 +46,7 @@ rule gtdbtk:
         db={GTDB_DB},
         outdir=f"{OUTPUT_DIR}/profiling_genomes/gtdbtk/",
         tmpdir=f"{OUTPUT_DIR}/profiling_genomes/tmp/"
-    threads: 24
+    threads: 4
     conda:
         f"{PACKAGE_DIR}/workflow/envs/annotating_taxonomy.yaml"
     resources:
