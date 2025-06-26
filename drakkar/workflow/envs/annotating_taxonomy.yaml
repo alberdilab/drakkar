@@ -3,7 +3,5 @@ channels:
   - bioconda
   - defaults
 dependencies:
-  - numpy=1.23
-  - skani==0.2.1
-  - typing_extensions==4.7.0
-  - gtdbtk==2.3.2
+  - numpy=1.9
+  - gtdbtk==2.4.0
