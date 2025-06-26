@@ -24,7 +24,7 @@ checkpoint dereplicate:
     params:
         drep_module={DREP_MODULE},
         mash_module={MASH_MODULE},
-        metadata=f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv"
+        metadata=f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv",
         outdir=f"{OUTPUT_DIR}/profiling_genomes/drep/"
     threads: 8
     conda:
