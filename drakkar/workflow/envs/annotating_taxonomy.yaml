@@ -5,5 +5,5 @@ channels:
 dependencies:
   - numpy=1.23
   - skani==0.2.1
-  - pydantic==1.10.12
+  - typing_extensions==4.7.0
   - gtdbtk==2.3.2
