@@ -456,16 +456,16 @@ def main():
             print(f"")
             print(f"Both bin path file and input directory were provided.")
             print(f"DRAKKAR will use the reads provided in the file.")
-            file_samples_to_json(reads_file,args.output)
+            file_preprocessed_to_json(reads_file,args.output)
         elif args.reads_file and not reads_dir:
             print(f"")
             print(f"DRAKKAR will use the reads provided in the file.")
-            file_samples_to_json(reads_file,args.output)
+            file_preprocessed_to_json(reads_file,args.output)
         elif reads_dir and not reads_file:
             print(f"")
             print(f"No sample info file was provided.")
             print(f"DRAKKAR will use the reads from the input directory.")
-            argument_samples_to_json(reads_dir,args.output)
+            argument_preprocessed_to_json(reads_dir,args.output)
         else:
             print(f"")
             print(f"No input information was provided. DRAKKAR will try to guess the location of the reads.")
