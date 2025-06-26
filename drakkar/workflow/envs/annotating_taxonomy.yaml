@@ -4,4 +4,5 @@ channels:
   - defaults
 dependencies:
   - numpy=1.23
-  - gtdbtk==2.4.0
+  - skani==0.2.1
+  - gtdbtk==2.3.2
