@@ -17,14 +17,14 @@ MASH_MODULE = config["MASH_MODULE"]
 
 checkpoint dereplicate:
     input:
-        genomes=expand("{bin_path}", bin_path=BINS_TO_FILES.values()),
-        metadata=f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv"
+        genomes=expand("{bin_path}", bin_path=BINS_TO_FILES.values())
     output:
         Wdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Wdb.csv",
         Cdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Cdb.csv"
     params:
         drep_module={DREP_MODULE},
         mash_module={MASH_MODULE},
+        metadata=f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv"
         outdir=f"{OUTPUT_DIR}/profiling_genomes/drep/"
     threads: 8
     conda:
@@ -36,7 +36,13 @@ checkpoint dereplicate:
     shell:
         """
         rm -rf {params.outdir}
-        dRep dereplicate {params.outdir} -p {threads} -g {input.genomes} -sa 0.98 --genomeInfo {input.metadata}
+        if [ -f "{params.metadata}" ]; then
+            # Using existing completeness information
+            dRep dereplicate {params.outdir} -p {threads} -g {input.genomes} -sa 0.98 --genomeInfo {params.metadata}
+        else
+            # Generate completeness information
+            dRep dereplicate {params.outdir} -p {threads} -g {input.genomes} -sa 0.98
+        fi
 
         # rename headers in every .fa under dereplicated_genomes/
         for f in {params.outdir}/dereplicated_genomes/*.fa; do
