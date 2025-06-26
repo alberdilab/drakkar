@@ -246,16 +246,14 @@ checkpoint binette:
         binette_module = {BINETTE_MODULE},
         outdir=f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}"
     threads: 8
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/cataloging.yaml"
     resources:
         mem_mb=lambda wildcards, input, attempt: min(1000*1024,max(32*1024, (row_count(input.metabat2) + row_count(input.maxbin2) + row_count(input.semibin2)) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: min(20000,max(15, int(input.size_mb) * 2 ** (attempt - 1)))
     message: "Refining bins from assembly {wildcards.assembly} using binette..."
     shell:
         """
-        module load {params.checkm2_module} {params.binette_module}
-        MODULEPATH=/opt/shared_software/shared_envmodules/modules:$MODULEPATH \
-        module load {params.diamond_module}
-
         # Define input files
         METABAT2="{input.metabat2}"
         MAXBIN2="{input.maxbin2}"
