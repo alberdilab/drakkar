@@ -44,8 +44,8 @@ rule gtdbtk:
         prodigal_module={PRODIGAL_MODULE},
         gtdbtk_module={GTDBTK_MODULE},
         db={GTDB_DB},
-        outdir=f"{OUTPUT_DIR}/profiling_genomes/gtdbtk/",
-        tmpdir=f"{OUTPUT_DIR}/profiling_genomes/tmp/"
+        outdir=f"{OUTPUT_DIR}/annotating/gtdbtk/",
+        tmpdir=f"{OUTPUT_DIR}/annotating/tmp/"
     threads: 8
     conda:
         f"{PACKAGE_DIR}/workflow/envs/annotating_taxonomy.yaml"
