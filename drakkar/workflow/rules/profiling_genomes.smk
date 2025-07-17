@@ -30,8 +30,8 @@ checkpoint dereplicate:
     conda:
         f"{PACKAGE_DIR}/workflow/envs/profiling_genomes.yaml"
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 20) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 10) * 2 ** (attempt - 1))
     message: "Dereplicating bins using dRep..."
     shell:
         """
@@ -47,7 +47,7 @@ checkpoint dereplicate:
         # rename headers in every .fa under dereplicated_genomes/
         for f in {params.outdir}/dereplicated_genomes/*.fa; do
             genome=$(basename "$f" .fa)
-            sed -i -e "s/^>[^@]*/>$genome/" "$f"
+            awk -v g="$genome" 'BEGIN{i=1} /^>/ {print ">" g "^" i++; next} {print}' "$f" > tmp && mv tmp "$f"
         done
         """
 
