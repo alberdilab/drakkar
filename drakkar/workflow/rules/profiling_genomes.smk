@@ -47,7 +47,7 @@ checkpoint dereplicate:
         # rename headers in every .fa under dereplicated_genomes/
         for f in {params.outdir}/dereplicated_genomes/*.fa; do
             genome=$(basename "$f" .fa)
-            awk -v g="$genome" 'BEGIN{i=1} /^>/ {print ">" g "^" i++; next} {print}' "$f" > tmp && mv tmp "$f"
+            awk -v g="$genome" 'BEGIN{i=0} /^>/ {print ">" g "^" i++; next} {print}' "$f" > tmp && mv tmp "$f"
         done
         """
 
