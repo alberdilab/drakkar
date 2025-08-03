@@ -138,6 +138,46 @@ rule quantify_reads_catalogue:
             > {output}
         """
 
+rule profiling_stats:
+    input:
+        f"{OUTPUT_DIR}/profiling_genomes/bowtie2/{{sample}}.bam"
+    output:
+        mappedreads=f"{OUTPUT_DIR}/profiling_genomes/bowtie2/{{sample}}.mappedreads",
+        mappedbases=f"{OUTPUT_DIR}/profiling_genomes/bowtie2/{{sample}}.mappedbases"
+    params:
+        bowtie2_module={BOWTIE2_MODULE},
+        samtools_module={SAMTOOLS_MODULE}
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 100) * 2 ** (attempt - 1))
+    message: "Calculating mapping stats of {wildcards.sample}..."
+    shell:
+        """
+        module load {params.bowtie2_module} {params.samtools_module}
+        samtools view -b -F12 -@ {threads} {input} | samtools view -c - > {output.mappedreads}
+        samtools view -F12 -@ {threads} {input} | awk '{{sum += length($10)}} END {{print sum}}' > {output.mappedbases}
+        """
+
+rule profiling_stats_merge:
+    input:
+        mappedreads=expand(f"{OUTPUT_DIR}/profiling_genomes/bowtie2/{{sample}}.mappedreads", sample=samples),
+        mappedbases=expand(f"{OUTPUT_DIR}/profiling_genomes/bowtie2/{{sample}}.mappedbases", sample=samples)
+    output:
+        f"{OUTPUT_DIR}/profiling_genomes.tsv"
+    localrule: True
+    params:
+        package_dir={PACKAGE_DIR}
+    threads: 1
+    resources:
+        mem_mb=1*1024,
+        runtime=5
+    message: "Creating profiling genomes stats file..."
+    shell:
+        """
+        python {params.package_dir}/workflow/scripts/profiling_genomes_stats.py -r {input.mappedreads} -o {output}
+        """
+
 rule split_coverm:
     input:
         f"{OUTPUT_DIR}/profiling_genomes/coverm/coverm.tsv"
