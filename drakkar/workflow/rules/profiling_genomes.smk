@@ -164,7 +164,7 @@ rule singlem_microbial_fraction:
         r2=lambda wildcards: PREPROCESSED_TO_READS2[wildcards.sample],
         profile=f"{OUTPUT_DIR}/profiling_genomes/singlem/{{sample}}.profile"
     output:
-        f"{OUTPUT_DIR}/profiling_genomes/singlem/microbial_fraction.tsv"
+        f"{OUTPUT_DIR}/profiling_genomes/singlem/{{sample}}.tsv"
     params:
         singlem_module={SINGLEM_MODULE}
     threads: 1
@@ -176,6 +176,22 @@ rule singlem_microbial_fraction:
         """
         module load {params.singlem_module}
         singlem microbial_fraction --forward {input.r1} --reverse {input.r2} -p {input.profile} > {output}
+        """
+
+rule singlem_merge:
+    input:
+        expand(f"{OUTPUT_DIR}/profiling_genomes/singlem/{{sample}}.tsv", sample=samples)
+    output:
+        f"{OUTPUT_DIR}/profiling_genomes/singlem/microbial_fraction.tsv"
+    localrule: True
+    threads: 1
+    resources:
+        mem_mb=1*1024,
+        runtime=5
+    message: "Merging singlem outputs..."
+    shell:
+        """
+        cat {input} > {output}
         """
 
 rule profiling_stats:
