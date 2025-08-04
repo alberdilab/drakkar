@@ -12,6 +12,7 @@ configfile: "workflow/config.yaml"
 WORKFLOW = config.get("workflow", None)
 OUTPUT_DIR = config.get("output_dir", None)
 REFERENCE = config.get("reference", None)
+FRACTION = config.get("fraction", None)
 PROFILING_TYPE = config["profiling_type"].split(",") if "profiling_type" in config else []
 ANNOTATING_TYPE = config["annotating_type"].split(",") if "annotating_type" in config else []
 
@@ -169,6 +170,7 @@ if WORKFLOW == "profiling":
             *([f"{OUTPUT_DIR}/profiling_genomes/final/counts.tsv"] if "genomes" in PROFILING_TYPE else []),
             *([f"{OUTPUT_DIR}/profiling_genomes/final/bases.tsv"] if "genomes" in PROFILING_TYPE else []),
             *([f"{OUTPUT_DIR}/profiling_genomes.tsv"] if "genomes" in PROFILING_TYPE else []),
+            *([f"{OUTPUT_DIR}/profiling_genomes/singlem/microbial_fraction.tsv"] if ("genomes" in PROFILING_TYPE and FRACTION) else []),
             *([f"{OUTPUT_DIR}/profiling_genomes/genome_gene.csv"] if "pangenomes" in PROFILING_TYPE else []),
             *([f"{OUTPUT_DIR}/profiling_pangenomes/final/final.tsv"] if "pangenomes" in PROFILING_TYPE else [])
 

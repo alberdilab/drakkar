@@ -144,7 +144,7 @@ def run_snakemake_cataloging2(workflow, project_name, output_dir, profile):
     else:
         display_end()
 
-def run_snakemake_profiling(workflow, project_name, profiling_type, output_dir, profile):
+def run_snakemake_profiling(workflow, project_name, profiling_type, output_dir, profile, fraction):
     """ Run the profiling workflow """
 
     snakemake_command = [
@@ -232,6 +232,7 @@ def main():
     subparser_profiling.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_profiling.add_argument("-t", "--type", required=False, default="genomes", help="Either genomes or pangenomes profiling type. Default: genomes")
     subparser_profiling.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
+    subparser_profiling.add_argument("-f", "--fraction", required=False, action='store_true', help="Calculate microbial fraction using singlem")
 
     subparser_annotating = subparsers.add_parser("annotating", help="Run the annotating workflow")
     subparser_annotating.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
@@ -477,10 +478,15 @@ def main():
                 print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
                 return
 
+        if args.fraction in ("profiling"):
+            fraction = True
+        else:
+            fraction = False
+
         print(f"")
         print(f"Starting Profiling pipeline...")
         print(f"")
-        run_snakemake_profiling("profiling", project_name, args.type, args.output, args.profile)
+        run_snakemake_profiling("profiling", project_name, args.type, args.output, args.profile, fraction)
 
     ###
     # Annotating

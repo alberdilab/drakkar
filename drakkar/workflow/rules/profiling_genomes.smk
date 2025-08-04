@@ -10,6 +10,7 @@ BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 COVERM_MODULE = config["COVERM_MODULE"]
 MASH_MODULE = config["MASH_MODULE"]
+SINGLEM_MODULE = config["SINGLEM_MODULE"]
 
 ####
 # Workflow rules
@@ -136,6 +137,45 @@ rule quantify_reads_catalogue:
             -t {threads} \
             --min-covered-fraction 0 \
             > {output}
+        """
+
+rule singlem_profile:
+    input:
+        r1=lambda wildcards: PREPROCESSED_TO_READS1[wildcards.sample],
+        r2=lambda wildcards: PREPROCESSED_TO_READS2[wildcards.sample]
+    output:
+        f"{OUTPUT_DIR}/profiling_genomes/singlem/{{sample}}.profile"
+    params:
+        singlem_module={SINGLEM_MODULE},
+    threads: 8
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 20) * 2 ** (attempt - 1))
+    message: "Running singlem for {wildcards.sample}..."
+    shell:
+        """
+        module load {params.singlem_module}
+        singlem pipe --forward {input.r1} --reverse {input.r2} --threads {threads} -p {output}
+        """
+
+rule singlem_microbial_fraction:
+    input:
+        r1=lambda wildcards: PREPROCESSED_TO_READS1[wildcards.sample],
+        r2=lambda wildcards: PREPROCESSED_TO_READS2[wildcards.sample],
+        profile=f"{OUTPUT_DIR}/profiling_genomes/singlem/{{sample}}.profile"
+    output:
+        f"{OUTPUT_DIR}/profiling_genomes/singlem/microbial_fraction.tsv"
+    params:
+        singlem_module={SINGLEM_MODULE}
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 20) * 2 ** (attempt - 1))
+    message: "Running singlem for {wildcards.sample}..."
+    shell:
+        """
+        module load {params.singlem_module}
+        singlem microbial_fraction --forward {input.r1} --reverse {input.r2} -p {input.profile} > {output}
         """
 
 rule profiling_stats:
