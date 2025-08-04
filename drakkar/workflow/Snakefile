@@ -16,8 +16,6 @@ FRACTION = config.get("fraction", None)
 PROFILING_TYPE = config["profiling_type"].split(",") if "profiling_type" in config else []
 ANNOTATING_TYPE = config["annotating_type"].split(",") if "annotating_type" in config else []
 
-print(FRACTION)
-
 ####
 # Calculate optimal resources for computing
 ####

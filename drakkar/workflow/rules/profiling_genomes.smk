@@ -256,5 +256,5 @@ rule singlem_merge:
     message: "Merging singlem outputs..."
     shell:
         """
-        awk 'FNR==1 && NR!=1 { next } { print }' {input} > {output}
+        awk 'FNR==1 && NR!=1 {{ next }} {{ print }}' {input} > {output}
         """
