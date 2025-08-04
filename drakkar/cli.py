@@ -478,15 +478,10 @@ def main():
                 print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
                 return
 
-        if args.fraction in ("profiling"):
-            fraction = True
-        else:
-            fraction = False
-
         print(f"")
         print(f"Starting Profiling pipeline...")
         print(f"")
-        run_snakemake_profiling("profiling", project_name, args.type, args.output, args.profile, fraction)
+        run_snakemake_profiling("profiling", project_name, args.type, args.output, args.profile, args.fraction)
 
     ###
     # Annotating
