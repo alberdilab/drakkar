@@ -155,7 +155,7 @@ def run_snakemake_profiling(workflow, project_name, profiling_type, output_dir, 
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} profiling_type={profiling_type} output_dir={output_dir}"
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} profiling_type={profiling_type} output_dir={output_dir} fraction={fraction}"
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
 
