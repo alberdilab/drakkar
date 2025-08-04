@@ -175,7 +175,7 @@ rule profiling_stats_merge:
     message: "Creating profiling genomes stats file..."
     shell:
         """
-        python {params.package_dir}/workflow/scripts/profiling_genomes_stats.py -r {input.mappedreads} -o {output}
+        python {params.package_dir}/workflow/scripts/profiling_genomes_stats.py -r {input.mappedreads} -b {input.mappedbases} -o {output}
         """
 
 rule split_coverm:
