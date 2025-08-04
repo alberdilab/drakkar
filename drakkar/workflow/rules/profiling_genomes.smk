@@ -12,6 +12,9 @@ COVERM_MODULE = config["COVERM_MODULE"]
 MASH_MODULE = config["MASH_MODULE"]
 SINGLEM_MODULE = config["SINGLEM_MODULE"]
 
+# Annotation databases
+SINGLEM_DB = config["SINGLEM_DB"]
+
 ####
 # Workflow rules
 ####
@@ -207,6 +210,7 @@ rule singlem_profile:
         f"{OUTPUT_DIR}/profiling_genomes/singlem/{{sample}}.profile"
     params:
         singlem_module={SINGLEM_MODULE},
+        singlem_db={SINGLEM_DB}
     threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
@@ -215,7 +219,7 @@ rule singlem_profile:
     shell:
         """
         module load {params.singlem_module}
-        singlem pipe --forward {input.r1} --reverse {input.r2} --threads {threads} -p {output}
+        singlem pipe --forward {input.r1} --reverse {input.r2} --threads {threads} -p {output} --metapackage {params.singlem_db}
         """
 
 rule singlem_microbial_fraction:
@@ -226,7 +230,8 @@ rule singlem_microbial_fraction:
     output:
         f"{OUTPUT_DIR}/profiling_genomes/singlem/{{sample}}.tsv"
     params:
-        singlem_module={SINGLEM_MODULE}
+        singlem_module={SINGLEM_MODULE},
+        singlem_db={SINGLEM_DB}
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
@@ -235,7 +240,7 @@ rule singlem_microbial_fraction:
     shell:
         """
         module load {params.singlem_module}
-        singlem microbial_fraction --forward {input.r1} --reverse {input.r2} -p {input.profile} > {output}
+        singlem microbial_fraction --forward {input.r1} --reverse {input.r2} -p {input.profile} --metapackage {params.singlem_db} > {output}
         """
 
 rule singlem_merge:
