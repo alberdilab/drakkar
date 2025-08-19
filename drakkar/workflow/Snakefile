@@ -83,6 +83,7 @@ if WORKFLOW == "preprocessing":
                 expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz", sample=samples),
                 expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam", sample=samples),
                 f"{OUTPUT_DIR}/preprocessing.tsv",
+                f"{OUTPUT_DIR}/preprocessing/preprocessing.html",
                 f"{OUTPUT_DIR}/drakkar_report.html"
                 #f"{OUTPUT_DIR}/data/preprocessing_report.done"
 

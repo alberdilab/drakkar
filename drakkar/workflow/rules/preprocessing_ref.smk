@@ -9,10 +9,14 @@ FASTP_MODULE = config["FASTP_MODULE"]
 BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 SINGLEM_MODULE = config["SINGLEM_MODULE"]
+MULTIQC_MODULE = config["MULTIQC_MODULE"]
 
 ####
 # Workflow rules
 ####
+
+# Run fastp on paired-end reads to perform adapter/quality trimming and filtering.  
+# Outputs the cleaned FASTQ files along with an HTML and JSON report that MultiQC can parse.
 
 rule fastp:
     input:
@@ -49,6 +53,9 @@ rule fastp:
             --adapter_sequence_r2 AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
         """
 
+# Build a Bowtie2 index from the given reference genome FASTA file.  
+# Produces the index files required for read mapping and saves a copy of the reference sequence.
+
 rule reference_index:
     input:
         f"{OUTPUT_DIR}/data/references/{{reference}}.fna"
@@ -68,6 +75,9 @@ rule reference_index:
         bowtie2-build {input} {params.basename}
         cat {input} > {params.basename}.fna
         """
+
+# Align quality-filtered paired-end reads to the corresponding reference genome using Bowtie2.  
+# The alignments are converted to BAM format and sorted with samtools for downstream analyses.
 
 rule reference_map:
     input:
@@ -93,6 +103,36 @@ rule reference_map:
         module load {params.bowtie2_module} {params.samtools_module}
         bowtie2 -x {params.basename} -1 {input.r1} -2 {input.r2} -p {threads} | samtools view -bS - | samtools sort -o {output}
         """
+
+# Generate alignment quality metrics for each BAM file using samtools.  
+# Produces an index (.bai), a flagstat summary, idxstats, and detailed stats file for MultiQC reporting.
+
+rule samtools_stats:
+    input:
+        rules.reference_map.output
+    output:
+        bai      = f"{OUTPUT_DIR}/preprocessing/samtools/{{sample}}.bam.bai",
+        flagstat = f"{OUTPUT_DIR}/preprocessing/samtools/{{sample}}.flagstat.txt",
+        idxstats = f"{OUTPUT_DIR}/preprocessing/samtools/{{sample}}.idxstats.txt",
+        stats    = f"{OUTPUT_DIR}/preprocessing/samtools/{{sample}}.stats.txt"
+    params:
+        samtools_module={SAMTOOLS_MODULE}
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 2) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: 10 * 2 ** (attempt - 1))
+    message: "Generating mapping stats for {wildcards.sample}..."
+    shell:
+        """
+        module load {params.samtools_module}
+        samtools index {input} {output.bai}
+        samtools flagstat {input} > {output.flagstat}
+        samtools idxstats {input} > {output.idxstats}
+        samtools stats {input} > {output.stats}
+        """
+
+# Split mapped BAM files into metagenomic (unmapped) and host (mapped) read sets.  
+# Outputs paired FASTQ files for unmapped reads, a host-only BAM, and text files counting reads/bases in each category.
 
 rule split_reads:
     input:
@@ -124,6 +164,9 @@ rule split_reads:
         samtools view -F12 -@ {threads} {input} | awk '{{sum += length($10)}} END {{print sum}}' > {output.hostbases}
         """
 
+# Run SingleM on the filtered metagenomic read pairs to generate OTU tables  
+# and condensed taxonomic profiles for downstream community analysis.
+
 rule singlem:
     input:
         r1=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz",
@@ -148,6 +191,9 @@ rule singlem:
             --threads {threads}
         """
 
+# Estimate microbial fraction for each sample using SingleM.  
+# Combines paired reads with the SingleM taxonomic profile to produce a microbial fraction table.
+
 rule singlem_mf:
     input:
         r1=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz",
@@ -171,6 +217,10 @@ rule singlem_mf:
             --output-tsv {output}
         """
 
+# Aggregate preprocessing statistics across all samples.  
+# Combines fastp JSON reports with host/metagenomic read and base counts  
+# to produce a single summary table (preprocessing.tsv).
+
 rule preprocessing_stats:
     input:
         fastp=expand(f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}.json", sample=samples),
@@ -193,6 +243,10 @@ rule preprocessing_stats:
         python {params.package_dir}/workflow/scripts/preprocessing_stats.py -p {input.fastp} -m {input.bases_metagenomic} -M {input.reads_metagenomic} -g {input.bases_host} -G {input.reads_host} -o {output}
         """
 
+# Generate an HTML report summarizing preprocessing statistics.  
+# Uses the aggregated preprocessing table (preprocessing.tsv) and writes a completion flag.
+# PROBABLY TO BE DEPRECATED AFTER MULTIQC IMPLEMENTATION
+
 rule preprocessing_report:
     input:
         data=f"{OUTPUT_DIR}/preprocessing.tsv",
@@ -211,4 +265,30 @@ rule preprocessing_report:
         """
         python {params.package_dir}/workflow/scripts/preprocessing_report.py -i {input.data} -r {input.report} -o {input.report}
         touch {output.done}
+        """
+
+# Run MultiQC on preprocessing outputs (fastp JSON and samtools stats).  
+# Produces an HTML summary report and a zipped data directory for further inspection.
+
+rule preprocessing_multiqc:
+    input:
+        fastp=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}.json", sample=SAMPLES),
+        samtools=expand(f"{OUTPUT_DIR}/preprocessing/bowtie2/{{sample}}.flagstat.txt", sample=SAMPLES)
+    output:
+        html=f"{OUTPUT_DIR}/preprocessing/preprocessing.html",
+        zip=f"{OUTPUT_DIR}/preprocessing/preprocessing.zip"
+    params:
+        package_dir={PACKAGE_DIR},
+        multiqc_module={MULTIQC_MODULE},
+        datadir="preprocessing",
+        title="Preprocessing report"
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 100) * 2 ** (attempt - 1))
+    message: "Building MultiQC report..."
+    shell:
+        """
+        module load {params.multiqc_module}
+        multiqc --zip-data-dir --outdir {params.datadir} --title "{params.title}" --filename {output.html} {params.datadir}
         """
