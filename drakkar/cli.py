@@ -218,8 +218,8 @@ def main():
     subparser_complete.add_argument("-r", "--reference", required=False, help="Reference host genome")
     subparser_complete.add_argument("-m", "--mode", required=False, help="Comma-separated list of cataloging modes (e.g. individual,all)")
     subparser_complete.add_argument("-t", "--type", required=False, default="genomes", help="Either genomes or pangenomes profiling type. Default: genomes")
+    subparser_complete.add_argument("--annotation-type", required=False, default="taxonomy,function", help="Taxonomic, functional and/or network annotations (comma-separated). Default: taxonomy,function")
     subparser_complete.add_argument("--fraction", required=False, action='store_true', help="Calculate microbial fraction using singlem")
-    subparser_complete.add_argument("-t", "--type", required=False, default="taxonomy,function", help="Taxonomic, functional and/or network annotations (comma-separated). Default: taxonomy,function")
     subparser_complete.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
     subparser_preprocessing = subparsers.add_parser("preprocessing", help="Run the preprocessing workflow (quality-filtering and host removal)")
@@ -250,7 +250,7 @@ def main():
     subparser_annotating.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
     subparser_annotating.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
     subparser_annotating.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
-    subparser_annotating.add_argument("-t", "--type", required=False, default="taxonomy,function", help="Taxonomic, functional and/or network annotations (comma-separated). Default: taxonomy,function")
+    subparser_annotating.add_argument("--annotation-type", required=False, default="taxonomy,function", help="Taxonomic, functional and/or network annotations (comma-separated). Default: taxonomy,function")
     subparser_annotating.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
     subparser_inspecting = subparsers.add_parser("inspecting", help="Run the inspecting workflow")
@@ -550,7 +550,7 @@ def main():
                 print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
                 return
 
-        run_snakemake_annotating("annotating", project_name, args.type, args.output, args.profile)
+        run_snakemake_annotating("annotating", project_name, args.annotation-type, args.output, args.profile)
 
     ###
     # Inspecting
