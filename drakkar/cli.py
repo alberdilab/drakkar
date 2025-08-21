@@ -27,6 +27,15 @@ def load_config():
 config_vars = load_config()
 
 ###
+# Define text colors
+###
+
+HEADER1 = "\033[1;95m"
+ERROR = "\033[1;31m"
+INFO = "\033[1;34m"
+RESET = "\033[0m"
+
+###
 # Define workflow launching functions
 ###
 
@@ -268,30 +277,44 @@ def main():
     ###
 
     if args.command == "unlock":
+        print(f"{HEADER1}UNLOCKING DRAKKAR DIRECTORY...{RESET}", flush=True)
+        print(f"", flush=True)
         run_unlock(args.command, args.output, args.profile)
+
     elif args.command == "update":
-        PINK_BOLD = "\033[1;95m"
-        RESET = "\033[0m"
         pip_cmd = [
                     sys.executable, "-m", "pip", "install",
                     "--upgrade", "--force-reinstall", "--no-deps",
                     "git+https://github.com/alberdilab/drakkar.git"
                 ]
-        print(f"{PINK_BOLD}UPDATING DRAKKAR...{RESET}", flush=True)
+        print(f"{HEADER1}UPDATING DRAKKAR...{RESET}", flush=True)
         print(f"", flush=True)
         try:
             update_code = subprocess.run(pip_cmd)
         except Exception as e:
             print(f"Update failed: {e}", file=sys.stderr, flush=True)
             sys.exit(1)
-    else:
+
+    else:            
         project_name = os.path.basename(os.path.normpath(args.output))
+
+        # Check if directory is locked
+        if is_snakemake_locked(args.output):
+            print(f"{ERROR}Error: directory is locked by Snakemake{RESET}", file=sys.stderr)
+            print(f"This usually happens when a workflow is interrupted suddenly,")
+            print(f"often while Slurm jobs are still running. Make sure all pending")
+            print(f"jobs are finished or killed before unlocking the working directory.")
+            print(f"{INFO}Run 'drakkar unlock' to unlock the working directory{RESET}")
+            sys.exit(2)
 
     ###
     # Preprocessing
     ###
 
     if args.command in ("preprocessing", "complete"):
+
+        print(f"{HEADER1}STARTING PREPROCESSING PIPELINE...{RESET}", flush=True)
+        print(f"", flush=True)
 
         # Generate raw data dictionaries
 
@@ -365,6 +388,9 @@ def main():
 
     if args.command in ("cataloging", "complete"):
 
+        print(f"{HEADER1}STARTING CATALOGING PIPELINE...{RESET}", flush=True)
+        print(f"", flush=True)
+
         # Generate preprocessing data dictionaries
 
         if args.file and args.input:
@@ -424,6 +450,9 @@ def main():
     ###
 
     if args.command in ("profiling", "complete"):
+
+        print(f"{HEADER1}STARTING PROFILING PIPELINE...{RESET}", flush=True)
+        print(f"", flush=True)
 
         # Prepare bin dictionaries
 
@@ -495,9 +524,6 @@ def main():
                 print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
                 return
 
-        print(f"")
-        print(f"Starting Profiling pipeline...")
-        print(f"")
         run_snakemake_profiling("profiling", project_name, args.type, args.output, args.profile, args.fraction)
 
     ###
@@ -506,6 +532,9 @@ def main():
 
     if args.command in ("annotating", "complete"):
 
+        print(f"{HEADER1}STARTING ANNOTATING PIPELINE...{RESET}", flush=True)
+        print(f"", flush=True)
+
         # Prepare bin dictionaries
         if args.bins_dir and args.bins_file:
             print(f"")
@@ -532,17 +561,17 @@ def main():
                 print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
                 return
 
-        print(f"")
-        print(f"Starting Annotating pipeline...")
-        print(f"")
         run_snakemake_annotating("annotating", project_name,  args.type, args.output, args.profile)
 
     ###
-    # Annotating
+    # Inspecting
     ###
 
     if args.command in ("inspecting", "complete"):
 
+        print(f"{HEADER1}STARTING INSPECTING PIPELINE...{RESET}", flush=True)
+        print(f"", flush=True)
+
         # Prepare bin dictionaries
         if args.bins_dir and args.bins_file:
             print(f"")
@@ -568,10 +597,7 @@ def main():
                 print(f"Make sure that the preprocessing and cataloging modules were run in this directory.")
                 print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
                 return
-
-        print(f"")
-        print(f"Starting Annotating pipeline...")
-        print(f"")
+            
         run_snakemake_inspecting("annotating", project_name,  args.type, args.output, args.profile)
 
 

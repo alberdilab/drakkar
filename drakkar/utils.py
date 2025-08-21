@@ -150,6 +150,10 @@ def display_end():
     """
     print(ascii_dragon)
 
+def is_snakemake_locked(workdir: str) -> bool:
+    locks_dir = os.path.join(workdir, ".snakemake", "locks")
+    return os.path.isdir(locks_dir) and len(os.listdir(locks_dir)) > 0
+
 def check_screen_session():
     """Checks if the script is running inside a 'screen' session. If not, warns the user and asks for confirmation."""
     if "STY" not in os.environ:
