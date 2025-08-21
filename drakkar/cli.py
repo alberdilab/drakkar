@@ -566,9 +566,9 @@ def main():
     if args.command == "update":
         pip_cmd = [
             sys.executable, "-m", "pip", "install",
-            "--upgrade", "--force-reinstall",
+            "--upgrade", "--force-reinstall", "--no-deps",
             "git+https://github.com/alberdilab/drakkar.git"
         ]
-        
+
 if __name__ == "__main__":
     main()
