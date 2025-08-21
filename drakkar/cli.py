@@ -281,7 +281,6 @@ def main():
         except Exception as e:
             print(f"Update failed: {e}", file=sys.stderr, flush=True)
             sys.exit(1)
-        sys.exit(update_code)
     else:
         project_name = os.path.basename(os.path.normpath(args.output))
 
