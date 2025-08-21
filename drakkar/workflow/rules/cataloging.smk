@@ -149,7 +149,8 @@ rule maxbin2:
     params:
         maxbin2_module={MAXBIN2_MODULE},
         hmmer_module={HMMER_MODULE},
-        basename=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}"
+        basename=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}",
+        assembly_size_mb=lambda wildcards, input: int(Path(input.assembly).stat().st_size / (1024*1024))
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 50) * 2 ** (attempt - 1)),
@@ -157,10 +158,15 @@ rule maxbin2:
     message: "Binning contigs from assembly {wildcards.assembly} using maxbin2..."
     shell:
         """
-        MODULEPATH=/opt/shared_software/shared_envmodules/modules:$MODULEPATH \
-        module load {params.maxbin2_module} {params.hmmer_module}
-        rm -rf {params.basename}*
-        run_MaxBin.pl -contig {input.assembly} -abund {input.depth} -max_iteration 10 -out {params.basename} -min_contig_length 1500
+        if (( {params.assembly_size_mb} < 10 )); then
+            echo "Assembly is smaller than 10 MB, skipping maxbin2..."
+            touch {output}
+        else
+            MODULEPATH=/opt/shared_software/shared_envmodules/modules:$MODULEPATH \
+            module load {params.maxbin2_module} {params.hmmer_module}
+            rm -rf {params.basename}*
+            run_MaxBin.pl -contig {input.assembly} -abund {input.depth} -max_iteration 10 -out {params.basename} -min_contig_length 1500
+        fi
         """
 
 rule maxbin2_table:
@@ -177,7 +183,11 @@ rule maxbin2_table:
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 5) * 2 ** (attempt - 1))
     shell:
         """
-        python {params.package_dir}/workflow/scripts/fastas_to_bintable.py -d {params.fastadir} -e fasta -o {output}
+        if [ ! -s {input} ]; then
+            touch {output}
+        else
+            python {params.package_dir}/workflow/scripts/fastas_to_bintable.py -d {params.fastadir} -e fasta -o {output}
+        fi
         """
 
 rule semibin2:
@@ -203,7 +213,7 @@ rule semibin2:
     shell:
         """
         if (( {params.assembly_size_mb} < 10 )); then
-            echo "Assembly smaller than 10 MB, skipping semibin2..."
+            echo "Assembly is smaller than 10 MB, skipping semibin2..."
             touch {output}
         else
             module load {params.semibin2_module} {params.bedtools_module} {params.hmmer_module}

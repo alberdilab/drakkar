@@ -312,31 +312,27 @@ def main():
     ###
 
     if args.command in ("preprocessing", "complete"):
-
+        print(f"", flush=True)
         print(f"{HEADER1}STARTING PREPROCESSING PIPELINE...{RESET}", flush=True)
         print(f"", flush=True)
 
         # Generate raw data dictionaries
 
         if args.file and args.input:
-            print(f"")
             print(f"Both sample info file and input directory were provided.")
             print(f"DRAKKAR will continue with the information provided in the sample info file.")
             file_samples_to_json(args.file,args.output)
 
         elif args.file and not args.input:
-            print(f"")
             print(f"DRAKKAR will run with the information provided in the sample info file.")
             file_samples_to_json(args.file,args.output)
 
         elif args.input and not args.file:
-            print(f"")
             print(f"No sample info file was provided.")
             print(f"DRAKKAR will run with the files in the input directory.")
             argument_samples_to_json(args.input,args.output)
 
         else:
-            print(f"")
             print(f"Please provide either an input directory (-i) or a sample info file (-f)")
             return
 
@@ -387,7 +383,7 @@ def main():
     ###
 
     if args.command in ("cataloging", "complete"):
-
+        print(f"", flush=True)
         print(f"{HEADER1}STARTING CATALOGING PIPELINE...{RESET}", flush=True)
         print(f"", flush=True)
 
@@ -440,9 +436,6 @@ def main():
 
         file_assemblies_to_json(args.file,samples,INDIVIDUAL_MODE,ALL_MODE,args.output)
 
-        print(f"")
-        print(f"Starting Cataloging pipeline...")
-        print(f"")
         run_snakemake_cataloging("cataloging", project_name, Path(args.output).resolve(), args.profile)
 
     ###
@@ -450,7 +443,7 @@ def main():
     ###
 
     if args.command in ("profiling", "complete"):
-
+        print(f"", flush=True)
         print(f"{HEADER1}STARTING PROFILING PIPELINE...{RESET}", flush=True)
         print(f"", flush=True)
 
@@ -531,7 +524,7 @@ def main():
     ###
 
     if args.command in ("annotating", "complete"):
-
+        print(f"", flush=True)
         print(f"{HEADER1}STARTING ANNOTATING PIPELINE...{RESET}", flush=True)
         print(f"", flush=True)
 
@@ -568,7 +561,7 @@ def main():
     ###
 
     if args.command in ("inspecting", "complete"):
-
+        print(f"", flush=True)
         print(f"{HEADER1}STARTING INSPECTING PIPELINE...{RESET}", flush=True)
         print(f"", flush=True)
 
