@@ -253,6 +253,8 @@ def main():
     subparser_unlock.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_unlock.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
+    subparser_update = subparsers.add_parser("update", help="Reinstall Drakkar from the Git repo (forces reinstall in this environment)")
+
     args = parser.parse_args()
 
     # Display ASCII logo before running any command or showing help
@@ -557,5 +559,16 @@ def main():
         print(f"")
         run_snakemake_inspecting("annotating", project_name,  args.type, args.output, args.profile)
 
+    ###
+    # Updating
+    ###
+
+    if args.command == "update":
+        pip_cmd = [
+            sys.executable, "-m", "pip", "install",
+            "--upgrade", "--force-reinstall",
+            "git+https://github.com/alberdilab/drakkar.git"
+        ]
+        
 if __name__ == "__main__":
     main()

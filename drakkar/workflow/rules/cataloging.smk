@@ -201,8 +201,13 @@ rule semibin2:
     message: "Binning contigs from assembly {wildcards.assembly} using semibin2..."
     shell:
         """
-        module load {params.semibin2_module} {params.bedtools_module} {params.hmmer_module}
-        SemiBin2 single_easy_bin -i {input.assembly} -b {input.bam} -o {params.outdir} -m 1500 -t {threads} --compression none
+        if (( {input.assembly.size_mb} < 10 )); then
+            echo "Assembly smaller than 10 MB, skipping semibin2..."
+            touch {output}
+        else
+            module load {params.semibin2_module} {params.bedtools_module} {params.hmmer_module}
+            SemiBin2 single_easy_bin -i {input.assembly} -b {input.bam} -o {params.outdir} -m 1500 -t {threads} --compression none
+        fi
         """
 
 rule semibin2_table:

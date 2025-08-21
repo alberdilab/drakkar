@@ -1,5 +1,5 @@
 ####
-# Config variables
+# Variables parsed from the config.yaml file
 ####
 
 PACKAGE_DIR = config["package_dir"]
