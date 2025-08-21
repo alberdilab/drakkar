@@ -271,6 +271,7 @@ def main():
         run_unlock(args.command, args.output, args.profile)
     elif args.command == "update":
         PINK_BOLD = "\033[1;95m"
+        RESET = "\033[0m"
         pip_cmd = [
                     sys.executable, "-m", "pip", "install",
                     "--upgrade", "--force-reinstall", "--no-deps",
