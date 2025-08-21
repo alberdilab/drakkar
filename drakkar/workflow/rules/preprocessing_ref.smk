@@ -120,7 +120,7 @@ rule samtools_stats:
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 2) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: 10 * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: 10 * 2 ** (attempt - 1)
     message: "Generating mapping stats for {wildcards.sample}..."
     shell:
         """
