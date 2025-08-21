@@ -275,8 +275,7 @@ rule preprocessing_multiqc:
         fastp=expand(f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}.json", sample=samples),
         samtools=expand(f"{OUTPUT_DIR}/preprocessing/samtools/{{sample}}.flagstat.txt", sample=samples)
     output:
-        html=f"{OUTPUT_DIR}/preprocessing/preprocessing.html",
-        zip=f"{OUTPUT_DIR}/preprocessing/preprocessing.zip"
+        html=f"{OUTPUT_DIR}/preprocessing/preprocessing.html"
     params:
         package_dir={PACKAGE_DIR},
         multiqc_module={MULTIQC_MODULE},
