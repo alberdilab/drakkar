@@ -453,21 +453,17 @@ def main():
             bins_file = None
 
         if bins_dir and bins_file:
-            print(f"")
             print(f"Both bin path file and bin directory were provided.")
             print(f"DRAKKAR will continue with the information provided in the path file.")
             file_bins_to_json(bins_file,args.output)
         elif bins_file and not bins_dir:
-            print(f"")
             print(f"DRAKKAR will run with the information provided in the bin info file.")
             print(bins_file)
             file_bins_to_json(bins_file,args.output)
         elif bins_dir and not bins_file:
-            print(f"")
             print(f"DRAKKAR will run with the bins in the bin directory.")
             path_bins_to_json(bins_dir,args.output)
         else:
-            print(f"")
             print(f"No bin information was provided. DRAKKAR will try to guess the location of the bins.")
             if os.path.exists(f"{args.output}/cataloging/final/all_bin_paths.txt"):
                 file_bins_to_json(f"{args.output}/cataloging/final/all_bin_paths.txt",args.output)
