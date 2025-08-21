@@ -264,11 +264,23 @@ def main():
     check_screen_session()
 
     ###
-    # Unlock
+    # Unlock or update
     ###
 
     if args.command == "unlock":
         run_unlock(args.command, args.output, args.profile)
+    elif args.command == "update":
+        pip_cmd = [
+                    sys.executable, "-m", "pip", "install",
+                    "--upgrade", "--force-reinstall", "--no-deps",
+                    "git+https://github.com/alberdilab/drakkar.git"
+                ]
+        print("Reinstalling Drakkar")
+        try:
+            update_code = run(pip_cmd)
+        except Exception as e:
+            print(f"Update failed: {e}", file=sys.stderr, flush=True)
+            sys.exit(1)
     else:
         project_name = os.path.basename(os.path.normpath(args.output))
 
@@ -559,16 +571,6 @@ def main():
         print(f"")
         run_snakemake_inspecting("annotating", project_name,  args.type, args.output, args.profile)
 
-    ###
-    # Updating
-    ###
-
-    if args.command == "update":
-        pip_cmd = [
-            sys.executable, "-m", "pip", "install",
-            "--upgrade", "--force-reinstall", "--no-deps",
-            "git+https://github.com/alberdilab/drakkar.git"
-        ]
 
 if __name__ == "__main__":
     main()
