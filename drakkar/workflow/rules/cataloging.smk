@@ -193,7 +193,8 @@ rule semibin2:
         semibin2_module={SEMIBIN2_MODULE},
         hmmer_module={HMMER_MODULE},
         bedtools_module={BEDTOOLS_MODULE},
-        outdir=f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}"
+        outdir=f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}",
+        assembly_size_mb=lambda wildcards, input: int(Path(input.assembly).stat().st_size / (1024*1024))
     threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: min(1000*1024,max(8*1024, int(input.size_mb * 30) * 2 ** (attempt - 1))),
@@ -201,7 +202,7 @@ rule semibin2:
     message: "Binning contigs from assembly {wildcards.assembly} using semibin2..."
     shell:
         """
-        if (( {input.assembly.size_mb} < 10 )); then
+        if (( {params.assembly_size_mb} < 10 )); then
             echo "Assembly smaller than 10 MB, skipping semibin2..."
             touch {output}
         else
