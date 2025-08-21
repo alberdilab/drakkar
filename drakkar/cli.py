@@ -277,7 +277,7 @@ def main():
                 ]
         print("Reinstalling Drakkar")
         try:
-            update_code = run(pip_cmd)
+            update_code = subprocess.run(pip_cmd)
         except Exception as e:
             print(f"Update failed: {e}", file=sys.stderr, flush=True)
             sys.exit(1)
