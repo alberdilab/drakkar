@@ -1,6 +1,6 @@
 ![alt text](drakkar.png "DRAKKAR by the AlberdiLab")
 
-**Drakkar** is a genome-resolved metagenomics pipeline optimised for running in the Globe Institute's Mjolnir HPC. It is built in a modular fashion, so that the entire workflow or only parts of it can be executed. Extended usage tutorial can be found in https://drakkar.readthedocs.io/
+**DRAKKAR** is a snakemake-based genome-resolved metagenomics pipeline optimised for Mjolnir. Snakemake works along with Slurm to conduct the long pipeline using the optimal memory and time resources. It is built in a modular fashion, so that the entire workflow or only parts of it can be executed. Extended usage tutorial can be found in https://drakkar.readthedocs.io/
 
 ## Quickstart
 

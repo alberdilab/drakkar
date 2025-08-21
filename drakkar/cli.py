@@ -519,21 +519,29 @@ def main():
         print(f"{HEADER1}STARTING ANNOTATING PIPELINE...{RESET}", flush=True)
         print(f"", flush=True)
 
+        if args.command in ("annotating"):
+            bins_dir = args.bins_dir
+            bins_file = args.bins_file
+
+        if args.command in ("complete"):
+            bins_dir = None
+            bins_file = None
+
         # Prepare bin dictionaries
-        if args.bins_dir and args.bins_file:
+        if bins_dir and bins_file:
             print(f"")
             print(f"Both bin path file and input directory were provided.")
             print(f"DRAKKAR will continue with the information provided in the path file.")
-            file_mags_to_json(args.bins_dir,args.output)
-        elif args.bins_file and not args.bins_dir:
+            file_mags_to_json(bins_dir,args.output)
+        elif bins_file and not bins_dir:
             print(f"")
             print(f"DRAKKAR will run with the information provided in the sample info file.")
-            file_mags_to_json(args.bins_file,args.output)
-        elif args.bins_dir and not args.bins_file:
+            file_mags_to_json(bins_file,args.output)
+        elif bins_dir and not bins_file:
             print(f"")
             print(f"No sample info file was provided.")
             print(f"DRAKKAR will run with the files in the input directory.")
-            path_mags_to_json(args.bins_dir,args.output)
+            path_mags_to_json(bins_dir,args.output)
         else:
             print(f"")
             print(f"No input information was provided. DRAKKAR will try to guess the location of the MAGs.")
