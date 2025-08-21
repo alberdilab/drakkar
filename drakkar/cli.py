@@ -276,7 +276,7 @@ def main():
                     "--upgrade", "--force-reinstall", "--no-deps",
                     "git+https://github.com/alberdilab/drakkar.git"
                 ]
-        print(f"{PINK_BOLD}Reinstalling Drakkar{RESET}", flush=True)
+        print(f"{PINK_BOLD}UPDATING DRAKKAR...{RESET}", flush=True)
         print(f"", flush=True)
         try:
             update_code = subprocess.run(pip_cmd)
