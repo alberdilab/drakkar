@@ -270,12 +270,14 @@ def main():
     if args.command == "unlock":
         run_unlock(args.command, args.output, args.profile)
     elif args.command == "update":
+        PINK_BOLD = "\033[1;95m"
         pip_cmd = [
                     sys.executable, "-m", "pip", "install",
                     "--upgrade", "--force-reinstall", "--no-deps",
                     "git+https://github.com/alberdilab/drakkar.git"
                 ]
-        print("Reinstalling Drakkar")
+        print(f"{PINK_BOLD}Reinstalling Drakkar{RESET}", flush=True)
+        print(f"", flush=True)
         try:
             update_code = subprocess.run(pip_cmd)
         except Exception as e:
