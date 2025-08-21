@@ -219,6 +219,7 @@ def main():
     subparser_complete.add_argument("-m", "--mode", required=False, help="Comma-separated list of cataloging modes (e.g. individual,all)")
     subparser_complete.add_argument("-t", "--type", required=False, default="genomes", help="Either genomes or pangenomes profiling type. Default: genomes")
     subparser_complete.add_argument("--fraction", required=False, action='store_true', help="Calculate microbial fraction using singlem")
+    subparser_complete.add_argument("-t", "--type", required=False, default="taxonomy,function", help="Taxonomic, functional and/or network annotations (comma-separated). Default: taxonomy,function")
     subparser_complete.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
     subparser_preprocessing = subparsers.add_parser("preprocessing", help="Run the preprocessing workflow (quality-filtering and host removal)")
@@ -529,21 +530,17 @@ def main():
 
         # Prepare bin dictionaries
         if bins_dir and bins_file:
-            print(f"")
             print(f"Both bin path file and input directory were provided.")
             print(f"DRAKKAR will continue with the information provided in the path file.")
             file_mags_to_json(bins_dir,args.output)
         elif bins_file and not bins_dir:
-            print(f"")
             print(f"DRAKKAR will run with the information provided in the sample info file.")
             file_mags_to_json(bins_file,args.output)
         elif bins_dir and not bins_file:
-            print(f"")
             print(f"No sample info file was provided.")
             print(f"DRAKKAR will run with the files in the input directory.")
             path_mags_to_json(bins_dir,args.output)
         else:
-            print(f"")
             print(f"No input information was provided. DRAKKAR will try to guess the location of the MAGs.")
             if os.path.exists(f"{args.output}/profiling_genomes/drep/dereplicated_genomes"):
                 path_mags_to_json(f"{args.output}/profiling_genomes/drep/dereplicated_genomes",args.output)
@@ -553,7 +550,7 @@ def main():
                 print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
                 return
 
-        run_snakemake_annotating("annotating", project_name,  args.type, args.output, args.profile)
+        run_snakemake_annotating("annotating", project_name, args.type, args.output, args.profile)
 
     ###
     # Inspecting
@@ -566,21 +563,17 @@ def main():
 
         # Prepare bin dictionaries
         if args.bins_dir and args.bins_file:
-            print(f"")
             print(f"Both bin path file and input directory were provided.")
             print(f"DRAKKAR will continue with the information provided in the path file.")
             file_mags_to_json(args.bins_dir,args.output)
         elif args.bins_file and not args.bins_dir:
-            print(f"")
             print(f"DRAKKAR will run with the information provided in the sample info file.")
             file_mags_to_json(args.bins_file,args.output)
         elif args.bins_dir and not args.bins_file:
-            print(f"")
             print(f"No sample info file was provided.")
             print(f"DRAKKAR will run with the files in the input directory.")
             path_mags_to_json(args.bins_dir,args.output)
         else:
-            print(f"")
             print(f"No input information was provided. DRAKKAR will try to guess the location of the MAGs.")
             if os.path.exists(f"{args.output}/profiling_genomes/drep/dereplicated_genomes"):
                 path_mags_to_json(f"{args.output}/profiling_genomes/drep/dereplicated_genomes",args.output)
