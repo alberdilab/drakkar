@@ -373,9 +373,6 @@ def main():
             print(f"Running DRAKKAR without mapping against a reference genome")
             REFERENCE = False
 
-        print(f"")
-        print(f"Starting Preprocessing pipeline...")
-        print(f"")
         run_snakemake_preprocessing("preprocessing", project_name, Path(args.output).resolve(), REFERENCE, args.profile)
 
     ###
@@ -387,24 +384,20 @@ def main():
         print(f"{HEADER1}STARTING CATALOGING PIPELINE...{RESET}", flush=True)
         print(f"", flush=True)
 
-        # Generate preprocessing data dictionaries
+        # Generate cataloging data dictionaries
 
         if args.file and args.input:
-            print(f"")
             print(f"Both sample info file and input directory were provided.")
             print(f"DRAKKAR will continue with the information provided in the input directory.")
             argument_preprocessed_to_json(args.input,args.output)
         elif args.file and not args.input:
-            print(f"")
             print(f"DRAKKAR will run with the information provided in the sample info file.")
             file_preprocessed_to_json(args.file,args.output)
         elif args.input and not args.file:
-            print(f"")
             print(f"No sample info file was provided.")
             print(f"DRAKKAR will run with the files in the input directory.")
             argument_preprocessed_to_json(args.input,args.output)
         else:
-            print(f"")
             print(f"No input information was provided. DRAKKAR will try to guess the location of the preprocessing data")
             if any(os.scandir(f"{args.output}/preprocessing/final")):
                 argument_preprocessed_to_json(f"{args.output}/preprocessing/final",args.output)
@@ -497,7 +490,7 @@ def main():
             print(f"Both bin path file and input directory were provided.")
             print(f"DRAKKAR will use the reads provided in the file.")
             file_preprocessed_to_json(reads_file,args.output)
-        elif args.reads_file and not reads_dir:
+        elif reads_file and not reads_dir:
             print(f"")
             print(f"DRAKKAR will use the reads provided in the file.")
             file_preprocessed_to_json(reads_file,args.output)
