@@ -272,7 +272,7 @@ rule preprocessing_report:
 
 rule preprocessing_multiqc:
     input:
-        fastp=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}.json", sample=SAMPLES),
+        fastp=expand(f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}.json", sample=SAMPLES),
         samtools=expand(f"{OUTPUT_DIR}/preprocessing/bowtie2/{{sample}}.flagstat.txt", sample=SAMPLES)
     output:
         html=f"{OUTPUT_DIR}/preprocessing/preprocessing.html",
