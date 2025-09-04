@@ -23,7 +23,7 @@ rule prodigal:
         faa=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa",
         gff=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.gff"
     envmodules:
-        {EMAPPER_MODULE}
+        {PRODIGAL_MODULE}
     resources:
         mem_mb=lambda wildcards, input, attempt: max(1*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 1024) * 2 ** (attempt - 1))
@@ -31,7 +31,7 @@ rule prodigal:
     shell:
         """
         if [[ "{input}" == *.gz ]]; then
-            gzip -dc {input} | prodigal -d {output.fna} -a {output.faa} -o {output.gff} -f gff
+            gzip -dc {input} | prodigal -i - -d {output.fna} -a {output.faa} -o {output.gff} -f gff
         else
             prodigal -i {input} -d {output.fna} -a {output.faa} -o {output.gff} -f gff
         fi
