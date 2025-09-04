@@ -22,6 +22,8 @@ rule prodigal:
         fna=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.fna",
         faa=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa",
         gff=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.gff"
+    log:
+        f"{OUTPUT_DIR}/log/annotating/prodigal/{{mag}}.log"
     envmodules:
         {PRODIGAL_MODULE}
     resources:
