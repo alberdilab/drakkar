@@ -30,7 +30,8 @@ rule prodigal:
     threads: 1
     shell:
         """
-        module load pprodigal/1.0.1
+        mkdir annotating
+        mkdir annotating/prodigal
         if [[ "{input}" == *.gz ]]; then
             gzip -dc {input} | prodigal -i - -d {output.fna} -a {output.faa} -o {output.gff} -f gff
         else
