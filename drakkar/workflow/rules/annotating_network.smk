@@ -36,8 +36,10 @@ rule prodigal:
         mkdir annotating
         mkdir annotating/prodigal
         if [[ "{input}" == *.gz ]]; then
+            echo "Running gzip"  
             gzip -dc {input} | prodigal -i - -d {output.fna} -a {output.faa} -o {output.gff} -f gff
         else
+            echo "Running non-gzip"  
             prodigal -i {input} -d {output.fna} -a {output.faa} -o {output.gff} -f gff
         fi
         """
