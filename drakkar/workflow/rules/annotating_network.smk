@@ -19,23 +19,22 @@ rule prodigal:
     input:
         lambda wildcards: MAGS_TO_FILES[wildcards.mag]
     output:
-        nt=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.fna",
-        aa=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa",
+        fna=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.fna",
+        faa=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa",
         gff=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.gff"
-    params:
-        prodigal_module={PRODIGAL_MODULE}
+    envmodules:
+        {EMAPPER_MODULE}
     resources:
         mem_mb=lambda wildcards, input, attempt: max(1*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 1024) * 2 ** (attempt - 1))
     threads: 1
-    message: "Predicting genes of MAG {wildards.mag}..."
+    message: "Predicting genes of MAG {wilcards.mag}..."
     shell:
         """
-        module load {params.prodigal_module}
         if [[ "{input}" == *.gz ]]; then
             gzip -dc {input} | prodigal -d {output.nt} -a {output.aa} -o {output.gff} -f gff
         else
-            prodigal -i {input} -d {output.nt} -a {output.aa} -o {output.gff} -f gff
+            prodigal -i {input} -d {output.fna} -a {output.faa} -o {output.gff} -f gff
         fi
         """
 
@@ -47,25 +46,25 @@ rule emapper:
         hit=f"{OUTPUT_DIR}/annotating/eggnog/{{mag}}.emapper.hits",
         ort=f"{OUTPUT_DIR}/annotating/eggnog/{{mag}}.emapper.seed_orthologs"
     params:
-        emapper_module={EMAPPER_MODULE}
-        outdir=f"{OUTPUT_DIR}/annotating/eggnog/
-        outname=f"{wildards.mag}"
+        outdir=f"{OUTPUT_DIR}/annotating/eggnog/",
+        outname={wildards.mag},
+        tmpdir="tmp"
     threads:
         8
+    envmodules:
+        {EMAPPER_MODULE}
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 100) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 100) * 2 ** (attempt - 1))
-        tmpdir="tmp"
     shell:
         """
-        module load {params.emapper_module}
         emapper.py  \
             -i {input.faa} \
             --cpu {threads} \
             --data_dir /projects/mjolnir1/data/databases/eggnog-mapper/20230317/ \
             -o {params.outname} \
             --output_dir {params.outdir} \
-            --temp_dir {resources.tmpdir} \
+            --temp_dir {params.tmpdir} \
             -m diamond --dmnd_ignore_warnings \
             --itype proteins \
             --evalue 0.001 --score 60 --pident 40 --query_cover 20 --subject_cover 20 \
@@ -75,21 +74,20 @@ rule emapper:
 
 rule emapper2gbk:
     input:
-        nt=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.fna",
-        aa=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa",
+        fna=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.fna",
+        faa=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa",
         ann=f"{OUTPUT_DIR}/annotating/eggnog/{{mag}}.emapper.annotations"
     output:
         f"{OUTPUT_DIR}/annotating/gbk/{{mag}}/{{mag}}.gbk"
-    params:
-        emapper_module={EMAPPER_MODULE}
     threads:
         1
+    envmodules:
+        {EMAPPER_MODULE}
     resources:
         mem_mb=lambda wildcards, input, attempt: max(1*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 1024) * 2 ** (attempt - 1))
     shell:
         """
-	    module load {params.emapper_module}
         emapper2gbk genes -fn {input.fna} -fp {input.faa} -a {input.ann} -o {output.file}
         """
 
@@ -99,7 +97,7 @@ rule m2m:
     output:
         sbml=f"{OUTPUT_DIR}/annotating/m2m/sbml/{{mag}}.sbml"
     params:
-        indir=f"{OUTPUT_DIR}/annotating/eggnog/"
+        indir=f"{OUTPUT_DIR}/annotating/eggnog/",
         outdir=f"{OUTPUT_DIR}/annotating/m2m/"
     threads:
         24

@@ -556,7 +556,7 @@ def main():
     # Inspecting
     ###
 
-    if args.command in ("inspecting", "complete"):
+    if args.command == "inspecting":
         print(f"", flush=True)
         print(f"{HEADER1}STARTING INSPECTING PIPELINE...{RESET}", flush=True)
         print(f"", flush=True)
