@@ -62,7 +62,7 @@ rule emapper:
         8
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 8) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 20) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 100) * 2 ** (attempt - 1))
     shell:
         """
         module load {params.emapper_module}

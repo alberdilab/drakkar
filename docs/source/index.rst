@@ -1,10 +1,9 @@
-Welcome to Lumache's documentation!
+Welcome to DRAKKAR's documentation!
 ===================================
 
-**Lumache** (/lu'make/) is a Python library for cooks and food lovers
-that creates recipes mixing random ingredients.
-It pulls data from the `Open Food Facts database <https://world.openfoodfacts.org/>`_
-and offers a *simple* and *intuitive* API.
+**DRAKKAR** is a snakemake-based genome-resolved metagenomics pipeline optimised for Mjolnir. 
+Snakemake works along with Slurm to conduct the long pipeline using the optimal memory and time resources. 
+It is built in a modular fashion, so that the entire workflow or only parts of it can be executed.
 
 Check out the :doc:`usage` section for further information, including
 how to :ref:`installation` the project.
