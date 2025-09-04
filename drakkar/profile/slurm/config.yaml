@@ -2,7 +2,6 @@ executor: slurm
 jobs: 100
 latency-wait: 300
 use-conda: true
-use-envmodules: true
 rerun-incomplete: true
 rerun-trigger: mtime
 keep-going: true

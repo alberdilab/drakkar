@@ -24,8 +24,6 @@ rule prodigal:
         gff=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.gff"
     log:
         f"{OUTPUT_DIR}/log/annotating/prodigal/{{mag}}.log"
-    envmodules:
-        {PRODIGAL_MODULE}
     resources:
         mem_mb=lambda wildcards, input, attempt: max(1*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 1024) * 2 ** (attempt - 1))
@@ -33,8 +31,8 @@ rule prodigal:
     shell:
         """
         module load pprodigal/1.0.1
-        mkdir annotating
-        mkdir annotating/prodigal
+        set -euo pipefail
+        mkdir -p "$(dirname {output.gff})"
         if [[ "{input}" == *.gz ]]; then
             echo "Running gzip"  
             gzip -dc {input} | prodigal -i - -d {output.fna} -a {output.faa} -o {output.gff} -f gff
