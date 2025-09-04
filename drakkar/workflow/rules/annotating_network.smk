@@ -51,13 +51,13 @@ rule emapper:
     input:
         faa=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
     output:
-        ann=f"{OUTPUT_DIR}/annotating/eggnog/{{mag}}.emapper.annotations",
-        hit=f"{OUTPUT_DIR}/annotating/eggnog/{{mag}}.emapper.hits",
-        ort=f"{OUTPUT_DIR}/annotating/eggnog/{{mag}}.emapper.seed_orthologs"
+        ann=f"{OUTPUT_DIR}/annotating/eggnog/{{mag}}/{{mag}}.emapper.annotations",
+        hit=f"{OUTPUT_DIR}/annotating/eggnog/{{mag}}/{{mag}}.emapper.hits",
+        ort=f"{OUTPUT_DIR}/annotating/eggnog/{{mag}}/{{mag}}.emapper.seed_orthologs"
     params:
         emapper_module={EMAPPER_MODULE},
         eggnog_db={EGGNOG_DB},
-        outdir=f"{OUTPUT_DIR}/annotating/eggnog/"
+        outdir=f"{OUTPUT_DIR}/annotating/eggnog/{{mag}}"
     threads:
         8
     resources:
@@ -83,7 +83,7 @@ rule emapper2gbk:
     input:
         fna=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.fna",
         faa=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa",
-        ann=f"{OUTPUT_DIR}/annotating/eggnog/{{mag}}.emapper.annotations"
+        ann=f"{OUTPUT_DIR}/annotating/eggnog/{{mag}}/{{mag}}.emapper.annotations"
     output:
         f"{OUTPUT_DIR}/annotating/gbk/{{mag}}/{{mag}}.gbk"
     threads:

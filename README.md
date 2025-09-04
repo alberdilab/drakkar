@@ -20,7 +20,11 @@ drakkar preprocessing {arguments}
 ```
 drakkar cataloging {arguments}
 ```
-* **Profiling**: annotates the bins and conducts genome- or pangenome-based quantitative analyses.
+* **Annotating**: annotates the bins taxonomically and/or functionally, and/or generates community-scale metabolic networks.
+```
+drakkar annotating {arguments}
+```
+* **Profiling**: conducts genome- or pangenome-based quantitative analyses.
 ```
 drakkar profiling {arguments}
 ```
