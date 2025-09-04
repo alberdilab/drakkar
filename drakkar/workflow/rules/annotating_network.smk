@@ -47,7 +47,6 @@ rule emapper:
         ort=f"{OUTPUT_DIR}/annotating/eggnog/{{mag}}.emapper.seed_orthologs"
     params:
         outdir=f"{OUTPUT_DIR}/annotating/eggnog/",
-        outname="{wildards.mag}",
         tmpdir="tmp"
     threads:
         8
@@ -62,7 +61,7 @@ rule emapper:
             -i {input.faa} \
             --cpu {threads} \
             --data_dir /projects/mjolnir1/data/databases/eggnog-mapper/20230317/ \
-            -o {params.outname} \
+            -o {wildcards.mag} \
             --output_dir {params.outdir} \
             --temp_dir {params.tmpdir} \
             -m diamond --dmnd_ignore_warnings \
