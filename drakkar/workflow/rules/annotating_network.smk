@@ -11,6 +11,9 @@ PATHWAYTOOLS_MODULE = config["PATHWAYTOOLS_MODULE"]
 BLAST_MODULE = config["BLAST_MODULE"]
 M2M_MODULE = config["M2M_MODULE"]
 
+# Annotation databases
+EGGNOG_DB = config["EGGNOG_DB"]
+
 ####
 # Workflow rules
 ####
@@ -53,6 +56,7 @@ rule emapper:
         ort=f"{OUTPUT_DIR}/annotating/eggnog/{{mag}}.emapper.seed_orthologs"
     params:
         emapper_module={EMAPPER_MODULE},
+        eggnog_db={EGGNOG_DB},
         outdir=f"{OUTPUT_DIR}/annotating/eggnog/",
         tmpdir="tmp"
     threads:
@@ -66,7 +70,7 @@ rule emapper:
         emapper.py  \
             -i {input.faa} \
             --cpu {threads} \
-            --data_dir /projects/mjolnir1/data/databases/eggnog-mapper/20230317/ \
+            --data_dir {params.eggnog_db} \
             -o {wildcards.mag} \
             --output_dir {params.outdir} \
             --temp_dir {params.tmpdir} \
