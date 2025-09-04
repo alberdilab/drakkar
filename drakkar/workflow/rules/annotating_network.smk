@@ -24,13 +24,15 @@ rule prodigal:
         gff=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.gff"
     log:
         f"{OUTPUT_DIR}/log/annotating/prodigal/{{mag}}.log"
+    params:
+         prodigal_module={PRODIGAL_MODULE}
     resources:
         mem_mb=lambda wildcards, input, attempt: max(1*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 1024) * 2 ** (attempt - 1))
     threads: 1
     shell:
         """
-        module load pprodigal/1.0.1
+        module load {params.prodigal_module}
         set -euo pipefail
         mkdir -p "$(dirname {output.gff})"
         if [[ "{input}" == *.gz ]]; then
@@ -50,17 +52,17 @@ rule emapper:
         hit=f"{OUTPUT_DIR}/annotating/eggnog/{{mag}}.emapper.hits",
         ort=f"{OUTPUT_DIR}/annotating/eggnog/{{mag}}.emapper.seed_orthologs"
     params:
+        emapper_module={EMAPPER_MODULE},
         outdir=f"{OUTPUT_DIR}/annotating/eggnog/",
         tmpdir="tmp"
     threads:
         8
-    envmodules:
-        {EMAPPER_MODULE}
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 100) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 100) * 2 ** (attempt - 1))
     shell:
         """
+        module load {params.emapper_module}
         emapper.py  \
             -i {input.faa} \
             --cpu {threads} \
@@ -84,13 +86,14 @@ rule emapper2gbk:
         f"{OUTPUT_DIR}/annotating/gbk/{{mag}}/{{mag}}.gbk"
     threads:
         1
-    envmodules:
-        {EMAPPER_MODULE}
+    params:
+        emapper_module={EMAPPER_MODULE}
     resources:
         mem_mb=lambda wildcards, input, attempt: max(1*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 1024) * 2 ** (attempt - 1))
     shell:
         """
+        module load {params.emapper_module}
         emapper2gbk genes -fn {input.fna} -fp {input.faa} -a {input.ann} -o {output.file}
         """
 
@@ -100,6 +103,9 @@ rule m2m:
     output:
         sbml=f"{OUTPUT_DIR}/annotating/m2m/sbml/{{mag}}.sbml"
     params:
+        pathwaytools_module={PATHWAYTOOLS_MODULE},
+        blast_module={BLAST_MODULE},
+        m2m_module={M2M_MODULE},
         indir=f"{OUTPUT_DIR}/annotating/eggnog/",
         outdir=f"{OUTPUT_DIR}/annotating/m2m/"
     threads:
@@ -109,7 +115,7 @@ rule m2m:
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 50) * 2 ** (attempt - 1))
     shell:
         """
-        module load pathway-tools/27.0 blast/2.13.0 metage2metabo/1.5.3
+        module load {params.pathwaytools_module} {params.blast_module} {params.m2m_module}
         m2m recon -g {params.indir} -o {params.outdir} -c {threads}
         """
 
