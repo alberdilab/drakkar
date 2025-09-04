@@ -47,7 +47,7 @@ rule emapper:
         ort=f"{OUTPUT_DIR}/annotating/eggnog/{{mag}}.emapper.seed_orthologs"
     params:
         outdir=f"{OUTPUT_DIR}/annotating/eggnog/",
-        outname={wildards.mag},
+        outname="{wildards.mag}",
         tmpdir="tmp"
     threads:
         8
