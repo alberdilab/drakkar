@@ -57,8 +57,7 @@ rule emapper:
     params:
         emapper_module={EMAPPER_MODULE},
         eggnog_db={EGGNOG_DB},
-        outdir=f"{OUTPUT_DIR}/annotating/eggnog/",
-        tmpdir="tmp"
+        outdir=f"{OUTPUT_DIR}/annotating/eggnog/"
     threads:
         8
     resources:
@@ -73,7 +72,6 @@ rule emapper:
             --data_dir {params.eggnog_db} \
             -o {wildcards.mag} \
             --output_dir {params.outdir} \
-            --temp_dir {params.tmpdir} \
             -m diamond --dmnd_ignore_warnings \
             --itype proteins \
             --evalue 0.001 --score 60 --pident 40 --query_cover 20 --subject_cover 20 \
