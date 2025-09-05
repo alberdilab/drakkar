@@ -10,6 +10,7 @@ EMAPPER_MODULE = config["EMAPPER_MODULE"]
 PATHWAYTOOLS_MODULE = config["PATHWAYTOOLS_MODULE"]
 BLAST_MODULE = config["BLAST_MODULE"]
 M2M_MODULE = config["M2M_MODULE"]
+CARVEME_MODULE = config["CARVEME_MODULE"]
 
 # Annotation databases
 EGGNOG_DB = config["EGGNOG_DB"]
@@ -45,6 +46,24 @@ rule prodigal:
             echo "Running non-gzip"  
             prodigal -i {input} -d {output.fna} -a {output.faa} -o {output.gff} -f gff
         fi
+        """
+
+rule carveme_model:
+    input:
+        f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
+    output:
+        f"{OUTPUT_DIR}/annotating/carveme/{{mag}}.xml"
+    params:
+        carveme_module={CARVEME_MODULE}
+    threads:
+        8
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 8) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 300) * 2 ** (attempt - 1))
+    shell:
+        """
+        module load {params.carveme_module}
+        carve {input} -o {output} --gapfill
         """
 
 rule emapper:
@@ -96,7 +115,7 @@ rule emapper2gbk:
     shell:
         """
         module load {params.emapper_module}
-        emapper2gbk genes -fn {input.fna} -fp {input.faa} -a {input.ann} -o {output.file}
+        emapper2gbk genes -fn {input.fna} -fp {input.faa} -a {input.ann} -o {output}
         """
 
 rule m2m:
