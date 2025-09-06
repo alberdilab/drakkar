@@ -14,6 +14,7 @@ CARVEME_MODULE = config["CARVEME_MODULE"]
 
 # Annotation databases
 EGGNOG_DB = config["EGGNOG_DB"]
+MEDIA_DB = config["MEDIA_DB"]
 
 ####
 # Workflow rules
@@ -52,9 +53,10 @@ rule carveme_model:
     input:
         f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
     output:
-        f"{OUTPUT_DIR}/annotating/carveme/{{mag}}.xml"
+        f"{OUTPUT_DIR}/annotating/carveme/{{mag}}.sbml"
     params:
-        carveme_module={CARVEME_MODULE}
+        carveme_module={CARVEME_MODULE},
+        media_db={MEDIA_DB}
     threads:
         8
     resources:
@@ -63,7 +65,7 @@ rule carveme_model:
     shell:
         """
         module load {params.carveme_module}
-        carve {input} -o {output} --gapfill
+        carve {input} -o {output} --mediadb {params.media_db} --gapfill M3 --fbc2
         """
 
 rule emapper:
@@ -144,7 +146,7 @@ rule final_network:
     input:
         f"{OUTPUT_DIR}/annotating/m2m/sbml/{{mag}}.sbml"
     output:
-        f"{OUTPUT_DIR}/annotating/sbml/{{mag}}.sbml"
+        f"{OUTPUT_DIR}/annotating/m2m/{{mag}}.sbml"
     localrule: True
     threads:
         1
