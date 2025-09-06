@@ -24,7 +24,7 @@ EMAPPER_MODULE: "eggnog-mapper/2.1.12"
 PATHWAYTOOLS_MODULE: "pathway-tools/27.0"
 BLAST_MODULE: "blast/2.13.0"
 CARVEME_MODULE: "carveme/1.6.4"
-M2M_MODULE: "metage2metabo/1.5.3"
+M2M_MODULE: "metage2metabo/1.5.3" # disappeared from mjolnir
 SIGNALP_MODULE: "signalp/6h"
 GATK_MODULE: "gatk/4.6.1.0"
 SEQTK_MODULE: "seqtk/1.4"
