@@ -60,7 +60,7 @@ rule carveme:
     threads:
         8
     conda:
-        f"{PACKAGE_DIR}/workflow/envs/annotating_network.yaml"
+        "/home/jpl786/miniforge3/envs/carveme"
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 8) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 300) * 2 ** (attempt - 1))
