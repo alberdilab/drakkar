@@ -10,11 +10,12 @@ EMAPPER_MODULE = config["EMAPPER_MODULE"]
 PATHWAYTOOLS_MODULE = config["PATHWAYTOOLS_MODULE"]
 BLAST_MODULE = config["BLAST_MODULE"]
 M2M_MODULE = config["M2M_MODULE"]
-CARVEME_MODULE = config["CARVEME_MODULE"]
+GAPSEQ_MODULE = config["GAPSEQ_MODULE"]
 
 # Annotation databases
 EGGNOG_DB = config["EGGNOG_DB"]
-MEDIA_DB = config["MEDIA_DB"]
+CARVEME_DB = config["CARVEME_DB"]
+GAPSEQ_DB = config["GAPSEQ_DB"]
 
 ####
 # Workflow rules
@@ -49,14 +50,35 @@ rule prodigal:
         fi
         """
 
-rule carveme_model:
+rule carveme:
     input:
         f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
     output:
         f"{OUTPUT_DIR}/annotating/carveme/{{mag}}.sbml"
     params:
-        carveme_module={CARVEME_MODULE},
-        media_db={MEDIA_DB}
+        carveme_db={CARVEME_DB}
+    threads:
+        8
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/annotating_network.yaml"
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 8) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 300) * 2 ** (attempt - 1))
+    shell:
+        """
+        module load {params.carveme_module}
+        carve {input} -o {output} --mediadb {params.carveme_db} --gapfill M3 --fbc2
+        """
+
+rule gapseq:
+    input:
+        f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
+    output:
+        f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}.xml"
+    params:
+        gapseq_module={GAPSEQ_MODULE},
+        gapseq_db={GAPSEQ_DB}
+        gapseq_dir=f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}"
     threads:
         8
     resources:
@@ -64,8 +86,11 @@ rule carveme_model:
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 300) * 2 ** (attempt - 1))
     shell:
         """
-        module load {params.carveme_module}
-        carve {input} -o {output} --mediadb {params.media_db} --gapfill M3 --fbc2
+        module load {params.gapseq_module}
+        set -euo pipefail
+        mkdir -p {params.gapseq_dir}
+        cd {params.gapseq_dir}
+        gapseq {input} {params.gapseq_db}/gut.csv -K {threads}
         """
 
 rule emapper:
