@@ -5,3 +5,8 @@ channels:
 dependencies:
   - carveme=1.6.6
   - diamond=2.1.13
+  - gapseq=1.4.0
+  - libsbml=5.18.0
+  - pip
+  - pip:
+      - mergem=1.1.0

@@ -60,10 +60,10 @@ rule carveme:
     threads:
         8
     conda:
-        "/home/jpl786/miniforge3/envs/carveme"
+        f"{PACKAGE_DIR}/workflow/envs/annotating_network.yaml"
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 8) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 300) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 100) * 2 ** (attempt - 1))
     shell:
         """
         carve {input} -o {output} --mediadb {params.carveme_db} --gapfill M3 --fbc2
@@ -73,16 +73,17 @@ rule gapseq:
     input:
         f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
     output:
-        f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}.xml"
+        f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}/{{mag}}.xml"
     params:
-        gapseq_module={GAPSEQ_MODULE},
         gapseq_db={GAPSEQ_DB},
         gapseq_dir=f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}"
     threads:
         8
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/annotating_network.yaml"
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 8) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 300) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 500) * 2 ** (attempt - 1))
     shell:
         """
         module load {params.gapseq_module}
@@ -92,92 +93,21 @@ rule gapseq:
         gapseq doall {input} {params.gapseq_db}/gut.csv -K {threads}
         """
 
-rule emapper:
+rule mergem:
     input:
-        faa=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
+        carveme=f"{OUTPUT_DIR}/annotating/carveme/{{mag}}.sbml",
+        gapseq=f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}/{{mag}}.xml"
     output:
-        ann=f"{OUTPUT_DIR}/annotating/eggnog/{{mag}}/{{mag}}.emapper.annotations",
-        hit=f"{OUTPUT_DIR}/annotating/eggnog/{{mag}}/{{mag}}.emapper.hits",
-        ort=f"{OUTPUT_DIR}/annotating/eggnog/{{mag}}/{{mag}}.emapper.seed_orthologs"
-    params:
-        emapper_module={EMAPPER_MODULE},
-        eggnog_db={EGGNOG_DB},
-        outdir=f"{OUTPUT_DIR}/annotating/eggnog/{{mag}}"
+        sbml=f"{OUTPUT_DIR}/annotating/mergem/{{mag}}.sbml",
+        report=f"{OUTPUT_DIR}/annotating/mergem/{{mag}}.tsv"
     threads:
-        8
+        1
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/annotating_network.yaml"
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 8) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 300) * 2 ** (attempt - 1))
     shell:
         """
-        module load {params.emapper_module}
-        emapper.py  \
-            -i {input.faa} \
-            --cpu {threads} \
-            --data_dir {params.eggnog_db} \
-            -o {wildcards.mag} \
-            --output_dir {params.outdir} \
-            -m diamond --dmnd_ignore_warnings \
-            --itype proteins \
-            --evalue 0.001 --score 60 --pident 40 --query_cover 20 --subject_cover 20 \
-            --tax_scope auto --target_orthologs all --go_evidence non-electronic \
-            --pfam_realign none
-        """
-
-rule emapper2gbk:
-    input:
-        fna=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.fna",
-        faa=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa",
-        ann=f"{OUTPUT_DIR}/annotating/eggnog/{{mag}}/{{mag}}.emapper.annotations"
-    output:
-        f"{OUTPUT_DIR}/annotating/gbk/{{mag}}/{{mag}}.gbk"
-    threads:
-        1
-    params:
-        emapper_module={EMAPPER_MODULE}
-    resources:
-        mem_mb=lambda wildcards, input, attempt: max(1*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 1024) * 2 ** (attempt - 1))
-    shell:
-        """
-        module load {params.emapper_module}
-        emapper2gbk genes -fn {input.fna} -fp {input.faa} -a {input.ann} -o {output}
-        """
-
-rule m2m:
-    input:
-        expand(f"{OUTPUT_DIR}/annotating/gbk/{{mag}}/{{mag}}.gbk",mag=mags)
-    output:
-        sbml=f"{OUTPUT_DIR}/annotating/m2m/sbml/{{mag}}.sbml"
-    params:
-        pathwaytools_module={PATHWAYTOOLS_MODULE},
-        blast_module={BLAST_MODULE},
-        m2m_module={M2M_MODULE},
-        indir=f"{OUTPUT_DIR}/annotating/eggnog/",
-        outdir=f"{OUTPUT_DIR}/annotating/m2m/"
-    threads:
-        24
-    resources:
-        mem_mb=lambda wildcards, input, attempt: max(1*1024, int(input.size_mb * 100) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 50) * 2 ** (attempt - 1))
-    shell:
-        """
-        module load {params.pathwaytools_module} {params.blast_module} {params.m2m_module}
-        m2m recon -g {params.indir} -o {params.outdir} -c {threads}
-        """
-
-rule final_network:
-    input:
-        f"{OUTPUT_DIR}/annotating/m2m/sbml/{{mag}}.sbml"
-    output:
-        f"{OUTPUT_DIR}/annotating/m2m/{{mag}}.sbml"
-    localrule: True
-    threads:
-        1
-    resources:
-        mem_gb=1*1024,
-        time=1
-    shell:
-        """
-        mv {input} {output}
+        mergem -i {input.carveme} {input.gapseq} -o {output.sbml} --report {output.report}
         """
