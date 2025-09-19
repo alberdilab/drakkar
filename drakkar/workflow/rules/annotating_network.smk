@@ -89,7 +89,7 @@ rule gapseq:
         set -euo pipefail
         mkdir -p {params.gapseq_dir}
         cd {params.gapseq_dir}
-        gapseq {input} {params.gapseq_db}/gut.csv -K {threads}
+        gapseq doall {input} {params.gapseq_db}/gut.csv -K {threads}
         """
 
 rule emapper:
