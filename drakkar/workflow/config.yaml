@@ -45,3 +45,4 @@ EGGNOG_DB: "/maps/datasets/globe_databases/eggnog-mapper/20230317/"
 CARVEME_DB: "/projects/alberdilab/data/databases/drakkar/carveme.tsv"
   # https://www.nature.com/articles/s41564-018-0123-9
   # https://github.com/franciscozorrilla/metaGEM/blob/8609ad6bcf040807df0928705d91b0ae31923259/workflow/scripts/media_db.tsv
+GAPSEQ_DB: "/projects/alberdilab/data/databases/drakkar/gapseq"
