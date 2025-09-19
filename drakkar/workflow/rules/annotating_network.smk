@@ -77,7 +77,7 @@ rule gapseq:
         f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}.xml"
     params:
         gapseq_module={GAPSEQ_MODULE},
-        gapseq_db={GAPSEQ_DB}
+        gapseq_db={GAPSEQ_DB},
         gapseq_dir=f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}"
     threads:
         8
