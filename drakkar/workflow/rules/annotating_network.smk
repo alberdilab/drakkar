@@ -66,7 +66,6 @@ rule carveme:
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 300) * 2 ** (attempt - 1))
     shell:
         """
-        module load {params.carveme_module}
         carve {input} -o {output} --mediadb {params.carveme_db} --gapfill M3 --fbc2
         """
 
