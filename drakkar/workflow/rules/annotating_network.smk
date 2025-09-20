@@ -86,7 +86,6 @@ rule gapseq:
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 500) * 2 ** (attempt - 1))
     shell:
         """
-        module load {params.gapseq_module}
         set -euo pipefail
         mkdir -p {params.gapseq_dir}
         cd {params.gapseq_dir}
