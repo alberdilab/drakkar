@@ -9,4 +9,4 @@ dependencies:
   - libsbml=5.20.5
   - pip
   - pip:
-      - mergem=1.1.0
+      - mergem==1.1.0
