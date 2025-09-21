@@ -69,9 +69,86 @@ rule carveme:
         carve {input} -o {output} --mediadb {params.carveme_db} --gapfill M3 --fbc2
         """
 
-rule gapseq:
+rule gapseq_find:
     input:
         f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
+    output:
+        pathways=f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}/{{mag}}-all-Pathways.tbl",
+        reactions=f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}/{{mag}}-all-Reactions.tbl"
+    params:
+        gapseq_db={GAPSEQ_DB},
+        gapseq_dir=f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}"
+    threads:
+        8
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/annotating_network.yaml"
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 500) * 2 ** (attempt - 1))
+    shell:
+        """
+        set -euo pipefail
+        mkdir -p {params.gapseq_dir}
+        cd {params.gapseq_dir}
+        gapseq find -p all {input} -K {threads}
+        """
+
+rule gapseq_find_transport:
+    input:
+        f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
+    output:
+        transporter=f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}/{{mag}}-Transporter.tbl"
+    params:
+        gapseq_db={GAPSEQ_DB},
+        gapseq_dir=f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}"
+    threads:
+        8
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/annotating_network.yaml"
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 500) * 2 ** (attempt - 1))
+    shell:
+        """
+        set -euo pipefail
+        mkdir -p {params.gapseq_dir}
+        cd {params.gapseq_dir}
+        gapseq find-transport {input} -K {threads}
+        """
+
+rule gapseq_draft:
+    input:
+        fasta=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
+        pathways=f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}/{{mag}}-all-Pathways.tbl",
+        reactions=f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}/{{mag}}-all-Reactions.tbl",
+        transporter=f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}/{{mag}}-Transporter.tbl"
+    output:
+        model=f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}/{{mag}}-draft.RDS",
+        weights=f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}/{{mag}}-rxnWeights.RDS",
+        Xgenes=f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}/{{mag}}-rxnXgenes.RDS"
+    params:
+        gapseq_db={GAPSEQ_DB},
+        gapseq_dir=f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}"
+    threads:
+        8
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/annotating_network.yaml"
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 500) * 2 ** (attempt - 1))
+    shell:
+        """
+        set -euo pipefail
+        mkdir -p {params.gapseq_dir}
+        cd {params.gapseq_dir}
+        gapseq draft -r {input.reactions} -t {input.transporter} -p {input.pathways} -c {input.fasta} -K {threads}
+        """
+
+rule gapseq_fill:
+    input:
+        model=f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}/{{mag}}-draft.RDS",
+        weights=f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}/{{mag}}-rxnWeights.RDS",
+        Xgenes=f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}/{{mag}}-rxnXgenes.RDS"
     output:
         f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}/{{mag}}.xml"
     params:
@@ -82,14 +159,13 @@ rule gapseq:
     conda:
         f"{PACKAGE_DIR}/workflow/envs/annotating_network.yaml"
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 8) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 500) * 2 ** (attempt - 1))
     shell:
         """
         set -euo pipefail
-        mkdir -p {params.gapseq_dir}
         cd {params.gapseq_dir}
-        gapseq doall {input} {params.gapseq_db}/gut.csv -K {threads}
+        gapseq fill -m {input.model} -c {input.weights} -g {input.Xgenes} -n {params.gapseq_db}/gut.csv -K {threads}
         """
 
 rule mergem:
