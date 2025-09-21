@@ -118,7 +118,7 @@ rule gapseq_find_transport:
 
 rule gapseq_draft:
     input:
-        fasta=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
+        fasta=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa",
         pathways=f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}/{{mag}}-all-Pathways.tbl",
         reactions=f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}/{{mag}}-all-Reactions.tbl",
         transporter=f"{OUTPUT_DIR}/annotating/gapseq/{{mag}}/{{mag}}-Transporter.tbl"
