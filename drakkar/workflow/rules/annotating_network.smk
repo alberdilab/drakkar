@@ -90,7 +90,7 @@ rule gapseq_find:
         set -euo pipefail
         mkdir -p {params.gapseq_dir}
         cd {params.gapseq_dir}
-        gapseq find -p all {input} -K {threads}
+        gapseq find -p all -K {threads} {input} 
         """
 
 rule gapseq_find_transport:
@@ -113,7 +113,7 @@ rule gapseq_find_transport:
         set -euo pipefail
         mkdir -p {params.gapseq_dir}
         cd {params.gapseq_dir}
-        gapseq find-transport {input} -K {threads}
+        gapseq find-transport -K {threads} {input} 
         """
 
 rule gapseq_draft:
