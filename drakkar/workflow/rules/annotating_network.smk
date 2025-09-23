@@ -107,7 +107,7 @@ rule gapseq_find_transport:
         f"{PACKAGE_DIR}/workflow/envs/annotating_network.yaml"
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 500) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 25) * 2 ** (attempt - 1))
     shell:
         """
         set -euo pipefail
@@ -165,7 +165,7 @@ rule gapseq_fill:
         """
         set -euo pipefail
         cd {params.gapseq_dir}
-        gapseq fill -m {input.model} -c {input.weights} -g {input.Xgenes} -n {params.gapseq_db}/gut.csv -K {threads}
+        gapseq fill -m {input.model} -c {input.weights} -g {input.Xgenes} -n {params.gapseq_db}/gut.csv
         """
 
 rule mergem:
