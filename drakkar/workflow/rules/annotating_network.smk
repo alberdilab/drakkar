@@ -135,7 +135,7 @@ rule gapseq_draft:
         f"{PACKAGE_DIR}/workflow/envs/annotating_network.yaml"
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 600) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 800) * 2 ** (attempt - 1))
     shell:
         """
         set -euo pipefail
