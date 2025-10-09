@@ -363,7 +363,7 @@ def main():
         run_snakemake_environments(args.command, project_name, args.profile)
 
     else:            
-        project_name = os.path.basename(os.path.normpath(args.output))
+        project_name = "environments"
 
         # Check if directory is locked
         if is_snakemake_locked(args.output):
