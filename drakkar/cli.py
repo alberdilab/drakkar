@@ -63,7 +63,7 @@ def run_snakemake_environments(workflow, profile):
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
         "snakemake "
         f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
-        f"--directory {Path.cwd()} "  # any dir; we’re only creating envs
+        f"--directory {Path.cwd()} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
         f"--config package_dir={PACKAGE_DIR} workflow={workflow} "
