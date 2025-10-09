@@ -55,6 +55,6 @@ rule env4:
         f"{PACKAGE_DIR}/workflow/envs/annotating_network.yaml"
     shell:
         """
-        echo "CreaCreateding conda environment for annotating network"
+        echo "Created conda environment for annotating network"
         touch {output}
         """

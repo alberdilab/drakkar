@@ -194,7 +194,6 @@ def run_snakemake_profiling(workflow, project_name, profiling_type, output_dir, 
         f"--configfile {CONFIG_PATH} "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} profiling_type={profiling_type} output_dir={output_dir} fraction={fraction} "
         f"--conda-prefix {ENV_PATH} "
-        f"--conda-frontend mamba "
         f"--use-conda "
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
@@ -212,7 +211,6 @@ def run_snakemake_annotating(workflow, project_name, annotating_type, output_dir
         f"--configfile {CONFIG_PATH} "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} annotating_type={annotating_type} output_dir={output_dir} "
         f"--conda-prefix {ENV_PATH} "
-        f"--conda-frontend mamba "
         f"--use-conda "
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
