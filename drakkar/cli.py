@@ -68,9 +68,7 @@ def run_snakemake_environments(workflow, profile):
         f"--configfile {CONFIG_PATH} "
         f"--config package_dir={PACKAGE_DIR} workflow={workflow} "
         f"--conda-prefix {ENV_PATH} "
-        f"--conda-frontend mamba "
         f"--use-conda "
-        f"--conda-create-envs-only"
     ]
     subprocess.run(cmd, shell=False, check=True)
 
