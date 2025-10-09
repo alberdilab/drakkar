@@ -180,7 +180,7 @@ def run_snakemake_cataloging2(workflow, project_name, output_dir, profile):
     else:
         display_end()
 
-def run_snakemake_profiling(workflow, project_name, profiling_type, output_dir, profile, fraction):
+def run_snakemake_profiling(workflow, project_name, profiling_type, output_dir, env_path, profile, fraction):
     """ Run the profiling workflow """
 
     snakemake_command = [
@@ -192,7 +192,7 @@ def run_snakemake_profiling(workflow, project_name, profiling_type, output_dir, 
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} profiling_type={profiling_type} output_dir={output_dir} fraction={fraction} "
-        f"--conda-prefix {ENV_PATH} "
+        f"--conda-prefix {env_path} "
         f"--use-conda "
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
@@ -324,9 +324,9 @@ def main():
     ###
 
     if args.env_path:
-        ENV_PATH = args.env_path
+        env_path = args.env_path
     else:
-        ENV_PATH = os.path.normpath(args.output) / "environments"
+        env_path = os.path.normpath(args.output) / "environments"
 
     ###
     # Unlock, update or create environments
@@ -567,7 +567,7 @@ def main():
                 print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
                 return
 
-        run_snakemake_profiling("profiling", project_name, args.type, args.output, args.profile, args.fraction)
+        run_snakemake_profiling("profiling", project_name, args.type, args.output, env_path, args.profile, args.fraction)
 
     ###
     # Annotating
