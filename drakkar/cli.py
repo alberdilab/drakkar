@@ -16,7 +16,6 @@ from drakkar.utils import *
 
 PACKAGE_DIR = Path(__file__).parent
 CONFIG_PATH = PACKAGE_DIR / "workflow" / "config.yaml"
-ENV_PATH = PACKAGE_DIR / ".snakemake" / "conda"
 
 def load_config():
     """Load fixed variables from config.yaml."""
@@ -324,10 +323,10 @@ def main():
     # Declare environment directory
     ###
 
-    print(args.env_path)
     if args.env_path:
         ENV_PATH = args.env_path
-        print(ENV_PATH)
+    else:
+        ENV_PATH = os.path.normpath(args.output) / "environments"
 
     ###
     # Unlock, update or create environments
@@ -355,7 +354,7 @@ def main():
     elif args.command == "environments":
         print(f"{HEADER1}CREATING CONDA ENVIRONMENTS...{RESET}", flush=True)
         print(f"", flush=True)
-        run_snakemake_environments(args.command, args.profile)
+        run_snakemake_environments(args.command, args.env_path, args.profile)
 
     else:            
         project_name = os.path.basename(os.path.normpath(args.output))
