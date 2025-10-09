@@ -57,7 +57,7 @@ def run_unlock(workflow, output_dir, profile):
     print(f"The output directory {output_dir} has been succesfully unlocked")
     print(f"You can now rerun a new workflow using any drakkar command:")
 
-def run_snakemake_environments(workflow, project_name, profile):
+def run_snakemake_environments(workflow, profile):
     cmd = [
         "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
@@ -66,7 +66,7 @@ def run_snakemake_environments(workflow, project_name, profile):
         f"--directory {Path.cwd()} "  # any dir; we’re only creating envs
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} "
+        f"--config package_dir={PACKAGE_DIR} workflow={workflow} "
         f"--conda-prefix {ENV_PATH} "
         f"--conda-frontend mamba "
         f"--use-conda "
@@ -308,7 +308,6 @@ def main():
     subparser_environments = subparsers.add_parser("environments", help="Pre-create conda environments")
     subparser_environments.add_argument("-e", "--env_path",type=str, default={ENV_PATH}, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_environments.add_argument("--profile", default="local", choices=["local", "slurm"])
-    subparser_environments.set_defaults(func=lambda args: create_envs(args.profile))
 
     subparser_unlock = subparsers.add_parser("unlock", help="Unlock snakemake")
     subparser_unlock.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
@@ -357,10 +356,9 @@ def main():
             sys.exit(1)
 
     elif args.command == "environments":
-        project_name = "environments"
         print(f"{HEADER1}CREATING CONDA ENVIRONMENTS...{RESET}", flush=True)
         print(f"", flush=True)
-        run_snakemake_environments(args.command, project_name, args.profile)
+        run_snakemake_environments(args.command, args.profile)
 
     else:            
         project_name = os.path.basename(os.path.normpath(args.output))
