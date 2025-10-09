@@ -16,6 +16,7 @@ from drakkar.utils import *
 
 PACKAGE_DIR = Path(__file__).parent
 CONFIG_PATH = PACKAGE_DIR / "workflow" / "config.yaml"
+ENV_PATH = PACKAGE_DIR / ".snakemake" / "conda"
 
 def load_config():
     """Load fixed variables from config.yaml."""
@@ -56,6 +57,23 @@ def run_unlock(workflow, output_dir, profile):
     print(f"The output directory {output_dir} has been succesfully unlocked")
     print(f"You can now rerun a new workflow using any drakkar command:")
 
+def run_snakemake_environments(profile):
+    cmd = [
+        "/bin/bash", "-c",
+        f"module load {config_vars['SNAKEMAKE_MODULE']} && "
+        "snakemake "
+        f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
+        f"--directory {Path.cwd()} "  # any dir; we’re only creating envs
+        f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
+        f"--configfile {CONFIG_PATH} "
+        f"--config package_dir={PACKAGE_DIR} "
+        f"--conda-prefix {ENV_PATH} "
+        f"--conda-frontend mamba "
+        f"--use-conda "
+        f"--conda-create-envs-only"
+    ]
+    subprocess.run(cmd, shell=False, check=True)
+
 def run_snakemake_preprocessing(workflow, project_name, output_dir, reference, profile):
 
     """ Run the preprocessing workflow """
@@ -69,6 +87,9 @@ def run_snakemake_preprocessing(workflow, project_name, output_dir, reference, p
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} reference={reference} "
+        f"--conda-prefix {ENV_PATH} "
+        f"--conda-frontend mamba "
+        f"--use-conda "
         f"--slurm-delete-logfiles-older-than 0"
     ]
 
@@ -87,6 +108,9 @@ def run_snakemake_preprocessing2(workflow, project_name, output_dir, reference, 
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} reference={reference} "
+        f"--conda-prefix {ENV_PATH} "
+        f"--conda-frontend mamba "
+        f"--use-conda "
     ]
 
     try:
@@ -114,6 +138,9 @@ def run_snakemake_cataloging(workflow, project_name, output_dir, profile):
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} "
+        f"--conda-prefix {ENV_PATH} "
+        f"--conda-frontend mamba "
+        f"--use-conda "
     ]
 
     subprocess.run(snakemake_command, shell=False, check=True)
@@ -132,6 +159,9 @@ def run_snakemake_cataloging2(workflow, project_name, output_dir, profile):
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} "
+        f"--conda-prefix {ENV_PATH} "
+        f"--conda-frontend mamba "
+        f"--use-conda "
     ]
 
     process = subprocess.Popen(snakemake_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -164,7 +194,10 @@ def run_snakemake_profiling(workflow, project_name, profiling_type, output_dir, 
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} profiling_type={profiling_type} output_dir={output_dir} fraction={fraction}"
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} profiling_type={profiling_type} output_dir={output_dir} fraction={fraction} "
+        f"--conda-prefix {ENV_PATH} "
+        f"--conda-frontend mamba "
+        f"--use-conda "
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
 
@@ -179,7 +212,10 @@ def run_snakemake_annotating(workflow, project_name, annotating_type, output_dir
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} annotating_type={annotating_type} output_dir={output_dir}"
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} annotating_type={annotating_type} output_dir={output_dir} "
+        f"--conda-prefix {ENV_PATH} "
+        f"--conda-frontend mamba "
+        f"--use-conda "
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
 
@@ -194,10 +230,12 @@ def run_snakemake_inspecting(workflow, project_name, output_dir, profile):
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir}"
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} "
+        f"--conda-prefix {ENV_PATH} "
+        f"--conda-frontend mamba "
+        f"--use-conda "
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
-
 
 ###
 # Main function to launch workflows
@@ -220,6 +258,7 @@ def main():
     subparser_complete.add_argument("-t", "--type", required=False, default="genomes", help="Either genomes or pangenomes profiling type. Default: genomes")
     subparser_complete.add_argument("--annotation-type", dest="annotation_type", required=False, default="taxonomy,function", help="Taxonomic, functional and/or network annotations (comma-separated). Default: taxonomy,function")
     subparser_complete.add_argument("--fraction", required=False, action='store_true', help="Calculate microbial fraction using singlem")
+    subparser_complete.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_complete.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
     subparser_preprocessing = subparsers.add_parser("preprocessing", help="Run the preprocessing workflow (quality-filtering and host removal)")
@@ -227,6 +266,7 @@ def main():
     subparser_preprocessing.add_argument("-f", "--file", required=False, help="Sample detail file (required if no input directory is provided)")
     subparser_preprocessing.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_preprocessing.add_argument("-r", "--reference", required=False, help="Reference host genome file (fna.gz)")
+    subparser_preprocessing.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_preprocessing.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
     subparser_cataloging = subparsers.add_parser("cataloging", help="Run the cataloging (assembly and binning) workflow")
@@ -234,6 +274,7 @@ def main():
     subparser_cataloging.add_argument("-f", "--file", required=False, help="Sample detail file (required if no input directory is provided)")
     subparser_cataloging.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_cataloging.add_argument("-m", "--mode", required=False, help="Comma-separated list of cataloging modes (e.g. individual,all)")
+    subparser_cataloging.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_cataloging.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
     subparser_profiling = subparsers.add_parser("profiling", help="Run the profiling workflow")
@@ -243,14 +284,16 @@ def main():
     subparser_profiling.add_argument("-R", "--reads_file", required=False, help="Sample detail file")
     subparser_profiling.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_profiling.add_argument("-t", "--type", required=False, default="genomes", help="Either genomes or pangenomes profiling type. Default: genomes")
-    subparser_profiling.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
     subparser_profiling.add_argument("-f", "--fraction", required=False, action='store_true', help="Calculate microbial fraction using singlem")
+    subparser_profiling.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
+    subparser_profiling.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
     subparser_annotating = subparsers.add_parser("annotating", help="Run the annotating workflow")
     subparser_annotating.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
     subparser_annotating.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
     subparser_annotating.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_annotating.add_argument("--annotation-type", dest="annotation_type", required=False, default="taxonomy,function", help="Taxonomic, functional and/or network annotations (comma-separated). Default: taxonomy,function")
+    subparser_annotating.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_annotating.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
     subparser_inspecting = subparsers.add_parser("inspecting", help="Run the inspecting workflow")
@@ -259,7 +302,13 @@ def main():
     subparser_inspecting.add_argument("-m", "--mapping_dir", required=False, help="Directory containing the mapping (.bam) files")
     subparser_inspecting.add_argument("-c", "--cov_file", required=False, help="Tab-separated file containing mapping coverage per genome per smaple")
     subparser_inspecting.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
+    subparser_inspecting.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_inspecting.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
+
+    subparser_environments = subparsers.add_parser("environments", help="Pre-create conda environments")
+    subparser_environments.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
+    subparser_environments.add_argument("--profile", default="local", choices=["local", "slurm"])
+    subparser_environments.set_defaults(func=lambda args: create_envs(args.profile))
 
     subparser_unlock = subparsers.add_parser("unlock", help="Unlock snakemake")
     subparser_unlock.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
@@ -274,6 +323,13 @@ def main():
 
     # Check screen session
     check_screen_session()
+
+    ###
+    # Declare environment directory
+    ###
+
+    if args.env_path:
+        ENV_PATH == args.env_path
 
     ###
     # Unlock or update
@@ -309,6 +365,15 @@ def main():
             print(f"jobs are finished or killed before unlocking the working directory.")
             print(f"{INFO}Run 'drakkar unlock' to unlock the working directory{RESET}")
             sys.exit(2)
+
+    ###
+    # Create environments
+    ###
+
+    if args.command == "environments":
+        print(f"{HEADER1}CREATING CONDA ENVIRONMENTS...{RESET}", flush=True)
+        print(f"", flush=True)
+        run_snakemake_environments(args.profile)
 
     ###
     # Preprocessing
