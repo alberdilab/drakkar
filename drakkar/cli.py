@@ -357,13 +357,13 @@ def main():
             sys.exit(1)
 
     elif args.command == "environments":
-        project_name = os.path.basename(os.path.normpath(args.output))
+        project_name = "environments"
         print(f"{HEADER1}CREATING CONDA ENVIRONMENTS...{RESET}", flush=True)
         print(f"", flush=True)
         run_snakemake_environments(args.command, project_name, args.profile)
 
     else:            
-        project_name = "environments"
+        project_name = os.path.basename(os.path.normpath(args.output))
 
         # Check if directory is locked
         if is_snakemake_locked(args.output):
