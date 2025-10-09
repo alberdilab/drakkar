@@ -14,7 +14,7 @@ rule env1:
     shell:
         """
         echo "Created conda environment for cataloging"
-        touch drakkar_environments/env1.txt
+        touch {output}
         """
     
 rule env2:
@@ -28,7 +28,7 @@ rule env2:
     shell:
         """
         echo "Created conda environment for profiling genomes"
-        touch drakkar_environments/env2.txt
+        touch {output}
         """
 
 rule env3:
@@ -42,7 +42,7 @@ rule env3:
     shell:
         """
         echo "Created conda environment for annotating taxonomy"
-        touch drakkar_environments/env3.txt
+        touch {output}
         """
 
 rule env4:
@@ -56,5 +56,5 @@ rule env4:
     shell:
         """
         echo "CreaCreateding conda environment for annotating network"
-        touch drakkar_environments/env4.txt
+        touch {output}
         """
