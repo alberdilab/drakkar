@@ -332,7 +332,7 @@ def main():
         ENV_PATH == args.env_path
 
     ###
-    # Unlock or update
+    # Unlock, update or create environments
     ###
 
     if args.command == "unlock":
@@ -354,6 +354,11 @@ def main():
             print(f"Update failed: {e}", file=sys.stderr, flush=True)
             sys.exit(1)
 
+    elif args.command == "environments":
+        print(f"{HEADER1}CREATING CONDA ENVIRONMENTS...{RESET}", flush=True)
+        print(f"", flush=True)
+        run_snakemake_environments(args.profile)
+
     else:            
         project_name = os.path.basename(os.path.normpath(args.output))
 
@@ -365,15 +370,6 @@ def main():
             print(f"jobs are finished or killed before unlocking the working directory.")
             print(f"{INFO}Run 'drakkar unlock' to unlock the working directory{RESET}")
             sys.exit(2)
-
-    ###
-    # Create environments
-    ###
-
-    if args.command == "environments":
-        print(f"{HEADER1}CREATING CONDA ENVIRONMENTS...{RESET}", flush=True)
-        print(f"", flush=True)
-        run_snakemake_environments(args.profile)
 
     ###
     # Preprocessing
