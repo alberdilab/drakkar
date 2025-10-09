@@ -57,7 +57,7 @@ def run_unlock(workflow, output_dir, profile):
     print(f"The output directory {output_dir} has been succesfully unlocked")
     print(f"You can now rerun a new workflow using any drakkar command:")
 
-def run_snakemake_environments(workflow, profile):
+def run_snakemake_environments(workflow, project_name, profile):
     cmd = [
         "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
@@ -66,7 +66,7 @@ def run_snakemake_environments(workflow, profile):
         f"--directory {Path.cwd()} "  # any dir; we’re only creating envs
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} workflow={workflow} "
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} "
         f"--conda-prefix {ENV_PATH} "
         f"--conda-frontend mamba "
         f"--use-conda "
@@ -316,6 +316,7 @@ def main():
     subparser_unlock.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
     subparser_update = subparsers.add_parser("update", help="Reinstall Drakkar from the Git repo (forces reinstall in this environment)")
+    subparser_update.add_argument("-e", "--env_path",type=str, default={ENV_PATH}, help="Path to a shared conda environment directory (default: drakkar install path)")
 
     args = parser.parse_args()
 
@@ -356,9 +357,10 @@ def main():
             sys.exit(1)
 
     elif args.command == "environments":
+        project_name = os.path.basename(os.path.normpath(args.output))
         print(f"{HEADER1}CREATING CONDA ENVIRONMENTS...{RESET}", flush=True)
         print(f"", flush=True)
-        run_snakemake_environments(args.command, args.profile)
+        run_snakemake_environments(args.command, project_name, args.profile)
 
     else:            
         project_name = os.path.basename(os.path.normpath(args.output))
