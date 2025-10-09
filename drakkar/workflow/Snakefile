@@ -47,6 +47,20 @@ def calculate_file_sizes(file_dict):
 
     return file_sizes
 
+####
+# Create environments
+####
+
+if WORKFLOW == "environments":
+    include: "rules/preparing.smk"
+    include: "rules/preprocessing.smk"
+    include: "rules/cataloging.smk"
+    include: "rules/profiling_genomes.smk"
+    include: "rules/profiling_pangenomes.smk"
+    include: "rules/annotating_taxonomy.smk"
+    include: "rules/annotating_function.smk"
+    include: "rules/annotating_network.smk"
+    include: "rules/inspecting_microdiversity.smk"
 
 ####
 # Run pipelines
