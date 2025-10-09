@@ -1,4 +1,5 @@
 # Toy pipeline that only declares environments
+PACKAGE_DIR = config["package_dir"]
 
 rule all:
     input:
