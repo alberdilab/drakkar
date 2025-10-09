@@ -228,7 +228,6 @@ def run_snakemake_inspecting(workflow, project_name, output_dir, profile):
         f"--configfile {CONFIG_PATH} "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} "
         f"--conda-prefix {ENV_PATH} "
-        f"--conda-frontend mamba "
         f"--use-conda "
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
@@ -327,6 +326,7 @@ def main():
 
     if args.env_path:
         ENV_PATH == args.env_path
+        print(ENV_PATH)
 
     ###
     # Unlock, update or create environments
