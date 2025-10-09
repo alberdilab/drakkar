@@ -326,7 +326,7 @@ def main():
 
     print(args.env_path)
     if args.env_path:
-        ENV_PATH == args.env_path
+        ENV_PATH = args.env_path
         print(ENV_PATH)
 
     ###
