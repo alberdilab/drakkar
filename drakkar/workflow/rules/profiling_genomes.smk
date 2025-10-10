@@ -31,14 +31,13 @@ checkpoint dereplicate:
         metadata=f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv",
         outdir=f"{OUTPUT_DIR}/profiling_genomes/drep/"
     threads: 8
-    conda:
-        f"{PACKAGE_DIR}/workflow/envs/profiling_genomes.yaml"
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 10) * 2 ** (attempt - 1))
     message: "Dereplicating bins using dRep..."
     shell:
         """
+        module load {params.mash_module} {params.drep_module}
         rm -rf {params.outdir}
         if [ -f "{params.metadata}" ]; then
             # Using existing completeness information
