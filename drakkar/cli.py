@@ -327,7 +327,7 @@ def main():
         env_path = args.env_path
     else:
         if args.command != "update":
-            env_path = os.path.normpath(args.output) / "environments"
+            env_path = (Path(args.output).resolve() / "environments")
 
     ###
     # Unlock, update or create environments
