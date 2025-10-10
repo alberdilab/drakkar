@@ -66,7 +66,7 @@ def run_snakemake_environments(workflow, profile):
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
         f"--config package_dir={PACKAGE_DIR} workflow={workflow} "
-        f"--conda-prefix {ENV_PATH} "
+        f"--conda-prefix {env_path} "
         f"--use-conda "
     ]
     subprocess.run(cmd, shell=False, check=True)
@@ -84,7 +84,7 @@ def run_snakemake_preprocessing(workflow, project_name, output_dir, reference, p
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} reference={reference} "
-        f"--conda-prefix {ENV_PATH} "
+        f"--conda-prefix {env_path} "
         f"--conda-frontend mamba "
         f"--use-conda "
         f"--slurm-delete-logfiles-older-than 0"
@@ -105,7 +105,7 @@ def run_snakemake_preprocessing2(workflow, project_name, output_dir, reference, 
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} reference={reference} "
-        f"--conda-prefix {ENV_PATH} "
+        f"--conda-prefix {env_path} "
         f"--conda-frontend mamba "
         f"--use-conda "
     ]
@@ -135,7 +135,7 @@ def run_snakemake_cataloging(workflow, project_name, output_dir, profile):
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} "
-        f"--conda-prefix {ENV_PATH} "
+        f"--conda-prefix {env_path} "
         f"--conda-frontend mamba "
         f"--use-conda "
     ]
@@ -156,7 +156,7 @@ def run_snakemake_cataloging2(workflow, project_name, output_dir, profile):
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} "
-        f"--conda-prefix {ENV_PATH} "
+        f"--conda-prefix {env_path} "
         f"--conda-frontend mamba "
         f"--use-conda "
     ]
@@ -197,7 +197,7 @@ def run_snakemake_profiling(workflow, project_name, profiling_type, output_dir, 
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
 
-def run_snakemake_annotating(workflow, project_name, annotating_type, output_dir, profile):
+def run_snakemake_annotating(workflow, project_name, annotating_type, output_dir, env_path, profile):
     """ Run the profiling workflow """
 
     snakemake_command = [
@@ -209,7 +209,7 @@ def run_snakemake_annotating(workflow, project_name, annotating_type, output_dir
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} annotating_type={annotating_type} output_dir={output_dir} "
-        f"--conda-prefix {ENV_PATH} "
+        f"--conda-prefix {env_path} "
         f"--use-conda "
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
@@ -226,7 +226,7 @@ def run_snakemake_inspecting(workflow, project_name, output_dir, profile):
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} "
-        f"--conda-prefix {ENV_PATH} "
+        f"--conda-prefix {env_path} "
         f"--use-conda "
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
@@ -435,7 +435,7 @@ def main():
             print(f"Running DRAKKAR without mapping against a reference genome")
             REFERENCE = False
 
-        run_snakemake_preprocessing("preprocessing", project_name, Path(args.output).resolve(), REFERENCE, args.profile)
+        run_snakemake_preprocessing("preprocessing", project_name, Path(args.output).resolve(), REFERENCE, env_path, args.profile)
 
     ###
     # Cataloging
@@ -491,7 +491,7 @@ def main():
 
         file_assemblies_to_json(args.file,samples,INDIVIDUAL_MODE,ALL_MODE,args.output)
 
-        run_snakemake_cataloging("cataloging", project_name, Path(args.output).resolve(), args.profile)
+        run_snakemake_cataloging("cataloging", project_name, Path(args.output).resolve(), env_path, args.profile)
 
     ###
     # Profiling
@@ -609,7 +609,7 @@ def main():
                 print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
                 return
 
-        run_snakemake_annotating("annotating", project_name, args.annotation_type, args.output, args.profile)
+        run_snakemake_annotating("annotating", project_name, args.annotation_type, args.output, env_path, args.profile)
 
     ###
     # Inspecting
@@ -642,7 +642,7 @@ def main():
                 print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
                 return
             
-        run_snakemake_inspecting("annotating", project_name,  args.type, args.output, args.profile)
+        run_snakemake_inspecting("annotating", project_name,  args.type, args.output, env_path, args.profile)
 
 
 if __name__ == "__main__":
