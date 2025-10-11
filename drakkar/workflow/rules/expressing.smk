@@ -123,5 +123,5 @@ rule quantify:
     shell:
         """
         module load {params.subread_module}
-        featureCounts {params.extra} -a {input.annotation} -o {output.counts} {input.bams} &> {log}
+        featureCounts {params.extra} -a {input.annotation} -o {output.counts} {input.bams}
         """
