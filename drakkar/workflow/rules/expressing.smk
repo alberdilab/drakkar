@@ -97,8 +97,8 @@ rule map_to_metagenome:
         basename=f"{OUTPUT_DIR}/expressing/reference/metagenome"
     threads: 16
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 20) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 50) * 2 ** (attempt - 1))
     message: "Mapping {wildcards.sample} against genome catalogue..."
     shell:
         """
@@ -118,8 +118,8 @@ rule quantify:
         subread_module={SUBREAD_MODULE},
         extra="-F GFF -t CDS,tRNA,rRNA -g ID -p",
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 20) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 2) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 100) * 2 ** (attempt - 1))
     shell:
         """
         module load {params.subread_module}
