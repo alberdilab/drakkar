@@ -42,7 +42,7 @@ RESET = "\033[0m"
 def run_unlock(workflow, output_dir, profile):
 
     unlock_command = [
-        "/bin/bash", "-c",  # Ensures the module system works properly
+        "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
         "snakemake "
         f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
@@ -76,7 +76,7 @@ def run_snakemake_preprocessing(workflow, project_name, output_dir, reference, p
     """ Run the preprocessing workflow """
 
     snakemake_command = [
-        "/bin/bash", "-c",  # Ensures the module system works properly
+        "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
         "snakemake "
         f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
@@ -97,7 +97,7 @@ def run_snakemake_preprocessing2(workflow, project_name, output_dir, reference, 
     """ Run the preprocessing workflow """
 
     snakemake_command = [
-        "/bin/bash", "-c",  # Ensures the module system works properly
+        "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
         "snakemake "
         f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
@@ -127,7 +127,7 @@ def run_snakemake_cataloging(workflow, project_name, output_dir, profile):
     """ Run the cataloging workflow """
 
     snakemake_command = [
-        "/bin/bash", "-c",  # Ensures the module system works properly
+        "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
         "snakemake "
         f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
@@ -148,7 +148,7 @@ def run_snakemake_cataloging2(workflow, project_name, output_dir, profile):
     """ Run the cataloging workflow """
 
     snakemake_command = [
-        "/bin/bash", "-c",  # Ensures the module system works properly
+        "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
         "snakemake "
         f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
@@ -184,7 +184,7 @@ def run_snakemake_profiling(workflow, project_name, profiling_type, output_dir, 
     """ Run the profiling workflow """
 
     snakemake_command = [
-        "/bin/bash", "-c",  # Ensures the module system works properly
+        "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
         "snakemake "
         f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
@@ -201,7 +201,7 @@ def run_snakemake_annotating(workflow, project_name, annotating_type, output_dir
     """ Run the profiling workflow """
 
     snakemake_command = [
-        "/bin/bash", "-c",  # Ensures the module system works properly
+        "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
         "snakemake "
         f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
@@ -214,11 +214,28 @@ def run_snakemake_annotating(workflow, project_name, annotating_type, output_dir
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
 
-def run_snakemake_inspecting(workflow, project_name, output_dir, profile):
+def run_snakemake_inspecting(workflow, project_name, output_dir, env_path, profile):
     """ Run the profiling workflow """
 
     snakemake_command = [
-        "/bin/bash", "-c",  # Ensures the module system works properly
+        "/bin/bash", "-c", 
+        f"module load {config_vars['SNAKEMAKE_MODULE']} && "
+        "snakemake "
+        f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
+        f"--directory {output_dir} "
+        f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
+        f"--configfile {CONFIG_PATH} "
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} "
+        f"--conda-prefix {env_path} "
+        f"--use-conda "
+    ]
+    subprocess.run(snakemake_command, shell=False, check=True)
+
+def run_snakemake_expressing(workflow, project_name, output_dir, env_path, profile):
+    """ Run the expressing workflow """
+
+    snakemake_command = [
+        "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
         "snakemake "
         f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
@@ -298,6 +315,16 @@ def main():
     subparser_inspecting.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_inspecting.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_inspecting.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
+
+    subparser_expressing = subparsers.add_parser("expressing", help="Run the gene expression workflow")
+    subparser_expressing.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
+    subparser_expressing.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
+    subparser_expressing.add_argument("-r", "--reads_dir", required=False, help="Directory in which metagenomic reads are stored")
+    subparser_expressing.add_argument("-R", "--reads_file", required=False, help="Sample detail file")
+    subparser_expressing.add_argument("-g", "--host_genome", required=False, help="Text file containing paths to the bins (.fa or .fna)")
+    subparser_expressing.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
+    subparser_expressing.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
+    subparser_expressing.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
     subparser_environments = subparsers.add_parser("environments", help="Pre-create conda environments")
     subparser_environments.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
@@ -643,6 +670,70 @@ def main():
                 return
             
         run_snakemake_inspecting("annotating", project_name,  args.type, args.output, env_path, args.profile)
+
+
+    ###
+    # Expressing
+    ###
+
+    if args.command == "expressing":
+        print(f"", flush=True)
+        print(f"{HEADER1}STARTING EXPRESSING PIPELINE...{RESET}", flush=True)
+        print(f"", flush=True)
+
+        # Prepare bin dictionaries
+        if args.bins_dir and args.bins_file:
+            print(f"Both bin path file and input directory were provided.")
+            print(f"DRAKKAR will continue with the information provided in the path file.")
+            file_mags_to_json(args.bins_dir,args.output)
+        elif args.bins_file and not args.bins_dir:
+            print(f"DRAKKAR will run with the information provided in the sample info file.")
+            file_mags_to_json(args.bins_file,args.output)
+        elif args.bins_dir and not args.bins_file:
+            print(f"No sample info file was provided.")
+            print(f"DRAKKAR will run with the files in the input directory.")
+            path_mags_to_json(args.bins_dir,args.output)
+        else:
+            print(f"No input information was provided. DRAKKAR will try to guess the location of the MAGs.")
+            if os.path.exists(f"{args.output}/profiling_genomes/drep/dereplicated_genomes"):
+                path_mags_to_json(f"{args.output}/profiling_genomes/drep/dereplicated_genomes",args.output)
+            else:
+                print(f"ERROR: No bin data was found in the output directory.")
+                print(f"Make sure that the preprocessing and cataloging modules were run in this directory.")
+                print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
+                return
+
+        # Prepare read dictionaries
+
+        reads_dir = args.reads_dir
+        reads_file = args.reads_file
+
+        if reads_dir and reads_file:
+            print(f"")
+            print(f"Both bin path file and input directory were provided.")
+            print(f"DRAKKAR will use the reads provided in the file.")
+            file_transcriptome_to_json(reads_file,args.output)
+        elif reads_file and not reads_dir:
+            print(f"")
+            print(f"DRAKKAR will use the reads provided in the file.")
+            file_transcriptome_to_json(reads_file,args.output)
+        elif reads_dir and not reads_file:
+            print(f"")
+            print(f"No sample info file was provided.")
+            print(f"DRAKKAR will use the reads from the input directory.")
+            argument_transcriptome_to_json(reads_dir,args.output)
+        else:
+            print(f"")
+            print(f"No input information was provided. DRAKKAR will try to guess the location of the reads.")
+            if any(os.scandir(f"{args.output}/preprocessing/final")):
+                argument_transcriptome_to_json(f"{args.output}/preprocessing/final",args.output)
+            else:
+                print(f"ERROR: No bin data was found in the output directory.")
+                print(f"Make sure that the preprocessing and cataloging modules were run in this directory.")
+                print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
+                return
+
+        run_snakemake_inspecting("expressing", project_name, args.type, args.output, env_path, args.profile)
 
 
 if __name__ == "__main__":

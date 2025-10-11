@@ -510,3 +510,67 @@ def preprocessing_summary(summary_table, bar_width=50):
     # Print the averages and the stacked barplot
     print(f"░ Discarded: {pct_discarded:.1f}%, ▒ Host: {pct_host:.1f}%, █ Metagenomic: {pct_metagenomic:.1f}%")
     print(f"│{bar}│")
+
+
+def file_transcriptome_to_json(infofile, output):
+    # Load sample info file
+    df = pd.read_csv(infofile, sep="\t")
+
+    # Initialize dictionaries with lists
+    SAMPLE_TO_READS1 = defaultdict(list)
+    SAMPLE_TO_READS2 = defaultdict(list)
+
+    # Populate the dictionaries
+    for _, row in df.iterrows():
+        SAMPLE_TO_READS1[row["sample"]].append(str(Path(row["rawreads1"]).resolve()))
+        SAMPLE_TO_READS2[row["sample"]].append(str(Path(row["rawreads2"]).resolve()))
+
+    # Convert defaultdict to standard dict (optional)
+    SAMPLE_TO_READS1 = dict(SAMPLE_TO_READS1)
+    SAMPLE_TO_READS2 = dict(SAMPLE_TO_READS2)
+
+    # Save dictionaries to JSON files
+    os.makedirs(f"{output}/data", exist_ok=True)
+    with open(f"{output}/data/transcriptome_to_reads1.json", "w") as f:
+        json.dump(SAMPLE_TO_READS1, f)
+
+    with open(f"{output}/data/transcriptome_to_reads2.json", "w") as f:
+        json.dump(SAMPLE_TO_READS2, f)
+
+def argument_transcriptome_to_json(argument, output):
+    # Define the directory containing the raw reads
+    TRANSCRIPTOME_DIR = Path(argument).resolve()
+
+    # Initialize dictionaries
+    TRANSCRIPTOME_TO_READS1 = defaultdict(list)
+    TRANSCRIPTOME_TO_READS2 = defaultdict(list)
+
+    # Regular expression to capture sample names
+    pattern = re.compile(r"^(.*)_\d\.fq\.gz$")  # Captures everything before "_1.fq.gz" or "_2.fq.gz"
+
+    # Scan the directory
+    for filename in os.listdir(TRANSCRIPTOME_DIR):
+        if filename.endswith(".fq.gz"):
+            full_path = os.path.join(TRANSCRIPTOME_DIR, filename)
+
+            # Extract sample name using regex
+            match = pattern.match(filename)
+            if match:
+                sample_name = match.group(1)  # Everything before _1.fq.gz or _2.fq.gz
+
+                # Sort into forward and reverse reads
+                if "_1.fq.gz" in filename:
+                    TRANSCRIPTOME_TO_READS1[sample_name].append(full_path)
+                elif "_2.fq.gz" in filename:
+                    TRANSCRIPTOME_TO_READS2[sample_name].append(full_path)
+
+    # Convert defaultdict to standard dict (optional)
+    TRANSCRIPTOME_TO_READS1 = dict(TRANSCRIPTOME_TO_READS1)
+    TRANSCRIPTOME_TO_READS2 = dict(TRANSCRIPTOME_TO_READS2)
+
+    os.makedirs(f"{output}/data", exist_ok=True)
+    with open(f"{output}/data/transcriptome_to_reads1.json", "w") as f:
+        json.dump(TRANSCRIPTOME_TO_READS1, f)
+
+    with open(f"{output}/data/transcriptome_to_reads2.json", "w") as f:
+        json.dump(TRANSCRIPTOME_TO_READS2, f)

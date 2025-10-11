@@ -30,6 +30,7 @@ SIGNALP_MODULE: "signalp/6h"
 GATK_MODULE: "gatk/4.6.1.0"
 SEQTK_MODULE: "seqtk/1.4"
 MULTIQC_MODULE: "multiqc/1.29"
+SUBREAD_MODULE: "subread/2.0.6"
 
 # Annotation databases
 CHECKM2_DB: "/maps/datasets/globe_databases/checkm2/20250215/CheckM2_database/uniref100.KO.1.dmnd"

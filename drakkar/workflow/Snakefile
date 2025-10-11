@@ -224,3 +224,25 @@ if WORKFLOW == "inspecting":
 
     if "microdiversity" in INSPECTING_TYPE:
         include: "rules/inspecting_microdiversity.smk"
+
+
+if WORKFLOW == "expressing":
+
+    with open(f"{OUTPUT_DIR}/data/transcriptome_to_reads1.json", "r") as f:
+        TRANSCRIPTOME_TO_READS1 = json.load(f)
+
+    with open(f"{OUTPUT_DIR}/data/transcriptome_to_reads2.json", "r") as f:
+        TRANSCRIPTOME_TO_READS2 = json.load(f)
+
+    samples = list(TRANSCRIPTOME_TO_READS1.keys())
+
+    with open(f"{OUTPUT_DIR}/data/mags_to_files.json", "r") as f:
+        MAGS_TO_FILES = json.load(f)
+
+    mags = list(MAGS_TO_FILES.keys())
+
+    rule all:
+        input:
+            f"{OUTPUT_DIR}/expressing/featurecounts/counts.tsv"
+
+    include: "rules/expressing.smk"
