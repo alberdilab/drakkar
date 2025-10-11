@@ -733,7 +733,7 @@ def main():
                 print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
                 return
 
-        run_snakemake_inspecting("expressing", project_name, args.type, args.output, env_path, args.profile)
+        run_snakemake_inspecting("expressing", project_name, args.output, env_path, args.profile)
 
 
 if __name__ == "__main__":
