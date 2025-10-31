@@ -287,7 +287,7 @@ rule dbcan3:
     input:
         f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/total_cgc_info.tsv"
     output:
-        f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/cgc_standard.tsv
+        f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/cgc_standard.tsv"
     threads:
         1
     params:
