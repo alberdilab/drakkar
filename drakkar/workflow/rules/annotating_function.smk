@@ -230,11 +230,11 @@ rule merge_gene_annotations:
             -o {output}
         """
 
-rule carbohydrate_clusters:
+rule dbcan:
     input:
         f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
     output:
-        f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/cgc_standard_out.tsv"
+        f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/dbCAN_hmm_results.tsv"
     threads:
         1
     params:
@@ -248,7 +248,7 @@ rule carbohydrate_clusters:
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 100) * 2 ** (attempt - 1))
     shell:
         """
-        run_dbcan easy_CGC \
+        run_dbcan CAZyme_annotation \
             --input_raw_data {input} \
             --mode protein \
             --output_dir {params.output_dir} \
@@ -257,7 +257,7 @@ rule carbohydrate_clusters:
             --threads {threads}
         """
 
-rule secondary_metabolite_clusters:
+rule antismash:
     input:
         gff=f"{OUTPUT_DIR}/annotating/antismash/{{mag}}.gff",
 
@@ -274,7 +274,7 @@ rule secondary_metabolite_clusters:
         antismash {input.gff}
         """
 
-rule phages:
+rule genomad:
     input:
         lambda wildcards: MAGS_TO_FILES[wildcards.mag]
     output:
