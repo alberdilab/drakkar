@@ -198,7 +198,7 @@ if WORKFLOW == "annotating":
         input:
             *([f"{OUTPUT_DIR}/annotating/final/{mag}.tsv" for mag in mags] if "function" in ANNOTATING_TYPE else []),
             *([f"{OUTPUT_DIR}/annotating/genomad/{mag}/{mag}_summary/{mag}_virus_summary.tsv" for mag in mags] if "function" in ANNOTATING_TYPE else []),
-            *([f"{OUTPUT_DIR}/annotating/dbcan/{mag}/dbCAN_hmm_results.tsv" for mag in mags] if "function" in ANNOTATING_TYPE else []),
+            *([f"{OUTPUT_DIR}/annotating/dbcan/{mag}/total_cgc_info.tsv" for mag in mags] if "function" in ANNOTATING_TYPE else []),
             *([f"{OUTPUT_DIR}/annotating/gene_annotations.tsv.xz"] if "function" in ANNOTATING_TYPE else []),
             *([f"{OUTPUT_DIR}/annotating/genome_taxonomy.tsv"] if "taxonomy" in ANNOTATING_TYPE else []),
             #*([f"{OUTPUT_DIR}/annotating/m2m/{mag}.sbml" for mag in mags] if "network" in ANNOTATING_TYPE else []),
