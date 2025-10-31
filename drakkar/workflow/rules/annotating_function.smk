@@ -282,6 +282,27 @@ rule dbcan2:
             --db_dir {params.db} \
             --gff_type prodigal
         """
+    
+rule dbcan3:
+    input:
+        f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/total_cgc_info.tsv"
+    output:
+        f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/cgc_standard.tsv
+    threads:
+        1
+    params:
+        package_dir={PACKAGE_DIR},
+        output_dir=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}",
+        db={DBCAN_DB}
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/annotating_network.yaml"
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 100) * 2 ** (attempt - 1))
+    shell:
+        """
+        run_dbcan cgc_finder --output_dir {params.output_dir}
+        """
 
 rule antismash:
     input:
