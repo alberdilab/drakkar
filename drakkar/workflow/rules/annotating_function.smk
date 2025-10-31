@@ -18,6 +18,7 @@ AMR_DB = config["AMR_DB"]
 PFAM_DB = config["PFAM_DB"]
 VFDB_DB = config["VFDB_DB"]
 GENOMAD_DB = config["GENOMAD_DB"]
+DBCAN_DB = config["DBCAN_DB"]
 
 ####
 # Workflow rules
@@ -197,7 +198,7 @@ rule merge_gene_annotations:
         amr=f"{OUTPUT_DIR}/annotating/amr/{{mag}}.tsv",
         sp=f"{OUTPUT_DIR}/annotating/signalp/{{mag}}.txt"
     output:
-        f"{OUTPUT_DIR}/annotating/final/{{mag}}.tsv"
+        f"{OUTPUT_DIR}/annotating/final/{{mag}}_genes.tsv"
     params:
         package_dir={PACKAGE_DIR},
         kegg=f"{KEGG_DB}.json",
@@ -213,7 +214,7 @@ rule merge_gene_annotations:
     shell:
         """
         export PATH="/home/jpl786/miniforge3/envs/drakkar/bin:$PATH"
-        python {params.package_dir}/workflow/scripts/merge_annotations.py \
+        python {params.package_dir}/workflow/scripts/merge_gene_annotations.py \
             -gff {input.gff} \
             -kegg {input.kegg} \
             -keggdb {params.kegg} \
@@ -228,13 +229,40 @@ rule merge_gene_annotations:
             -o {output}
         """
 
+
 rule carbohydrate_clusters:
     input:
-        gff=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.gff",
-        cazy=f"{OUTPUT_DIR}/annotating/cazy/{{mag}}.tsv",
-        pfam=f"{OUTPUT_DIR}/annotating/pfam/{{mag}}.tsv"
+        f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.gff"
     output:
-        f"{OUTPUT_DIR}/annotating/cgc/{{mag}}.txt"
+        f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/cgc_standard_out.tsv"
+    threads:
+        1
+    params:
+        package_dir={PACKAGE_DIR},
+        output_dir=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}",
+        db={DBCAN_DB}
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/annotating_network.yaml"
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 100) * 2 ** (attempt - 1))
+    shell:
+        """
+        run_dbcan easy_CGC \
+            --input_raw_data {input} \
+            --mode protein \
+            --output_dir {params.output_dir} \
+            --db_dir {params.db} \
+            --methods hmm \
+            --threads {threads}
+        """
+
+rule secondary_metabolite_clusters:
+    input:
+        gff=f"{OUTPUT_DIR}/annotating/antismash/{{mag}}.gff",
+
+    output:
+        f"{OUTPUT_DIR}/annotating/antismash/{{mag}}.txt"
     threads:
         1
     resources:
@@ -242,13 +270,10 @@ rule carbohydrate_clusters:
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 100) * 2 ** (attempt - 1))
     shell:
         """
-        python {params.package_dir}/workflow/scripts/detect_cgcs.py \
-            -cazy {input.cazy} \
-            -pfam {input.pfam}
-            -output {output}
+        antismash {input.gff}
         """
 
-rule genomad:
+rule phages:
     input:
         lambda wildcards: MAGS_TO_FILES[wildcards.mag]
     output:
@@ -271,9 +296,32 @@ rule genomad:
             {params.db}
         """
 
+rule merge_cluster_annotations:
+    input:
+        cgcs=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.gff",
+        genomad=f"{OUTPUT_DIR}/annotating/genomad/{{mag}}/{{mag}}_summary/{{mag}}_virus_summary.tsv"
+    output:
+        f"{OUTPUT_DIR}/annotating/final/{{mag}}_clusters.tsv"
+    params:
+        package_dir={PACKAGE_DIR}
+    threads:
+        1
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 50) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 10) * 2 ** (attempt - 1))
+    message: "Merging cluster annotations of MAG {wildcards.mag}..."
+    shell:
+        """
+        export PATH="/home/jpl786/miniforge3/envs/drakkar/bin:$PATH"
+        python {params.package_dir}/workflow/scripts/merge_cluster_annotations.py \
+            -cgcs {input.cgcs} \
+            -genomad {input.genomad} \
+            -o {output}
+        """
+
 rule final_gene_annotation_table:
     input:
-        expand(f"{OUTPUT_DIR}/annotating/final/{{mag}}.tsv",mag=mags)
+        expand(f"{OUTPUT_DIR}/annotating/final/{{mag}}_genes.tsv",mag=mags)
     output:
         f"{OUTPUT_DIR}/annotating/gene_annotations.tsv.xz"
     threads:
@@ -282,6 +330,22 @@ rule final_gene_annotation_table:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 50) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 10) * 2 ** (attempt - 1))
     message: "Generating final gene annotation file..."
+    shell:
+        """
+        cat {input} | xz -c > {output}
+        """
+
+rule final_cluster_annotation_table:
+    input:
+        expand(f"{OUTPUT_DIR}/annotating/final/{{mag}}_clusters.tsv",mag=mags)
+    output:
+        f"{OUTPUT_DIR}/annotating/cluster_annotations.tsv.xz"
+    threads:
+        1
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 50) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 10) * 2 ** (attempt - 1))
+    message: "Generating final cluster annotation file..."
     shell:
         """
         cat {input} | xz -c > {output}

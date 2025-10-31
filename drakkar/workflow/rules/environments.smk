@@ -38,7 +38,7 @@ rule env3:
         f"drakkar_environments/env3.txt"
     threads: 1
     conda: 
-        f"{PACKAGE_DIR}/workflow/envs/annotating_taxonomu.yaml"
+        f"{PACKAGE_DIR}/workflow/envs/annotating_taxonomy.yaml"
     shell:
         """
         echo "Created conda environment for annotating taxonomy"
