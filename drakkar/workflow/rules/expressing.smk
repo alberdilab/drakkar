@@ -116,10 +116,10 @@ rule quantify:
     threads: 8
     params:
         subread_module={SUBREAD_MODULE},
-        extra="-F GFF -t CDS,tRNA,rRNA -g ID -p",
+        extra="-F GFF -t CDS,tRNA,rRNA -g ID -p"
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 2) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 100) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 200) * 2 ** (attempt - 1))
     shell:
         """
         module load {params.subread_module}

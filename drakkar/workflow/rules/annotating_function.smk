@@ -263,7 +263,6 @@ rule genomad:
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 100) * 2 ** (attempt - 1))
     shell:
         """
-        output/GPB_bin_000118_summary/GPB_bin_000118_virus_summary.tsv
         module load genomad/1.11.0
         genomad end-to-end \
             -t {threads} \
