@@ -31,6 +31,7 @@ GATK_MODULE: "gatk/4.6.1.0"
 SEQTK_MODULE: "seqtk/1.4"
 MULTIQC_MODULE: "multiqc/1.29"
 SUBREAD_MODULE: "subread/2.0.6"
+GENOMAD_MODULE: "genomad/1.11.0"
 
 # Annotation databases
 CHECKM2_DB: "/maps/datasets/globe_databases/checkm2/20250215/CheckM2_database/uniref100.KO.1.dmnd"
@@ -48,3 +49,7 @@ CARVEME_DB: "/projects/alberdilab/data/databases/drakkar/carveme.tsv"
   # https://github.com/franciscozorrilla/metaGEM/blob/8609ad6bcf040807df0928705d91b0ae31923259/workflow/scripts/media_db.tsv
 GAPSEQ_DB: "/projects/alberdilab/data/databases/drakkar/gapseq"
 DBCAN_DB: "/projects/alberdilab/data/databases/drakkar/dbcan"
+
+# Environments
+
+ENVIRONMENTS_DIR: "/projects/alberdilab/data/environments/drakkar"

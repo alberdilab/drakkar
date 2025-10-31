@@ -10,6 +10,7 @@ PRODIGAL_MODULE = config["PRODIGAL_MODULE"]
 HMMER_MODULE = config["HMMER_MODULE"]
 MMSEQS2_MODULE = config["MMSEQS2_MODULE"]
 SIGNALP_MODULE = config["SIGNALP_MODULE"]
+GENOMAD_MODULE = config["GENOMAD_MODULE"]
 
 # Annotation databases
 KEGG_DB = config["KEGG_DB"]
@@ -229,10 +230,9 @@ rule merge_gene_annotations:
             -o {output}
         """
 
-
 rule carbohydrate_clusters:
     input:
-        f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.gff"
+        f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
     output:
         f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/cgc_standard_out.tsv"
     threads:
@@ -270,6 +270,7 @@ rule secondary_metabolite_clusters:
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 100) * 2 ** (attempt - 1))
     shell:
         """
+        module load {params.antismash}
         antismash {input.gff}
         """
 
@@ -279,6 +280,7 @@ rule phages:
     output:
         f"{OUTPUT_DIR}/annotating/genomad/{{mag}}/{{mag}}_summary/{{mag}}_virus_summary.tsv"
     params:
+        genomad_module={GENOMAD_MODULE},
         outdir=f"{OUTPUT_DIR}/annotating/genomad/{{mag}}",
         db={GENOMAD_DB}
     threads:
@@ -288,7 +290,7 @@ rule phages:
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 100) * 2 ** (attempt - 1))
     shell:
         """
-        module load genomad/1.11.0
+        module load {params.genomad_module}
         genomad end-to-end \
             -t {threads} \
             {input} \
