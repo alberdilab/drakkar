@@ -360,6 +360,8 @@ rule antismash_regions:
         f"{OUTPUT_DIR}/annotating/antismash/{{mag}}.csv"
     threads:
         1
+    params:
+        package_dir={PACKAGE_DIR}
     resources:
         mem_mb=lambda wildcards, input, attempt: max(1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(5, int(input.size_mb * 100) * 2 ** (attempt - 1))
