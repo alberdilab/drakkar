@@ -3,6 +3,6 @@ channels:
   - bioconda
   - defaults
 dependencies:
-  - carveme=1.6.6
-  - diamond=2.1.13
-  - libsbml=5.20.5
+  - biopython=1.81
+  - antismash=8.0.4
+  - dbcan=5.2.1

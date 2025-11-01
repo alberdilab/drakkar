@@ -242,7 +242,7 @@ rule dbcan:
         output_dir=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}",
         db={DBCAN_DB}
     conda:
-        f"{PACKAGE_DIR}/workflow/envs/annotating_network.yaml"
+        f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 100) * 2 ** (attempt - 1))
@@ -270,7 +270,7 @@ rule dbcan2:
         output_dir=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}",
         db={DBCAN_DB}
     conda:
-        f"{PACKAGE_DIR}/workflow/envs/annotating_network.yaml"
+        f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 100) * 2 ** (attempt - 1))
@@ -294,7 +294,7 @@ rule dbcan3:
         package_dir={PACKAGE_DIR},
         output_dir=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}"
     conda:
-        f"{PACKAGE_DIR}/workflow/envs/annotating_network.yaml"
+        f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 100) * 2 ** (attempt - 1))
@@ -315,7 +315,7 @@ rule dbcan4:
         output_dir=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}",
         db={DBCAN_DB}
     conda:
-        f"{PACKAGE_DIR}/workflow/envs/annotating_network.yaml"
+        f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 100) * 2 ** (attempt - 1))
@@ -337,6 +337,8 @@ rule antismash:
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 100) * 2 ** (attempt - 1))
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
     shell:
         """
         module load {params.antismash}
