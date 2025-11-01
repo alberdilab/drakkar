@@ -332,7 +332,7 @@ rule antismash:
         fna=lambda wildcards: MAGS_TO_FILES[wildcards.mag],
         gff=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.gff"
     output:
-        f"{OUTPUT_DIR}/annotating/antismash/{{mag}}.txt"
+        f"{OUTPUT_DIR}/annotating/antismash/{{mag}}/regions.js"
     params:
         db={ANTISMASH_DB},
         out_dir=f"{OUTPUT_DIR}/annotating/antismash/{{mag}}",
@@ -349,8 +349,24 @@ rule antismash:
             --databases {params.db} \
             --output-dir {params.out_dir} \
             --genefinding-gff3 {input.gff} \
+            -c {threads} \
             {input.fna}
-        touch {output}
+        """
+
+rule antismash_regions:
+    input:
+        f"{OUTPUT_DIR}/annotating/antismash/{{mag}}/regions.js"
+    output:
+        f"{OUTPUT_DIR}/annotating/antismash/{{mag}}/{{mag}}.csv"
+    threads:
+        1
+    localrule: True
+    resources:
+        mem_mb=1024,
+        runtime=1
+    shell:
+        """
+        python {params.package_dir}/workflow/scripts/antismash_regions.py {input} {output}
         """
 
 rule genomad:
