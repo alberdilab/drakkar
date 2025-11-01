@@ -347,7 +347,7 @@ rule antismash:
         """
         antismash  \
             --databases {params.db} \
-            --output-dir {out_dir} \
+            --output-dir {params.out_dir} \
             --genefinding-gff3 {input.gff} \
             {input.fna}
         touch {output}
