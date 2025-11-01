@@ -357,13 +357,12 @@ rule antismash_regions:
     input:
         f"{OUTPUT_DIR}/annotating/antismash/{{mag}}/regions.js"
     output:
-        f"{OUTPUT_DIR}/annotating/antismash/{{mag}}/{{mag}}.csv"
+        f"{OUTPUT_DIR}/annotating/antismash/{{mag}}.csv"
     threads:
         1
-    localrule: True
     resources:
-        mem_mb=1024,
-        runtime=1
+        mem_mb=lambda wildcards, input, attempt: max(1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(5, int(input.size_mb * 100) * 2 ** (attempt - 1))
     shell:
         """
         python {params.package_dir}/workflow/scripts/antismash_regions.py {input} {output}
