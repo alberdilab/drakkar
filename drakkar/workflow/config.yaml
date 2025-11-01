@@ -49,6 +49,7 @@ CARVEME_DB: "/projects/alberdilab/data/databases/drakkar/carveme.tsv"
   # https://github.com/franciscozorrilla/metaGEM/blob/8609ad6bcf040807df0928705d91b0ae31923259/workflow/scripts/media_db.tsv
 GAPSEQ_DB: "/projects/alberdilab/data/databases/drakkar/gapseq"
 DBCAN_DB: "/projects/alberdilab/data/databases/drakkar/dbcan"
+ANTISMASH_DB: "/projects/alberdilab/data/databases/drakkar/antismash"
 
 # Environments
 

@@ -20,6 +20,7 @@ PFAM_DB = config["PFAM_DB"]
 VFDB_DB = config["VFDB_DB"]
 GENOMAD_DB = config["GENOMAD_DB"]
 DBCAN_DB = config["DBCAN_DB"]
+ANTISMASH_DB = config["ANTISMASH_DB"]
 
 ####
 # Workflow rules
@@ -328,10 +329,13 @@ rule dbcan4:
 
 rule antismash:
     input:
-        gff=f"{OUTPUT_DIR}/annotating/antismash/{{mag}}.gff",
-
+        fna=lambda wildcards: MAGS_TO_FILES[wildcards.mag],
+        gff=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.gff"
     output:
         f"{OUTPUT_DIR}/annotating/antismash/{{mag}}.txt"
+    params:
+        db={ANTISMASH_DB},
+        out_dir=f"{OUTPUT_DIR}/annotating/antismash/{{mag}}",
     threads:
         1
     resources:
@@ -341,8 +345,12 @@ rule antismash:
         f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
     shell:
         """
-        module load {params.antismash}
-        antismash {input.gff}
+        antismash  \
+            --databases {params.db} \
+            --output-dir {out_dir} \
+            --genefinding-gff3 {input.gff} \
+            {input.fna}
+        touch {output}
         """
 
 rule genomad:
