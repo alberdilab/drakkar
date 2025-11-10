@@ -233,7 +233,7 @@ rule merge_gene_annotations:
 
 rule dbcan:
     input:
-        f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
+        lambda wildcards: MAGS_TO_FILES[wildcards.mag]
     output:
         f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/dbCAN_hmm_results.tsv"
     threads:
@@ -251,7 +251,7 @@ rule dbcan:
         """
         run_dbcan CAZyme_annotation \
             --input_raw_data {input} \
-            --mode protein \
+            --mode prok \
             --output_dir {params.output_dir} \
             --db_dir {params.db} \
             --methods hmm \
