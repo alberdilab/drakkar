@@ -260,7 +260,7 @@ rule dbcan:
 
 rule dbcan2:
     input:
-        gff=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.gff",
+        gff=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/uniInput.gff",
         ann=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/dbCAN_hmm_results.tsv"
     output:
         f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/total_cgc_info.tsv"
