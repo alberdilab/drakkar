@@ -235,7 +235,7 @@ rule dbcan:
     input:
         lambda wildcards: MAGS_TO_FILES[wildcards.mag]
     output:
-        f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/dbCAN_hmm_results.tsv"
+        f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/uniInput.gff"
     threads:
         1
     params:
@@ -260,8 +260,7 @@ rule dbcan:
 
 rule dbcan2:
     input:
-        gff=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/uniInput.gff",
-        ann=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/dbCAN_hmm_results.tsv"
+        f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/uniInput.gff"
     output:
         f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/total_cgc_info.tsv"
     threads:
@@ -278,7 +277,7 @@ rule dbcan2:
     shell:
         """
         run_dbcan gff_process \
-            --input_gff {input.gff} \
+            --input_gff {input} \
             --output_dir {params.output_dir} \
             --db_dir {params.db} \
             --gff_type prodigal
