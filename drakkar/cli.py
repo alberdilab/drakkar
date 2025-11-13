@@ -71,7 +71,7 @@ def run_snakemake_environments(workflow, profile):
     ]
     subprocess.run(cmd, shell=False, check=True)
 
-def run_snakemake_preprocessing(workflow, project_name, output_dir, reference, profile):
+def run_snakemake_preprocessing(workflow, project_name, output_dir, reference, env_path, profile):
 
     """ Run the preprocessing workflow """
 
@@ -92,37 +92,8 @@ def run_snakemake_preprocessing(workflow, project_name, output_dir, reference, p
 
     subprocess.run(snakemake_command, shell=False, check=True)
 
-def run_snakemake_preprocessing2(workflow, project_name, output_dir, reference, profile):
 
-    """ Run the preprocessing workflow """
-
-    snakemake_command = [
-        "/bin/bash", "-c",
-        f"module load {config_vars['SNAKEMAKE_MODULE']} && "
-        "snakemake "
-        f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
-        f"--directory {output_dir} "
-        f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
-        f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} reference={reference} "
-        f"--conda-prefix {env_path} "
-        f"--conda-frontend mamba "
-        f"--use-conda "
-    ]
-
-    try:
-        subprocess.run(snakemake_command, shell=False, check=True)
-    except subprocess.CalledProcessError as e:
-        error_message = e.stderr
-        if "LockException" in error_message:
-            display_unlock()
-        else:
-            print(f"\nERROR: Snakemake failed with exit code {e.returncode}!", file=sys.stderr)
-            print(f"ERROR: Check the Snakemake logs for more details.", file=sys.stderr)
-            sys.exit(1)
-
-
-def run_snakemake_cataloging(workflow, project_name, output_dir, profile):
+def run_snakemake_cataloging(workflow, project_name, output_dir, env_path, profile):
 
     """ Run the cataloging workflow """
 
@@ -143,7 +114,7 @@ def run_snakemake_cataloging(workflow, project_name, output_dir, profile):
     subprocess.run(snakemake_command, shell=False, check=True)
 
 #Screen output control
-def run_snakemake_cataloging2(workflow, project_name, output_dir, profile):
+def run_snakemake_cataloging2(workflow, project_name, output_dir, env_path, profile):
 
     """ Run the cataloging workflow """
 
