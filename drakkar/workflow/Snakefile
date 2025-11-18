@@ -196,7 +196,7 @@ if WORKFLOW == "annotating":
 
     rule all:
         input:
-            *([f"{OUTPUT_DIR}/annotating/final/{mag}.tsv" for mag in mags] if "function" in ANNOTATING_TYPE else []),
+            *([f"{OUTPUT_DIR}/annotating/final/{mag}_genes.tsv" for mag in mags] if "function" in ANNOTATING_TYPE else []),
             *([f"{OUTPUT_DIR}/annotating/genomad/{mag}/{mag}_summary/{mag}_virus_summary.tsv" for mag in mags] if "function" in ANNOTATING_TYPE else []),
             *([f"{OUTPUT_DIR}/annotating/dbcan/{mag}/substrate_prediction.tsv" for mag in mags] if "function" in ANNOTATING_TYPE else []),
             *([f"{OUTPUT_DIR}/annotating/antismash/{mag}.csv" for mag in mags] if "function" in ANNOTATING_TYPE else []),
