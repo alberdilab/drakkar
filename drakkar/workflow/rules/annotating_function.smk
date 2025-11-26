@@ -209,6 +209,8 @@ rule merge_gene_annotations:
         amr=f"{AMR_DB}.tsv"
     threads:
         1
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 50) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 10) * 2 ** (attempt - 1))
