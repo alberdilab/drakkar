@@ -217,7 +217,6 @@ rule merge_gene_annotations:
     message: "Merging gene annotations of MAG {wildcards.mag}..."
     shell:
         """
-        export PATH="/home/jpl786/miniforge3/envs/drakkar/bin:$PATH"
         python {params.package_dir}/workflow/scripts/merge_gene_annotations.py \
             -gff {input.gff} \
             -kegg {input.kegg} \
@@ -405,13 +404,14 @@ rule merge_cluster_annotations:
         package_dir={PACKAGE_DIR}
     threads:
         1
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 50) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 10) * 2 ** (attempt - 1))
     message: "Merging cluster annotations of MAG {wildcards.mag}..."
     shell:
         """
-        export PATH="/home/jpl786/miniforge3/envs/drakkar/bin:$PATH"
         python {params.package_dir}/workflow/scripts/merge_cluster_annotations.py \
             -cgcs {input.cgcs} \
             -genomad {input.genomad} \
