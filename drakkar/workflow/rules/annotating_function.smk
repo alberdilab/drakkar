@@ -217,6 +217,15 @@ rule merge_gene_annotations:
     message: "Merging gene annotations of MAG {wildcards.mag}..."
     shell:
         """
+        python - <<'PY'
+            import sys
+            print("DEBUG_PYTHON", sys.executable)
+            try:
+                import Bio
+                print("DEBUG_BIO", Bio.__file__)
+            except Exception as e:
+                print("DEBUG_BIO_IMPORT_ERROR", e)
+            PY
         python {params.package_dir}/workflow/scripts/merge_gene_annotations.py \
             -gff {input.gff} \
             -kegg {input.kegg} \
@@ -382,7 +391,7 @@ rule genomad:
     threads:
         1
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 10) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 20) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 100) * 2 ** (attempt - 1))
     shell:
         """

@@ -117,7 +117,7 @@ def merge_annotations(gff_file, kegg_file, keggdb_file, pfam_file, ec_file, cazy
     keggdb_df = keggdb_df[keggdb_df['evalue'] < evalue_threshold]
     keggdb_df = keggdb_df.rename(columns={'id': 'kegg'})
     keggdb_df = pd.merge(keggdb_df, kegg_hierachy[['kegg', 'ec']], on='kegg', how='left')
-    keggdb_df = keggdb_df.groupby('gene', group_keys=False)[['gene','kegg','ec','evalue']].apply(select_lowest_evalue, include_groups=False)
+    keggdb_df = keggdb_df.groupby('gene', group_keys=False)[['gene','kegg','ec','evalue']].apply(select_lowest_evalue, include_groups=False).reset_index(drop=True)
     keggdb_df['ec'] = keggdb_df['ec'].str.replace('EC:', '', regex=False)
 
     # Parse PFAM
@@ -142,7 +142,7 @@ def merge_annotations(gff_file, kegg_file, keggdb_file, pfam_file, ec_file, cazy
     pfam_df['pfam'] = pfam_df['pfam'].str.split('.').str[0]
     pfam_df['evalue'] = pd.to_numeric(pfam_df['evalue'], errors='coerce')
     pfam_df = pfam_df[pfam_df['evalue'] < evalue_threshold]
-    pfam_df = pfam_df.groupby('gene', group_keys=False)[['gene','pfam','evalue']].apply(select_lowest_evalue, include_groups=False)
+    pfam_df = pfam_df.groupby('gene', group_keys=False)[['gene','pfam','evalue']].apply(select_lowest_evalue, include_groups=False).reset_index(drop=True)
     pfam_df = pd.merge(pfam_df, pfam_to_ec[['pfam', 'ec']], on='pfam', how='left')
 
     # Parse CAZY
@@ -167,7 +167,7 @@ def merge_annotations(gff_file, kegg_file, keggdb_file, pfam_file, ec_file, cazy
     cazy_df['evalue'] = pd.to_numeric(cazy_df['evalue'], errors='coerce')
     cazy_df = cazy_df[cazy_df['evalue'] < evalue_threshold]
     cazy_df = cazy_df.rename(columns={'id': 'cazy'})
-    cazy_df = cazy_df.groupby('gene', group_keys=False)[['gene','cazy','evalue']].apply(select_lowest_evalue, include_groups=False)
+    cazy_df = cazy_df.groupby('gene', group_keys=False)[['gene','cazy','evalue']].apply(select_lowest_evalue, include_groups=False).reset_index(drop=True)
 
     # Parse AMR
     amr_hits = defaultdict(list)
@@ -190,7 +190,7 @@ def merge_annotations(gff_file, kegg_file, keggdb_file, pfam_file, ec_file, cazy
     amr_df['evalue'] = pd.to_numeric(amr_df['evalue'], errors='coerce')
     amr_df = amr_df[amr_df['evalue'] < evalue_threshold]
     amr_df = amr_df.rename(columns={'id': 'amr'})
-    amr_df = amr_df.groupby('gene', group_keys=False)[['gene','amr','accession','evalue']].apply(select_lowest_evalue, include_groups=False)
+    amr_df = amr_df.groupby('gene', group_keys=False)[['gene','amr','accession','evalue']].apply(select_lowest_evalue, include_groups=False).reset_index(drop=True)
     amr_df = pd.merge(amr_df, amr_to_class[['accession','subtype','subclass']], on='accession', how='left')
     amr_df = amr_df.rename(columns={'subtype': 'resistance_type'})
     amr_df = amr_df.rename(columns={'subclass': 'resistance_target'})
@@ -201,13 +201,13 @@ def merge_annotations(gff_file, kegg_file, keggdb_file, pfam_file, ec_file, cazy
                             'gaps', 'query_start', 'query_end', 'target_start', 'target_end', 'evalue', 'bitscore'])
     vfdb_df['evalue'] = pd.to_numeric(vfdb_df['evalue'], errors='coerce')
     vfdb_df = vfdb_df[vfdb_df['evalue'] < evalue_threshold]
-    vfdb_df = vfdb_df.groupby('gene', group_keys=False)[['gene','entry','evalue']].apply(select_lowest_evalue, include_groups=False)
+    vfdb_df = vfdb_df.groupby('gene', group_keys=False)[['gene','entry','evalue']].apply(select_lowest_evalue, include_groups=False).reset_index(drop=True)
     vfdb_df = pd.merge(vfdb_df, entry_to_vf[['entry','vf','vfc','vf_type']], on='entry', how='left')
 
     # Parse SIGNALP
     signalp_df = pd.read_csv(signalp_file, sep='\t', comment='#', header=None, names=['gene', 'signalp', 'confidence'])
     signalp_df['confidence'] = pd.to_numeric(signalp_df['confidence'], errors='coerce')
-    signalp_df = signalp_df.groupby('gene', group_keys=False)[['gene','signalp','confidence']].apply(select_highest_confidence)
+    signalp_df = signalp_df.groupby('gene', group_keys=False)[['gene','signalp','confidence']].apply(select_highest_confidence).reset_index(drop=True)
 
     #####################
     # Merge annotations #
