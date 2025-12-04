@@ -280,6 +280,10 @@ rule dbcan2:
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 100) * 2 ** (attempt - 1))
     shell:
         """
+        python {params.package_dir}/workflow/scripts/update_cgc_cazy_annotations.py \
+            --hmm_results {params.output_dir}/dbCAN_hmm_results.tsv \
+            --gff {params.output_dir}/cgc.gff
+
         run_dbcan gff_process \
             --input_gff {input} \
             --output_dir {params.output_dir} \
