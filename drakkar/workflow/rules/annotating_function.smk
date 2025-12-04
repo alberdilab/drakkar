@@ -218,14 +218,14 @@ rule merge_gene_annotations:
     shell:
         """
         python - <<'PY'
-            import sys
-            print("DEBUG_PYTHON", sys.executable)
-            try:
-                import Bio
-                print("DEBUG_BIO", Bio.__file__)
-            except Exception as e:
-                print("DEBUG_BIO_IMPORT_ERROR", e)
-            PY
+        import sys
+        print("DEBUG_PYTHON", sys.executable)
+        try:
+            import Bio
+            print("DEBUG_BIO", Bio.__file__)
+        except Exception as e:
+            print("DEBUG_BIO_IMPORT_ERROR", e)
+        PY
         python {params.package_dir}/workflow/scripts/merge_gene_annotations.py \
             -gff {input.gff} \
             -kegg {input.kegg} \
