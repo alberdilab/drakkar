@@ -226,7 +226,13 @@ try:
 except Exception as e:
     print("DEBUG_BIO_IMPORT_ERROR", e)
 PY
-        python {params.package_dir}/workflow/scripts/merge_gene_annotations.py \
+        if [[ -z "${{CONDA_PREFIX:-}}" ]]; then
+            echo "ERROR: CONDA_PREFIX not set; conda env not active" 1>&2
+            exit 1
+        fi
+        PYTHON_BIN="${{CONDA_PREFIX}}/bin/python"
+        echo "INFO Using python from $PYTHON_BIN"
+        $PYTHON_BIN {params.package_dir}/workflow/scripts/merge_gene_annotations.py \
             -gff {input.gff} \
             -kegg {input.kegg} \
             -keggdb {params.kegg} \
