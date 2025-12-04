@@ -217,19 +217,7 @@ rule merge_gene_annotations:
     message: "Merging gene annotations of MAG {wildcards.mag}..."
     shell:
         """
-        python - <<'PY'
-import sys
-print("DEBUG_PYTHON", sys.executable)
-try:
-    import Bio
-    print("DEBUG_BIO", Bio.__file__)
-except Exception as e:
-    print("DEBUG_BIO_IMPORT_ERROR", e)
-PY
-        if [[ -z "${{CONDA_PREFIX:-}}" ]]; then
-            echo "ERROR: CONDA_PREFIX not set; conda env not active" 1>&2
-            exit 1
-        fi
+        # Set python path to conda environment to avoid conflicts with modules
         PYTHON_BIN="${{CONDA_PREFIX}}/bin/python"
         echo "INFO Using python from $PYTHON_BIN"
         $PYTHON_BIN {params.package_dir}/workflow/scripts/merge_gene_annotations.py \
@@ -427,7 +415,10 @@ rule merge_cluster_annotations:
     message: "Merging cluster annotations of MAG {wildcards.mag}..."
     shell:
         """
-        python {params.package_dir}/workflow/scripts/merge_cluster_annotations.py \
+        # Set python path to conda environment to avoid conflicts with modules
+        PYTHON_BIN="${{CONDA_PREFIX}}/bin/python"
+        echo "INFO Using python from $PYTHON_BIN"
+        $PYTHON_BIN {params.package_dir}/workflow/scripts/merge_cluster_annotations.py \
             -cgcs {input.cgcs} \
             -genomad {input.genomad} \
             -o {output}
