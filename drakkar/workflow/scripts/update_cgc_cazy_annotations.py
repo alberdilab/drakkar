@@ -2,14 +2,12 @@
 import argparse
 import csv
 import os
-import re
 import sys
 from typing import Dict, List
 
 
 def load_cazy_types(hmm_results_path: str) -> Dict[str, List[str]]:
-    """Return mapping from target (gene) to a list of CAZyme type prefixes."""
-    type_regex = re.compile(r"^([A-Za-z]+)")
+    """Return mapping from target (gene) to a list of CAZyme types (HMM name without .hmm)."""
     gene_to_types: Dict[str, List[str]] = {}
 
     with open(hmm_results_path, newline="") as handle:
@@ -19,10 +17,9 @@ def load_cazy_types(hmm_results_path: str) -> Dict[str, List[str]]:
             hmm_name = row.get("HMM Name", "")
             if not gene:
                 continue
-            match = type_regex.match(hmm_name)
-            if not match:
+            cazy_type = os.path.basename(hmm_name).replace(".hmm", "")
+            if not cazy_type:
                 continue
-            cazy_type = match.group(1)
             gene_to_types.setdefault(gene, [])
             if cazy_type not in gene_to_types[gene]:
                 gene_to_types[gene].append(cazy_type)
@@ -66,11 +63,14 @@ def update_cgc_annotations(gff_path: str, gene_to_types: Dict[str, List[str]]) -
             updated_lines.append(line)
             continue
 
-        existing = [] if cgc_annotation in ("null", "None", "") else cgc_annotation.split("|")
+        tokens = [] if cgc_annotation in ("null", "None", "") else cgc_annotation.split("|")
+        # Ensure CAZyme label is present once, then add each type if missing
+        if "CAZyme" not in tokens:
+            tokens.append("CAZyme")
         for t in types:
-            if t not in existing:
-                existing.append(t)
-        attrs["CGC_annotation"] = "|".join(existing) if existing else "null"
+            if t not in tokens:
+                tokens.append(t)
+        attrs["CGC_annotation"] = "|".join(tokens) if tokens else "null"
         parts[8] = attrs_to_string(attrs)
         updated_lines.append("\t".join(parts) + "\n")
 
