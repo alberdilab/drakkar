@@ -364,7 +364,8 @@ rule antismash_regions:
     input:
         f"{OUTPUT_DIR}/annotating/antismash/{{mag}}/regions.js"
     output:
-        f"{OUTPUT_DIR}/annotating/antismash/{{mag}}.csv"
+        summary=f"{OUTPUT_DIR}/annotating/antismash/{{mag}}_summary.tsv",
+        genes=f"{OUTPUT_DIR}/annotating/antismash/{{mag}}_genes.tsv"
     threads:
         1
     params:
@@ -374,7 +375,10 @@ rule antismash_regions:
         runtime=lambda wildcards, input, attempt: max(5, int(input.size_mb * 100) * 2 ** (attempt - 1))
     shell:
         """
-        python {params.package_dir}/workflow/scripts/antismash_regions.py {input} {output}
+        python {params.package_dir}/workflow/scripts/antismash_regions.py \
+            -i {input} \
+            -s {output.summary} \
+            -g {output.genes}
         """
 
 rule genomad:
@@ -403,8 +407,9 @@ rule genomad:
 
 rule merge_cluster_annotations:
     input:
-        cgcs=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.gff",
-        genomad=f"{OUTPUT_DIR}/annotating/genomad/{{mag}}/{{mag}}_summary/{{mag}}_virus_summary.tsv"
+        dbcan=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/cgc_standard_out_summary.tsv",
+        genomad=f"{OUTPUT_DIR}/annotating/genomad/{{mag}}/{{mag}}_summary/{{mag}}_virus_summary.tsv",
+        antismash=f"{OUTPUT_DIR}/annotating/antismash/{{mag}}.tsv"
     output:
         f"{OUTPUT_DIR}/annotating/final/{{mag}}_clusters.tsv"
     params:
@@ -423,8 +428,9 @@ rule merge_cluster_annotations:
         PYTHON_BIN="${{CONDA_PREFIX}}/bin/python"
         echo "INFO Using python from $PYTHON_BIN"
         $PYTHON_BIN {params.package_dir}/workflow/scripts/merge_cluster_annotations.py \
-            -cgcs {input.cgcs} \
+            -dbcan {input.dbcan} \
             -genomad {input.genomad} \
+            -antismash {input.antismash} \
             -o {output}
         """
 
