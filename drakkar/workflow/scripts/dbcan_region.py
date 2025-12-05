@@ -18,6 +18,17 @@ def load_cgc(file_path: Path):
         for row in reader:
             yield {k.strip(): (v.strip() if isinstance(v, str) else v) for k, v in row.items()}
 
+def extract_function_categories(label: str):
+    if not label:
+        return []
+    categories = []
+    for part in str(label).split("+"):
+        head = part.split("|", 1)[0].strip()
+        if head:
+            categories.append(head)
+    # Deduplicate preserving order
+    return list(dict.fromkeys(categories))
+
 
 def summarize_cgcs(rows):
     grouped = defaultdict(list)
@@ -40,7 +51,14 @@ def summarize_cgcs(rows):
         gene_types = [g.get("Gene Type") or "" for g in genes if g.get("Gene Type")]
         type_label = Counter(gene_types).most_common(1)[0][0] if gene_types else cgc_id
 
-        annotations = [g.get("Gene Annotation") or g.get("Gene annotation") or "" for g in genes if (g.get("Gene Annotation") or g.get("Gene annotation"))]
+        annotations = []
+        for g in genes:
+            ann = g.get("Gene Annotation") or g.get("Gene annotation") or ""
+            if not ann:
+                continue
+            cats = extract_function_categories(ann) or [ann]
+            annotations.extend(cats)
+
         freq = Counter(annotations)
         annotated = [f"{ann} [{n}]" for ann, n in freq.items()]
 
