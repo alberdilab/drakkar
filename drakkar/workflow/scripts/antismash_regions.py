@@ -179,11 +179,10 @@ def main(in_path: str, summary_csv: str, gene_table: str):
                 )
                 gene_rows.append({
                     "bgc": bgc_code,
-                    "gene_type": extract_gene_type(orf),
                     "contig": contig,
-                    "protein_id": protein_id,
                     "start": orf.get("start"),
                     "end": orf.get("end"),
+                    "gene_type": extract_gene_type(orf),
                     "strand": format_strand(orf.get("strand")),
                     "annotation": extract_orf_function(orf) or "",
                 })
