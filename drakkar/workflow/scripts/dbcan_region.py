@@ -100,8 +100,8 @@ def summarize_cgcs(rows, pul_map=None):
             "end": end,
             "type": type_label,
             "gene_count": len(genes),
+            "substrate": substrate or "NA",
             "gene_functions": "; ".join(annotated),
-            "substrate": substrate,
             "pul_id": pul_id,
         })
 
@@ -120,8 +120,8 @@ def write_summary(rows, out_path: Path):
                 "end",
                 "type",
                 "gene_count",
-                "gene_functions",
                 "substrate",
+                "gene_functions",
                 "pul_id",
             ],
         )

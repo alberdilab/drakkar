@@ -135,8 +135,8 @@ def write_summary(rows, out_csv: Path):
                 "end",
                 "type",
                 "gene_count",
-                "gene_functions",
                 "substrate",
+                "gene_functions",
             ]
         )
         writer.writeheader()
@@ -197,8 +197,8 @@ def main(in_path: str, summary_csv: str, gene_table: str):
                 "end": end,
                 "type": "BGC",
                 "gene_count": gene_count,
+                "substrate": rtype or "NA",
                 "gene_functions": "; ".join(annotated),
-                "substrate": rtype,
             })
 
             for orf in orfs:
