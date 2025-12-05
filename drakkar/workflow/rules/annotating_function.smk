@@ -334,6 +334,27 @@ rule dbcan4:
             --db_dir {params.db}
         """
 
+rule dbcan_summary:
+    input:
+        f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/cgc_standard_out.tsv"
+    output:
+        f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}_summary.tsv"
+    threads:
+        1
+    params:
+        package_dir={PACKAGE_DIR}
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(5, int(input.size_mb * 100) * 2 ** (attempt - 1))
+    shell:
+        """
+        python {params.package_dir}/workflow/scripts/dbcan_region.py \
+            -i {input} \
+            -o {output}
+        """
+
 rule antismash:
     input:
         fna=lambda wildcards: MAGS_TO_FILES[wildcards.mag],
