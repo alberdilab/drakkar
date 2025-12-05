@@ -339,7 +339,7 @@ rule dbcan_summary:
         cgc=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/cgc_standard_out.tsv",
         substrate=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/substrate_prediction.tsv"
     output:
-        f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/cgc_standard_out_summary.tsv"
+        f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}_summary.tsv"
     threads:
         1
     params:
