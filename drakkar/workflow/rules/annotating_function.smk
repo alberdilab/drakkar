@@ -408,7 +408,8 @@ rule genomad:
     input:
         lambda wildcards: MAGS_TO_FILES[wildcards.mag]
     output:
-        f"{OUTPUT_DIR}/annotating/genomad/{{mag}}/{{mag}}_summary/{{mag}}_virus_summary.tsv"
+        summary=f"{OUTPUT_DIR}/annotating/genomad/{{mag}}/{{mag}}_summary/{{mag}}_virus_summary.tsv",
+        genes=f"{OUTPUT_DIR}/annotating/genomad/{{mag}}/{{mag}}_summary/{{mag}}_virus_genes.tsv"
     params:
         genomad_module={GENOMAD_MODULE},
         outdir=f"{OUTPUT_DIR}/annotating/genomad/{{mag}}",
@@ -428,10 +429,39 @@ rule genomad:
             {params.db}
         """
 
+rule genomad_regions:
+    input:
+        summary=f"{OUTPUT_DIR}/annotating/genomad/{{mag}}/{{mag}}_summary/{{mag}}_virus_summary.tsv",
+        genes=f"{OUTPUT_DIR}/annotating/genomad/{{mag}}/{{mag}}_summary/{{mag}}_virus_genes.tsv"
+    output:
+        summary=f"{OUTPUT_DIR}/annotating/genomad/{{mag}}_summary.tsv",
+        genes=f"{OUTPUT_DIR}/annotating/genomad/{{mag}}_genes.tsv"
+    params:
+        package_dir={PACKAGE_DIR},
+        min_marker=5,
+        min_score=0.95
+    threads:
+        1
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(1024, int(input.summary.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(5, int(input.summary.size_mb * 100) * 2 ** (attempt - 1))
+    shell:
+        """
+        python {params.package_dir}/workflow/scripts/genomad_regions.py \
+            -s {input.summary} \
+            -g {input.genes} \
+            -o {output.summary} \
+            -G {output.genes} \
+            --min-marker-enrichment {params.min_marker} \
+            --min-virus-score {params.min_score}
+        """
+
 rule merge_cluster_annotations:
     input:
         dbcan=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/cgc_standard_out_summary.tsv",
-        genomad=f"{OUTPUT_DIR}/annotating/genomad/{{mag}}/{{mag}}_summary/{{mag}}_virus_summary.tsv",
+        genomad=f"{OUTPUT_DIR}/annotating/genomad/{{mag}}.tsv",
         antismash=f"{OUTPUT_DIR}/annotating/antismash/{{mag}}.tsv"
     output:
         f"{OUTPUT_DIR}/annotating/final/{{mag}}_clusters.tsv"
