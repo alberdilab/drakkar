@@ -69,6 +69,16 @@ def extract_orf_function(orf: dict) -> str | None:
 
     return "hypothetical protein"
 
+def extract_function_categories(label: str):
+    if not label:
+        return []
+    categories = []
+    for part in str(label).split("+"):
+        head = part.split("|", 1)[0].strip()
+        if head:
+            categories.append(head)
+    return list(dict.fromkeys(categories))
+
 def extract_gene_type(orf: dict) -> str:
     gene_functions = orf.get("gene_functions") or []
     labels = []
@@ -113,12 +123,12 @@ def write_summary(rows, out_csv: Path):
             delimiter="\t",
             fieldnames=[
                 "contig",
-                "type",
-                "substrate",
                 "start",
                 "end",
+                "type",
                 "gene_count",
                 "gene_functions",
+                "substrate",
             ]
         )
         writer.writeheader()
@@ -163,19 +173,23 @@ def main(in_path: str, summary_csv: str, gene_table: str):
             gene_count = len(orfs)
 
             # Count gene function frequencies
-            funcs = [extract_orf_function(o) for o in orfs]
+            funcs = []
+            for o in orfs:
+                annot = extract_orf_function(o) or ""
+                cats = extract_function_categories(annot) or [annot]
+                funcs.extend(cats)
             freq = Counter(funcs)
             # Build annotated list: func[count]
             annotated = [f"{f} [{n}]" for f, n in freq.items()]
 
             summary_rows.append({
                 "contig": contig,
-                "type": "BGC",
-                "substrate": rtype,
                 "start": start,
                 "end": end,
+                "type": "BGC",
                 "gene_count": gene_count,
-                "gene_functions": "; ".join(annotated)
+                "gene_functions": "; ".join(annotated),
+                "substrate": rtype,
             })
 
             for orf in orfs:

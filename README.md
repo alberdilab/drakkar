@@ -116,6 +116,13 @@ Individual assemblies are also conducted on top of the assemblies specified in t
 
 Documentation to be added.
 
+### Annotating
+
+The annotating module 
+
+- Gene annotations
+- Cluster annotations
+
 ### Profiling
 
 Documentation to be added.

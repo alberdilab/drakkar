@@ -96,13 +96,13 @@ def summarize_cgcs(rows, pul_map=None):
 
         summaries.append({
             "contig": contig,
-            "type": type_label,
             "start": start,
             "end": end,
+            "type": type_label,
             "gene_count": len(genes),
             "gene_functions": "; ".join(annotated),
-            "pul_id": pul_id,
             "substrate": substrate,
+            "pul_id": pul_id,
         })
 
     return summaries
@@ -116,13 +116,13 @@ def write_summary(rows, out_path: Path):
             delimiter="\t",
             fieldnames=[
                 "contig",
-                "type",
                 "start",
                 "end",
+                "type",
                 "gene_count",
                 "gene_functions",
-                "pul_id",
                 "substrate",
+                "pul_id",
             ],
         )
         writer.writeheader()
