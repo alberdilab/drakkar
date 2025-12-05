@@ -115,6 +115,14 @@ def resolve_bgc_code(region: dict, contig: str, idx: int) -> str:
             return val.strip()
     return f"{contig}_BGC{idx}"
 
+def restore_bin_caret(contig: str) -> str:
+    if not contig or "^" in contig:
+        return contig
+    m = re.match(r"^(.*_bin\.\d+)(_.*)$", contig)
+    if m:
+        return f"{m.group(1)}^{m.group(2)}"
+    return contig
+
 def write_summary(rows, out_csv: Path):
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     with out_csv.open("w", newline="", encoding="utf-8") as fh:
@@ -161,7 +169,8 @@ def main(in_path: str, summary_csv: str, gene_table: str):
     bgc_index = 1
 
     for rec in records:
-        contig = rec.get("seq_id") or rec.get("contig") or rec.get("record") or ""
+        contig_raw = rec.get("seq_id") or rec.get("contig") or rec.get("record") or ""
+        contig = restore_bin_caret(contig_raw)
         for region in rec.get("regions", []):
             start = region.get("start")
             end = region.get("end")
