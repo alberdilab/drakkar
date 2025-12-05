@@ -18,6 +18,27 @@ def load_cgc(file_path: Path):
         for row in reader:
             yield {k.strip(): (v.strip() if isinstance(v, str) else v) for k, v in row.items()}
 
+def load_substrates(file_path: Path):
+    """
+    Returns mapping of CGC id (e.g., CGC4) to tuple (PULID, substrate).
+    """
+    mapping = {}
+    with file_path.open() as fh:
+        reader = csv.DictReader(fh, delimiter="\t")
+        for row in reader:
+            if not row:
+                continue
+            raw_cgc = row.get("#cgcid") or row.get("cgcid") or row.get("CGC") or ""
+            if not raw_cgc:
+                continue
+            cgc_id = str(raw_cgc).split("|")[-1].strip()
+            if not cgc_id:
+                continue
+            pul_id = (row.get("PULID") or "").strip()
+            substrate = (row.get("dbCAN-PUL substrate") or row.get("substrate") or "").strip()
+            mapping[cgc_id] = (pul_id, substrate)
+    return mapping
+
 def extract_function_categories(label: str):
     if not label:
         return []
@@ -30,7 +51,7 @@ def extract_function_categories(label: str):
     return list(dict.fromkeys(categories))
 
 
-def summarize_cgcs(rows):
+def summarize_cgcs(rows, pul_map=None):
     grouped = defaultdict(list)
     for row in rows:
         cgc_id = row.get("CGC#") or row.get("CGC") or row.get("cgc") or ""
@@ -49,7 +70,18 @@ def summarize_cgcs(rows):
         end = max(ends) if ends else ""
 
         gene_types = [g.get("Gene Type") or "" for g in genes if g.get("Gene Type")]
-        type_label = Counter(gene_types).most_common(1)[0][0] if gene_types else cgc_id
+        type_label = "CGC"
+        pul_id = ""
+        substrate = ""
+        if pul_map:
+            # Match on CGC name (e.g., CGC4)
+            hit = pul_map.get(cgc_id)
+            if hit:
+                type_label = "PUL"
+                pul_id, substrate = hit
+
+        if type_label != "PUL":
+            type_label = "CGC"
 
         annotations = []
         for g in genes:
@@ -69,6 +101,8 @@ def summarize_cgcs(rows):
             "end": end,
             "gene_count": len(genes),
             "gene_functions": "; ".join(annotated),
+            "pul_id": pul_id,
+            "substrate": substrate,
         })
 
     return summaries
@@ -80,7 +114,16 @@ def write_summary(rows, out_path: Path):
         writer = csv.DictWriter(
             fh,
             delimiter="\t",
-            fieldnames=["contig", "type", "start", "end", "gene_count", "gene_functions"],
+            fieldnames=[
+                "contig",
+                "type",
+                "start",
+                "end",
+                "gene_count",
+                "gene_functions",
+                "pul_id",
+                "substrate",
+            ],
         )
         writer.writeheader()
         writer.writerows(rows)
@@ -90,13 +133,15 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Summarize dbCAN cgc_standard_out.tsv into a cluster table.")
     parser.add_argument("-i", "--input", required=True, help="Path to cgc_standard_out.tsv")
     parser.add_argument("-o", "--output", required=True, help="Path to write summary TSV")
+    parser.add_argument("-p", "--puls", help="Path to substrate_prediction.tsv (optional)")
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
     rows = list(load_cgc(Path(args.input)))
-    summary = summarize_cgcs(rows)
+    pul_map = load_substrates(Path(args.puls)) if args.puls else None
+    summary = summarize_cgcs(rows, pul_map=pul_map)
     write_summary(summary, Path(args.output))
     print(f"Wrote {len(summary)} clusters to {args.output}")
 

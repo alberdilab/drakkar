@@ -336,9 +336,10 @@ rule dbcan4:
 
 rule dbcan_summary:
     input:
-        f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/cgc_standard_out.tsv"
+        cgc=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/cgc_standard_out.tsv",
+        substrate=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/substrate_prediction.tsv"
     output:
-        f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}_summary.tsv"
+        f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/cgc_standard_out_summary.tsv"
     threads:
         1
     params:
@@ -351,7 +352,8 @@ rule dbcan_summary:
     shell:
         """
         python {params.package_dir}/workflow/scripts/dbcan_region.py \
-            -i {input} \
+            -i {input.cgc} \
+            -p {input.substrate} \
             -o {output}
         """
 
