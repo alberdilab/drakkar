@@ -111,7 +111,15 @@ def write_summary(rows, out_csv: Path):
         writer = csv.DictWriter(
             fh,
             delimiter="\t",
-            fieldnames=["contig", "type", "start", "end", "gene_count", "gene_functions"]
+            fieldnames=[
+                "contig",
+                "type",
+                "substrate",
+                "start",
+                "end",
+                "gene_count",
+                "gene_functions",
+            ]
         )
         writer.writeheader()
         writer.writerows(rows)
@@ -162,7 +170,8 @@ def main(in_path: str, summary_csv: str, gene_table: str):
 
             summary_rows.append({
                 "contig": contig,
-                "type": rtype,
+                "type": "BGC",
+                "substrate": rtype,
                 "start": start,
                 "end": end,
                 "gene_count": gene_count,
