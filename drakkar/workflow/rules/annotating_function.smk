@@ -442,9 +442,7 @@ rule genomad_regions:
         min_score=0.95
     threads:
         1
-    resources:
-        mem_mb=1024,
-        runtime=15
+    localrule: True
     shell:
         """
         python {params.package_dir}/workflow/scripts/genomad_regions.py \
