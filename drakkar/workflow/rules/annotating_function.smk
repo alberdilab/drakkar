@@ -445,8 +445,8 @@ rule genomad_regions:
     conda:
         f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(1024, int(input.summary.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(5, int(input.summary.size_mb * 100) * 2 ** (attempt - 1))
+        mem_mb=1024,
+        runtime=5
     shell:
         """
         # Set python path to conda environment to avoid conflicts with modules

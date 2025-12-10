@@ -183,7 +183,6 @@ def run_snakemake_annotating(workflow, project_name, annotating_type, output_dir
         f"--conda-prefix {env_path} "
         f"--use-conda "
     ]
-    print(snakemake_command)
     subprocess.run(snakemake_command, shell=False, check=True)
 
 def run_snakemake_inspecting(workflow, project_name, output_dir, env_path, profile):
