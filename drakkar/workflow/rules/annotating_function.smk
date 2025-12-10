@@ -442,17 +442,12 @@ rule genomad_regions:
         min_score=0.95
     threads:
         1
-    conda:
-        f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
     resources:
         mem_mb=1024,
         runtime=15
     shell:
         """
-        # Set python path to conda environment to avoid conflicts with modules
-        PYTHON_BIN="${{CONDA_PREFIX}}/bin/python"
-        echo "INFO Using python from $PYTHON_BIN"
-        $PYTHON_BIN {params.package_dir}/workflow/scripts/genomad_regions.py \
+        python {params.package_dir}/workflow/scripts/genomad_regions.py \
             -s {input.summary} \
             -g {input.genes} \
             -o {output.summary} \
