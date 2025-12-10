@@ -339,7 +339,7 @@ rule dbcan_summary:
         cgc=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/cgc_standard_out.tsv",
         substrate=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/substrate_prediction.tsv"
     output:
-        f"{OUTPUT_DIR}/annotating/dbcan/{{mag,[^/]+}}.tsv"
+        f"{OUTPUT_DIR}/annotating/dbcan/{{mag,[^/]+}}.tsv"  #wildcard modified to avoid recursive loops
     threads:
         1
     params:
@@ -348,7 +348,7 @@ rule dbcan_summary:
         f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
     resources:
         mem_mb=lambda wildcards, input, attempt: max(1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(5, int(input.size_mb * 100) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb * 100) * 2 ** (attempt - 1))
     shell:
         """
         python {params.package_dir}/workflow/scripts/dbcan_region.py \
@@ -395,7 +395,7 @@ rule antismash_regions:
         package_dir={PACKAGE_DIR}
     resources:
         mem_mb=lambda wildcards, input, attempt: max(1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(5, int(input.size_mb * 100) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb * 100) * 2 ** (attempt - 1))
     shell:
         """
         python {params.package_dir}/workflow/scripts/antismash_regions.py \
@@ -434,7 +434,7 @@ rule genomad_regions:
         summary=f"{OUTPUT_DIR}/annotating/genomad/{{mag}}/{{mag}}_summary/{{mag}}_virus_summary.tsv",
         genes=f"{OUTPUT_DIR}/annotating/genomad/{{mag}}/{{mag}}_summary/{{mag}}_virus_genes.tsv"
     output:
-        summary=f"{OUTPUT_DIR}/annotating/genomad/{{mag,[^/]+}}.tsv",
+        summary=f"{OUTPUT_DIR}/annotating/genomad/{{mag,[^/]+}}.tsv", #wildcard modified to avoid recursive loops
         genes=f"{OUTPUT_DIR}/annotating/genomad/{{mag}}_genes.tsv"
     params:
         package_dir={PACKAGE_DIR},
@@ -446,7 +446,7 @@ rule genomad_regions:
         f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
     resources:
         mem_mb=1024,
-        runtime=5
+        runtime=15
     shell:
         """
         # Set python path to conda environment to avoid conflicts with modules
