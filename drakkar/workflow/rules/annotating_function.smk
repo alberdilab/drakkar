@@ -339,7 +339,7 @@ rule dbcan_summary:
         cgc=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/cgc_standard_out.tsv",
         substrate=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/substrate_prediction.tsv"
     output:
-        f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}.tsv"
+        f"{OUTPUT_DIR}/annotating/dbcan/{{mag,[^/]+}}.tsv"
     threads:
         1
     params:
@@ -387,7 +387,7 @@ rule antismash_regions:
     input:
         f"{OUTPUT_DIR}/annotating/antismash/{{mag}}/regions.js"
     output:
-        summary=f"{OUTPUT_DIR}/annotating/antismash/{{mag}}.tsv",
+        summary=f"{OUTPUT_DIR}/annotating/antismash/{{mag,[^/]+}}.tsv",
         genes=f"{OUTPUT_DIR}/annotating/antismash/{{mag}}_genes.tsv"
     threads:
         1
@@ -434,7 +434,7 @@ rule genomad_regions:
         summary=f"{OUTPUT_DIR}/annotating/genomad/{{mag}}/{{mag}}_summary/{{mag}}_virus_summary.tsv",
         genes=f"{OUTPUT_DIR}/annotating/genomad/{{mag}}/{{mag}}_summary/{{mag}}_virus_genes.tsv"
     output:
-        summary=f"{OUTPUT_DIR}/annotating/genomad/{{mag}}.tsv",
+        summary=f"{OUTPUT_DIR}/annotating/genomad/{{mag,[^/]+}}.tsv",
         genes=f"{OUTPUT_DIR}/annotating/genomad/{{mag}}_genes.tsv"
     params:
         package_dir={PACKAGE_DIR},
