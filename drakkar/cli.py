@@ -36,6 +36,19 @@ INFO = "\033[1;34m"
 RESET = "\033[0m"
 
 ###
+# Define helper functions
+###
+
+def normalize_annotation_type(annotation_type):
+    allowed = {"taxonomy", "function"}
+    items = [item.strip() for item in annotation_type.split(",") if item.strip()]
+    invalid = [item for item in items if item not in allowed]
+    if not items or invalid:
+        print(f"{ERROR}ERROR:{RESET} --annotation-type must be 'taxonomy', 'function', or a comma-separated list of those options (e.g. taxonomy,function).")
+        return None
+    return ",".join(items)
+
+###
 # Define workflow launching functions
 ###
 
@@ -238,7 +251,7 @@ def main():
     subparser_complete.add_argument("-r", "--reference", required=False, help="Reference host genome")
     subparser_complete.add_argument("-m", "--mode", required=False, help="Comma-separated list of cataloging modes (e.g. individual,all)")
     subparser_complete.add_argument("-t", "--type", required=False, default="genomes", help="Either genomes or pangenomes profiling type. Default: genomes")
-    subparser_complete.add_argument("--annotation-type", dest="annotation_type", required=False, default="taxonomy,function", help="Taxonomic, functional and/or network annotations (comma-separated). Default: taxonomy,function")
+    subparser_complete.add_argument("--annotation-type", dest="annotation_type", required=False, default="taxonomy,function", help="Taxonomic and/or functional annotations (comma-separated). Default: taxonomy,function")
     subparser_complete.add_argument("--fraction", required=False, action='store_true', help="Calculate microbial fraction using singlem")
     subparser_complete.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_complete.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
@@ -274,7 +287,7 @@ def main():
     subparser_annotating.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa, .fna or .fasta, optionally including .gz) are stored")
     subparser_annotating.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
     subparser_annotating.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
-    subparser_annotating.add_argument("--annotation-type", dest="annotation_type", required=False, default="taxonomy,function", help="Taxonomic, functional and/or network annotations (comma-separated). Default: taxonomy,function")
+    subparser_annotating.add_argument("--annotation-type", dest="annotation_type", required=False, default="taxonomy,function", help="Taxonomic and/or functional annotations (comma-separated). Default: taxonomy,function")
     subparser_annotating.add_argument("-e", "--env_path", type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_annotating.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
@@ -287,12 +300,11 @@ def main():
     subparser_inspecting.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_inspecting.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
-    subparser_expressing = subparsers.add_parser("expressing", help="Run the gene expression workflow")
+    subparser_expressing = subparsers.add_parser("expressing", help="Run the microbial gene expression workflow")
     subparser_expressing.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
     subparser_expressing.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
     subparser_expressing.add_argument("-r", "--reads_dir", required=False, help="Directory in which metagenomic reads are stored")
     subparser_expressing.add_argument("-R", "--reads_file", required=False, help="Sample detail file")
-    subparser_expressing.add_argument("-g", "--host_genome", required=False, help="Text file containing paths to the bins (.fa or .fna)")
     subparser_expressing.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_expressing.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_expressing.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
@@ -366,6 +378,12 @@ def main():
             print(f"jobs are finished or killed before unlocking the working directory.")
             print(f"{INFO}Run 'drakkar unlock' to unlock the working directory{RESET}")
             sys.exit(2)
+
+    if args.command in ("annotating", "complete"):
+        normalized_annotation_type = normalize_annotation_type(args.annotation_type)
+        if not normalized_annotation_type:
+            return
+        args.annotation_type = normalized_annotation_type
 
     ###
     # Preprocessing
