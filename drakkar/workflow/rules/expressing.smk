@@ -160,7 +160,11 @@ rule gzip_gene_counts:
     shell:
         """
         awk -v OFS="\t" -v samples="{params.sample_names}" '
-            NR == 1 {{
+            /^#/ {{
+                print
+                next
+            }}
+            header_done == 0 {{
                 nfixed = 6
                 nsamples = split(samples, names, ",")
                 if (NF != nfixed + nsamples) {{
@@ -170,6 +174,7 @@ rule gzip_gene_counts:
                 for (i = 1; i <= nsamples; i++) {{
                     $(nfixed + i) = names[i]
                 }}
+                header_done = 1
             }}
             {{ print }}
         ' {input} | gzip -c > {output}
