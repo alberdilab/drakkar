@@ -49,7 +49,14 @@ rule merge_metagenome:
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 1024 * 50) * 2 ** (attempt - 1))
     shell:
         """
-        cat {input} > {output}
+        : > {output}
+        for fasta in {input}; do
+            if [[ "$fasta" == *.gz ]]; then
+                gzip -dc "$fasta" >> {output}
+            else
+                cat "$fasta" >> {output}
+            fi
+        done
         """
 
 rule merge_metagenome_gff:
