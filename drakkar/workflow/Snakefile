@@ -243,6 +243,6 @@ if WORKFLOW == "expressing":
 
     rule all:
         input:
-            f"{OUTPUT_DIR}/expressing/gene_counts.tsv.gz"
+            f"{OUTPUT_DIR}/expressing/gene_counts.tsv.xz"
 
     include: "rules/expressing.smk"

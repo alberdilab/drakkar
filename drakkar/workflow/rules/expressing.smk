@@ -150,7 +150,7 @@ rule gzip_gene_counts:
     input:
         f"{OUTPUT_DIR}/expressing/featurecounts/counts.tsv"
     output:
-        f"{OUTPUT_DIR}/expressing/gene_counts.tsv.gz"
+        f"{OUTPUT_DIR}/expressing/gene_counts.tsv.xz"
     params:
         sample_names=",".join(samples)
     threads: 1
@@ -177,5 +177,5 @@ rule gzip_gene_counts:
                 header_done = 1
             }}
             {{ print }}
-        ' {input} | gzip -c > {output}
+        ' {input} | xz -c > {output}
         """
