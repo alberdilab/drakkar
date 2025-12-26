@@ -145,3 +145,32 @@ rule quantify:
         module load {params.subread_module}
         featureCounts {params.extra} -a {input.annotation} -o {output.counts} {input.bams}
         """
+
+rule gzip_gene_counts:
+    input:
+        f"{OUTPUT_DIR}/expressing/featurecounts/counts.tsv"
+    output:
+        f"{OUTPUT_DIR}/expressing/gene_counts.tsv.gz"
+    params:
+        sample_names=",".join(samples)
+    threads: 1
+    resources:
+        mem_mb=128,
+        runtime=5
+    shell:
+        """
+        awk -v OFS="\t" -v samples="{params.sample_names}" '
+            NR == 1 {{
+                nfixed = 6
+                nsamples = split(samples, names, ",")
+                if (NF != nfixed + nsamples) {{
+                    print "ERROR: featureCounts header columns do not match sample list." > "/dev/stderr"
+                    exit 1
+                }}
+                for (i = 1; i <= nsamples; i++) {{
+                    $(nfixed + i) = names[i]
+                }}
+            }}
+            {{ print }}
+        ' {input} | gzip -c > {output}
+        """
