@@ -73,15 +73,15 @@ rule merge_metagenome_gff:
         : > {output}
         for gff in {input}; do
             awk -v OFS="\t" '
-                /^#/ { print; next }
-                $0 ~ /\t/ {
+                /^#/ {{ print; next }}
+                $0 ~ /\t/ {{
                     contig=$1
-                    if ($9 ~ /ID=[^;]+/) {
+                    if ($9 ~ /ID=[^;]+/) {{
                         id=contig "_" ++count[contig]
                         sub(/ID=[^;]+/, "ID=" id, $9)
-                    }
+                    }}
                     print
-                }
+                }}
             ' "$gff" >> {output}
         done
         """
