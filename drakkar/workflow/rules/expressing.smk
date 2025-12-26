@@ -70,7 +70,20 @@ rule merge_metagenome_gff:
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 1024 * 50) * 2 ** (attempt - 1))
     shell:
         """
-        cat {input} > {output}
+        : > {output}
+        for gff in {input}; do
+            awk -v OFS="\t" '
+                /^#/ { print; next }
+                $0 ~ /\t/ {
+                    contig=$1
+                    if ($9 ~ /ID=[^;]+/) {
+                        id=contig "_" ++count[contig]
+                        sub(/ID=[^;]+/, "ID=" id, $9)
+                    }
+                    print
+                }
+            ' "$gff" >> {output}
+        done
         """
 
 rule index_metagenome:
