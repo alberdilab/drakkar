@@ -155,7 +155,7 @@ rule gzip_gene_counts:
         sample_names=",".join(samples)
     threads: 1
     resources:
-        mem_mb=128,
+        mem_mb=8 * 1024,
         runtime=5
     shell:
         """
