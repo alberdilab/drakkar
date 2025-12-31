@@ -180,15 +180,15 @@ def check_reference_columns(file_path):
     return True
 
 def check_assembly_column(file_path):
-    """Checks if a file contains the column 'assembly' with non-NA values."""
+    """Checks if a file contains the column 'coassembly' with non-NA values."""
     # Read the file (assumed to be TSV, change sep="," for CSV)
     df = pd.read_csv(file_path, sep="\t")
     # Check if required columns exist
-    required_columns = {"assembly"}
+    required_columns = {"coassembly"}
     if not required_columns.issubset(df.columns):
         return False
     # Check if both columns have at least one non-NA value
-    if df["assembly"].dropna().empty:
+    if df["coassembly"].dropna().empty:
         return False
     return True
 
@@ -201,9 +201,27 @@ def file_samples_to_json(infofile, output):
     SAMPLE_TO_READS2 = defaultdict(list)
 
     # Populate the dictionaries
-    for _, row in df.iterrows():
-        SAMPLE_TO_READS1[row["sample"]].append(str(Path(row["rawreads1"]).resolve()))
-        SAMPLE_TO_READS2[row["sample"]].append(str(Path(row["rawreads2"]).resolve()))
+    for idx, row in df.iterrows():
+        sample = row.get("sample")
+        rawreads1 = row.get("rawreads1")
+        rawreads2 = row.get("rawreads2")
+
+        for column, value in (("sample", sample), ("rawreads1", rawreads1), ("rawreads2", rawreads2)):
+            if pd.isna(value) or str(value).strip() == "":
+                print(f"ERROR: Missing value in column '{column}' on row {idx + 1} of the sample info file.")
+                sys.exit(1)
+
+        rawreads1_path = str(Path(str(rawreads1)).resolve())
+        rawreads2_path = str(Path(str(rawreads2)).resolve())
+        if not os.path.exists(rawreads1_path):
+            print(f"ERROR: rawreads1 file not found on row {idx + 1}: {rawreads1_path}")
+            sys.exit(1)
+        if not os.path.exists(rawreads2_path):
+            print(f"ERROR: rawreads2 file not found on row {idx + 1}: {rawreads2_path}")
+            sys.exit(1)
+
+        SAMPLE_TO_READS1[str(sample)].append(rawreads1_path)
+        SAMPLE_TO_READS2[str(sample)].append(rawreads2_path)
 
     # Convert defaultdict to standard dict (optional)
     SAMPLE_TO_READS1 = dict(SAMPLE_TO_READS1)
@@ -352,12 +370,18 @@ def file_assemblies_to_json(infofile=None, samples=None, individual=False, all=F
 
     if infofile is not None:
         df = pd.read_csv(infofile, sep="\t")
-        for _, row in df.iterrows():
-            sample = row['sample']
-            assembly_list = row['assembly'].split(',')
+        if "coassembly" in df.columns:
+            for _, row in df.iterrows():
+                sample = row["sample"]
+                coassembly_value = row["coassembly"]
+                if pd.isna(coassembly_value) or str(coassembly_value).strip() == "":
+                    continue
+                assembly_list = str(coassembly_value).split(",")
 
-            for assembly in assembly_list:
-                assemblies[assembly].append(sample)
+                for assembly in assembly_list:
+                    assembly = assembly.strip()
+                    if assembly:
+                        assemblies[assembly].append(sample)
 
     if samples:
         if individual:
@@ -372,6 +396,37 @@ def file_assemblies_to_json(infofile=None, samples=None, individual=False, all=F
     os.makedirs(f"{output}/data", exist_ok=True)
     with open(f"{output}/data/assembly_to_samples.json", "w") as f:
         json.dump(ASSEMBLY_TO_SAMPLE, f)
+
+def file_coverages_to_json(infofile=None, samples=None, output=False):
+
+    coverage_groups = defaultdict(list)
+    has_coverage_column = False
+
+    if infofile is not None:
+        df = pd.read_csv(infofile, sep="\t")
+        if "coverage" in df.columns:
+            has_coverage_column = True
+            for _, row in df.iterrows():
+                sample = row["sample"]
+                coverage_value = row["coverage"]
+                if pd.isna(coverage_value) or str(coverage_value).strip() == "":
+                    coverage_value = sample
+                for group in str(coverage_value).split(","):
+                    group = group.strip()
+                    if group:
+                        coverage_groups[group].append(sample)
+
+    if not has_coverage_column and samples:
+        coverage_groups["all"].extend(samples)
+
+    COVERAGE_TO_SAMPLES = {
+        key: sorted(set(value)) for key, value in coverage_groups.items()
+    }
+
+    os.makedirs(f"{output}/data", exist_ok=True)
+    with open(f"{output}/data/coverage_to_samples.json", "w") as f:
+        json.dump(COVERAGE_TO_SAMPLES, f)
+    return has_coverage_column
 
 # Create dictionary of bin names and paths from the input file
 def file_bins_to_json(paths_file=None, output=False):

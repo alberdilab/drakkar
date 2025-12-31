@@ -79,21 +79,25 @@ Metagenomic reads are mapped to the host genome, individual assemblies as well a
 
 ### With sample info file
 
-|sample|rawreads1|rawreads2|reference_name|reference_path|assembly|
-|---|---|---|---|---|---|
-|sample1|path/sample1_1.fq.gz|path/sample1_2.fq.gz|ref1|path/ref1.fna|assembly1,all|
-|sample1|path/sample1_1.fq.gz|path/sample1_2.fq.gz|ref1|path/ref1.fna|assembly1,all|
-|sample2|path/sample2_1.fq.gz|path/sample2_2.fq.gz|ref1|path/ref1.fna|assembly2,all|
-|sample3|path/sample3_1.fq.gz|path/sample3_2.fq.gz|ref2|path/ref2.fna|assembly2,all|
-|sample4|path/sample4_1.fq.gz|path/sample4_2.fq.gz|ref2|path/ref2.fna|assembly2,all|
-|sample4|path/sample4_1.fq.gz|path/sample4_2.fq.gz|ref2|path/ref2.fna|assembly2,all|
+|sample|rawreads1|rawreads2|reference_name|reference_path|coassembly|coverage|
+|---|---|---|---|---|---|---|
+|sample1|path/sample1_1.fq.gz|path/sample1_2.fq.gz|ref1|path/ref1.fna|assembly1,all|coverage1|
+|sample1|path/sample1_1.fq.gz|path/sample1_2.fq.gz|ref1|path/ref1.fna|assembly1,all|coverage1|
+|sample2|path/sample2_1.fq.gz|path/sample2_2.fq.gz|ref1|path/ref1.fna|assembly2,all|coverage2|
+|sample3|path/sample3_1.fq.gz|path/sample3_2.fq.gz|ref2|path/ref2.fna|assembly2,all|coverage2|
+|sample4|path/sample4_1.fq.gz|path/sample4_2.fq.gz|ref2|path/ref2.fna|assembly2,all|coverage2|
+|sample4|path/sample4_1.fq.gz|path/sample4_2.fq.gz|ref2|path/ref2.fna|assembly2,all|coverage2|
 
 #### Minimum usage
-
-```
-drakkar complete -f {info_file} -o {output_path}
-```
 All the required information is extracted from the sample info file.
+
+Assembly and coverage behavior:
+- The sample info file columns are optional unless a workflow uses them.
+- The `coassembly` column defines which co-assemblies are built; each label groups samples whose reads are combined for assembly.
+- Individual assemblies can be enabled with `-m individual`, creating one assembly per sample in addition to any co-assemblies.
+- If `--multicoverage` is selected, samples that share the same value in the `coverage` column are mapped to each other's individual assemblies to compute coverage for binning.
+- Co-assemblies are not compatible with `--multicoverage`; they already use coverage from the samples used to build the assembly.
+- If the `coverage` column is absent or no sample info file is used, all samples are mapped to all assemblies.
 
 #### Minimum usage
 
@@ -126,3 +130,7 @@ The annotating module
 ### Profiling
 
 Documentation to be added.
+
+### Expressing
+
+The **Expressing** module uses metatranscriptomics reads to map them against annotated genes of a MAG catalogue.

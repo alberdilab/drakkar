@@ -48,6 +48,19 @@ def normalize_annotation_type(annotation_type):
         return None
     return ",".join(items)
 
+def validate_path(path_value, label, expect_dir=False):
+    if not path_value:
+        return True
+    if expect_dir:
+        exists = os.path.isdir(path_value)
+    else:
+        exists = os.path.exists(path_value)
+    if not exists:
+        kind = "directory" if expect_dir else "path"
+        print(f"{ERROR}ERROR:{RESET} {label} {kind} not found: {path_value}")
+        return False
+    return True
+
 ###
 # Define workflow launching functions
 ###
@@ -252,6 +265,7 @@ def main():
     subparser_complete.add_argument("-m", "--mode", required=False, help="Comma-separated list of cataloging modes (e.g. individual,all)")
     subparser_complete.add_argument("-t", "--type", required=False, default="genomes", help="Either genomes or pangenomes profiling type. Default: genomes")
     subparser_complete.add_argument("--annotation-type", dest="annotation_type", required=False, default="taxonomy,function", help="Taxonomic and/or functional annotations (comma-separated). Default: taxonomy,function")
+    subparser_complete.add_argument("-c", "--multicoverage", action="store_true", help="Map samples sharing the same coverage group to each other's individual assemblies")
     subparser_complete.add_argument("--fraction", required=False, action='store_true', help="Calculate microbial fraction using singlem")
     subparser_complete.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_complete.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
@@ -269,6 +283,7 @@ def main():
     subparser_cataloging.add_argument("-f", "--file", required=False, help="Sample detail file (required if no input directory is provided)")
     subparser_cataloging.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_cataloging.add_argument("-m", "--mode", required=False, help="Comma-separated list of cataloging modes (e.g. individual,all)")
+    subparser_cataloging.add_argument("-c", "--multicoverage", action="store_true", help="Map samples sharing the same coverage group to each other's individual assemblies")
     subparser_cataloging.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_cataloging.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
@@ -328,6 +343,20 @@ def main():
 
     # Check screen session
     check_screen_session()
+
+    path_checks = [
+        (args.input, "Input", True),
+        (args.file, "Sample detail file", False),
+        (getattr(args, "bins_dir", None), "Bins directory", True),
+        (getattr(args, "bins_file", None), "Bins file", False),
+        (getattr(args, "reads_dir", None), "Reads directory", True),
+        (getattr(args, "reads_file", None), "Reads file", False),
+        (getattr(args, "reference", None), "Reference", False),
+        (getattr(args, "cov_file", None), "Coverage file", False),
+    ]
+    for path_value, label, expect_dir in path_checks:
+        if not validate_path(path_value, label, expect_dir):
+            return
 
     ###
     # Declare environment directory
@@ -506,6 +535,19 @@ def main():
                 INDIVIDUAL_MODE=True
 
         file_assemblies_to_json(args.file,samples,INDIVIDUAL_MODE,ALL_MODE,args.output)
+
+        if args.multicoverage:
+            with open(f"{args.output}/data/assembly_to_samples.json", "r") as f:
+                assembly_to_samples = json.load(f)
+            if any(len(group_samples) > 1 for group_samples in assembly_to_samples.values()):
+                print(f"{ERROR}ERROR:{RESET} --multicoverage is not compatible with co-assemblies.")
+                print("Co-assemblies already use coverage from the samples used to build the assembly.")
+                return
+            has_coverage = file_coverages_to_json(args.file, samples, args.output)
+            if has_coverage:
+                print("Coverage groups loaded from the sample info file.")
+            else:
+                print("No coverage information provided; all samples will be mapped against all assemblies.")
 
         run_snakemake_cataloging("cataloging", project_name, Path(args.output).resolve(), env_path, args.profile)
 

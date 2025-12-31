@@ -102,7 +102,7 @@ rule assembly_map_depth:
     input:
         lambda wildcards: [
             f"{OUTPUT_DIR}/cataloging/bowtie2/{wildcards.assembly}/{sample}.bam"
-            for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]
+            for sample in ASSEMBLY_TO_COVERAGE_SAMPLES[wildcards.assembly]
         ]
     output:
         metabat2=f"{OUTPUT_DIR}/cataloging/bowtie2/{{assembly}}_metabat.depth",
@@ -195,7 +195,7 @@ rule semibin2:
         assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}.fna",
         bam=lambda wildcards: [
             f"{OUTPUT_DIR}/cataloging/bowtie2/{wildcards.assembly}/{sample}.bam"
-            for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]
+            for sample in ASSEMBLY_TO_COVERAGE_SAMPLES[wildcards.assembly]
             ]
     output:
         f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/contig_bins.tsv"
