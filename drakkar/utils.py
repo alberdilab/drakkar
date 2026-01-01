@@ -22,8 +22,10 @@ def download_to_cache(url, sample_name, column_name, output):
     filename = f"{sample_name}_{basename}" if sample_name else basename
     dest_path = os.path.join(cache_dir, filename)
     if os.path.exists(dest_path) and os.path.getsize(dest_path) > 0:
+        print(f"Using cached {column_name} for {sample_name}: {dest_path}", flush=True)
         return dest_path
 
+    print(f"Downloading {column_name} for {sample_name} from {url}", flush=True)
     tmp_path = f"{dest_path}.tmp"
     try:
         with urlopen(url) as response, open(tmp_path, "wb") as handle:
@@ -34,6 +36,7 @@ def download_to_cache(url, sample_name, column_name, output):
         print(f"ERROR: Failed to download {url}: {exc}")
         sys.exit(1)
     os.replace(tmp_path, dest_path)
+    print(f"Saved {column_name} for {sample_name} to {dest_path}", flush=True)
     return dest_path
 
 def display_drakkar():
