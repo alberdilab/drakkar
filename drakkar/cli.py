@@ -345,8 +345,8 @@ def main():
     check_screen_session()
 
     path_checks = [
-        (args.input, "Input", True),
-        (args.file, "Sample detail file", False),
+        (getattr(args, "input", None), "Input", True),
+        (getattr(args, "file", None), "Sample detail file", False),
         (getattr(args, "bins_dir", None), "Bins directory", True),
         (getattr(args, "bins_file", None), "Bins file", False),
         (getattr(args, "reads_dir", None), "Reads directory", True),
