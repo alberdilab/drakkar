@@ -4,8 +4,37 @@ import yaml
 import re
 import json
 import pandas as pd
+import shutil
+from urllib.parse import urlparse
+from urllib.request import urlopen
 from pathlib import Path
 from collections import defaultdict
+
+def is_url(value):
+    parsed = urlparse(str(value))
+    return parsed.scheme in {"http", "https", "ftp"}
+
+def download_to_cache(url, sample_name, column_name, output):
+    cache_dir = os.path.join(output, "data", "reads_cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    parsed = urlparse(url)
+    basename = os.path.basename(parsed.path) or f"{sample_name}_{column_name}"
+    filename = f"{sample_name}_{basename}" if sample_name else basename
+    dest_path = os.path.join(cache_dir, filename)
+    if os.path.exists(dest_path) and os.path.getsize(dest_path) > 0:
+        return dest_path
+
+    tmp_path = f"{dest_path}.tmp"
+    try:
+        with urlopen(url) as response, open(tmp_path, "wb") as handle:
+            shutil.copyfileobj(response, handle)
+    except Exception as exc:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        print(f"ERROR: Failed to download {url}: {exc}")
+        sys.exit(1)
+    os.replace(tmp_path, dest_path)
+    return dest_path
 
 def display_drakkar():
     ascii_ship = r"""
@@ -211,17 +240,28 @@ def file_samples_to_json(infofile, output):
                 print(f"ERROR: Missing value in column '{column}' on row {idx + 1} of the sample info file.")
                 sys.exit(1)
 
-        rawreads1_path = str(Path(str(rawreads1)).resolve())
-        rawreads2_path = str(Path(str(rawreads2)).resolve())
-        if not os.path.exists(rawreads1_path):
-            print(f"ERROR: rawreads1 file not found on row {idx + 1}: {rawreads1_path}")
-            sys.exit(1)
-        if not os.path.exists(rawreads2_path):
-            print(f"ERROR: rawreads2 file not found on row {idx + 1}: {rawreads2_path}")
-            sys.exit(1)
+        sample_name = str(sample)
+        rawreads1_value = str(rawreads1)
+        rawreads2_value = str(rawreads2)
 
-        SAMPLE_TO_READS1[str(sample)].append(rawreads1_path)
-        SAMPLE_TO_READS2[str(sample)].append(rawreads2_path)
+        if is_url(rawreads1_value):
+            rawreads1_path = download_to_cache(rawreads1_value, sample_name, "rawreads1", output)
+        else:
+            rawreads1_path = str(Path(rawreads1_value).resolve())
+            if not os.path.exists(rawreads1_path):
+                print(f"ERROR: rawreads1 file not found on row {idx + 1}: {rawreads1_path}")
+                sys.exit(1)
+
+        if is_url(rawreads2_value):
+            rawreads2_path = download_to_cache(rawreads2_value, sample_name, "rawreads2", output)
+        else:
+            rawreads2_path = str(Path(rawreads2_value).resolve())
+            if not os.path.exists(rawreads2_path):
+                print(f"ERROR: rawreads2 file not found on row {idx + 1}: {rawreads2_path}")
+                sys.exit(1)
+
+        SAMPLE_TO_READS1[sample_name].append(rawreads1_path)
+        SAMPLE_TO_READS2[sample_name].append(rawreads2_path)
 
     # Convert defaultdict to standard dict (optional)
     SAMPLE_TO_READS1 = dict(SAMPLE_TO_READS1)
@@ -310,9 +350,38 @@ def file_preprocessed_to_json(infofile, output):
     SAMPLE_TO_READS2 = defaultdict(list)
 
     # Populate the dictionaries
-    for _, row in df.iterrows():
-        SAMPLE_TO_READS1[row["sample"]].append(str(Path(row["rawreads1"]).resolve()))
-        SAMPLE_TO_READS2[row["sample"]].append(str(Path(row["rawreads2"]).resolve()))
+    for idx, row in df.iterrows():
+        sample = row.get("sample")
+        rawreads1 = row.get("rawreads1")
+        rawreads2 = row.get("rawreads2")
+
+        for column, value in (("sample", sample), ("rawreads1", rawreads1), ("rawreads2", rawreads2)):
+            if pd.isna(value) or str(value).strip() == "":
+                print(f"ERROR: Missing value in column '{column}' on row {idx + 1} of the sample info file.")
+                sys.exit(1)
+
+        sample_name = str(sample)
+        rawreads1_value = str(rawreads1)
+        rawreads2_value = str(rawreads2)
+
+        if is_url(rawreads1_value):
+            rawreads1_path = download_to_cache(rawreads1_value, sample_name, "rawreads1", output)
+        else:
+            rawreads1_path = str(Path(rawreads1_value).resolve())
+            if not os.path.exists(rawreads1_path):
+                print(f"ERROR: rawreads1 file not found on row {idx + 1}: {rawreads1_path}")
+                sys.exit(1)
+
+        if is_url(rawreads2_value):
+            rawreads2_path = download_to_cache(rawreads2_value, sample_name, "rawreads2", output)
+        else:
+            rawreads2_path = str(Path(rawreads2_value).resolve())
+            if not os.path.exists(rawreads2_path):
+                print(f"ERROR: rawreads2 file not found on row {idx + 1}: {rawreads2_path}")
+                sys.exit(1)
+
+        SAMPLE_TO_READS1[sample_name].append(rawreads1_path)
+        SAMPLE_TO_READS2[sample_name].append(rawreads2_path)
 
     # Convert defaultdict to standard dict (optional)
     SAMPLE_TO_READS1 = dict(SAMPLE_TO_READS1)
