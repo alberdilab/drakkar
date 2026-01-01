@@ -27,8 +27,8 @@ CHECKM2_DB = config["CHECKM2_DB"]
 
 rule assembly:
     input:
-        r1=lambda wildcards: [f"{OUTPUT_DIR}/preprocessing/final/{sample}_1.fq.gz" for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]],
-        r2=lambda wildcards: [f"{OUTPUT_DIR}/preprocessing/final/{sample}_2.fq.gz" for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly]]
+        r1=lambda wildcards: [path for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly] for path in PREPROCESSED_TO_READS1[sample]],
+        r2=lambda wildcards: [path for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly] for path in PREPROCESSED_TO_READS2[sample]]
     output:
         f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}.fna"
     params:
@@ -79,8 +79,8 @@ rule assembly_index:
 rule assembly_map:
     input:
         index=lambda wildcards: f"{OUTPUT_DIR}/cataloging/megahit/{wildcards.assembly}/{wildcards.assembly}.rev.2.bt2",
-        r1=lambda wildcards: f"{OUTPUT_DIR}/preprocessing/final/{wildcards.sample}_1.fq.gz",
-        r2=lambda wildcards: f"{OUTPUT_DIR}/preprocessing/final/{wildcards.sample}_2.fq.gz"
+        r1=lambda wildcards: PREPROCESSED_TO_READS1[wildcards.sample],
+        r2=lambda wildcards: PREPROCESSED_TO_READS2[wildcards.sample]
     output:
         f"{OUTPUT_DIR}/cataloging/bowtie2/{{assembly}}/{{sample}}.bam"
     params:
@@ -95,7 +95,9 @@ rule assembly_map:
     shell:
         """
         module load {params.bowtie2_module} {params.samtools_module}
-        bowtie2 -x {params.basename} -1 {input.r1} -2 {input.r2} | samtools view -bS - | samtools sort -o {output}
+        R1_FILES=$(echo {input.r1} | tr ' ' ',')
+        R2_FILES=$(echo {input.r2} | tr ' ' ',')
+        bowtie2 -x {params.basename} -1 $R1_FILES -2 $R2_FILES | samtools view -bS - | samtools sort -o {output}
         """
 
 rule assembly_map_depth:

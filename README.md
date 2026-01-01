@@ -93,6 +93,7 @@ All the required information is extracted from the sample info file.
 
 Assembly and coverage behavior:
 - The sample info file columns are optional unless a workflow uses them.
+- Input read files can be local paths or remote URLs (http/https/ftp).
 - The `coassembly` column defines which co-assemblies are built; each label groups samples whose reads are combined for assembly.
 - Individual assemblies can be enabled with `-m individual`, creating one assembly per sample in addition to any co-assemblies.
 - If `--multicoverage` is selected, samples that share the same value in the `coverage` column are mapped to each other's individual assemblies to compute coverage for binning.

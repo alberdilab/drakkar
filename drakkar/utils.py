@@ -21,7 +21,7 @@ def download_to_cache(url, sample_name, column_name, output):
     basename = os.path.basename(parsed.path) or f"{sample_name}_{column_name}"
     filename = f"{sample_name}_{basename}" if sample_name else basename
     dest_path = os.path.join(cache_dir, filename)
-    if os.path.exists(dest_path) and os.path.getsize(dest_path) > 0:
+    if os.path.exists(dest_path):
         print(f"Using cached {column_name} for {sample_name}: {dest_path}", flush=True)
         return dest_path
 
