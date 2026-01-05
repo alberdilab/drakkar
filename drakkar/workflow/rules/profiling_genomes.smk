@@ -11,6 +11,7 @@ SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 COVERM_MODULE = config["COVERM_MODULE"]
 MASH_MODULE = config["MASH_MODULE"]
 SINGLEM_MODULE = config["SINGLEM_MODULE"]
+DREP_ANI = float(config.get("DREP_ANI", 0.98))
 
 # Annotation databases
 SINGLEM_DB = config["SINGLEM_DB"]
@@ -29,7 +30,8 @@ checkpoint dereplicate:
         drep_module={DREP_MODULE},
         mash_module={MASH_MODULE},
         metadata=f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv",
-        outdir=f"{OUTPUT_DIR}/profiling_genomes/drep/"
+        outdir=f"{OUTPUT_DIR}/profiling_genomes/drep/",
+        ani={DREP_ANI}
     threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
@@ -41,10 +43,10 @@ checkpoint dereplicate:
         rm -rf {params.outdir}
         if [ -f "{params.metadata}" ]; then
             # Using existing completeness information
-            dRep dereplicate {params.outdir} -p {threads} -g {input.genomes} -sa 0.98 --genomeInfo {params.metadata}
+            dRep dereplicate {params.outdir} -p {threads} -g {input.genomes} -sa {params.ani} --genomeInfo {params.metadata}
         else
             # Generate completeness information
-            dRep dereplicate {params.outdir} -p {threads} -g {input.genomes} -sa 0.98
+            dRep dereplicate {params.outdir} -p {threads} -g {input.genomes} -sa {params.ani}
         fi
 
         # rename headers in every .fa under dereplicated_genomes/
