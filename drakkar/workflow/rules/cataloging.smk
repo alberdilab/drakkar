@@ -72,13 +72,19 @@ rule assembly_index:
     message: "Indexing assembly {wildcards.assembly}..."
     shell:
         """
-        module load {params.bowtie2_module}
-        bowtie2-build {input} {params.basename}
+        if [ ! -s {input} ]; then
+            echo "Assembly is empty, skipping bowtie2-build..."
+            touch {output.index}
+        else
+            module load {params.bowtie2_module}
+            bowtie2-build {input} {params.basename}
+        fi
         """
 
 rule assembly_map:
     input:
         index=lambda wildcards: f"{OUTPUT_DIR}/cataloging/megahit/{wildcards.assembly}/{wildcards.assembly}.rev.2.bt2",
+        assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}.fna",
         r1=lambda wildcards: PREPROCESSED_TO_READS1[wildcards.sample],
         r2=lambda wildcards: PREPROCESSED_TO_READS2[wildcards.sample]
     output:
@@ -94,15 +100,22 @@ rule assembly_map:
     message: "Mapping {wildcards.sample} reads to assembly {wildcards.assembly}..."
     shell:
         """
-        module load {params.bowtie2_module} {params.samtools_module}
-        R1_FILES=$(echo {input.r1} | tr ' ' ',')
-        R2_FILES=$(echo {input.r2} | tr ' ' ',')
-        bowtie2 -x {params.basename} -1 $R1_FILES -2 $R2_FILES | samtools view -bS - | samtools sort -o {output}
+        if [ ! -s {input.assembly} ]; then
+            echo "Assembly is empty, skipping mapping..."
+            mkdir -p $(dirname {output})
+            touch {output}
+        else
+            module load {params.bowtie2_module} {params.samtools_module}
+            R1_FILES=$(echo {input.r1} | tr ' ' ',')
+            R2_FILES=$(echo {input.r2} | tr ' ' ',')
+            bowtie2 -x {params.basename} -1 $R1_FILES -2 $R2_FILES | samtools view -bS - | samtools sort -o {output}
+        fi
         """
 
 rule assembly_map_depth:
     input:
-        lambda wildcards: [
+        assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}.fna",
+        bams=lambda wildcards: [
             f"{OUTPUT_DIR}/cataloging/bowtie2/{wildcards.assembly}/{sample}.bam"
             for sample in ASSEMBLY_TO_COVERAGE_SAMPLES[wildcards.assembly]
         ]
@@ -118,9 +131,15 @@ rule assembly_map_depth:
     message: "Calculating mapping states of assembly {wildcards.assembly}..."
     shell:
         """
-        module load {params.metabat2_module}
-        jgi_summarize_bam_contig_depths --outputDepth {output.metabat2} {input}
-        cut -f1,3 {output.metabat2} | tail -n+2 > {output.maxbin2}
+        if [ ! -s {input.assembly} ]; then
+            echo "Assembly is empty, skipping depth calculation..."
+            mkdir -p $(dirname {output.metabat2})
+            touch {output.metabat2} {output.maxbin2}
+        else
+            module load {params.metabat2_module}
+            jgi_summarize_bam_contig_depths --outputDepth {output.metabat2} {input.bams}
+            cut -f1,3 {output.metabat2} | tail -n+2 > {output.maxbin2}
+        fi
         """
 
 rule metabat2:
@@ -138,8 +157,14 @@ rule metabat2:
     message: "Binning contigs from assembly {wildcards.assembly} using metabat2..."
     shell:
         """
-        module load {params.metabat2_module}
-        metabat2 -i {input.assembly} -a {input.depth} -o {output} -m 1500 --saveCls --noBinOut
+        if [ ! -s {input.assembly} ]; then
+            echo "Assembly is empty, skipping metabat2..."
+            mkdir -p $(dirname {output})
+            touch {output}
+        else
+            module load {params.metabat2_module}
+            metabat2 -i {input.assembly} -a {input.depth} -o {output} -m 1500 --saveCls --noBinOut
+        fi
         """
 
 rule maxbin2:
@@ -162,6 +187,7 @@ rule maxbin2:
         """
         if (( {params.assembly_size_mb} < 10 )); then
             echo "Assembly is smaller than 10 MB, skipping maxbin2..."
+            mkdir -p $(dirname {output})
             touch {output}
         else
             MODULEPATH=/opt/shared_software/shared_envmodules/modules:$MODULEPATH \
@@ -216,6 +242,7 @@ rule semibin2:
         """
         if (( {params.assembly_size_mb} < 10 )); then
             echo "Assembly is smaller than 10 MB, skipping semibin2..."
+            mkdir -p {params.outdir}
             touch {output}
         else
             module load {params.semibin2_module} {params.bedtools_module} {params.hmmer_module}
@@ -289,10 +316,13 @@ checkpoint binette:
             VALID_TSV_FILES="$VALID_TSV_FILES $SEMIBIN2"
         fi
 
+        mkdir -p {params.outdir}
+
         # Ensure at least one valid TSV file exists
         if [ -z "$VALID_TSV_FILES" ]; then
-            echo "Error: No valid TSV input files for binette." >&2
-            exit 1
+            echo "No valid TSV input files for binette, skipping..."
+            printf "bin_id\tcompleteness\tcontamination\tscore\tsize\tN50\tcontig_count\n" > {output}
+            exit 0
         fi
 
         # Run binette only with non-empty TSV files
