@@ -31,7 +31,12 @@ drakkar profiling {arguments}
 
 * **Expressing**: conducts gene expression analysis.
 ```
-drakkar profiling {arguments}
+drakkar expressing {arguments}
+```
+
+* **Dereplicating**: dereplicates bins with dRep without read mapping.
+```
+drakkar dereplicating {arguments}
 ```
 
 ## Complete mode
@@ -119,19 +124,32 @@ Individual assemblies are also conducted on top of the assemblies specified in t
 
 ### Cataloging
 
-Documentation to be added.
+- Assembles reads into contigs and bins them into MAGs.
+- Supports individual assemblies, co-assemblies, and multicoverage mapping.
+- Produces bin FASTA files, bin metadata, and assembly summaries.
 
 ### Annotating
 
-The annotating module 
-
-- Gene annotations
-- Cluster annotations
+- Annotates dereplicated MAGs with taxonomic and functional labels.
+- Generates per-genome annotations and summary tables.
+- Can run taxonomy, function, or both via `--annotation-type`.
 
 ### Profiling
 
-Documentation to be added.
+- Dereplicates MAGs to create a non-redundant reference set.
+- Maps reads to the dereplicated genome catalogue to quantify abundance.
+- Optionally computes microbial fraction with singlem.
+
+### Dereplicating
+
+A subset of the profiling module.
+
+- Runs only the dereplication step from profiling.
+- Outputs dereplicated genomes to `dereplicating/final`.
+- Useful when reads are unavailable or mapping is not needed.
 
 ### Expressing
 
 The **Expressing** module uses metatranscriptomics reads to map them against annotated genes of a MAG catalogue.
+
+

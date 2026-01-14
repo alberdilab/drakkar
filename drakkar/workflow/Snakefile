@@ -219,6 +219,19 @@ if WORKFLOW == "profiling":
     if "pangenomes" in PROFILING_TYPE:
         include: "rules/profiling_pangenomes.smk"
 
+if WORKFLOW == "dereplicating":
+
+    with open(f"{OUTPUT_DIR}/data/bins_to_files.json", "r") as f:
+        BINS_TO_FILES = json.load(f)
+
+    bins = list(BINS_TO_FILES.keys())
+
+    include: "rules/dereplicating.smk"
+
+    rule all:
+        input:
+            get_derep_final_files
+
 if WORKFLOW == "annotating":
 
     with open(f"{OUTPUT_DIR}/data/mags_to_files.json", "r") as f:

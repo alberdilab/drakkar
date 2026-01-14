@@ -72,8 +72,9 @@ def get_modules_to_run(command):
 def write_launch_metadata(args, output_dir, env_path=None):
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now(timezone.utc)
     metadata = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": timestamp.isoformat(),
         "command": args.command,
         "modules": get_modules_to_run(args.command),
         "working_directory": str(Path.cwd()),
@@ -83,7 +84,8 @@ def write_launch_metadata(args, output_dir, env_path=None):
     }
     if env_path is not None:
         metadata["env_path"] = env_path
-    metadata_path = output_path / "drakkar_timestamp.yaml"
+    filename_timestamp = timestamp.strftime("%y%d%m_%H%M%S")
+    metadata_path = output_path / f"drakkar_{filename_timestamp}.yaml"
     with open(metadata_path, "w") as f:
         yaml.safe_dump(metadata, f, sort_keys=False)
 
@@ -220,6 +222,23 @@ def run_snakemake_profiling(workflow, project_name, profiling_type, output_dir, 
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
 
+def run_snakemake_dereplicating(workflow, project_name, output_dir, env_path, profile, ani):
+    """ Run the dereplicating workflow """
+
+    snakemake_command = [
+        "/bin/bash", "-c",
+        f"module load {config_vars['SNAKEMAKE_MODULE']} && "
+        "snakemake "
+        f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
+        f"--directory {output_dir} "
+        f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
+        f"--configfile {CONFIG_PATH} "
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} DREP_ANI={ani} "
+        f"--conda-prefix {env_path} "
+        f"--use-conda "
+    ]
+    subprocess.run(snakemake_command, shell=False, check=True)
+
 def run_snakemake_annotating(workflow, project_name, annotating_type, output_dir, env_path, profile):
     """ Run the profiling workflow """
 
@@ -325,6 +344,14 @@ def main():
     subparser_profiling.add_argument("-a", "--ani", required=False, type=float, default=0.98, help="ANI threshold for dRep dereplication (-sa). Default: 0.98")
     subparser_profiling.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_profiling.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
+
+    subparser_dereplicating = subparsers.add_parser("dereplicating", help="Run dereplication only (no mapping)")
+    subparser_dereplicating.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
+    subparser_dereplicating.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
+    subparser_dereplicating.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
+    subparser_dereplicating.add_argument("-a", "--ani", required=False, type=float, default=0.98, help="ANI threshold for dRep dereplication (-sa). Default: 0.98")
+    subparser_dereplicating.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
+    subparser_dereplicating.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
     subparser_annotating = subparsers.add_parser("annotating", help="Run the annotating workflow")
     subparser_annotating.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa, .fna or .fasta, optionally including .gz) are stored")
@@ -658,6 +685,40 @@ def main():
                 return
 
         run_snakemake_profiling("profiling", project_name, args.type, args.output, env_path, args.profile, args.fraction, args.ani)
+
+    ###
+    # Dereplicating
+    ###
+
+    if args.command == "dereplicating":
+        print(f"", flush=True)
+        print(f"{HEADER1}STARTING DEREPLICATING PIPELINE...{RESET}", flush=True)
+        print(f"", flush=True)
+
+        bins_dir = args.bins_dir
+        bins_file = args.bins_file
+
+        if bins_dir and bins_file:
+            print(f"Both bin path file and bin directory were provided.")
+            print(f"DRAKKAR will continue with the information provided in the path file.")
+            file_bins_to_json(bins_file,args.output)
+        elif bins_file and not bins_dir:
+            print(f"DRAKKAR will run with the information provided in the bin info file.")
+            file_bins_to_json(bins_file,args.output)
+        elif bins_dir and not bins_file:
+            print(f"DRAKKAR will run with the bins in the bin directory.")
+            path_bins_to_json(bins_dir,args.output)
+        else:
+            print(f"No bin information was provided. DRAKKAR will try to guess the location of the bins.")
+            if os.path.exists(f"{args.output}/cataloging/final/all_bin_paths.txt"):
+                file_bins_to_json(f"{args.output}/cataloging/final/all_bin_paths.txt",args.output)
+            else:
+                print(f"ERROR: No bin data was found in the output directory.")
+                print(f"Make sure that the cataloging module was run in this directory.")
+                print(f"If you want to start from your own bin files, make sure to indicate an bin file (-B) or directory (-b).")
+                return
+
+        run_snakemake_dereplicating("dereplicating", project_name, args.output, env_path, args.profile, args.ani)
 
     ###
     # Annotating
