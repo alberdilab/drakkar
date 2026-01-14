@@ -507,6 +507,8 @@ def file_bins_to_json(paths_file=None, output=False):
     if not os.path.isfile(paths_file):
             raise FileNotFoundError(f"Bin file not found: {paths_file}")
 
+    fasta_re = re.compile(r"\.(?:fa|fna|fasta)(?:\.gz)?$", re.IGNORECASE)
+
     # Read the paths file
     with open(paths_file, "r") as f:
         for line in f:
@@ -514,8 +516,8 @@ def file_bins_to_json(paths_file=None, output=False):
             if not full_path:
                 continue
 
-            # Extract filename without path and extension
-            filename = os.path.splitext(os.path.basename(full_path))[0]
+            # Extract filename without path and extension (supports .gz)
+            filename = fasta_re.sub("", os.path.basename(full_path))
 
             # Store in dictionary
             fasta_dict[filename] = full_path
@@ -531,11 +533,13 @@ def path_bins_to_json(folder_path=None, output=False):
     if not os.path.isdir(folder_path):
         raise FileNotFoundError(f"❌ Folder not found: {folder_path}")
 
+    fasta_re = re.compile(r"\.(?:fa|fna|fasta)(?:\.gz)?$", re.IGNORECASE)
+
     # Iterate over all files in the folder
     for file_name in os.listdir(folder_path):
-        if file_name.endswith((".fna", ".fa")):
+        if fasta_re.search(file_name):
             full_path = os.path.join(folder_path, file_name)
-            file_id = os.path.splitext(file_name)[0]  # Remove extension
+            file_id = fasta_re.sub("", file_name)
             fasta_dict[file_id] = full_path
 
     os.makedirs(f"{output}/data", exist_ok=True)
