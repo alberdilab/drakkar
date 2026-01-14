@@ -8,6 +8,7 @@ import json
 import pandas as pd
 from pathlib import Path
 from collections import defaultdict
+from datetime import datetime, timezone
 from drakkar.utils import *
 
 ###
@@ -60,6 +61,31 @@ def validate_path(path_value, label, expect_dir=False):
         print(f"{ERROR}ERROR:{RESET} {label} {kind} not found: {path_value}")
         return False
     return True
+
+def get_modules_to_run(command):
+    if command == "complete":
+        return ["preprocessing", "cataloging", "profiling", "annotating"]
+    if command:
+        return [command]
+    return []
+
+def write_launch_metadata(args, output_dir, env_path=None):
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    metadata = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "command": args.command,
+        "modules": get_modules_to_run(args.command),
+        "working_directory": str(Path.cwd()),
+        "output_directory": str(output_path.resolve()),
+        "arguments": vars(args),
+        "argv": sys.argv,
+    }
+    if env_path is not None:
+        metadata["env_path"] = env_path
+    metadata_path = output_path / "drakkar_timestamp.yaml"
+    with open(metadata_path, "w") as f:
+        yaml.safe_dump(metadata, f, sort_keys=False)
 
 ###
 # Define workflow launching functions
@@ -370,6 +396,15 @@ def main():
         if args.command != "update":
             env_path = config_vars['ENVIRONMENTS_DIR']
 
+    if args.command in ("annotating", "complete"):
+        normalized_annotation_type = normalize_annotation_type(args.annotation_type)
+        if not normalized_annotation_type:
+            return
+        args.annotation_type = normalized_annotation_type
+
+    output_dir = getattr(args, "output", os.getcwd())
+    write_launch_metadata(args, output_dir, env_path=locals().get("env_path"))
+
     ###
     # Unlock, update or create environments
     ###
@@ -409,12 +444,6 @@ def main():
             print(f"jobs are finished or killed before unlocking the working directory.")
             print(f"{INFO}Run 'drakkar unlock' to unlock the working directory{RESET}")
             sys.exit(2)
-
-    if args.command in ("annotating", "complete"):
-        normalized_annotation_type = normalize_annotation_type(args.annotation_type)
-        if not normalized_annotation_type:
-            return
-        args.annotation_type = normalized_annotation_type
 
     ###
     # Preprocessing
