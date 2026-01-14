@@ -84,7 +84,7 @@ def write_launch_metadata(args, output_dir, env_path=None):
     }
     if env_path is not None:
         metadata["env_path"] = env_path
-    filename_timestamp = timestamp.strftime("%y%d%m_%H%M%S")
+    filename_timestamp = timestamp.strftime("%Y%m%d-%H%M%S")
     metadata_path = output_path / f"drakkar_{filename_timestamp}.yaml"
     with open(metadata_path, "w") as f:
         yaml.safe_dump(metadata, f, sort_keys=False)
