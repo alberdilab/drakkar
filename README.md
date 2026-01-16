@@ -34,9 +34,15 @@ DRAKKAR is organized into independent modules. Use `drakkar complete` to chain t
 
 ### Preprocessing
 
-- Quality-filtering using fastp.
-- Optional host genome mapping and removal.
-- Outputs cleaned reads and summary tables.
+Prepares raw metagenomic reads for downstream modules by filtering, trimming, and (optionally) removing host DNA. It produces cleaned paired reads and summary statistics.
+
+Key options:
+- `-i/--input`: input directory containing raw reads.
+- `-f/--file`: sample info table (TSV) instead of an input directory.
+- `-o/--output`: output directory (defaults to current working directory).
+- `-r/--reference`: host reference genome file for host removal.
+- `-e/--env_path`: conda environments directory (shared).
+- `-p/--profile`: Snakemake profile (default: slurm).
 
 ```
 drakkar preprocessing {arguments}
@@ -44,9 +50,16 @@ drakkar preprocessing {arguments}
 
 ### Cataloging
 
-- Assembles reads into contigs.
-- Bins contigs into MAGs.
-- Supports individual assemblies, co-assemblies, and multicoverage mapping.
+Builds assemblies and bins contigs into MAGs. It supports individual assemblies, co-assemblies, and coverage-based mapping strategies for binning.
+
+Key options:
+- `-i/--input`: input directory (preprocessed reads or sample info output).
+- `-f/--file`: sample info table.
+- `-o/--output`: output directory.
+- `-m/--mode`: assembly modes (e.g. `individual,all`).
+- `-c/--multicoverage`: map coverage groups across assemblies.
+- `-e/--env_path`: conda environments directory.
+- `-p/--profile`: Snakemake profile.
 
 ```
 drakkar cataloging {arguments}
@@ -54,9 +67,19 @@ drakkar cataloging {arguments}
 
 ### Profiling
 
-- Dereplicates MAGs to create a non-redundant reference set.
-- Maps reads to the dereplicated genome catalogue.
-- Optionally computes microbial fraction with singlem.
+Quantifies genomes or pangenomes by mapping reads to a dereplicated reference set and summarizing abundance metrics.
+
+Key options:
+- `-b/--bins_dir`: directory of MAGs/bins.
+- `-B/--bins_file`: text file listing MAG/bin paths.
+- `-r/--reads_dir`: directory of metagenomic reads.
+- `-R/--reads_file`: sample info table with reads.
+- `-o/--output`: output directory.
+- `-t/--type`: `genomes` or `pangenomes` (default: genomes).
+- `-f/--fraction`: compute microbial fraction with singlem.
+- `-a/--ani`: dereplication ANI threshold (default: 0.98).
+- `-e/--env_path`: conda environments directory.
+- `-p/--profile`: Snakemake profile.
 
 ```
 drakkar profiling {arguments}
@@ -64,9 +87,15 @@ drakkar profiling {arguments}
 
 ### Annotating
 
-- Taxonomic and functional annotation of MAGs.
-- Outputs gene, cluster, and taxonomy tables.
-- Use `--annotation-type` to select taxonomy/function/both.
+Annotates dereplicated MAGs with taxonomic and/or functional labels and produces per-genome tables.
+
+Key options:
+- `-b/--bins_dir`: directory of MAGs/bins.
+- `-B/--bins_file`: text file listing MAG/bin paths.
+- `-o/--output`: output directory.
+- `--annotation-type`: `taxonomy`, `function`, or `taxonomy,function`.
+- `-e/--env_path`: conda environments directory.
+- `-p/--profile`: Snakemake profile.
 
 ```
 drakkar annotating {arguments}
@@ -74,8 +103,16 @@ drakkar annotating {arguments}
 
 ### Expressing
 
-- Maps metatranscriptomics reads to annotated genes.
-- Produces expression tables for MAGs and genes.
+Maps metatranscriptomics reads to annotated genes and reports expression metrics by gene and MAG.
+
+Key options:
+- `-b/--bins_dir`: directory of MAGs/bins.
+- `-B/--bins_file`: text file listing MAG/bin paths.
+- `-r/--reads_dir`: directory of transcriptome reads.
+- `-R/--reads_file`: sample info table with transcriptome reads.
+- `-o/--output`: output directory.
+- `-e/--env_path`: conda environments directory.
+- `-p/--profile`: Snakemake profile.
 
 ```
 drakkar expressing {arguments}
@@ -83,8 +120,15 @@ drakkar expressing {arguments}
 
 ### Dereplicating
 
-- Runs only dereplication from profiling (no read mapping).
-- Outputs dereplicated genomes to `dereplicating/final`.
+Runs only the dereplication step from profiling and writes dereplicated MAGs to `dereplicating/final`.
+
+Key options:
+- `-b/--bins_dir`: directory of MAGs/bins.
+- `-B/--bins_file`: text file listing MAG/bin paths.
+- `-o/--output`: output directory.
+- `-a/--ani`: dereplication ANI threshold (default: 0.98).
+- `-e/--env_path`: conda environments directory.
+- `-p/--profile`: Snakemake profile.
 
 ```
 drakkar dereplicating {arguments}
@@ -92,8 +136,23 @@ drakkar dereplicating {arguments}
 
 ### Transfer
 
-- Sends selected outputs via SFTP while preserving directory structure.
-- Supports shortcuts for common output sets and ERDA defaults.
+Transfers selected outputs via SFTP while preserving the original folder structure.
+
+Key options:
+- `--host` and `--user`: SFTP connection (optional if `--erda` is used).
+- `--port`: SFTP port (default: 22).
+- `-i/--identity`: SSH private key for authentication.
+- `-l/--local-dir`: local output directory to transfer.
+- `-r/--remote-dir`: remote destination directory.
+- `--erda`: use ERDA defaults (`io.erda.dk` and the default ERDA user).
+- `--all`: transfer the entire output directory.
+- `--data`: transfer everything except `.snakemake`.
+- `--results`: transfer the union of `-a/-m/-p/-b`.
+- `-a/--annotations`: annotation outputs.
+- `-m/--mags`: dereplicated MAGs.
+- `-p/--profile`: profiling outputs.
+- `-b/--bins`: cataloging bins (recursive).
+- `-v/--verbose`: log each transfer on screen.
 
 ```
 drakkar transfer {arguments}
