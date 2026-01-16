@@ -173,7 +173,10 @@ def build_sftp_batch_commands(files, base_dir, remote_dir):
     for file_path in sorted(files):
         rel_path = file_path.relative_to(base_dir)
         remote_path = remote_root / PurePosixPath(rel_path.as_posix())
-        mkdirs.add(remote_path.parent)
+        parent = remote_path.parent
+        while parent != remote_root and parent not in mkdirs:
+            mkdirs.add(parent)
+            parent = parent.parent
         put_cmds.append((file_path, remote_path))
 
     commands = []
