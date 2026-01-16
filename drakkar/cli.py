@@ -565,8 +565,9 @@ def main():
     # Declare environment directory
     ###
 
-    if args.env_path:
-        env_path = args.env_path
+    env_path = getattr(args, "env_path", None)
+    if env_path:
+        env_path = env_path
     else:
         if args.command != "update":
             env_path = config_vars['ENVIRONMENTS_DIR']
