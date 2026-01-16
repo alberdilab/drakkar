@@ -219,9 +219,19 @@ def run_sftp_transfer(args):
         sftp_cmd += ["-i", args.identity]
     sftp_cmd += ["-b", "-", f"{args.user}@{args.host}"]
 
-    result = subprocess.run(sftp_cmd, input=batch_commands, text=True)
+    result = subprocess.run(sftp_cmd, input=batch_commands, text=True, capture_output=True)
     if result.returncode != 0:
-        print(f"{ERROR}ERROR:{RESET} sftp transfer failed with exit code {result.returncode}")
+        stderr = result.stderr.strip()
+        mkdir_only_errors = False
+        if stderr:
+            error_lines = [line for line in stderr.splitlines() if line.strip()]
+            mkdir_only_errors = all("Couldn't create directory" in line for line in error_lines)
+        if mkdir_only_errors:
+            print(f"{INFO}INFO:{RESET} sftp reported existing directories; continuing.")
+        else:
+            if stderr:
+                print(stderr, file=sys.stderr)
+            print(f"{ERROR}ERROR:{RESET} sftp transfer failed with exit code {result.returncode}")
 
 ###
 # Define workflow launching functions
