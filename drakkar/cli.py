@@ -177,7 +177,6 @@ def build_sftp_batch_commands(files, base_dir, remote_dir):
         put_cmds.append((file_path, remote_path))
 
     commands = []
-    commands.append(f'mkdir "{remote_root.as_posix()}"')
     for directory in sorted(mkdirs, key=lambda p: len(p.parts)):
         if directory == remote_root:
             continue
