@@ -9,6 +9,7 @@ import pandas as pd
 from pathlib import Path
 from collections import defaultdict
 from datetime import datetime, timezone
+from pathlib import PurePosixPath
 from drakkar.utils import *
 
 ###
@@ -88,6 +89,137 @@ def write_launch_metadata(args, output_dir, env_path=None):
     metadata_path = output_path / f"drakkar_{filename_timestamp}.yaml"
     with open(metadata_path, "w") as f:
         yaml.safe_dump(metadata, f, sort_keys=False)
+
+def list_files_recursive(base_dir, exclude_snakemake=False):
+    for root, dirs, files in os.walk(base_dir):
+        if exclude_snakemake:
+            dirs[:] = [d for d in dirs if d != ".snakemake"]
+        for filename in files:
+            yield Path(root) / filename
+
+def collect_transfer_files(base_dir, args):
+    selected_files = set()
+    missing_paths = []
+    warnings = []
+
+    def add_annotations():
+        add_file(Path("annotating/cluster_annotations.tsv.xz"))
+        add_file(Path("annotating/gene_annotations.tsv.xz"))
+        add_file(Path("annotating/genome_taxonomy.tsv"))
+
+    def add_mags():
+        add_dir(Path("profiling_genomes/drep/dereplicated_genomes"))
+
+    def add_profile():
+        add_file(Path("profiling_genomes/final/bases.tsv"))
+        add_file(Path("profiling_genomes/final/counts.tsv"))
+        add_file(Path("profiling_genomes.tsv"))
+
+    def add_bins():
+        add_dir(Path("cataloging/final"))
+
+    def add_file(rel_path):
+        local_path = base_dir / rel_path
+        if local_path.is_file():
+            selected_files.add(local_path)
+        else:
+            missing_paths.append(str(local_path))
+
+    def add_dir(rel_path):
+        local_path = base_dir / rel_path
+        if local_path.is_dir():
+            for file_path in local_path.rglob("*"):
+                if file_path.is_file():
+                    selected_files.add(file_path)
+        else:
+            missing_paths.append(str(local_path))
+
+    if args.all:
+        for file_path in list_files_recursive(base_dir):
+            if file_path.is_file():
+                selected_files.add(file_path)
+        return selected_files, missing_paths, warnings
+
+    if args.data:
+        for file_path in list_files_recursive(base_dir, exclude_snakemake=True):
+            if file_path.is_file():
+                selected_files.add(file_path)
+
+    if args.results:
+        add_annotations()
+        add_mags()
+        add_profile()
+        add_bins()
+
+    if args.annotations:
+        add_annotations()
+
+    if args.mags:
+        add_mags()
+
+    if args.profile:
+        add_profile()
+
+    if args.bins:
+        add_bins()
+
+    return selected_files, missing_paths, warnings
+
+def build_sftp_batch_commands(files, base_dir, remote_dir):
+    remote_root = PurePosixPath(remote_dir)
+    mkdirs = set()
+    put_cmds = []
+
+    for file_path in sorted(files):
+        rel_path = file_path.relative_to(base_dir)
+        remote_path = remote_root / PurePosixPath(rel_path.as_posix())
+        mkdirs.add(remote_path.parent)
+        put_cmds.append((file_path, remote_path))
+
+    commands = []
+    commands.append(f'mkdir "{remote_root.as_posix()}"')
+    for directory in sorted(mkdirs, key=lambda p: len(p.parts)):
+        if directory == remote_root:
+            continue
+        commands.append(f'mkdir "{directory.as_posix()}"')
+    for local_path, remote_path in put_cmds:
+        commands.append(f'put "{local_path}" "{remote_path.as_posix()}"')
+
+    return "\n".join(commands) + "\n"
+
+def run_sftp_transfer(args):
+    base_dir = Path(args.local_dir).resolve()
+    if args.erda:
+        args.host = "io.erda.dk"
+        args.user = "antton.alberdi@snm.ku.dk"
+    if not args.host or not args.user:
+        print(f"{ERROR}ERROR:{RESET} --host and --user are required unless --erda is set.")
+        return
+    selected_files, missing_paths, warnings = collect_transfer_files(base_dir, args)
+
+    if warnings:
+        for warning in warnings:
+            print(f"{INFO}INFO:{RESET} {warning}")
+
+    if missing_paths:
+        for missing in missing_paths:
+            print(f"{ERROR}MISSING:{RESET} {missing}")
+
+    if not selected_files:
+        print(f"{ERROR}ERROR:{RESET} No files selected for transfer.")
+        return
+
+    batch_commands = build_sftp_batch_commands(selected_files, base_dir, args.remote_dir)
+    sftp_cmd = ["sftp"]
+    if args.port:
+        sftp_cmd += ["-P", str(args.port)]
+    if args.identity:
+        sftp_cmd += ["-i", args.identity]
+    sftp_cmd += ["-b", "-", f"{args.user}@{args.host}"]
+
+    result = subprocess.run(sftp_cmd, input=batch_commands, text=True)
+    if result.returncode != 0:
+        print(f"{ERROR}ERROR:{RESET} sftp transfer failed with exit code {result.returncode}")
 
 ###
 # Define workflow launching functions
@@ -391,6 +523,22 @@ def main():
     subparser_update = subparsers.add_parser("update", help="Reinstall Drakkar from the Git repo (forces reinstall in this environment)")
     subparser_update.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
 
+    subparser_transfer = subparsers.add_parser("transfer", help="Transfer outputs via sftp")
+    subparser_transfer.add_argument("--host", help="SFTP host")
+    subparser_transfer.add_argument("--user", help="SFTP user")
+    subparser_transfer.add_argument("--port", type=int, default=22, help="SFTP port")
+    subparser_transfer.add_argument("-i", "--identity", help="Path to SSH private key")
+    subparser_transfer.add_argument("-l", "--local-dir", required=False, default=os.getcwd(), help="Local output directory. Default is the directory from which drakkar is called.")
+    subparser_transfer.add_argument("-r", "--remote-dir", required=True, help="Remote base directory for transfer")
+    subparser_transfer.add_argument("--erda", action="store_true", help="Use ERDA SFTP defaults")
+    subparser_transfer.add_argument("--all", action="store_true", help="Transfer the entire output folder")
+    subparser_transfer.add_argument("--data", action="store_true", help="Transfer the output folder excluding .snakemake")
+    subparser_transfer.add_argument("--results", action="store_true", help="Transfer configured results files")
+    subparser_transfer.add_argument("-a", "--annotations", action="store_true", help="Transfer annotation outputs")
+    subparser_transfer.add_argument("-m", "--mags", action="store_true", help="Transfer dereplicated MAGs")
+    subparser_transfer.add_argument("-p", "--profile", action="store_true", help="Transfer profiling outputs")
+    subparser_transfer.add_argument("-b", "--bins", action="store_true", help="Transfer cataloging bins")
+
     args = parser.parse_args()
 
     # Display ASCII logo before running any command or showing help
@@ -429,7 +577,10 @@ def main():
             return
         args.annotation_type = normalized_annotation_type
 
-    output_dir = getattr(args, "output", os.getcwd())
+    if args.command == "transfer":
+        output_dir = getattr(args, "local_dir", os.getcwd())
+    else:
+        output_dir = getattr(args, "output", os.getcwd())
     write_launch_metadata(args, output_dir, env_path=locals().get("env_path"))
 
     ###
@@ -440,6 +591,12 @@ def main():
         print(f"{HEADER1}UNLOCKING DRAKKAR DIRECTORY...{RESET}", flush=True)
         print(f"", flush=True)
         run_unlock(args.command, args.output, args.profile)
+
+    elif args.command == "transfer":
+        print(f"{HEADER1}TRANSFERRING DRAKKAR OUTPUTS...{RESET}", flush=True)
+        print(f"", flush=True)
+        run_sftp_transfer(args)
+        return
 
     elif args.command == "update":
         pip_cmd = [
