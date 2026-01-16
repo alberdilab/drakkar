@@ -1,6 +1,15 @@
 ![alt text](drakkar.png "DRAKKAR by the AlberdiLab")
 
-**DRAKKAR** is a snakemake-based genome-resolved metagenomics pipeline optimised for the Globe Institute's HPC Mjolnir. Snakemake works along with Slurm to run long pipelines using optimal memory and time resources. It is built in a modular fashion, so that the entire workflow or only parts of it can be executed. Extended usage tutorial can be found in https://drakkar.readthedocs.io/
+# DRAKKAR
+
+DRAKKAR is a Snakemake-based, modular genome-resolved metagenomics pipeline optimized for the Globe Institute's HPC Mjolnir. It runs on Slurm, supports re-entrant modules, and produces standardized outputs for downstream analysis. Full docs: https://drakkar.readthedocs.io/
+
+## Highlights
+
+- Modular workflows: run the full pipeline or just the parts you need.
+- HPC-friendly: Snakemake + Slurm with resource-aware rules.
+- Reproducible outputs: consistent folder structure and metadata logs.
+- Flexible inputs: directories or sample info tables.
 
 ## Quickstart
 
@@ -9,147 +18,179 @@ module load drakkar/1.0.0
 drakkar complete -f input_info.tsv -o drakkar_output
 ```
 
-## Modules
-**DRAKKAR** is a modular software that allows executing each section of the genome-resolved metagenomic pipeline independently.
+## Workflow overview
 
-* **Preprocessing**: quality-filters the reads and optionally removes host DNA.
+DRAKKAR is organized into independent modules. Use `drakkar complete` to chain them.
+
+- **Preprocessing**: quality filtering, optional host removal.
+- **Cataloging**: assembly, binning, and coverage mapping.
+- **Profiling**: dereplication and abundance estimation.
+- **Annotating**: taxonomic and functional annotations.
+- **Expressing**: metatranscriptomics mapping to annotated genes.
+- **Dereplicating**: dereplication only, no read mapping.
+- **Transfer**: SFTP transfer of selected outputs.
+
+## Modules
+
+### Preprocessing
+
+- Quality-filtering using fastp.
+- Optional host genome mapping and removal.
+- Outputs cleaned reads and summary tables.
+
 ```
 drakkar preprocessing {arguments}
 ```
-* **Cataloging**: assembles and bins the metagenomic reads using multiple strategies.
+
+### Cataloging
+
+- Assembles reads into contigs.
+- Bins contigs into MAGs.
+- Supports individual assemblies, co-assemblies, and multicoverage mapping.
+
 ```
 drakkar cataloging {arguments}
 ```
-* **Annotating**: annotates the bins taxonomically and/or functionally, and/or generates community-scale metabolic networks.
-```
-drakkar annotating {arguments}
-```
-* **Profiling**: conducts genome- or pangenome-based quantitative analyses.
+
+### Profiling
+
+- Dereplicates MAGs to create a non-redundant reference set.
+- Maps reads to the dereplicated genome catalogue.
+- Optionally computes microbial fraction with singlem.
+
 ```
 drakkar profiling {arguments}
 ```
 
-* **Expressing**: conducts gene expression analysis.
+### Annotating
+
+- Taxonomic and functional annotation of MAGs.
+- Outputs gene, cluster, and taxonomy tables.
+- Use `--annotation-type` to select taxonomy/function/both.
+
+```
+drakkar annotating {arguments}
+```
+
+### Expressing
+
+- Maps metatranscriptomics reads to annotated genes.
+- Produces expression tables for MAGs and genes.
+
 ```
 drakkar expressing {arguments}
 ```
 
-* **Dereplicating**: dereplicates bins with dRep without read mapping.
+### Dereplicating
+
+- Runs only dereplication from profiling (no read mapping).
+- Outputs dereplicated genomes to `dereplicating/final`.
+
 ```
 drakkar dereplicating {arguments}
 ```
 
+### Transfer
+
+- Sends selected outputs via SFTP while preserving directory structure.
+- Supports shortcuts for common output sets and ERDA defaults.
+
+```
+drakkar transfer {arguments}
+```
+
 ## Complete mode
-All the modules of **DRAKKAR** can be run together by using the ***complete*** mode.
+
+Run the full pipeline in one command:
+
 ```
 drakkar complete {arguments}
 ```
 
-## Usage examples
+## Inputs
 
-### Without sample info file
+You can provide inputs as a directory of reads or as a sample info table.
 
-#### Minimum usage
+### Directory inputs (minimum)
 
 ```
 drakkar complete -i {input_path} -o {output_path}
 ```
 
-**-i**: path to the folder where the metagenomic sequencing reads are stored.
-**-o**: path in which the DRAKKAR outputs will be stored.
-Metagenomic reads are not mapped to a host genome, individual assemblies are performed, and genome-based profiling is conducted.
+### Sample info table
 
-#### With reference genome
-
-```
-drakkar complete -i {input_path} -o {output_path} -r {genome_path}
-```
-
-**-i**: path to the folder where the metagenomic sequencing reads are stored.
-**-o**: path in which the DRAKKAR outputs will be stored.
-**-r**: path to the reference genome.
-Metagenomic reads are mapped to the host genome individual assemblies are performed, and genome-based profiling is conducted.
-
-#### With reference genome and assembly mode
-
-```
-drakkar complete -i {input_path} -o {output_path} -r {genome_path} -m individual,all -t genomes,pangenomes
-```
-
-**-i**: path to the folder where the metagenomic sequencing reads are stored.
-**-o**: path in which the DRAKKAR outputs will be stored.
-**-r**: path to the reference genome.
-**-m**: comma-separated list of assembly modes
-Metagenomic reads are mapped to the host genome, individual assemblies as well as a single coassembly including all samples are performed, and both genome- and pangenome-based profiling is conducted.
-
-### With sample info file
+A tab-separated file with optional columns depending on module usage:
 
 |sample|rawreads1|rawreads2|reference_name|reference_path|coassembly|coverage|
 |---|---|---|---|---|---|---|
 |sample1|path/sample1_1.fq.gz|path/sample1_2.fq.gz|ref1|path/ref1.fna|assembly1,all|coverage1|
-|sample1|path/sample1_1.fq.gz|path/sample1_2.fq.gz|ref1|path/ref1.fna|assembly1,all|coverage1|
 |sample2|path/sample2_1.fq.gz|path/sample2_2.fq.gz|ref1|path/ref1.fna|assembly2,all|coverage2|
-|sample3|path/sample3_1.fq.gz|path/sample3_2.fq.gz|ref2|path/ref2.fna|assembly2,all|coverage2|
-|sample4|path/sample4_1.fq.gz|path/sample4_2.fq.gz|ref2|path/ref2.fna|assembly2,all|coverage2|
-|sample4|path/sample4_1.fq.gz|path/sample4_2.fq.gz|ref2|path/ref2.fna|assembly2,all|coverage2|
 
-#### Minimum usage
-All the required information is extracted from the sample info file.
-
-Assembly and coverage behavior:
-- The sample info file columns are optional unless a workflow uses them.
+Notes:
 - Input read files can be local paths or remote URLs (http/https/ftp).
-- The `coassembly` column defines which co-assemblies are built; each label groups samples whose reads are combined for assembly.
-- Individual assemblies can be enabled with `-m individual`, creating one assembly per sample in addition to any co-assemblies.
-- If `--multicoverage` is selected, samples that share the same value in the `coverage` column are mapped to each other's individual assemblies to compute coverage for binning.
-- Co-assemblies are not compatible with `--multicoverage`; they already use coverage from the samples used to build the assembly.
-- If the `coverage` column is absent or no sample info file is used, all samples are mapped to all assemblies.
+- The `coassembly` column defines which samples are pooled for co-assembly.
+- `-m individual` adds per-sample assemblies in addition to any co-assemblies.
+- If `--multicoverage` is set, samples sharing a coverage group map to each other's assemblies.
+- Co-assemblies are not compatible with `--multicoverage`.
 
-#### Minimum usage
+## Usage examples
+
+### Run complete with a sample info file
 
 ```
 drakkar complete -f {info_file} -o {output_path} -m individual
 ```
-Individual assemblies are also conducted on top of the assemblies specified in the sample info file.
 
+### Run preprocessing with a host reference
 
-## DRAKKAR modules
+```
+drakkar preprocessing -i {input_path} -o {output_path} -r {genome_path}
+```
 
-### Preprocessing
+### Run profiling without microbial fraction
 
-- Quality-filtering using fastp
-- Reference genome indexing
-- Reference genome mapping
-- Metagenomic and host genomic data outputting
+```
+drakkar profiling -b {bins_dir} -R {reads_file} -o {output_path}
+```
 
-### Cataloging
+### Run dereplication only
 
-- Assembles reads into contigs and bins them into MAGs.
-- Supports individual assemblies, co-assemblies, and multicoverage mapping.
-- Produces bin FASTA files, bin metadata, and assembly summaries.
+```
+drakkar dereplicating -b {bins_dir} -o {output_path}
+```
 
-### Annotating
+### Transfer results to ERDA
 
-- Annotates dereplicated MAGs with taxonomic and functional labels.
-- Generates per-genome annotations and summary tables.
-- Can run taxonomy, function, or both via `--annotation-type`.
+```
+drakkar transfer --erda -l {output_path} -r /remote/path --results -v
+```
 
-### Profiling
+## Outputs
 
-- Dereplicates MAGs to create a non-redundant reference set.
-- Maps reads to the dereplicated genome catalogue to quantify abundance.
-- Optionally computes microbial fraction with singlem.
+All modules write into the output directory you provide. Key locations:
 
-### Dereplicating
+- `preprocessing/` cleaned reads and summaries.
+- `cataloging/` assemblies, bins, and metadata.
+- `profiling_genomes/` dereplication, mapping, and abundance tables.
+- `annotating/` annotation tables.
+- `expressing/` expression outputs.
+- `dereplicating/` dereplicated genomes (dereplication-only mode).
 
-A subset of the profiling module.
+Each run also writes a metadata file `drakkar_YYYYMMDD-HHMMSS.yaml` capturing CLI arguments and run context.
 
-- Runs only the dereplication step from profiling.
-- Outputs dereplicated genomes to `dereplicating/final`.
-- Useful when reads are unavailable or mapping is not needed.
+## Transfer flags
 
-### Expressing
+- `--all`: transfer the entire output directory.
+- `--data`: transfer everything except `.snakemake`.
+- `--results`: transfer the union of `-a/-m/-p/-b`.
+- `-a/--annotations`: annotation tables.
+- `-m/--mags`: dereplicated MAGs.
+- `-p/--profile`: profiling tables.
+- `-b/--bins`: cataloging bins (recursive).
+- `--erda`: use `io.erda.dk` with the default ERDA user.
+- `-v/--verbose`: log each transfer on screen.
 
-The **Expressing** module uses metatranscriptomics reads to map them against annotated genes of a MAG catalogue.
+## Support and docs
 
-
+- Docs: https://drakkar.readthedocs.io/
+- Issues: https://github.com/alberdilab/drakkar

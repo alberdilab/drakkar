@@ -187,7 +187,7 @@ def build_sftp_batch_commands(files, base_dir, remote_dir):
     for local_path, remote_path in put_cmds:
         commands.append(f'put "{local_path}" "{remote_path.as_posix()}"')
 
-    return "\n".join(commands) + "\n"
+    return "\n".join(commands) + "\n", put_cmds
 
 def run_sftp_transfer(args):
     base_dir = Path(args.local_dir).resolve()
@@ -211,7 +211,10 @@ def run_sftp_transfer(args):
         print(f"{ERROR}ERROR:{RESET} No files selected for transfer.")
         return
 
-    batch_commands = build_sftp_batch_commands(selected_files, base_dir, args.remote_dir)
+    batch_commands, put_cmds = build_sftp_batch_commands(selected_files, base_dir, args.remote_dir)
+    if args.verbose:
+        for local_path, remote_path in put_cmds:
+            print(f"{INFO}PUT:{RESET} {local_path} -> {remote_path.as_posix()}")
     sftp_cmd = ["sftp"]
     if args.port:
         sftp_cmd += ["-P", str(args.port)]
@@ -550,6 +553,7 @@ def main():
     subparser_transfer.add_argument("-m", "--mags", action="store_true", help="Transfer dereplicated MAGs")
     subparser_transfer.add_argument("-p", "--profile", action="store_true", help="Transfer profiling outputs")
     subparser_transfer.add_argument("-b", "--bins", action="store_true", help="Transfer cataloging bins")
+    subparser_transfer.add_argument("-v", "--verbose", action="store_true", help="Log each transfer on screen")
 
     args = parser.parse_args()
 
