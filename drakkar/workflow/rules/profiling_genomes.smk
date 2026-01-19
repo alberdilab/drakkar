@@ -55,10 +55,10 @@ checkpoint dereplicate:
         done
         if [ -f "{params.metadata}" ]; then
             # Using existing completeness information
-            dRep dereplicate {params.outdir} -p {threads} -g "${files[@]}" -sa {params.ani} --genomeInfo {params.metadata}
+            dRep dereplicate {params.outdir} -p {threads} -g "${{files[@]}}" -sa {params.ani} --genomeInfo {params.metadata}
         else
             # Generate completeness information
-            dRep dereplicate {params.outdir} -p {threads} -g "${files[@]}" -sa {params.ani}
+            dRep dereplicate {params.outdir} -p {threads} -g "${{files[@]}}" -sa {params.ani}
         fi
 
         # rename headers in every .fa under dereplicated_genomes/
