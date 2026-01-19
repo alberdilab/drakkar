@@ -24,7 +24,8 @@ checkpoint dereplicate:
         mash_module={MASH_MODULE},
         metadata=f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv",
         outdir=f"{OUTPUT_DIR}/dereplicating/drep/",
-        ani={DREP_ANI}
+        ani={DREP_ANI},
+        uncompressed_dir=f"{OUTPUT_DIR}/dereplicating/drep/uncompressed_genomes"
     threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
@@ -34,12 +35,23 @@ checkpoint dereplicate:
         """
         module load {params.mash_module} {params.drep_module}
         rm -rf {params.outdir}
+        mkdir -p {params.uncompressed_dir}
+        files=()
+        for f in {input.genomes}; do
+            if [[ "$f" == *.gz ]]; then
+                out="{params.uncompressed_dir}/$(basename "$f" .gz)"
+                gunzip -c "$f" > "$out"
+                files+=("$out")
+            else
+                files+=("$f")
+            fi
+        done
         if [ -f "{params.metadata}" ]; then
             # Using existing completeness information
-            dRep dereplicate {params.outdir} -p {threads} -g {input.genomes} -sa {params.ani} --genomeInfo {params.metadata}
+            dRep dereplicate {params.outdir} -p {threads} -g "${files[@]}" -sa {params.ani} --genomeInfo {params.metadata}
         else
             # Generate completeness information
-            dRep dereplicate {params.outdir} -p {threads} -g {input.genomes} -sa {params.ani}
+            dRep dereplicate {params.outdir} -p {threads} -g "${files[@]}" -sa {params.ani}
         fi
 
         # rename headers in every .fa under dereplicated_genomes/
