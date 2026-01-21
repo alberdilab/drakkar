@@ -115,8 +115,18 @@ def collect_transfer_files(base_dir, args):
         add_file(Path("profiling_genomes/final/counts.tsv"))
         add_file(Path("profiling_genomes.tsv"))
 
+    def add_expression():
+        add_file(Path("expressing/gene_counts.tsv.xz"))
+
     def add_bins():
         add_dir(Path("cataloging/final"))
+
+    def add_runner_logs():
+        log_files = sorted(base_dir.glob("drakkar_*.yaml"))
+        if log_files:
+            selected_files.update(log_files)
+        else:
+            warnings.append("No drakkar_*.yaml run logs found in the local directory.")
 
     def add_file(rel_path):
         local_path = base_dir / rel_path
@@ -138,6 +148,7 @@ def collect_transfer_files(base_dir, args):
         for file_path in list_files_recursive(base_dir):
             if file_path.is_file():
                 selected_files.add(file_path)
+        add_runner_logs()
         return selected_files, missing_paths, warnings
 
     if args.data:
@@ -149,6 +160,7 @@ def collect_transfer_files(base_dir, args):
         add_annotations()
         add_mags()
         add_profile()
+        add_expression()
         add_bins()
 
     if args.annotations:
@@ -160,8 +172,13 @@ def collect_transfer_files(base_dir, args):
     if args.profile:
         add_profile()
 
+    if args.expression:
+        add_expression()
+
     if args.bins:
         add_bins()
+
+    add_runner_logs()
 
     return selected_files, missing_paths, warnings
 
@@ -197,6 +214,20 @@ def run_sftp_transfer(args):
     if not args.host or not args.user:
         print(f"{ERROR}ERROR:{RESET} --host and --user are required unless --erda is set.")
         return
+    sftp_cmd = ["sftp"]
+    if args.port:
+        sftp_cmd += ["-P", str(args.port)]
+    if args.identity:
+        sftp_cmd += ["-i", args.identity]
+    sftp_cmd += ["-b", "-", f"{args.user}@{args.host}"]
+    check_cmds = f'ls "{args.remote_dir}"\n'
+    check_result = subprocess.run(sftp_cmd, input=check_cmds, text=True, capture_output=True)
+    if check_result.returncode != 0:
+        stderr = check_result.stderr.strip()
+        if stderr:
+            print(stderr, file=sys.stderr)
+        print(f"{ERROR}ERROR:{RESET} Remote directory not found: {args.remote_dir}")
+        return
     selected_files, missing_paths, warnings = collect_transfer_files(base_dir, args)
 
     if warnings:
@@ -215,12 +246,6 @@ def run_sftp_transfer(args):
     if args.verbose:
         for local_path, remote_path in put_cmds:
             print(f"{INFO}PUT:{RESET} {local_path} -> {remote_path.as_posix()}")
-    sftp_cmd = ["sftp"]
-    if args.port:
-        sftp_cmd += ["-P", str(args.port)]
-    if args.identity:
-        sftp_cmd += ["-i", args.identity]
-    sftp_cmd += ["-b", "-", f"{args.user}@{args.host}"]
 
     result = subprocess.run(sftp_cmd, input=batch_commands, text=True, capture_output=True)
     if result.returncode != 0:
@@ -552,6 +577,7 @@ def main():
     subparser_transfer.add_argument("-a", "--annotations", action="store_true", help="Transfer annotation outputs")
     subparser_transfer.add_argument("-m", "--mags", action="store_true", help="Transfer dereplicated MAGs")
     subparser_transfer.add_argument("-p", "--profile", action="store_true", help="Transfer profiling outputs")
+    subparser_transfer.add_argument("-e", "--expression", action="store_true", help="Transfer expression outputs")
     subparser_transfer.add_argument("-b", "--bins", action="store_true", help="Transfer cataloging bins")
     subparser_transfer.add_argument("-v", "--verbose", action="store_true", help="Log each transfer on screen")
 
