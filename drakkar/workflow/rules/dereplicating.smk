@@ -23,7 +23,8 @@ rule checkm2:
     params:
         checkm2_module={CHECKM2_MODULE},
         checkm2_db={CHECKM2_DB},
-        outdir=f"{OUTPUT_DIR}/dereplicating/checkm2"
+        outdir=f"{OUTPUT_DIR}/dereplicating/checkm2",
+        genome_dir=f"{OUTPUT_DIR}/data/genomes"
     threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
@@ -33,16 +34,16 @@ rule checkm2:
         """
         module load {params.checkm2_module}
         rm -rf {params.outdir}
-        mkdir -p {params.outdir}/input {OUTPUT_DIR}/cataloging/final
+        mkdir -p {params.genome_dir} {OUTPUT_DIR}/cataloging/final
         for f in {input.genomes}; do
             if [[ "$f" == *.gz ]]; then
-                out="{params.outdir}/input/$(basename "$f" .gz)"
+                out="{params.genome_dir}/$(basename "$f" .gz)"
                 gunzip -c "$f" > "$out"
             else
-                ln -sf "$f" "{params.outdir}/input/$(basename "$f")"
+                ln -sf "$f" "{params.genome_dir}/$(basename "$f")"
             fi
         done
-        checkm2 predict --input {params.outdir}/input --output-directory {params.outdir} --threads {threads} --database_path {params.checkm2_db} --force
+        checkm2 predict --input {params.genome_dir} --output-directory {params.outdir} --threads {threads} --database_path {params.checkm2_db} --force
         python - <<'PY'
             import pandas as pd
             from pathlib import Path
