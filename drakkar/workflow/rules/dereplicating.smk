@@ -42,7 +42,7 @@ rule checkm2:
                 ln -sf "$f" "{params.outdir}/input/$(basename "$f")"
             fi
         done
-        checkm2 predict --input {params.outdir}/input --output-directory {params.outdir} --threads {threads} --database_path {params.checkm2_db}
+        checkm2 predict --input {params.outdir}/input --output-directory {params.outdir} --threads {threads} --database_path {params.checkm2_db} --force
         python - <<'PY'
             import pandas as pd
             from pathlib import Path
