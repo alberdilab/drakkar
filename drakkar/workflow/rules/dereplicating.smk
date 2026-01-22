@@ -49,12 +49,12 @@ rule checkm2:
 
             report_path = Path("{params.outdir}") / "quality_report.tsv"
             df = pd.read_csv(report_path, sep="\\t")
-            lower_cols = {c.lower(): c for c in df.columns}
+            lower_cols = {{c.lower(): c for c in df.columns}}
             name_col = lower_cols.get("name") or lower_cols.get("genome") or lower_cols.get("bin")
             comp_col = lower_cols.get("completeness")
             cont_col = lower_cols.get("contamination")
             if not name_col or not comp_col or not cont_col:
-                raise ValueError(f"CheckM2 output missing required columns: {df.columns}")
+                raise ValueError(f"CheckM2 output missing required columns: {{df.columns}}")
             out_df = df[[name_col, comp_col, cont_col]].copy()
             out_df.columns = ["genome", "completeness", "contamination"]
             out_df.to_csv("{output.metadata}", index=False)
