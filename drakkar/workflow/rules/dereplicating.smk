@@ -15,11 +15,11 @@ DREP_ANI = float(config.get("DREP_ANI", 0.98))
 # Workflow rules
 ####
 
-rule checkm2:
+rule checkm2_report:
     input:
         genomes=expand("{bin_path}", bin_path=BINS_TO_FILES.values())
     output:
-        metadata=f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv"
+        report=f"{OUTPUT_DIR}/dereplicating/checkm2/quality_report.tsv"
     params:
         checkm2_module={CHECKM2_MODULE},
         checkm2_db={CHECKM2_DB},
@@ -34,7 +34,8 @@ rule checkm2:
         """
         module load {params.checkm2_module}
         rm -rf {params.outdir}
-        mkdir -p {params.genome_dir} {OUTPUT_DIR}/cataloging/final
+        rm -rf {params.genome_dir}
+        mkdir -p {params.genome_dir}
         for f in {input.genomes}; do
             if [[ "$f" == *.gz ]]; then
                 out="{params.genome_dir}/$(basename "$f" .gz)"
@@ -44,23 +45,63 @@ rule checkm2:
             fi
         done
         checkm2 predict --input {params.genome_dir} --output-directory {params.outdir} --threads {threads} --database_path {params.checkm2_db} --force
-        python - <<'PY'
-            import pandas as pd
-            from pathlib import Path
-
-            report_path = Path("{params.outdir}") / "quality_report.tsv"
-            df = pd.read_csv(report_path, sep="\\t")
-            lower_cols = {{c.lower(): c for c in df.columns}}
-            name_col = lower_cols.get("name") or lower_cols.get("genome") or lower_cols.get("bin")
-            comp_col = lower_cols.get("completeness")
-            cont_col = lower_cols.get("contamination")
-            if not name_col or not comp_col or not cont_col:
-                raise ValueError(f"CheckM2 output missing required columns: {{df.columns}}")
-            out_df = df[[name_col, comp_col, cont_col]].copy()
-            out_df.columns = ["genome", "completeness", "contamination"]
-            out_df.to_csv("{output.metadata}", index=False)
-            PY
         """
+
+rule checkm2_metadata:
+    input:
+        report=f"{OUTPUT_DIR}/dereplicating/checkm2/quality_report.tsv"
+    output:
+        metadata=f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv"
+    message: "Formatting CheckM2 report for dRep..."
+    run:
+        import pandas as pd
+        import re
+        from pathlib import Path
+
+        report_path = Path(input.report)
+        df = pd.read_csv(report_path, sep="\t")
+        lower_cols = {c.lower(): c for c in df.columns}
+        name_col = lower_cols.get("name") or lower_cols.get("genome") or lower_cols.get("bin")
+        comp_col = lower_cols.get("completeness")
+        cont_col = lower_cols.get("contamination")
+        if not name_col or not comp_col or not cont_col:
+            raise ValueError(f"CheckM2 output missing required columns: {list(df.columns)}")
+
+        output_root = Path(output.metadata).parents[2]
+        genomes_dir = output_root / "data" / "genomes"
+        genome_map = {}
+        for genome_path in genomes_dir.iterdir():
+            if not genome_path.is_file():
+                continue
+            base = genome_path.name
+            base_no_gz = re.sub(r"\.gz$", "", base, flags=re.IGNORECASE)
+            base_no_ext = re.sub(r"\.(fa|fna|fasta)$", "", base_no_gz, flags=re.IGNORECASE)
+            genome_map.setdefault(base_no_ext, base_no_gz)
+            genome_map.setdefault(base_no_gz, base_no_gz)
+
+        genomes = []
+        missing = []
+        for name in df[name_col].astype(str):
+            key = name.strip()
+            mapped = genome_map.get(key)
+            if not mapped:
+                missing.append(key)
+                genomes.append(key)
+            else:
+                genomes.append(mapped)
+
+        if missing:
+            raise ValueError(f"CheckM2 names not found in data/genomes: {missing}")
+
+        out_df = pd.DataFrame(
+            {
+                "genome": genomes,
+                "completeness": df[comp_col],
+                "contamination": df[cont_col],
+            }
+        )
+        Path(output.metadata).parent.mkdir(parents=True, exist_ok=True)
+        out_df.to_csv(output.metadata, index=False)
 
 checkpoint dereplicate:
     input:
@@ -78,7 +119,7 @@ checkpoint dereplicate:
     threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 10) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: max(60, int(input.size_mb / 10) * 2 ** (attempt - 1))
     message: "Dereplicating bins using dRep..."
     shell:
         """
@@ -95,13 +136,7 @@ checkpoint dereplicate:
                 files+=("$f")
             fi
         done
-        if [ -f "{input.metadata}" ]; then
-            # Using existing completeness information
-            dRep dereplicate {params.outdir} -p {threads} -g "${{files[@]}}" -sa {params.ani} --genomeInfo {input.metadata}
-        else
-            # Generate completeness information
-            dRep dereplicate {params.outdir} -p {threads} -g "${{files[@]}}" -sa {params.ani}
-        fi
+        dRep dereplicate {params.outdir} -p {threads} -g "${{files[@]}}" -sa {params.ani} --genomeInfo {input.metadata}
 
         # rename headers in every .fa under dereplicated_genomes/
         for f in {params.outdir}/dereplicated_genomes/*.fa; do
