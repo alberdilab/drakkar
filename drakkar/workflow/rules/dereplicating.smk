@@ -109,7 +109,8 @@ checkpoint dereplicate:
         metadata=f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv"
     output:
         Wdb=f"{OUTPUT_DIR}/dereplicating/drep/data_tables/Wdb.csv",
-        Cdb=f"{OUTPUT_DIR}/dereplicating/drep/data_tables/Cdb.csv"
+        Cdb=f"{OUTPUT_DIR}/dereplicating/drep/data_tables/Cdb.csv",
+        derep_dir=directory(f"{OUTPUT_DIR}/dereplicating/drep/dereplicated_genomes")
     params:
         drep_module={DREP_MODULE},
         mash_module={MASH_MODULE},
@@ -138,13 +139,28 @@ checkpoint dereplicate:
         done
         dRep dereplicate {params.outdir} -p {threads} -g "${{files[@]}}" -sa {params.ani} --genomeInfo {input.metadata}
 
-        # rename headers in every .fa under dereplicated_genomes/
-        for f in {params.outdir}/dereplicated_genomes/*.fa; do
-            genome=$(basename "$f" .fa)
-            awk -v g="$genome" 'BEGIN{{i=0}} /^>/ {{print ">" g "^" i++; next}} {{print}}' "$f" > tmp && mv tmp "$f"
-        done
         """
 
+# Normalize headers in dereplicated genomes with .fa/.fna/.fasta
+rule rename_derep_headers:
+    input:
+        derep_dir=f"{OUTPUT_DIR}/dereplicating/drep/dereplicated_genomes"
+    output:
+        touch(f"{OUTPUT_DIR}/dereplicating/drep/dereplicated_genomes/.headers_renamed")
+    localrule: True
+    message: "Renaming headers in dereplicated genomes..."
+    shell:
+        """
+        shopt -s nullglob
+        for f in {input.derep_dir}/*.fa {input.derep_dir}/*.fna {input.derep_dir}/*.fasta; do
+            base=$(basename "$f")
+            genome="${{base%.fa}}"
+            genome="${{genome%.fna}}"
+            genome="${{genome%.fasta}}"
+            awk -v g="$genome" 'BEGIN{{i=0}} /^>/ {{print ">" g "^" i++; next}} {{print}}' "$f" > tmp && mv tmp "$f"
+        done
+        touch {output}
+        """
 # Functions to define the input files dynamically.
 def get_mag_ids_from_drep(csv_path):
     df = pd.read_csv(csv_path)
@@ -157,7 +173,8 @@ def get_derep_final_files(wildcards):
 
 rule finalize_derep:
     input:
-        derep=f"{OUTPUT_DIR}/dereplicating/drep/dereplicated_genomes/{{bin_id}}"
+        derep=f"{OUTPUT_DIR}/dereplicating/drep/dereplicated_genomes/{{bin_id}}",
+        headers=f"{OUTPUT_DIR}/dereplicating/drep/dereplicated_genomes/.headers_renamed"
     output:
         f"{OUTPUT_DIR}/dereplicating/final/{{bin_id}}"
     localrule: True

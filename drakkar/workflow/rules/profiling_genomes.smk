@@ -11,7 +11,9 @@ SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 COVERM_MODULE = config["COVERM_MODULE"]
 MASH_MODULE = config["MASH_MODULE"]
 SINGLEM_MODULE = config["SINGLEM_MODULE"]
+CHECKM2_MODULE = config["CHECKM2_MODULE"]
 DREP_ANI = float(config.get("DREP_ANI", 0.98))
+CHECKM2_DB = config["CHECKM2_DB"]
 
 # Annotation databases
 SINGLEM_DB = config["SINGLEM_DB"]
@@ -20,16 +22,105 @@ SINGLEM_DB = config["SINGLEM_DB"]
 # Workflow rules
 ####
 
-checkpoint dereplicate:
+rule checkm2_report:
     input:
         genomes=expand("{bin_path}", bin_path=BINS_TO_FILES.values())
     output:
+        report=f"{OUTPUT_DIR}/profiling_genomes/checkm2/quality_report.tsv"
+    params:
+        checkm2_module={CHECKM2_MODULE},
+        checkm2_db={CHECKM2_DB},
+        outdir=f"{OUTPUT_DIR}/profiling_genomes/checkm2",
+        genome_dir=f"{OUTPUT_DIR}/data/genomes"
+    threads: 8
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 10) * 2 ** (attempt - 1))
+    message: "Estimating MAG completeness/contamination with CheckM2..."
+    shell:
+        """
+        module load {params.checkm2_module}
+        rm -rf {params.outdir}
+        rm -rf {params.genome_dir}
+        mkdir -p {params.genome_dir}
+        for f in {input.genomes}; do
+            if [[ "$f" == *.gz ]]; then
+                out="{params.genome_dir}/$(basename "$f" .gz)"
+                gunzip -c "$f" > "$out"
+            else
+                ln -sf "$f" "{params.genome_dir}/$(basename "$f")"
+            fi
+        done
+        checkm2 predict --input {params.genome_dir} --output-directory {params.outdir} --threads {threads} --database_path {params.checkm2_db} --force
+        """
+
+rule checkm2_metadata:
+    input:
+        report=f"{OUTPUT_DIR}/profiling_genomes/checkm2/quality_report.tsv"
+    output:
+        metadata=f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv"
+    message: "Formatting CheckM2 report for dRep..."
+    run:
+        import pandas as pd
+        import re
+        from pathlib import Path
+
+        report_path = Path(input.report)
+        df = pd.read_csv(report_path, sep="\t")
+        lower_cols = {c.lower(): c for c in df.columns}
+        name_col = lower_cols.get("name") or lower_cols.get("genome") or lower_cols.get("bin")
+        comp_col = lower_cols.get("completeness")
+        cont_col = lower_cols.get("contamination")
+        if not name_col or not comp_col or not cont_col:
+            raise ValueError(f"CheckM2 output missing required columns: {list(df.columns)}")
+
+        output_root = Path(output.metadata).parents[2]
+        genomes_dir = output_root / "data" / "genomes"
+        genome_map = {}
+        for genome_path in genomes_dir.iterdir():
+            if not genome_path.is_file():
+                continue
+            base = genome_path.name
+            base_no_gz = re.sub(r"\.gz$", "", base, flags=re.IGNORECASE)
+            base_no_ext = re.sub(r"\.(fa|fna|fasta)$", "", base_no_gz, flags=re.IGNORECASE)
+            genome_map.setdefault(base_no_ext, base_no_gz)
+            genome_map.setdefault(base_no_gz, base_no_gz)
+
+        genomes = []
+        missing = []
+        for name in df[name_col].astype(str):
+            key = name.strip()
+            mapped = genome_map.get(key)
+            if not mapped:
+                missing.append(key)
+                genomes.append(key)
+            else:
+                genomes.append(mapped)
+
+        if missing:
+            raise ValueError(f"CheckM2 names not found in data/genomes: {missing}")
+
+        out_df = pd.DataFrame(
+            {
+                "genome": genomes,
+                "completeness": df[comp_col],
+                "contamination": df[cont_col],
+            }
+        )
+        Path(output.metadata).parent.mkdir(parents=True, exist_ok=True)
+        out_df.to_csv(output.metadata, index=False)
+
+checkpoint dereplicate:
+    input:
+        genomes=expand("{bin_path}", bin_path=BINS_TO_FILES.values()),
+        metadata=f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv"
+    output:
         Wdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Wdb.csv",
-        Cdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Cdb.csv"
+        Cdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Cdb.csv",
+        derep_dir=directory(f"{OUTPUT_DIR}/profiling_genomes/drep/dereplicated_genomes")
     params:
         drep_module={DREP_MODULE},
         mash_module={MASH_MODULE},
-        metadata=f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv",
         outdir=f"{OUTPUT_DIR}/profiling_genomes/drep/",
         ani={DREP_ANI},
         uncompressed_dir=f"{OUTPUT_DIR}/profiling_genomes/drep/uncompressed_genomes"
@@ -53,19 +144,28 @@ checkpoint dereplicate:
                 files+=("$f")
             fi
         done
-        if [ -f "{params.metadata}" ]; then
-            # Using existing completeness information
-            dRep dereplicate {params.outdir} -p {threads} -g "${{files[@]}}" -sa {params.ani} --genomeInfo {params.metadata}
-        else
-            # Generate completeness information
-            dRep dereplicate {params.outdir} -p {threads} -g "${{files[@]}}" -sa {params.ani}
-        fi
+        dRep dereplicate {params.outdir} -p {threads} -g "${{files[@]}}" -sa {params.ani} --genomeInfo {input.metadata}
+        """
 
-        # rename headers in every .fa under dereplicated_genomes/
-        for f in {params.outdir}/dereplicated_genomes/*.fa; do
-            genome=$(basename "$f" .fa)
+# Normalize headers in dereplicated genomes with .fa/.fna/.fasta
+rule rename_derep_headers:
+    input:
+        derep_dir=f"{OUTPUT_DIR}/profiling_genomes/drep/dereplicated_genomes"
+    output:
+        touch(f"{OUTPUT_DIR}/profiling_genomes/drep/dereplicated_genomes/.headers_renamed")
+    localrule: True
+    message: "Renaming headers in dereplicated genomes..."
+    shell:
+        """
+        shopt -s nullglob
+        for f in {input.derep_dir}/*.fa {input.derep_dir}/*.fna {input.derep_dir}/*.fasta; do
+            base=$(basename "$f")
+            genome="${{base%.fa}}"
+            genome="${{genome%.fna}}"
+            genome="${{genome%.fasta}}"
             awk -v g="$genome" 'BEGIN{{i=0}} /^>/ {{print ">" g "^" i++; next}} {{print}}' "$f" > tmp && mv tmp "$f"
         done
+        touch {output}
         """
 
 # Functions to define the input files dynamically.
@@ -80,7 +180,8 @@ def get_mag_fna(wildcards):
 
 rule merge_catalogue:
     input:
-        get_mag_fna
+        get_mag_fna,
+        headers=f"{OUTPUT_DIR}/profiling_genomes/drep/dereplicated_genomes/.headers_renamed"
     output:
         f"{OUTPUT_DIR}/profiling_genomes/catalogue/genome_catalogue.fna"
     localrule: True
