@@ -1,12 +1,11 @@
-Welcome to DRAKKAR's documentation!
-===================================
+Welcome to DRAKKAR's documentation
+==================================
 
-**DRAKKAR** is a snakemake-based genome-resolved metagenomics pipeline optimised for Mjolnir. 
-Snakemake works along with Slurm to conduct the long pipeline using the optimal memory and time resources. 
-It is built in a modular fashion, so that the entire workflow or only parts of it can be executed.
+**DRAKKAR** is a Snakemake-based, modular genome-resolved metagenomics pipeline
+optimized for the Globe Institute's HPC Mjolnir. It runs on Slurm, supports
+re-entrant modules, and produces standardized outputs for downstream analysis.
 
-Check out the :doc:`usage` section for further information, including
-how to :ref:`installation` the project.
+If you are new to DRAKKAR, start with :doc:`installation` and :doc:`usage`.
 
 .. note::
 
@@ -16,6 +15,8 @@ Contents
 --------
 
 .. toctree::
+   :maxdepth: 2
 
+   installation
    usage
    api
