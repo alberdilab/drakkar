@@ -37,14 +37,20 @@ rule checkm2_report:
         rm -rf {params.genome_dir}
         mkdir -p {params.genome_dir}
         for f in {input.genomes}; do
+            base=$(basename "$f")
+            stem="${base%.gz}"
+            stem="${stem%.fa}"
+            stem="${stem%.fna}"
+            stem="${stem%.fasta}"
+            out="{params.genome_dir}/${stem}.fa"
             if [[ "$f" == *.gz ]]; then
-                out="{params.genome_dir}/$(basename "$f" .gz)"
                 gunzip -c "$f" > "$out"
             else
-                ln -sf "$f" "{params.genome_dir}/$(basename "$f")"
+                ln -sf "$f" "$out"
             fi
         done
-        checkm2 predict --input {params.genome_dir} --output-directory {params.outdir} --threads {threads} --database_path {params.checkm2_db} --force
+        checkm2 predict --input {params.genome_dir} --output-directory {params.outdir} --threads {threads} --database_path {params.checkm2_db} --extension fa --force
+        rm -rf {params.genome_dir}
         """
 
 rule checkm2_metadata:
@@ -67,13 +73,9 @@ rule checkm2_metadata:
         if not name_col or not comp_col or not cont_col:
             raise ValueError(f"CheckM2 output missing required columns: {list(df.columns)}")
 
-        output_root = Path(output.metadata).parents[2]
-        genomes_dir = output_root / "data" / "genomes"
         genome_map = {}
-        for genome_path in genomes_dir.iterdir():
-            if not genome_path.is_file():
-                continue
-            base = genome_path.name
+        for genome_path in BINS_TO_FILES.values():
+            base = Path(genome_path).name
             base_no_gz = re.sub(r"\.gz$", "", base, flags=re.IGNORECASE)
             base_no_ext = re.sub(r"\.(fa|fna|fasta)$", "", base_no_gz, flags=re.IGNORECASE)
             genome_map.setdefault(base_no_ext, base_no_gz)
@@ -138,7 +140,6 @@ checkpoint dereplicate:
             fi
         done
         dRep dereplicate {params.outdir} -p {threads} -g "${{files[@]}}" -sa {params.ani} --genomeInfo {input.metadata}
-
         """
 
 # Normalize headers in dereplicated genomes with .fa/.fna/.fasta
