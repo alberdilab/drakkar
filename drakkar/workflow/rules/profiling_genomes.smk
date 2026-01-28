@@ -151,8 +151,7 @@ checkpoint dereplicate:
 # Normalize headers in dereplicated genomes with .fa/.fna/.fasta
 rule rename_derep_headers:
     input:
-        wdb=f"{OUTPUT_DIR}/profiling_genomes/drep/data_tables/Wdb.csv",
-        derep_dir=f"{OUTPUT_DIR}/profiling_genomes/drep/dereplicated_genomes"
+        files=get_mag_fna
     output:
         touch(f"{OUTPUT_DIR}/profiling_genomes/drep/dereplicated_genomes/.headers_renamed")
     localrule: True
@@ -160,7 +159,7 @@ rule rename_derep_headers:
     shell:
         """
         shopt -s nullglob
-        for f in {input.derep_dir}/*.fa {input.derep_dir}/*.fna {input.derep_dir}/*.fasta; do
+        for f in {input.files}; do
             base=$(basename "$f")
             genome="${{base%.fa}}"
             genome="${{genome%.fna}}"

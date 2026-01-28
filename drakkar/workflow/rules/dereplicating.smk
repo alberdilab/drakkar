@@ -144,8 +144,7 @@ checkpoint dereplicate:
 # Normalize headers in dereplicated genomes with .fa/.fna/.fasta
 rule rename_derep_headers:
     input:
-        wdb=f"{OUTPUT_DIR}/dereplicating/drep/data_tables/Wdb.csv",
-        derep_dir=f"{OUTPUT_DIR}/dereplicating/drep/dereplicated_genomes"
+        files=lambda wildcards: get_derep_files(wildcards)
     output:
         touch(f"{OUTPUT_DIR}/dereplicating/drep/dereplicated_genomes/.headers_renamed")
     localrule: True
@@ -153,7 +152,7 @@ rule rename_derep_headers:
     shell:
         """
         shopt -s nullglob
-        for f in {input.derep_dir}/*.fa {input.derep_dir}/*.fna {input.derep_dir}/*.fasta; do
+        for f in {input.files}; do
             base=$(basename "$f")
             genome="${{base%.fa}}"
             genome="${{genome%.fna}}"
@@ -171,6 +170,11 @@ def get_derep_final_files(wildcards):
     checkpoint_output = checkpoints.dereplicate.get(**wildcards).output[0]
     selected_bins = get_mag_ids_from_drep(checkpoint_output)
     return expand(f"{OUTPUT_DIR}/dereplicating/final/{{bin_id}}", bin_id=selected_bins)
+
+def get_derep_files(wildcards):
+    checkpoint_output = checkpoints.dereplicate.get(**wildcards).output[0]
+    selected_bins = get_mag_ids_from_drep(checkpoint_output)
+    return expand(f"{OUTPUT_DIR}/dereplicating/drep/dereplicated_genomes/{{bin_id}}", bin_id=selected_bins)
 
 rule finalize_derep:
     input:
