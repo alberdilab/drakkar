@@ -111,8 +111,7 @@ checkpoint dereplicate:
         metadata=f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv"
     output:
         Wdb=f"{OUTPUT_DIR}/dereplicating/drep/data_tables/Wdb.csv",
-        Cdb=f"{OUTPUT_DIR}/dereplicating/drep/data_tables/Cdb.csv",
-        derep_dir=directory(f"{OUTPUT_DIR}/dereplicating/drep/dereplicated_genomes")
+        Cdb=f"{OUTPUT_DIR}/dereplicating/drep/data_tables/Cdb.csv"
     params:
         drep_module={DREP_MODULE},
         mash_module={MASH_MODULE},
@@ -145,6 +144,7 @@ checkpoint dereplicate:
 # Normalize headers in dereplicated genomes with .fa/.fna/.fasta
 rule rename_derep_headers:
     input:
+        wdb=f"{OUTPUT_DIR}/dereplicating/drep/data_tables/Wdb.csv",
         derep_dir=f"{OUTPUT_DIR}/dereplicating/drep/dereplicated_genomes"
     output:
         touch(f"{OUTPUT_DIR}/dereplicating/drep/dereplicated_genomes/.headers_renamed")
