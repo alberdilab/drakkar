@@ -45,11 +45,11 @@ rule checkm2_report:
         mkdir -p {params.genome_dir}
         for f in {input.genomes}; do
             base=$(basename "$f")
-            stem="${base%.gz}"
-            stem="${stem%.fa}"
-            stem="${stem%.fna}"
-            stem="${stem%.fasta}"
-            out="{params.genome_dir}/${stem}.fa"
+            stem="${{base%.gz}}"
+            stem="${{stem%.fa}}"
+            stem="${{stem%.fna}}"
+            stem="${{stem%.fasta}}"
+            out="{params.genome_dir}/${{stem}}.fa"
             if [[ "$f" == *.gz ]]; then
                 gunzip -c "$f" > "$out"
             else
