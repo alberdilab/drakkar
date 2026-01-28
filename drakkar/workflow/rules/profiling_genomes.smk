@@ -53,7 +53,8 @@ rule checkm2_report:
             if [[ "$f" == *.gz ]]; then
                 gunzip -c "$f" > "$out"
             else
-                ln -sf "$f" "$out"
+                src=$(readlink -f "$f" 2>/dev/null || realpath "$f")
+                ln -sf "$src" "$out"
             fi
         done
         checkm2 predict --input {params.genome_dir} --output-directory {params.outdir} --threads {threads} --database_path {params.checkm2_db} --extension fa --force
