@@ -151,7 +151,7 @@ checkpoint dereplicate:
 # Normalize headers in dereplicated genomes with .fa/.fna/.fasta
 rule rename_derep_headers:
     input:
-        files=get_mag_fna
+        files=lambda wildcards: get_mag_fna(wildcards)
     output:
         touch(f"{OUTPUT_DIR}/profiling_genomes/drep/dereplicated_genomes/.headers_renamed")
     localrule: True
