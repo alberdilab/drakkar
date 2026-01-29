@@ -377,7 +377,7 @@ def run_snakemake_cataloging2(workflow, project_name, output_dir, env_path, prof
     else:
         display_end()
 
-def run_snakemake_profiling(workflow, project_name, profiling_type, output_dir, env_path, profile, fraction, ani):
+def run_snakemake_profiling(workflow, project_name, profiling_type, output_dir, env_path, profile, fraction, ani, ignore_quality):
     """ Run the profiling workflow """
 
     snakemake_command = [
@@ -389,12 +389,13 @@ def run_snakemake_profiling(workflow, project_name, profiling_type, output_dir, 
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} profiling_type={profiling_type} output_dir={output_dir} fraction={fraction} DREP_ANI={ani} "
+        f"IGNORE_QUALITY={ignore_quality} "
         f"--conda-prefix {env_path} "
         f"--use-conda "
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
 
-def run_snakemake_dereplicating(workflow, project_name, output_dir, env_path, profile, ani):
+def run_snakemake_dereplicating(workflow, project_name, output_dir, env_path, profile, ani, ignore_quality):
     """ Run the dereplicating workflow """
 
     snakemake_command = [
@@ -405,7 +406,7 @@ def run_snakemake_dereplicating(workflow, project_name, output_dir, env_path, pr
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} DREP_ANI={ani} "
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} DREP_ANI={ani} IGNORE_QUALITY={ignore_quality} "
         f"--conda-prefix {env_path} "
         f"--use-conda "
     ]
@@ -514,6 +515,7 @@ def main():
     subparser_profiling.add_argument("-t", "--type", required=False, default="genomes", help="Either genomes or pangenomes profiling type. Default: genomes")
     subparser_profiling.add_argument("-f", "--fraction", required=False, action='store_true', help="Calculate microbial fraction using singlem")
     subparser_profiling.add_argument("-a", "--ani", required=False, type=float, default=0.98, help="ANI threshold for dRep dereplication (-sa). Default: 0.98")
+    subparser_profiling.add_argument("-q", "--ignore_quality", action="store_true", help="Pass --ignoreGenomeQuality to dRep during profiling")
     subparser_profiling.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_profiling.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
@@ -522,6 +524,7 @@ def main():
     subparser_dereplicating.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
     subparser_dereplicating.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_dereplicating.add_argument("-a", "--ani", required=False, type=float, default=0.98, help="ANI threshold for dRep dereplication (-sa). Default: 0.98")
+    subparser_dereplicating.add_argument("-q", "--ignore_quality", action="store_true", help="Pass --ignoreGenomeQuality to dRep during dereplication")
     subparser_dereplicating.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_dereplicating.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
@@ -884,7 +887,7 @@ def main():
                 print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
                 return
 
-        run_snakemake_profiling("profiling", project_name, args.type, args.output, env_path, args.profile, args.fraction, args.ani)
+        run_snakemake_profiling("profiling", project_name, args.type, args.output, env_path, args.profile, args.fraction, args.ani, args.ignore_quality)
 
     ###
     # Dereplicating
@@ -918,7 +921,7 @@ def main():
                 print(f"If you want to start from your own bin files, make sure to indicate an bin file (-B) or directory (-b).")
                 return
 
-        run_snakemake_dereplicating("dereplicating", project_name, args.output, env_path, args.profile, args.ani)
+        run_snakemake_dereplicating("dereplicating", project_name, args.output, env_path, args.profile, args.ani, args.ignore_quality)
 
     ###
     # Annotating

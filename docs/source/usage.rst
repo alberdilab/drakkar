@@ -161,6 +161,7 @@ Options:
 - ``-t/--type``: profiling type (``genomes`` or ``pangenomes``).
 - ``-f/--fraction``: compute microbial fraction with singlem.
 - ``-a/--ani``: dRep ANI threshold.
+- ``-q/--ignore_quality``: pass ``--ignoreGenomeQuality`` to dRep (skip CheckM quality filtering).
 - ``-e/--env_path``: shared Conda env dir.
 - ``-p/--profile``: Snakemake profile.
 
@@ -217,6 +218,7 @@ Options:
 - ``-B/--bins_file``: file listing MAG/bin paths.
 - ``-o/--output``: output directory.
 - ``-a/--ani``: dRep ANI threshold.
+- ``-q/--ignore_quality``: pass ``--ignoreGenomeQuality`` to dRep (skip CheckM quality filtering).
 - ``-e/--env_path``: shared Conda env dir.
 - ``-p/--profile``: Snakemake profile.
 

@@ -10,6 +10,7 @@ MASH_MODULE = config["MASH_MODULE"]
 CHECKM2_MODULE = config["CHECKM2_MODULE"]
 CHECKM2_DB = config["CHECKM2_DB"]
 DREP_ANI = float(config.get("DREP_ANI", 0.98))
+IGNORE_QUALITY = config.get("IGNORE_QUALITY", False)
 
 ####
 # Workflow rules
@@ -118,7 +119,8 @@ checkpoint dereplicate:
         mash_module={MASH_MODULE},
         outdir=f"{OUTPUT_DIR}/dereplicating/drep/",
         ani={DREP_ANI},
-        uncompressed_dir=f"{OUTPUT_DIR}/dereplicating/drep/uncompressed_genomes"
+        uncompressed_dir=f"{OUTPUT_DIR}/dereplicating/drep/uncompressed_genomes",
+        ignore_quality=IGNORE_QUALITY
     threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
@@ -139,7 +141,7 @@ checkpoint dereplicate:
                 files+=("$f")
             fi
         done
-        dRep dereplicate {params.outdir} -p {threads} -g "${{files[@]}}" -sa {params.ani} --genomeInfo {input.metadata}
+        dRep dereplicate {params.outdir} -p {threads} -g "${{files[@]}}" -sa {params.ani} --genomeInfo {input.metadata} { '--ignoreGenomeQuality' if params.ignore_quality else '' }
         """
 
 # Normalize headers in dereplicated genomes with .fa/.fna/.fasta
