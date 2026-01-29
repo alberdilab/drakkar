@@ -21,6 +21,7 @@ VFDB_DB = config["VFDB_DB"]
 GENOMAD_DB = config["GENOMAD_DB"]
 DBCAN_DB = config["DBCAN_DB"]
 ANTISMASH_DB = config["ANTISMASH_DB"]
+DEFENSEFINDER_DB = config["DEFENSEFINDER_DB"]
 
 ####
 # Workflow rules
@@ -198,7 +199,8 @@ rule merge_gene_annotations:
         pfam=f"{OUTPUT_DIR}/annotating/pfam/{{mag}}.tsv",
         vf=f"{OUTPUT_DIR}/annotating/vfdb/{{mag}}.txt",
         amr=f"{OUTPUT_DIR}/annotating/amr/{{mag}}.tsv",
-        sp=f"{OUTPUT_DIR}/annotating/signalp/{{mag}}.txt"
+        sp=f"{OUTPUT_DIR}/annotating/signalp/{{mag}}.txt",
+        defense=f"{OUTPUT_DIR}/annotating/defensefinder/{{mag}}_defense_finder_genes.tsv"
     output:
         f"{OUTPUT_DIR}/annotating/final/{{mag}}_genes.tsv"
     params:
@@ -232,6 +234,7 @@ rule merge_gene_annotations:
             -amr {input.amr} \
             -amrdb {params.amr} \
             -signalp {input.sp} \
+            -defense {input.defense} \
             -o {output}
         """
 
@@ -404,6 +407,32 @@ rule antismash_regions:
             -g {output.genes}
         """
 
+rule defensefinder:
+    input:
+        f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
+    output:
+        genes=f"{OUTPUT_DIR}/annotating/defensefinder/{{mag}}_defense_finder_genes.tsv",
+        systems=f"{OUTPUT_DIR}/annotating/defensefinder/{{mag}}_defense_finder_systems.tsv"
+    threads:
+        1
+    params:
+        package_dir={PACKAGE_DIR},
+        out_dir=f"{OUTPUT_DIR}/annotating/defensefinder",
+        db={DEFENSEFINDER_DB}
+    resources:
+        mem_mb=lambda wildcards, input, attempt: max(1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb * 100) * 2 ** (attempt - 1))
+    shell:
+        """
+        defense-finder run \
+            -w {threads} \
+            -o {params.out_dir} \
+            --models-dir {params.db} \
+            --skip-model-version-check \
+            -a \
+            {input}
+        """
+
 rule genomad:
     input:
         lambda wildcards: MAGS_TO_FILES[wildcards.mag]
@@ -458,7 +487,8 @@ rule merge_cluster_annotations:
     input:
         dbcan=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}.tsv",
         genomad=f"{OUTPUT_DIR}/annotating/genomad/{{mag}}.tsv",
-        antismash=f"{OUTPUT_DIR}/annotating/antismash/{{mag}}.tsv"
+        antismash=f"{OUTPUT_DIR}/annotating/antismash/{{mag}}.tsv",
+        defense=f"{OUTPUT_DIR}/annotating/defensefinder/{{mag}}_defense_finder_systems.tsv"
     output:
         f"{OUTPUT_DIR}/annotating/final/{{mag}}_clusters.tsv"
     params:
@@ -480,6 +510,7 @@ rule merge_cluster_annotations:
             -dbcan {input.dbcan} \
             -genomad {input.genomad} \
             -antismash {input.antismash} \
+            -defense {input.defense} \
             -o {output}
         """
 

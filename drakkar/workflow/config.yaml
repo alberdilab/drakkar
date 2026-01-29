@@ -51,6 +51,8 @@ CARVEME_DB: "/projects/alberdilab/data/databases/drakkar/carveme.tsv"
 GAPSEQ_DB: "/projects/alberdilab/data/databases/drakkar/gapseq"
 DBCAN_DB: "/projects/alberdilab/data/databases/drakkar/dbcan"
 ANTISMASH_DB: "/projects/alberdilab/data/databases/drakkar/antismash"
+DEFENSEFINDER_DB: "/projects/alberdilab/data/databases/drakkar/defensefinder"
+  # Small trick to change the versions of models from 2.1 to 2.0 was done to avoid errors in DefenseFinder
 
 # Environments
 

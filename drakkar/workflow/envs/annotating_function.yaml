@@ -6,3 +6,7 @@ dependencies:
   - biopython=1.81
   - antismash=8.0.4
   - dbcan=5.2.1
+  - hmmer=3.4
+  - pip
+  - pip:
+      - mdmparis-defense-finder

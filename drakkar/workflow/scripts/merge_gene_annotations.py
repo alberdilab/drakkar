@@ -30,7 +30,7 @@ def append_suffix_to_seqid(row):
 # Main function #
 #################
 
-def merge_annotations(gff_file, kegg_file, keggdb_file, pfam_file, ec_file, cazy_file, vf_file, vfdb_file, amr_file, amrdb_file, signalp_file, output_file):
+def merge_annotations(gff_file, kegg_file, keggdb_file, pfam_file, ec_file, cazy_file, vf_file, vfdb_file, amr_file, amrdb_file, signalp_file, output_file, defense_file=None):
 
     ##############
     # Load genes #
@@ -227,6 +227,32 @@ def merge_annotations(gff_file, kegg_file, keggdb_file, pfam_file, ec_file, cazy
     annotations = pd.merge(annotations, vfdb_df[['gene', 'vf', 'vf_type']], on='gene', how='left')
     annotations = pd.merge(annotations, signalp_df[['gene', 'signalp']], on='gene', how='left')
 
+    # Parse DefenseFinder (optional)
+    if defense_file:
+        defense_df = pd.read_csv(defense_file, sep='\t')
+        defense_df = defense_df.rename(columns={'hit_id': 'gene'})
+        defense_df['activity'] = defense_df['activity'].fillna('')
+        defense_df['gene_name'] = defense_df['gene_name'].fillna('')
+        defense_df['type'] = defense_df['type'].fillna('')
+
+        defense_hits = defense_df[defense_df['activity'] == 'Defense'][
+            ['gene', 'gene_name', 'type']
+        ].rename(columns={'gene_name': 'defense', 'type': 'defense_type'})
+        antidefense_hits = defense_df[defense_df['activity'] == 'Antidefense'][
+            ['gene', 'gene_name', 'type']
+        ].rename(columns={'gene_name': 'antidefense', 'type': 'antidefense_type'})
+
+        defense_hits = defense_hits.groupby('gene', group_keys=False).head(1).reset_index(drop=True)
+        antidefense_hits = antidefense_hits.groupby('gene', group_keys=False).head(1).reset_index(drop=True)
+
+        annotations = pd.merge(annotations, defense_hits, on='gene', how='left')
+        annotations = pd.merge(annotations, antidefense_hits, on='gene', how='left')
+    else:
+        annotations['defense'] = pd.NA
+        annotations['defense_type'] = pd.NA
+        annotations['antidefense'] = pd.NA
+        annotations['antidefense_type'] = pd.NA
+
     # Output the final DataFrame to the output file
     annotations.to_csv(output_file, sep='\t', index=False)
 
@@ -245,12 +271,13 @@ def main():
     parser.add_argument('-amrdb', required=True, type=str, help='Path to the AMRDB file')
     parser.add_argument('-signalp', required=True, type=str, help='Path to the SIGNALP file')
     parser.add_argument('-o', required=True, type=str, help='Path to the OUTPUT file')
+    parser.add_argument('-defense', required=False, type=str, help='Path to DefenseFinder genes TSV (optional)')
 
     # Parse the arguments
     args = parser.parse_args()
 
     # Process the files
-    merge_annotations(args.gff, args.kegg, args.keggdb, args.pfam, args.ec, args.cazy, args.vf, args.vfdb, args.amr, args.amrdb, args.signalp, args.o)
+    merge_annotations(args.gff, args.kegg, args.keggdb, args.pfam, args.ec, args.cazy, args.vf, args.vfdb, args.amr, args.amrdb, args.signalp, args.o, args.defense)
 
 if __name__ == '__main__':
     main()
