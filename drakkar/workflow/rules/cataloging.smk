@@ -54,7 +54,9 @@ rule assembly:
             --min-contig-len 1500 \
             -1 $R1_FILES -2 $R2_FILES \
             -o {params.outputdir}
-        mv {params.outputdir}/final.contigs.fa {output}
+        mv {params.outputdir}/final.contigs.fa {params.outputdir}/final.contigs.raw.fa
+        awk -v a="{wildcards.assembly}" 'BEGIN{{i=1}} /^>/{{print ">" a "_" i++; next}} {{print}}' \
+            {params.outputdir}/final.contigs.raw.fa > {output}
         """
 
 rule assembly_index:
@@ -344,16 +346,14 @@ rule rename_bins:
         lambda wildcards: get_bin_fna_sep(wildcards)
     output:
         f"{OUTPUT_DIR}/cataloging/final/{{assembly}}/{{assembly}}_bin_{{bin_id}}.fa"
-    params:
-        package_dir={PACKAGE_DIR}
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: max(1*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: max(2, int(input.size_mb) * 2 ** (attempt - 1))
-    message: "Renaming bin {wildcards.bin_id} from assembly {wildcards.assembly}..."
+    message: "Copying bin {wildcards.bin_id} from assembly {wildcards.assembly}..."
     shell:
         """
-        python {params.package_dir}/workflow/scripts/rename_bins.py {wildcards.assembly} {input} {output}
+        cp {input} {output}
         """
 
 rule move_metadata:
