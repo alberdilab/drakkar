@@ -122,7 +122,9 @@ checkpoint dereplicate:
         outdir=f"{OUTPUT_DIR}/dereplicating/drep/",
         ani={DREP_ANI},
         uncompressed_dir=f"{OUTPUT_DIR}/dereplicating/drep/uncompressed_genomes",
-        ignore_quality=IGNORE_QUALITY
+        ignore_quality=IGNORE_QUALITY,
+        ignore_quality_flag="true" if IGNORE_QUALITY else "false",
+        ignore_quality_arg="--ignoreGenomeQuality" if IGNORE_QUALITY else ""
     threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
@@ -144,10 +146,10 @@ checkpoint dereplicate:
             fi
         done
         genomeinfo_arg=""
-        if [ {str(IGNORE_QUALITY).lower()} = "false" ]; then
+        if [ "{params.ignore_quality_flag}" = "false" ]; then
             genomeinfo_arg="--genomeInfo {input.metadata}"
         fi
-        dRep dereplicate {params.outdir} -p {threads} -g "${{files[@]}}" -sa {params.ani} $genomeinfo_arg { '--ignoreGenomeQuality' if params.ignore_quality else '' }
+        dRep dereplicate {params.outdir} -p {threads} -g "${{files[@]}}" -sa {params.ani} $genomeinfo_arg {params.ignore_quality_arg}
         """
 
 # Normalize headers in dereplicated genomes with .fa/.fna/.fasta
