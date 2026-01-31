@@ -3,6 +3,7 @@ channels:
   - bioconda
   - defaults
 dependencies:
+  - python=3.10
   - biopython=1.81
   - antismash=8.0.4
   - dbcan=5.2.1
