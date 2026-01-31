@@ -200,7 +200,7 @@ rule merge_gene_annotations:
         vf=f"{OUTPUT_DIR}/annotating/vfdb/{{mag}}.txt",
         amr=f"{OUTPUT_DIR}/annotating/amr/{{mag}}.tsv",
         sp=f"{OUTPUT_DIR}/annotating/signalp/{{mag}}.txt",
-        defense=f"{OUTPUT_DIR}/annotating/defensefinder/{{mag}}_defense_finder_genes.tsv"
+        defense=f"{OUTPUT_DIR}/annotating/defensefinder/{{mag}}/{{mag}}_defense_finder_genes.tsv"
     output:
         f"{OUTPUT_DIR}/annotating/final/{{mag}}_genes.tsv"
     params:
@@ -411,13 +411,13 @@ rule defensefinder:
     input:
         f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
     output:
-        genes=f"{OUTPUT_DIR}/annotating/defensefinder/{{mag}}_defense_finder_genes.tsv",
-        systems=f"{OUTPUT_DIR}/annotating/defensefinder/{{mag}}_defense_finder_systems.tsv"
+        genes=f"{OUTPUT_DIR}/annotating/defensefinder/{{mag}}/{{mag}}_defense_finder_genes.tsv",
+        systems=f"{OUTPUT_DIR}/annotating/defensefinder/{{mag}}/{{mag}}_defense_finder_systems.tsv"
     threads:
         1
     params:
         package_dir={PACKAGE_DIR},
-        out_dir=f"{OUTPUT_DIR}/annotating/defensefinder",
+        out_dir=f"{OUTPUT_DIR}/annotating/defensefinder/{{mag}}",
         db={DEFENSEFINDER_DB}
     conda:
         f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
@@ -490,7 +490,7 @@ rule merge_cluster_annotations:
         dbcan=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}.tsv",
         genomad=f"{OUTPUT_DIR}/annotating/genomad/{{mag}}.tsv",
         antismash=f"{OUTPUT_DIR}/annotating/antismash/{{mag}}.tsv",
-        defense=f"{OUTPUT_DIR}/annotating/defensefinder/{{mag}}_defense_finder_systems.tsv"
+        defense=f"{OUTPUT_DIR}/annotating/defensefinder/{{mag}}/{{mag}}_defense_finder_systems.tsv"
     output:
         f"{OUTPUT_DIR}/annotating/final/{{mag}}_clusters.tsv"
     params:
