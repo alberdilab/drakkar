@@ -287,7 +287,8 @@ rule dbcan2:
             --input_gff {input} \
             --output_dir {params.output_dir} \
             --db_dir {params.db} \
-            --gff_type prodigal
+            --gff_type prodigal \
+            --threads {threads}
     
         python {params.package_dir}/workflow/scripts/update_cgc_cazy_annotations.py \
             --hmm_results {params.output_dir}/dbCAN_hmm_results.tsv \
