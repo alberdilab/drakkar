@@ -11,12 +11,13 @@ CHECKM2_MODULE = config["CHECKM2_MODULE"]
 CHECKM2_DB = config["CHECKM2_DB"]
 DREP_ANI = float(config.get("DREP_ANI", 0.98))
 IGNORE_QUALITY = config.get("IGNORE_QUALITY", False)
+QUALITY_FILE = config.get("QUALITY_FILE", False)
 
 ####
 # Workflow rules
 ####
 
-if not IGNORE_QUALITY:
+if not IGNORE_QUALITY and not QUALITY_FILE:
 
     rule checkm2_report:
         input:
@@ -112,7 +113,7 @@ if not IGNORE_QUALITY:
 checkpoint dereplicate:
     input:
         genomes=expand("{bin_path}", bin_path=BINS_TO_FILES.values()),
-        metadata=lambda wildcards: [] if IGNORE_QUALITY else f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv"
+        metadata=lambda wildcards: f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv" if QUALITY_FILE else ([] if IGNORE_QUALITY else f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv")
     output:
         Wdb=f"{OUTPUT_DIR}/dereplicating/drep/data_tables/Wdb.csv",
         Cdb=f"{OUTPUT_DIR}/dereplicating/drep/data_tables/Cdb.csv"
@@ -124,7 +125,8 @@ checkpoint dereplicate:
         uncompressed_dir=f"{OUTPUT_DIR}/dereplicating/drep/uncompressed_genomes",
         ignore_quality=IGNORE_QUALITY,
         ignore_quality_flag="true" if IGNORE_QUALITY else "false",
-        ignore_quality_arg="--ignoreGenomeQuality" if IGNORE_QUALITY else ""
+        ignore_quality_arg="--ignoreGenomeQuality" if (IGNORE_QUALITY and not QUALITY_FILE) else "",
+        use_genomeinfo_flag="true" if (QUALITY_FILE or not IGNORE_QUALITY) else "false"
     threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
@@ -146,7 +148,7 @@ checkpoint dereplicate:
             fi
         done
         genomeinfo_arg=""
-        if [ "{params.ignore_quality_flag}" = "false" ]; then
+        if [ "{params.use_genomeinfo_flag}" = "true" ]; then
             genomeinfo_arg="--genomeInfo {input.metadata}"
         fi
         dRep dereplicate {params.outdir} -p {threads} -g "${{files[@]}}" -sa {params.ani} $genomeinfo_arg {params.ignore_quality_arg}

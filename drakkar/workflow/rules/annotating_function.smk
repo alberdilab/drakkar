@@ -242,7 +242,8 @@ rule dbcan:
     input:
         lambda wildcards: MAGS_TO_FILES[wildcards.mag]
     output:
-        f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/uniInput.gff"
+        f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/uniInput.gff",
+        f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/dbCAN_hmm_results.tsv
     threads:
         1
     params:
@@ -267,7 +268,8 @@ rule dbcan:
 
 rule dbcan2:
     input:
-        f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/uniInput.gff"
+        gff=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/uniInput.gff",
+        tsv=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/dbCAN_hmm_results.tsv"
     output:
         f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/total_cgc_info.tsv"
     threads:
@@ -284,14 +286,14 @@ rule dbcan2:
     shell:
         """
         run_dbcan gff_process \
-            --input_gff {input} \
+            --input_gff {input.gff} \
             --output_dir {params.output_dir} \
             --db_dir {params.db} \
             --gff_type prodigal \
             --threads {threads}
     
         python {params.package_dir}/workflow/scripts/update_cgc_cazy_annotations.py \
-            --hmm_results {params.output_dir}/dbCAN_hmm_results.tsv \
+            --hmm_results {input.tsv} \
             --gff {params.output_dir}/cgc.gff
         """
     

@@ -90,6 +90,80 @@ def write_launch_metadata(args, output_dir, env_path=None):
     with open(metadata_path, "w") as f:
         yaml.safe_dump(metadata, f, sort_keys=False)
 
+def normalize_genome_name(name):
+    if not name:
+        return ""
+    base = os.path.basename(str(name).strip())
+    if base.endswith(".gz"):
+        base = base[:-3]
+    for ext in (".fa", ".fna", ".fasta"):
+        if base.endswith(ext):
+            base = base[: -len(ext)]
+            break
+    return base
+
+def load_bins_map(output_dir):
+    bins_path = Path(output_dir) / "data" / "bins_to_files.json"
+    if not bins_path.exists():
+        return {}
+    with open(bins_path, "r") as f:
+        return json.load(f)
+
+def validate_and_write_quality_file(quality_path, output_dir):
+    if not quality_path:
+        return False
+    if not os.path.isfile(quality_path):
+        print(f"{ERROR}ERROR:{RESET} Quality file not found: {quality_path}")
+        return False
+
+    df = pd.read_csv(quality_path, sep=None, engine="python")
+    required = {"genome", "completeness", "contamination"}
+    if not required.issubset(set(df.columns)):
+        print(f"{ERROR}ERROR:{RESET} Quality file must contain columns: genome, completeness, contamination")
+        return False
+
+    bins_map = load_bins_map(output_dir)
+    if not bins_map:
+        print(f"{ERROR}ERROR:{RESET} bins_to_files.json not found; cannot validate quality file.")
+        return False
+
+    # Build mapping from stem and basename to basename-with-extension
+    stem_to_base = {}
+    base_set = set()
+    for path in bins_map.values():
+        base = os.path.basename(path)
+        if base.endswith(".gz"):
+            base = base[:-3]
+        base_set.add(base)
+        stem_to_base[normalize_genome_name(base)] = base
+
+    mapped = []
+    missing = []
+    for name in df["genome"].astype(str):
+        key = name.strip()
+        if key in base_set:
+            mapped.append(key)
+            continue
+        stem = normalize_genome_name(key)
+        mapped_base = stem_to_base.get(stem)
+        if mapped_base:
+            mapped.append(mapped_base)
+        else:
+            mapped.append(key)
+            missing.append(key)
+
+    if missing:
+        print(f"{ERROR}ERROR:{RESET} Quality file missing bins: {missing}")
+        return False
+
+    out_dir = Path(output_dir) / "cataloging" / "final"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / "all_bin_metadata.csv"
+    out_df = df.copy()
+    out_df["genome"] = mapped
+    out_df = out_df[["genome", "completeness", "contamination"]]
+    out_df.to_csv(out_path, index=False)
+    return True
 def list_files_recursive(base_dir, exclude_snakemake=False):
     for root, dirs, files in os.walk(base_dir):
         if exclude_snakemake:
@@ -377,7 +451,7 @@ def run_snakemake_cataloging2(workflow, project_name, output_dir, env_path, prof
     else:
         display_end()
 
-def run_snakemake_profiling(workflow, project_name, profiling_type, output_dir, env_path, profile, fraction, ani, ignore_quality):
+def run_snakemake_profiling(workflow, project_name, profiling_type, output_dir, env_path, profile, fraction, ani, ignore_quality, quality_file):
     """ Run the profiling workflow """
 
     snakemake_command = [
@@ -389,13 +463,13 @@ def run_snakemake_profiling(workflow, project_name, profiling_type, output_dir, 
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} profiling_type={profiling_type} output_dir={output_dir} fraction={fraction} DREP_ANI={ani} "
-        f"IGNORE_QUALITY={ignore_quality} "
+        f"IGNORE_QUALITY={ignore_quality} QUALITY_FILE={bool(quality_file)} "
         f"--conda-prefix {env_path} "
         f"--use-conda "
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
 
-def run_snakemake_dereplicating(workflow, project_name, output_dir, env_path, profile, ani, ignore_quality):
+def run_snakemake_dereplicating(workflow, project_name, output_dir, env_path, profile, ani, ignore_quality, quality_file):
     """ Run the dereplicating workflow """
 
     snakemake_command = [
@@ -406,7 +480,7 @@ def run_snakemake_dereplicating(workflow, project_name, output_dir, env_path, pr
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} DREP_ANI={ani} IGNORE_QUALITY={ignore_quality} "
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} DREP_ANI={ani} IGNORE_QUALITY={ignore_quality} QUALITY_FILE={bool(quality_file)} "
         f"--conda-prefix {env_path} "
         f"--use-conda "
     ]
@@ -515,7 +589,8 @@ def main():
     subparser_profiling.add_argument("-t", "--type", required=False, default="genomes", help="Either genomes or pangenomes profiling type. Default: genomes")
     subparser_profiling.add_argument("-f", "--fraction", required=False, action='store_true', help="Calculate microbial fraction using singlem")
     subparser_profiling.add_argument("-a", "--ani", required=False, type=float, default=0.98, help="ANI threshold for dRep dereplication (-sa). Default: 0.98")
-    subparser_profiling.add_argument("-q", "--ignore_quality", action="store_true", help="Pass --ignoreGenomeQuality to dRep during profiling")
+    subparser_profiling.add_argument("-n", "--ignore_quality", action="store_true", help="Pass --ignoreGenomeQuality to dRep during profiling")
+    subparser_profiling.add_argument("-q", "--quality", type=str, help="CSV/TSV with genome, completeness, contamination columns")
     subparser_profiling.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_profiling.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
@@ -524,7 +599,8 @@ def main():
     subparser_dereplicating.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
     subparser_dereplicating.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_dereplicating.add_argument("-a", "--ani", required=False, type=float, default=0.98, help="ANI threshold for dRep dereplication (-sa). Default: 0.98")
-    subparser_dereplicating.add_argument("-q", "--ignore_quality", action="store_true", help="Pass --ignoreGenomeQuality to dRep during dereplication")
+    subparser_dereplicating.add_argument("-n", "--ignore_quality", action="store_true", help="Pass --ignoreGenomeQuality to dRep during dereplication")
+    subparser_dereplicating.add_argument("-q", "--quality", type=str, help="CSV/TSV with genome, completeness, contamination columns")
     subparser_dereplicating.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_dereplicating.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
@@ -887,7 +963,13 @@ def main():
                 print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
                 return
 
-        run_snakemake_profiling("profiling", project_name, args.type, args.output, env_path, args.profile, args.fraction, args.ani, args.ignore_quality)
+        quality_file = getattr(args, "quality", None)
+        ignore_quality = args.ignore_quality
+        if quality_file:
+            if not validate_and_write_quality_file(quality_file, args.output):
+                return
+            ignore_quality = True
+        run_snakemake_profiling("profiling", project_name, args.type, args.output, env_path, args.profile, args.fraction, args.ani, ignore_quality, quality_file)
 
     ###
     # Dereplicating
@@ -921,7 +1003,13 @@ def main():
                 print(f"If you want to start from your own bin files, make sure to indicate an bin file (-B) or directory (-b).")
                 return
 
-        run_snakemake_dereplicating("dereplicating", project_name, args.output, env_path, args.profile, args.ani, args.ignore_quality)
+        quality_file = getattr(args, "quality", None)
+        ignore_quality = args.ignore_quality
+        if quality_file:
+            if not validate_and_write_quality_file(quality_file, args.output):
+                return
+            ignore_quality = True
+        run_snakemake_dereplicating("dereplicating", project_name, args.output, env_path, args.profile, args.ani, ignore_quality, quality_file)
 
     ###
     # Annotating
