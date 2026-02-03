@@ -117,6 +117,8 @@ def validate_and_write_quality_file(quality_path, output_dir):
         return False
 
     df = pd.read_csv(quality_path, sep=None, engine="python")
+    col_map = {c: str(c).strip().lower() for c in df.columns}
+    df.rename(columns=col_map, inplace=True)
     required = {"genome", "completeness", "contamination"}
     if not required.issubset(set(df.columns)):
         print(f"{ERROR}ERROR:{RESET} Quality file must contain columns: genome, completeness, contamination")
