@@ -243,7 +243,7 @@ rule dbcan:
         lambda wildcards: MAGS_TO_FILES[wildcards.mag]
     output:
         f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/uniInput.gff",
-        f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/dbCAN_hmm_results.tsv
+        f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/dbCAN_hmm_results.tsv"
     threads:
         1
     params:
