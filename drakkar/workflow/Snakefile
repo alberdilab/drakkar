@@ -16,6 +16,28 @@ FRACTION = config.get("fraction", None)
 PROFILING_TYPE = config["profiling_type"].split(",") if "profiling_type" in config else []
 ANNOTATING_TYPE = config["annotating_type"].split(",") if "annotating_type" in config else []
 
+FUNCTION_ANNOTATION_COMPONENTS = {
+    "kegg", "cazy", "pfam", "virulence", "amr", "signalp",
+    "dbcan", "antismash", "defense", "mobile"
+}
+GENE_ANNOTATION_COMPONENTS = {"kegg", "cazy", "pfam", "virulence", "amr", "signalp"}
+CLUSTER_ANNOTATION_COMPONENTS = {"dbcan", "antismash", "defense", "mobile"}
+
+annotation_aliases = {"vfdb": "virulence", "genomad": "mobile"}
+ANNOTATING_TYPE = [annotation_aliases.get(t.strip().lower(), t.strip().lower()) for t in ANNOTATING_TYPE if t.strip()]
+ANNOTATING_TYPE_SET = set(ANNOTATING_TYPE)
+
+if "function" in ANNOTATING_TYPE_SET:
+    ANNOTATING_TYPE_SET.update(FUNCTION_ANNOTATION_COMPONENTS)
+
+if "genes" in ANNOTATING_TYPE_SET:
+    ANNOTATING_TYPE_SET.update(GENE_ANNOTATION_COMPONENTS)
+
+ANNOTATING_TYPE = sorted(ANNOTATING_TYPE_SET)
+RUN_ANNOTATING_FUNCTION = bool(ANNOTATING_TYPE_SET.intersection(FUNCTION_ANNOTATION_COMPONENTS | {"function", "genes"}))
+RUN_GENE_ANNOTATIONS = bool(ANNOTATING_TYPE_SET.intersection(GENE_ANNOTATION_COMPONENTS | {"defense"}))
+RUN_CLUSTER_ANNOTATIONS = bool(ANNOTATING_TYPE_SET.intersection(CLUSTER_ANNOTATION_COMPONENTS))
+
 ####
 # Calculate optimal resources for computing
 ####
@@ -241,8 +263,8 @@ if WORKFLOW == "annotating":
 
     rule all:
         input:
-            *([f"{OUTPUT_DIR}/annotating/cluster_annotations.tsv.xz"] if "function" in ANNOTATING_TYPE else []),
-            *([f"{OUTPUT_DIR}/annotating/gene_annotations.tsv.xz"] if "function" in ANNOTATING_TYPE else []),
+            *([f"{OUTPUT_DIR}/annotating/cluster_annotations.tsv.xz"] if RUN_CLUSTER_ANNOTATIONS else []),
+            *([f"{OUTPUT_DIR}/annotating/gene_annotations.tsv.xz"] if RUN_GENE_ANNOTATIONS else []),
             *([f"{OUTPUT_DIR}/annotating/genome_taxonomy.tsv"] if "taxonomy" in ANNOTATING_TYPE else []),
             #*([f"{OUTPUT_DIR}/annotating/m2m/{mag}.sbml" for mag in mags] if "network" in ANNOTATING_TYPE else []),
             *([f"{OUTPUT_DIR}/annotating/mergem/{mag}.sbml" for mag in mags] if "network" in ANNOTATING_TYPE else [])
@@ -250,7 +272,7 @@ if WORKFLOW == "annotating":
     if "taxonomy" in ANNOTATING_TYPE:
         include: "rules/annotating_taxonomy.smk"
 
-    if "function" in ANNOTATING_TYPE:
+    if RUN_ANNOTATING_FUNCTION:
         include: "rules/annotating_function.smk"
 
     if "network" in ANNOTATING_TYPE:

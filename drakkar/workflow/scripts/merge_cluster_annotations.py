@@ -18,6 +18,8 @@ SUMMARY_COLUMNS = [
 
 
 def read_table(path: Path, source: str, has_pul: bool = False):
+    if not path or not path.exists() or path.stat().st_size == 0:
+        return []
     rows = []
     with path.open() as fh:
         reader = csv.DictReader(fh, delimiter="\t")
@@ -46,9 +48,9 @@ def write_table(rows, out_path: Path):
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Merge dbCAN, geNomad, antiSMASH, and DefenseFinder cluster summaries.")
-    parser.add_argument("-dbcan", required=True, help="Path to dbCAN summary TSV")
-    parser.add_argument("-genomad", required=True, help="Path to geNomad summary TSV")
-    parser.add_argument("-antismash", required=True, help="Path to antiSMASH summary TSV")
+    parser.add_argument("-dbcan", required=False, help="Path to dbCAN summary TSV")
+    parser.add_argument("-genomad", required=False, help="Path to geNomad summary TSV")
+    parser.add_argument("-antismash", required=False, help="Path to antiSMASH summary TSV")
     parser.add_argument("-defense", required=False, help="Path to DefenseFinder systems TSV")
     parser.add_argument("-o", "--output", required=True, help="Path to write merged TSV")
     return parser.parse_args()
@@ -57,9 +59,12 @@ def parse_args():
 def main():
     args = parse_args()
     merged = []
-    merged.extend(read_table(Path(args.dbcan), "dbcan", has_pul=True))
-    merged.extend(read_table(Path(args.genomad), "genomad"))
-    merged.extend(read_table(Path(args.antismash), "antismash"))
+    if args.dbcan:
+        merged.extend(read_table(Path(args.dbcan), "dbcan", has_pul=True))
+    if args.genomad:
+        merged.extend(read_table(Path(args.genomad), "genomad"))
+    if args.antismash:
+        merged.extend(read_table(Path(args.antismash), "antismash"))
     if args.defense:
         defense_path = Path(args.defense)
         if defense_path.exists():

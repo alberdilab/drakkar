@@ -42,13 +42,35 @@ RESET = "\033[0m"
 ###
 
 def normalize_annotation_type(annotation_type):
-    allowed = {"taxonomy", "function"}
-    items = [item.strip() for item in annotation_type.split(",") if item.strip()]
+    functional_components = {
+        "kegg", "cazy", "pfam", "virulence", "amr", "signalp",
+        "dbcan", "antismash", "defense", "mobile"
+    }
+    gene_components = {"kegg", "cazy", "pfam", "virulence", "amr", "signalp"}
+    aliases = {"vfdb": "virulence", "genomad": "mobile"}
+    allowed = {
+        "taxonomy", "function", "genes", "network",
+        *functional_components
+    }
+    option_order = [
+        "taxonomy", "function", "genes", "network",
+        "kegg", "cazy", "pfam", "virulence", "amr", "signalp",
+        "dbcan", "antismash", "defense", "mobile"
+    ]
+    items = [aliases.get(item.strip().lower(), item.strip().lower()) for item in annotation_type.split(",") if item.strip()]
     invalid = [item for item in items if item not in allowed]
     if not items or invalid:
-        print(f"{ERROR}ERROR:{RESET} --annotation-type must be 'taxonomy', 'function', or a comma-separated list of those options (e.g. taxonomy,function).")
+        print(f"{ERROR}ERROR:{RESET} --annotation-type must be a comma-separated list including taxonomy, function, genes, kegg, cazy, pfam, virulence, amr, signalp, dbcan, antismash, defense, mobile, and/or network.")
         return None
-    return ",".join(items)
+
+    expanded = set(items)
+    if "function" in expanded:
+        expanded.update(functional_components)
+    if "genes" in expanded:
+        expanded.update(gene_components)
+
+    normalized = [opt for opt in option_order if opt in expanded]
+    return ",".join(normalized)
 
 def validate_path(path_value, label, expect_dir=False):
     if not path_value:
@@ -558,7 +580,17 @@ def main():
     subparser_complete.add_argument("-r", "--reference", required=False, help="Reference host genome")
     subparser_complete.add_argument("-m", "--mode", required=False, help="Comma-separated list of cataloging modes (e.g. individual,all)")
     subparser_complete.add_argument("-t", "--type", required=False, default="genomes", help="Either genomes or pangenomes profiling type. Default: genomes")
-    subparser_complete.add_argument("--annotation-type", dest="annotation_type", required=False, default="taxonomy,function", help="Taxonomic and/or functional annotations (comma-separated). Default: taxonomy,function")
+    subparser_complete.add_argument(
+        "--annotation-type",
+        dest="annotation_type",
+        required=False,
+        default="taxonomy,function",
+        help=(
+            "Comma-separated annotation targets. Options: taxonomy, function, genes, "
+            "kegg, cazy, pfam, virulence (vfdb), amr, signalp, dbcan, antismash, "
+            "defense, mobile (genomad), network. Default: taxonomy,function"
+        ),
+    )
     subparser_complete.add_argument("-c", "--multicoverage", action="store_true", help="Map samples sharing the same coverage group to each other's individual assemblies")
     subparser_complete.add_argument("--fraction", required=False, action='store_true', help="Calculate microbial fraction using singlem")
     subparser_complete.add_argument("-a", "--ani", required=False, type=float, default=0.98, help="ANI threshold for dRep dereplication (-sa). Default: 0.98")
@@ -610,7 +642,17 @@ def main():
     subparser_annotating.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa, .fna or .fasta, optionally including .gz) are stored")
     subparser_annotating.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
     subparser_annotating.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
-    subparser_annotating.add_argument("--annotation-type", dest="annotation_type", required=False, default="taxonomy,function", help="Taxonomic and/or functional annotations (comma-separated). Default: taxonomy,function")
+    subparser_annotating.add_argument(
+        "--annotation-type",
+        dest="annotation_type",
+        required=False,
+        default="taxonomy,function",
+        help=(
+            "Comma-separated annotation targets. Options: taxonomy, function, genes, "
+            "kegg, cazy, pfam, virulence (vfdb), amr, signalp, dbcan, antismash, "
+            "defense, mobile (genomad), network. Default: taxonomy,function"
+        ),
+    )
     subparser_annotating.add_argument("-e", "--env_path", type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_annotating.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 

@@ -1,283 +1,361 @@
 import argparse
-import pandas as pd
-from collections import defaultdict
-from Bio import SearchIO
 import json
+from collections import defaultdict
+from pathlib import Path
 
-#######################
-# Auxiliary functions #
-#######################
+import pandas as pd
+from Bio import SearchIO
 
-# Function to select the row with the lowest evalue or randomly if there is a tie
+
 def select_lowest_evalue(group):
-    # Sort the group by 'evalue' and take the first row of the sorted group
-    return group.sort_values(by='evalue').head(1)
+    return group.sort_values(by="evalue").head(1)
 
-# Function to select the row with the lowest evalue or randomly if there is a tie
+
 def select_highest_confidence(group):
-    # Sort the group by 'evalue' and take the first row of the sorted group
-    return group.sort_values(by='confidence', ascending=False).head(1)
+    return group.sort_values(by="confidence", ascending=False).head(1)
 
-# Function to extract the part after the underscore in ID and append it to seqid
+
 def append_suffix_to_seqid(row):
-    # Extract the part after 'ID=' and before the first ';'
-    id_part = row['attributes'].split(';')[0].replace('ID=', '')
-    # Extract the part after the underscore
-    suffix = id_part.split('_')[-1]
+    id_part = row["attributes"].split(";")[0].replace("ID=", "")
+    suffix = id_part.split("_")[-1]
     return f"{row['seqid']}_{suffix}"
 
-#################
-# Main function #
-#################
 
-def merge_annotations(gff_file, kegg_file, keggdb_file, pfam_file, ec_file, cazy_file, vf_file, vfdb_file, amr_file, amrdb_file, signalp_file, output_file, defense_file=None):
+def has_content(path):
+    if not path:
+        return False
+    path_obj = Path(path)
+    return path_obj.is_file() and path_obj.stat().st_size > 0
 
-    ##############
-    # Load genes #
-    ##############
 
-    annotations = pd.read_csv(gff_file, sep='\t', comment='#', header=None,
-                     names=['seqid', 'source', 'type', 'start', 'end',
-                            'score', 'strand', 'phase', 'attributes'])
-    annotations['seqid'] = annotations.apply(append_suffix_to_seqid, axis=1)
-    annotations = annotations.drop(columns=['attributes', 'source', 'score', 'type', 'phase'])
-    annotations = annotations.rename(columns={'seqid': 'gene'})
+def parse_hmmer3_tab(path):
+    fields = ["accession", "bitscore", "evalue", "id", "overlap_num", "region_num"]
+    if not has_content(path):
+        return pd.DataFrame(columns=["gene", *fields])
 
-    ######################
-    # Load mapping files #
-    ######################
-
-    #PFAM to EC
-    pfam_to_ec = pd.read_csv(ec_file, sep='\t', comment='#', header=0)
-    pfam_to_ec = pfam_to_ec[pfam_to_ec['Type'] == 'GOLD']
-    pfam_to_ec = pfam_to_ec.rename(columns={'Confidence-Score': 'confidence'})
-    pfam_to_ec = pfam_to_ec.rename(columns={'Pfam-Domain': 'pfam'})
-    pfam_to_ec = pfam_to_ec.rename(columns={'EC-Number': 'ec'})
-    pfam_to_ec['confidence'] = pd.to_numeric(pfam_to_ec['confidence'], errors='coerce')
-    pfam_to_ec = pfam_to_ec.groupby('pfam', group_keys=False)[['pfam','ec','confidence']].apply(select_highest_confidence, include_groups=False)
-
-    #Entry to VF
-    entry_to_vf = pd.read_csv(vfdb_file, sep='\t', comment='#', header=0)
-
-    #AMR to class
-    amr_to_class = pd.read_csv(amrdb_file, sep='\t', header=0)
-    amr_to_class = amr_to_class.rename(columns={'#hmm_accession': 'accession'})
-
-    #KEGG hierarchy
-    kegg_json=json.load(open(keggdb_file))
-    kegg_df = []
-    for main in kegg_json['children']:
-        for broad in main['children']:
-            for sub in broad['children']:
-                for gn in sub.get('children', [None]):
-                    if gn:
-                        # Extract the relevant parts of the 'name' field
-                        name = gn['name']
-                        kegg = name.split(' ')[0] if len(name.split(' ')) > 0 else ''
-                        description_and_ec = ' '.join(name.split(' ')[1:])
-
-                        # Split the description and EC number
-                        description_parts = description_and_ec.split(' [')
-                        description = description_parts[0]
-                        ec = description_parts[1][:-1] if len(description_parts) > 1 else ''  # Remove the trailing ']'
-
-                        # Append data to the list
-                        kegg_df.append([kegg, description, ec, sub['name'], broad['name'], main['name']])
-                    else:
-                        # Handle terms with no children if necessary
-                        pass
-    kegg_hierachy = pd.DataFrame(kegg_df, columns=['kegg', 'Description', 'ec', 'Subcategory', 'Broad Category', 'Main Category'])
-
-    #####################
-    # Parse annotations #
-    #####################
-
-    hmm_attribs = ['accession', 'bitscore', 'evalue', 'id', 'overlap_num', 'region_num']
-    evalue_threshold=0.00001
-
-    # Parse keggdb
-    keggdb_hits = defaultdict(list)
+    hits = defaultdict(list)
     query_ids = []
-
-    with open(kegg_file) as handle:
-        for queryresult in SearchIO.parse(handle, 'hmmer3-tab'):
-            query_id = queryresult.id  # Capture the query result id
-            query_ids.extend([query_id] * len(queryresult.hits))  # Extend query_ids list to match the number of hits
-
+    with open(path) as handle:
+        for queryresult in SearchIO.parse(handle, "hmmer3-tab"):
             for hit in queryresult.hits:
-                for attrib in hmm_attribs:
-                    # Use `getattr` to fetch the attribute value from the hit object
-                    value = getattr(hit, attrib, None)  # Use `None` as a default if the attribute does not exist
-                    keggdb_hits[attrib].append(value)
+                query_ids.append(queryresult.id)
+                for field in fields:
+                    hits[field].append(getattr(hit, field, None))
 
-    keggdb_hits['query_id'] = query_ids
-    keggdb_df = pd.DataFrame.from_dict(keggdb_hits)
-    keggdb_df = keggdb_df.rename(columns={'query_id': 'gene'})
-    keggdb_df['evalue'] = pd.to_numeric(keggdb_df['evalue'], errors='coerce')
-    keggdb_df = keggdb_df[keggdb_df['evalue'] < evalue_threshold]
-    keggdb_df = keggdb_df.rename(columns={'id': 'kegg'})
-    keggdb_df = pd.merge(keggdb_df, kegg_hierachy[['kegg', 'ec']], on='kegg', how='left')
-    keggdb_df = keggdb_df.groupby('gene', group_keys=False)[['gene','kegg','ec','evalue']].apply(select_lowest_evalue, include_groups=False).reset_index(drop=True)
-    keggdb_df['ec'] = keggdb_df['ec'].str.replace('EC:', '', regex=False)
+    if not query_ids:
+        return pd.DataFrame(columns=["gene", *fields])
 
-    # Parse PFAM
-    pfam_hits = defaultdict(list)
-    query_ids = []
+    data = pd.DataFrame.from_dict(hits)
+    data["gene"] = query_ids
+    return data
 
-    with open(pfam_file) as handle:
-        for queryresult in SearchIO.parse(handle, 'hmmer3-tab'):
-            query_id = queryresult.id  # Capture the query result id
-            query_ids.extend([query_id] * len(queryresult.hits))  # Extend query_ids list to match the number of hits
 
-            for hit in queryresult.hits:
-                for attrib in hmm_attribs:
-                    # Use `getattr` to fetch the attribute value from the hit object
-                    value = getattr(hit, attrib, None)  # Use `None` as a default if the attribute does not exist
-                    pfam_hits[attrib].append(value)
+def load_kegg_hierarchy(keggdb_file):
+    if not has_content(keggdb_file):
+        return pd.DataFrame(columns=["kegg", "ec"])
 
-    pfam_hits['query_id'] = query_ids
-    pfam_df = pd.DataFrame.from_dict(pfam_hits)
-    pfam_df = pfam_df.rename(columns={'query_id': 'gene'})
-    pfam_df = pfam_df.rename(columns={'accession': 'pfam'})
-    pfam_df['pfam'] = pfam_df['pfam'].str.split('.').str[0]
-    pfam_df['evalue'] = pd.to_numeric(pfam_df['evalue'], errors='coerce')
-    pfam_df = pfam_df[pfam_df['evalue'] < evalue_threshold]
-    pfam_df = pfam_df.groupby('gene', group_keys=False)[['gene','pfam','evalue']].apply(select_lowest_evalue, include_groups=False).reset_index(drop=True)
-    pfam_df = pd.merge(pfam_df, pfam_to_ec[['pfam', 'ec']], on='pfam', how='left')
+    with open(keggdb_file) as handle:
+        kegg_json = json.load(handle)
 
-    # Parse CAZY
-    cazy_hits = defaultdict(list)
-    query_ids = []
+    kegg_rows = []
+    for main in kegg_json.get("children", []):
+        for broad in main.get("children", []):
+            for sub in broad.get("children", []):
+                for gene_node in sub.get("children", []):
+                    name = gene_node.get("name", "")
+                    kegg = name.split(" ")[0] if name else ""
+                    description_and_ec = " ".join(name.split(" ")[1:])
+                    description_parts = description_and_ec.split(" [")
+                    ec = description_parts[1][:-1] if len(description_parts) > 1 else ""
+                    kegg_rows.append((kegg, ec))
 
-    with open(cazy_file) as handle:
-        for queryresult in SearchIO.parse(handle, 'hmmer3-tab'):
-            query_id = queryresult.id  # Capture the query result id
-            query_ids.extend([query_id] * len(queryresult.hits))  # Extend query_ids list to match the number of hits
+    return pd.DataFrame(kegg_rows, columns=["kegg", "ec"])
 
-            for hit in queryresult.hits:
-                for attrib in hmm_attribs:
-                    # Use `getattr` to fetch the attribute value from the hit object
-                    value = getattr(hit, attrib, None)  # Use `None` as a default if the attribute does not exist
-                    cazy_hits[attrib].append(value)
 
-    cazy_hits['query_id'] = query_ids
-    cazy_df = pd.DataFrame.from_dict(cazy_hits)
-    cazy_df = cazy_df.rename(columns={'query_id': 'gene'})
-    cazy_df['id'] = cazy_df['id'].str.replace('.hmm', '', regex=False)
-    cazy_df['evalue'] = pd.to_numeric(cazy_df['evalue'], errors='coerce')
-    cazy_df = cazy_df[cazy_df['evalue'] < evalue_threshold]
-    cazy_df = cazy_df.rename(columns={'id': 'cazy'})
-    cazy_df = cazy_df.groupby('gene', group_keys=False)[['gene','cazy','evalue']].apply(select_lowest_evalue, include_groups=False).reset_index(drop=True)
+def parse_kegg(kegg_file, keggdb_file, evalue_threshold):
+    kegg_df = pd.DataFrame(columns=["gene", "kegg", "ec"])
+    hits = parse_hmmer3_tab(kegg_file)
+    if hits.empty:
+        return kegg_df
 
-    # Parse AMR
-    amr_hits = defaultdict(list)
-    query_ids = []
+    hierarchy = load_kegg_hierarchy(keggdb_file)
+    hits["evalue"] = pd.to_numeric(hits["evalue"], errors="coerce")
+    hits = hits[hits["evalue"] < evalue_threshold]
+    if hits.empty:
+        return kegg_df
 
-    with open(amr_file) as handle:
-        for queryresult in SearchIO.parse(handle, 'hmmer3-tab'):
-            query_id = queryresult.id  # Capture the query result id
-            query_ids.extend([query_id] * len(queryresult.hits))  # Extend query_ids list to match the number of hits
-
-            for hit in queryresult.hits:
-                for attrib in hmm_attribs:
-                    # Use `getattr` to fetch the attribute value from the hit object
-                    value = getattr(hit, attrib, None)  # Use `None` as a default if the attribute does not exist
-                    amr_hits[attrib].append(value)
-
-    amr_hits['query_id'] = query_ids
-    amr_df = pd.DataFrame.from_dict(amr_hits)
-    amr_df = amr_df.rename(columns={'query_id': 'gene'})
-    amr_df['evalue'] = pd.to_numeric(amr_df['evalue'], errors='coerce')
-    amr_df = amr_df[amr_df['evalue'] < evalue_threshold]
-    amr_df = amr_df.rename(columns={'id': 'amr'})
-    amr_df = amr_df.groupby('gene', group_keys=False)[['gene','amr','accession','evalue']].apply(select_lowest_evalue, include_groups=False).reset_index(drop=True)
-    amr_df = pd.merge(amr_df, amr_to_class[['accession','subtype','subclass']], on='accession', how='left')
-    amr_df = amr_df.rename(columns={'subtype': 'resistance_type'})
-    amr_df = amr_df.rename(columns={'subclass': 'resistance_target'})
-
-    # Parse VFDB
-    vfdb_df = pd.read_csv(vf_file, sep='\t', comment='#', header=None,
-                     names=['gene', 'entry', 'identity', 'length', 'mismatches',
-                            'gaps', 'query_start', 'query_end', 'target_start', 'target_end', 'evalue', 'bitscore'])
-    vfdb_df['evalue'] = pd.to_numeric(vfdb_df['evalue'], errors='coerce')
-    vfdb_df = vfdb_df[vfdb_df['evalue'] < evalue_threshold]
-    vfdb_df = vfdb_df.groupby('gene', group_keys=False)[['gene','entry','evalue']].apply(select_lowest_evalue, include_groups=False).reset_index(drop=True)
-    vfdb_df = pd.merge(vfdb_df, entry_to_vf[['entry','vf','vfc','vf_type']], on='entry', how='left')
-
-    # Parse SIGNALP
-    signalp_df = pd.read_csv(signalp_file, sep='\t', comment='#', header=None, names=['gene', 'signalp', 'confidence'])
-    signalp_df['confidence'] = pd.to_numeric(signalp_df['confidence'], errors='coerce')
-    signalp_df = signalp_df.groupby('gene', group_keys=False)[['gene','signalp','confidence']].apply(select_highest_confidence).reset_index(drop=True)
-
-    #####################
-    # Merge annotations #
-    #####################
-
-    annotations = pd.merge(annotations, keggdb_df[['gene', 'kegg', 'ec']], on='gene', how='left')
-    # Perform the merge, adding 'ec' from pfam_df as 'pfam_ec' to avoid conflict
-    annotations = pd.merge(annotations, pfam_df[['gene', 'pfam', 'ec']], on='gene', how='left', suffixes=('', '_pfam'))
-    # Update 'ec' column in annotations only where it is empty
-    annotations['ec'] = annotations.apply(
-        lambda row: row['ec_pfam'] if pd.isna(row['ec']) or row['ec'] == '' else row['ec'],
-        axis=1)
-    # Drop the temporary 'ec_pfam' column
-    annotations.drop(columns=['ec_pfam'], inplace=True)
-    annotations = pd.merge(annotations, cazy_df[['gene', 'cazy']], on='gene', how='left')
-    annotations = pd.merge(annotations, amr_df[['gene','resistance_type','resistance_target']], on='gene', how='left')
-    annotations = pd.merge(annotations, vfdb_df[['gene', 'vf', 'vf_type']], on='gene', how='left')
-    annotations = pd.merge(annotations, signalp_df[['gene', 'signalp']], on='gene', how='left')
-
-    # Parse DefenseFinder (optional)
-    if defense_file:
-        defense_df = pd.read_csv(defense_file, sep='\t')
-        defense_df = defense_df.rename(columns={'hit_id': 'gene'})
-        defense_df['activity'] = defense_df['activity'].fillna('')
-        defense_df['gene_name'] = defense_df['gene_name'].fillna('')
-        defense_df['type'] = defense_df['type'].fillna('')
-
-        defense_hits = defense_df[defense_df['activity'] == 'Defense'][
-            ['gene', 'gene_name', 'type']
-        ].rename(columns={'gene_name': 'defense', 'type': 'defense_type'})
-        antidefense_hits = defense_df[defense_df['activity'] == 'Antidefense'][
-            ['gene', 'gene_name', 'type']
-        ].rename(columns={'gene_name': 'antidefense', 'type': 'antidefense_type'})
-
-        defense_hits = defense_hits.groupby('gene', group_keys=False).head(1).reset_index(drop=True)
-        antidefense_hits = antidefense_hits.groupby('gene', group_keys=False).head(1).reset_index(drop=True)
-
-        annotations = pd.merge(annotations, defense_hits, on='gene', how='left')
-        annotations = pd.merge(annotations, antidefense_hits, on='gene', how='left')
+    hits = hits.rename(columns={"id": "kegg"})
+    if not hierarchy.empty:
+        hits = pd.merge(hits, hierarchy, on="kegg", how="left")
     else:
-        annotations['defense'] = pd.NA
-        annotations['defense_type'] = pd.NA
-        annotations['antidefense'] = pd.NA
-        annotations['antidefense_type'] = pd.NA
+        hits["ec"] = pd.NA
 
-    # Output the final DataFrame to the output file
-    annotations.to_csv(output_file, sep='\t', index=False)
+    kegg_df = hits.groupby("gene", group_keys=False)[["gene", "kegg", "ec", "evalue"]].apply(
+        select_lowest_evalue, include_groups=False
+    ).reset_index(drop=True)
+    kegg_df["ec"] = kegg_df["ec"].astype("string").str.replace("EC:", "", regex=False)
+    return kegg_df
+
+
+def parse_pfam(pfam_file, ec_file, evalue_threshold):
+    pfam_df = pd.DataFrame(columns=["gene", "pfam", "ec"])
+    hits = parse_hmmer3_tab(pfam_file)
+    if hits.empty:
+        return pfam_df
+
+    hits["evalue"] = pd.to_numeric(hits["evalue"], errors="coerce")
+    hits = hits[hits["evalue"] < evalue_threshold]
+    if hits.empty:
+        return pfam_df
+
+    hits = hits.rename(columns={"accession": "pfam"})
+    hits["pfam"] = hits["pfam"].astype("string").str.split(".").str[0]
+    hits = hits.groupby("gene", group_keys=False)[["gene", "pfam", "evalue"]].apply(
+        select_lowest_evalue, include_groups=False
+    ).reset_index(drop=True)
+
+    if has_content(ec_file):
+        pfam_to_ec = pd.read_csv(ec_file, sep="\t", comment="#", header=0)
+        pfam_to_ec = pfam_to_ec[pfam_to_ec["Type"] == "GOLD"]
+        pfam_to_ec = pfam_to_ec.rename(columns={
+            "Confidence-Score": "confidence",
+            "Pfam-Domain": "pfam",
+            "EC-Number": "ec",
+        })
+        pfam_to_ec["confidence"] = pd.to_numeric(pfam_to_ec["confidence"], errors="coerce")
+        pfam_to_ec = pfam_to_ec.groupby("pfam", group_keys=False)[["pfam", "ec", "confidence"]].apply(
+            select_highest_confidence, include_groups=False
+        )
+        hits = pd.merge(hits, pfam_to_ec[["pfam", "ec"]], on="pfam", how="left")
+    else:
+        hits["ec"] = pd.NA
+
+    return hits
+
+
+def parse_cazy(cazy_file, evalue_threshold):
+    cazy_df = pd.DataFrame(columns=["gene", "cazy"])
+    hits = parse_hmmer3_tab(cazy_file)
+    if hits.empty:
+        return cazy_df
+
+    hits["evalue"] = pd.to_numeric(hits["evalue"], errors="coerce")
+    hits = hits[hits["evalue"] < evalue_threshold]
+    if hits.empty:
+        return cazy_df
+
+    hits["id"] = hits["id"].astype("string").str.replace(".hmm", "", regex=False)
+    hits = hits.rename(columns={"id": "cazy"})
+    cazy_df = hits.groupby("gene", group_keys=False)[["gene", "cazy", "evalue"]].apply(
+        select_lowest_evalue, include_groups=False
+    ).reset_index(drop=True)
+    return cazy_df
+
+
+def parse_amr(amr_file, amrdb_file, evalue_threshold):
+    amr_df = pd.DataFrame(columns=["gene", "resistance_type", "resistance_target"])
+    hits = parse_hmmer3_tab(amr_file)
+    if hits.empty:
+        return amr_df
+
+    hits["evalue"] = pd.to_numeric(hits["evalue"], errors="coerce")
+    hits = hits[hits["evalue"] < evalue_threshold]
+    if hits.empty:
+        return amr_df
+
+    hits = hits.rename(columns={"id": "amr"})
+    hits = hits.groupby("gene", group_keys=False)[["gene", "amr", "accession", "evalue"]].apply(
+        select_lowest_evalue, include_groups=False
+    ).reset_index(drop=True)
+
+    if has_content(amrdb_file):
+        amr_to_class = pd.read_csv(amrdb_file, sep="\t", header=0)
+        amr_to_class = amr_to_class.rename(columns={"#hmm_accession": "accession"})
+        hits = pd.merge(hits, amr_to_class[["accession", "subtype", "subclass"]], on="accession", how="left")
+        hits = hits.rename(columns={"subtype": "resistance_type", "subclass": "resistance_target"})
+    else:
+        hits["resistance_type"] = pd.NA
+        hits["resistance_target"] = pd.NA
+
+    return hits[["gene", "resistance_type", "resistance_target"]]
+
+
+def parse_vfdb(vf_file, vfdb_file, evalue_threshold):
+    vf_df = pd.DataFrame(columns=["gene", "vf", "vf_type"])
+    if not has_content(vf_file):
+        return vf_df
+
+    hits = pd.read_csv(
+        vf_file,
+        sep="\t",
+        comment="#",
+        header=None,
+        names=[
+            "gene", "entry", "identity", "length", "mismatches", "gaps",
+            "query_start", "query_end", "target_start", "target_end", "evalue", "bitscore",
+        ],
+    )
+    if hits.empty:
+        return vf_df
+
+    hits["evalue"] = pd.to_numeric(hits["evalue"], errors="coerce")
+    hits = hits[hits["evalue"] < evalue_threshold]
+    if hits.empty:
+        return vf_df
+
+    hits = hits.groupby("gene", group_keys=False)[["gene", "entry", "evalue"]].apply(
+        select_lowest_evalue, include_groups=False
+    ).reset_index(drop=True)
+
+    if has_content(vfdb_file):
+        entry_to_vf = pd.read_csv(vfdb_file, sep="\t", comment="#", header=0)
+        hits = pd.merge(hits, entry_to_vf[["entry", "vf", "vf_type"]], on="entry", how="left")
+    else:
+        hits["vf"] = pd.NA
+        hits["vf_type"] = pd.NA
+
+    return hits[["gene", "vf", "vf_type"]]
+
+
+def parse_signalp(signalp_file):
+    signalp_df = pd.DataFrame(columns=["gene", "signalp"])
+    if not has_content(signalp_file):
+        return signalp_df
+
+    hits = pd.read_csv(signalp_file, sep="\t", comment="#", header=None, names=["gene", "signalp", "confidence"])
+    if hits.empty:
+        return signalp_df
+
+    hits["confidence"] = pd.to_numeric(hits["confidence"], errors="coerce")
+    signalp_df = hits.groupby("gene", group_keys=False)[["gene", "signalp", "confidence"]].apply(
+        select_highest_confidence
+    ).reset_index(drop=True)
+    return signalp_df[["gene", "signalp"]]
+
+
+def parse_defensefinder(defense_file):
+    defense_hits = pd.DataFrame(columns=["gene", "defense", "defense_type"])
+    antidefense_hits = pd.DataFrame(columns=["gene", "antidefense", "antidefense_type"])
+    if not has_content(defense_file):
+        return defense_hits, antidefense_hits
+
+    defense_df = pd.read_csv(defense_file, sep="\t")
+    if defense_df.empty:
+        return defense_hits, antidefense_hits
+
+    defense_df = defense_df.rename(columns={"hit_id": "gene"})
+    defense_df["activity"] = defense_df["activity"].fillna("")
+    defense_df["gene_name"] = defense_df["gene_name"].fillna("")
+    defense_df["type"] = defense_df["type"].fillna("")
+
+    defense_hits = defense_df[defense_df["activity"] == "Defense"][["gene", "gene_name", "type"]].rename(
+        columns={"gene_name": "defense", "type": "defense_type"}
+    )
+    antidefense_hits = defense_df[defense_df["activity"] == "Antidefense"][["gene", "gene_name", "type"]].rename(
+        columns={"gene_name": "antidefense", "type": "antidefense_type"}
+    )
+
+    defense_hits = defense_hits.groupby("gene", group_keys=False).head(1).reset_index(drop=True)
+    antidefense_hits = antidefense_hits.groupby("gene", group_keys=False).head(1).reset_index(drop=True)
+    return defense_hits, antidefense_hits
+
+
+def merge_annotations(
+    gff_file,
+    kegg_file,
+    keggdb_file,
+    pfam_file,
+    ec_file,
+    cazy_file,
+    vf_file,
+    vfdb_file,
+    amr_file,
+    amrdb_file,
+    signalp_file,
+    output_file,
+    defense_file=None,
+):
+    annotations = pd.read_csv(
+        gff_file,
+        sep="\t",
+        comment="#",
+        header=None,
+        names=["seqid", "source", "type", "start", "end", "score", "strand", "phase", "attributes"],
+    )
+    if annotations.empty:
+        annotations = pd.DataFrame(columns=["gene", "start", "end", "strand"])
+    else:
+        annotations["seqid"] = annotations.apply(append_suffix_to_seqid, axis=1)
+        annotations = annotations.drop(columns=["attributes", "source", "score", "type", "phase"])
+        annotations = annotations.rename(columns={"seqid": "gene"})
+
+    evalue_threshold = 0.00001
+    kegg_df = parse_kegg(kegg_file, keggdb_file, evalue_threshold)
+    pfam_df = parse_pfam(pfam_file, ec_file, evalue_threshold)
+    cazy_df = parse_cazy(cazy_file, evalue_threshold)
+    amr_df = parse_amr(amr_file, amrdb_file, evalue_threshold)
+    vf_df = parse_vfdb(vf_file, vfdb_file, evalue_threshold)
+    signalp_df = parse_signalp(signalp_file)
+
+    annotations = pd.merge(annotations, kegg_df[["gene", "kegg", "ec"]], on="gene", how="left")
+    annotations = pd.merge(annotations, pfam_df[["gene", "pfam", "ec"]], on="gene", how="left", suffixes=("", "_pfam"))
+    if "ec_pfam" in annotations.columns:
+        annotations["ec"] = annotations.apply(
+            lambda row: row["ec_pfam"] if pd.isna(row["ec"]) or row["ec"] == "" else row["ec"],
+            axis=1,
+        )
+        annotations.drop(columns=["ec_pfam"], inplace=True)
+    annotations = pd.merge(annotations, cazy_df[["gene", "cazy"]], on="gene", how="left")
+    annotations = pd.merge(annotations, amr_df[["gene", "resistance_type", "resistance_target"]], on="gene", how="left")
+    annotations = pd.merge(annotations, vf_df[["gene", "vf", "vf_type"]], on="gene", how="left")
+    annotations = pd.merge(annotations, signalp_df[["gene", "signalp"]], on="gene", how="left")
+
+    defense_hits, antidefense_hits = parse_defensefinder(defense_file)
+    if not defense_hits.empty:
+        annotations = pd.merge(annotations, defense_hits, on="gene", how="left")
+    if not antidefense_hits.empty:
+        annotations = pd.merge(annotations, antidefense_hits, on="gene", how="left")
+
+    for column in ["defense", "defense_type", "antidefense", "antidefense_type"]:
+        if column not in annotations.columns:
+            annotations[column] = pd.NA
+
+    annotations.to_csv(output_file, sep="\t", index=False)
+
 
 def main():
-    # Set up argument parsing
-    parser = argparse.ArgumentParser(description='Compare GFF and PFAM files and output the results.')
-    parser.add_argument('-gff', required=True, type=str, help='Path to the GFF file')
-    parser.add_argument('-kegg', required=True, type=str, help='Path to the kegg file')
-    parser.add_argument('-keggdb', required=True, type=str, help='Path to the keggdb file')
-    parser.add_argument('-pfam', required=True, type=str, help='Path to the PFAM file')
-    parser.add_argument('-ec', required=True, type=str, help='Path to the EC file')
-    parser.add_argument('-cazy', required=True, type=str, help='Path to the CAZY file')
-    parser.add_argument('-vf', required=True, type=str, help='Path to the VF file')
-    parser.add_argument('-vfdb', required=True, type=str, help='Path to the VFDB file')
-    parser.add_argument('-amr', required=True, type=str, help='Path to the AMR file')
-    parser.add_argument('-amrdb', required=True, type=str, help='Path to the AMRDB file')
-    parser.add_argument('-signalp', required=True, type=str, help='Path to the SIGNALP file')
-    parser.add_argument('-o', required=True, type=str, help='Path to the OUTPUT file')
-    parser.add_argument('-defense', required=False, type=str, help='Path to DefenseFinder genes TSV (optional)')
+    parser = argparse.ArgumentParser(description="Merge gene-level annotation sources into one table.")
+    parser.add_argument("-gff", required=True, type=str, help="Path to the GFF file")
+    parser.add_argument("-kegg", required=False, type=str, help="Path to the KEGG HMMER table")
+    parser.add_argument("-keggdb", required=False, type=str, help="Path to the KEGG hierarchy JSON")
+    parser.add_argument("-pfam", required=False, type=str, help="Path to the PFAM HMMER table")
+    parser.add_argument("-ec", required=False, type=str, help="Path to the PFAM-to-EC mapping table")
+    parser.add_argument("-cazy", required=False, type=str, help="Path to the CAZy HMMER table")
+    parser.add_argument("-vf", required=False, type=str, help="Path to the VFDB alignment table")
+    parser.add_argument("-vfdb", required=False, type=str, help="Path to the VFDB mapping table")
+    parser.add_argument("-amr", required=False, type=str, help="Path to the AMR HMMER table")
+    parser.add_argument("-amrdb", required=False, type=str, help="Path to the AMR mapping table")
+    parser.add_argument("-signalp", required=False, type=str, help="Path to the SignalP table")
+    parser.add_argument("-o", required=True, type=str, help="Path to the output TSV file")
+    parser.add_argument("-defense", required=False, type=str, help="Path to DefenseFinder gene-level TSV")
 
-    # Parse the arguments
     args = parser.parse_args()
+    merge_annotations(
+        args.gff,
+        args.kegg,
+        args.keggdb,
+        args.pfam,
+        args.ec,
+        args.cazy,
+        args.vf,
+        args.vfdb,
+        args.amr,
+        args.amrdb,
+        args.signalp,
+        args.o,
+        args.defense,
+    )
 
-    # Process the files
-    merge_annotations(args.gff, args.kegg, args.keggdb, args.pfam, args.ec, args.cazy, args.vf, args.vfdb, args.amr, args.amrdb, args.signalp, args.o, args.defense)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

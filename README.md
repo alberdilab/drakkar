@@ -93,9 +93,19 @@ Key options:
 - `-b/--bins_dir`: directory of MAGs/bins.
 - `-B/--bins_file`: text file listing MAG/bin paths.
 - `-o/--output`: output directory.
-- `--annotation-type`: `taxonomy`, `function`, or `taxonomy,function`.
+- `--annotation-type`: comma-separated targets:
+  - `taxonomy`
+  - `function` (all functional components)
+  - `genes` (gene-level only: `kegg,cazy,pfam,virulence,amr,signalp`)
+  - `kegg`, `cazy`, `pfam`, `virulence` (`vfdb` alias), `amr`, `signalp`
+  - `dbcan`, `antismash`, `defense`, `mobile` (`genomad` alias), `network`
 - `-e/--env_path`: conda environments directory.
 - `-p/--profile`: Snakemake profile.
+
+Output behavior for partial functional runs:
+- `annotating/gene_annotations.tsv.xz` is produced when any gene-level source is selected (`kegg,cazy,pfam,virulence,amr,signalp,defense`).
+- `annotating/cluster_annotations.tsv.xz` is produced when any cluster-level source is selected (`dbcan,antismash,defense,mobile`).
+- Merged annotation tables can be generated from any subset of the functional sources above.
 
 ```
 drakkar annotating {arguments}

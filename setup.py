@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="drakkar",
-    version="1.0.0",
+    version="1.0.1",
     author="Antton Alberdi",
     author_email="antton.alberdi@sund.ku.dk",
     description="Metagenomics pipeline optimized for Mjolnir",

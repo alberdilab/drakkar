@@ -93,7 +93,7 @@ Options:
 - ``-r/--reference``: host reference genome for preprocessing.
 - ``-m/--mode``: assembly modes (``individual``, ``all``).
 - ``-t/--type``: profiling type (``genomes`` or ``pangenomes``).
-- ``--annotation-type``: ``taxonomy``, ``function``, or both.
+- ``--annotation-type``: comma-separated targets. See *Annotating* for all values.
 - ``-c/--multicoverage``: enable multicoverage mapping.
 - ``--fraction``: compute microbial fraction with singlem.
 - ``-a/--ani``: dRep ANI threshold (default: 0.98).
@@ -175,14 +175,41 @@ Annotates dereplicated MAGs taxonomically and/or functionally.
 
    $ drakkar annotating -b /path/to/mags -o drakkar_output --annotation-type taxonomy,function
 
+.. code-block:: console
+
+   $ drakkar annotating -b /path/to/mags -o drakkar_output --annotation-type genes
+
 Options:
 
 - ``-b/--bins_dir``: directory with MAG/bin FASTA files.
 - ``-B/--bins_file``: file listing MAG/bin paths.
 - ``-o/--output``: output directory.
-- ``--annotation-type``: ``taxonomy``, ``function``, or both.
+- ``--annotation-type``: comma-separated annotation targets:
+
+  - ``taxonomy``: run GTDB-Tk taxonomy.
+  - ``function``: run all functional components below.
+  - ``genes``: run only gene-level components (``kegg,cazy,pfam,virulence,amr,signalp``).
+  - ``kegg``: KEGG ortholog HMM annotation.
+  - ``cazy``: CAZy HMM annotation.
+  - ``pfam``: PFAM HMM annotation.
+  - ``virulence`` (alias: ``vfdb``): VFDB-based virulence annotation.
+  - ``amr``: AMR HMM annotation.
+  - ``signalp``: signal peptide prediction.
+  - ``dbcan``: dbCAN/CGC annotation (cluster-level).
+  - ``antismash``: BGC cluster annotation.
+  - ``defense``: DefenseFinder systems and genes.
+  - ``mobile`` (alias: ``genomad``): geNomad viral/mobile regions.
+  - ``network``: metabolic network reconstruction.
 - ``-e/--env_path``: shared Conda env dir.
 - ``-p/--profile``: Snakemake profile.
+
+Output behavior for partial functional runs:
+
+- ``annotating/gene_annotations.tsv.xz`` is generated when any gene-level source is selected
+  (``kegg,cazy,pfam,virulence,amr,signalp,defense``).
+- ``annotating/cluster_annotations.tsv.xz`` is generated when any cluster-level source is selected
+  (``dbcan,antismash,defense,mobile``).
+- You can run any subset of functional components; merged tables are still generated from the available sources.
 
 Expressing
 ^^^^^^^^^^

@@ -23,6 +23,51 @@ DBCAN_DB = config["DBCAN_DB"]
 ANTISMASH_DB = config["ANTISMASH_DB"]
 DEFENSEFINDER_DB = config["DEFENSEFINDER_DB"]
 
+ANNOTATING_TYPE_SET = set(ANNOTATING_TYPE)
+
+RUN_KEGG = "kegg" in ANNOTATING_TYPE_SET
+RUN_CAZY = "cazy" in ANNOTATING_TYPE_SET
+RUN_PFAM = "pfam" in ANNOTATING_TYPE_SET
+RUN_VIRULENCE = "virulence" in ANNOTATING_TYPE_SET
+RUN_AMR = "amr" in ANNOTATING_TYPE_SET
+RUN_SIGNALP = "signalp" in ANNOTATING_TYPE_SET
+RUN_DBCAN = "dbcan" in ANNOTATING_TYPE_SET
+RUN_ANTISMASH = "antismash" in ANNOTATING_TYPE_SET
+RUN_DEFENSE = "defense" in ANNOTATING_TYPE_SET
+RUN_MOBILE = "mobile" in ANNOTATING_TYPE_SET
+
+
+def selected_gene_annotation_inputs(wildcards):
+    selected = []
+    if RUN_KEGG:
+        selected.append(f"{OUTPUT_DIR}/annotating/kegg/{wildcards.mag}.tsv")
+    if RUN_CAZY:
+        selected.append(f"{OUTPUT_DIR}/annotating/cazy/{wildcards.mag}.tsv")
+    if RUN_PFAM:
+        selected.append(f"{OUTPUT_DIR}/annotating/pfam/{wildcards.mag}.tsv")
+    if RUN_VIRULENCE:
+        selected.append(f"{OUTPUT_DIR}/annotating/vfdb/{wildcards.mag}.txt")
+    if RUN_AMR:
+        selected.append(f"{OUTPUT_DIR}/annotating/amr/{wildcards.mag}.tsv")
+    if RUN_SIGNALP:
+        selected.append(f"{OUTPUT_DIR}/annotating/signalp/{wildcards.mag}.txt")
+    if RUN_DEFENSE:
+        selected.append(f"{OUTPUT_DIR}/annotating/defensefinder/{wildcards.mag}/{wildcards.mag}_defense_finder_genes.tsv")
+    return selected
+
+
+def selected_cluster_annotation_inputs(wildcards):
+    selected = []
+    if RUN_DBCAN:
+        selected.append(f"{OUTPUT_DIR}/annotating/dbcan/{wildcards.mag}.tsv")
+    if RUN_MOBILE:
+        selected.append(f"{OUTPUT_DIR}/annotating/genomad/{wildcards.mag}.tsv")
+    if RUN_ANTISMASH:
+        selected.append(f"{OUTPUT_DIR}/annotating/antismash/{wildcards.mag}.tsv")
+    if RUN_DEFENSE:
+        selected.append(f"{OUTPUT_DIR}/annotating/defensefinder/{wildcards.mag}/{wildcards.mag}_defense_finder_systems.tsv")
+    return selected
+
 ####
 # Workflow rules
 ####
@@ -77,6 +122,8 @@ rule select_kegg:
     output:
         tsv=f"{OUTPUT_DIR}/annotating/kegg/kegg.tsv",
         csv=f"{OUTPUT_DIR}/annotating/kegg/kegg.csv"
+    params:
+        package_dir={PACKAGE_DIR}
     threads: 1
     resources:
         mem_mb=lambda wildcards, attempt: 1*1024 * 2 ** (attempt - 1),
@@ -194,21 +241,22 @@ rule signalp:
 rule merge_gene_annotations:
     input:
         gff=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.gff",
-        kegg=f"{OUTPUT_DIR}/annotating/kegg/{{mag}}.tsv",
-        cazy=f"{OUTPUT_DIR}/annotating/cazy/{{mag}}.tsv",
-        pfam=f"{OUTPUT_DIR}/annotating/pfam/{{mag}}.tsv",
-        vf=f"{OUTPUT_DIR}/annotating/vfdb/{{mag}}.txt",
-        amr=f"{OUTPUT_DIR}/annotating/amr/{{mag}}.tsv",
-        sp=f"{OUTPUT_DIR}/annotating/signalp/{{mag}}.txt",
-        defense=f"{OUTPUT_DIR}/annotating/defensefinder/{{mag}}/{{mag}}_defense_finder_genes.tsv"
+        selected=selected_gene_annotation_inputs
     output:
         f"{OUTPUT_DIR}/annotating/final/{{mag}}_genes.tsv"
     params:
         package_dir={PACKAGE_DIR},
-        kegg=f"{KEGG_DB}.json",
-        ec=f"{PFAM_DB}_ec.tsv",
-        vf=f"{VFDB_DB}.tsv",
-        amr=f"{AMR_DB}.tsv"
+        kegg_db=f"{KEGG_DB}.json",
+        ec_db=f"{PFAM_DB}_ec.tsv",
+        vf_db=f"{VFDB_DB}.tsv",
+        amr_db=f"{AMR_DB}.tsv",
+        kegg=lambda wildcards: f"{OUTPUT_DIR}/annotating/kegg/{wildcards.mag}.tsv",
+        pfam=lambda wildcards: f"{OUTPUT_DIR}/annotating/pfam/{wildcards.mag}.tsv",
+        cazy=lambda wildcards: f"{OUTPUT_DIR}/annotating/cazy/{wildcards.mag}.tsv",
+        vf=lambda wildcards: f"{OUTPUT_DIR}/annotating/vfdb/{wildcards.mag}.txt",
+        amr=lambda wildcards: f"{OUTPUT_DIR}/annotating/amr/{wildcards.mag}.tsv",
+        signalp=lambda wildcards: f"{OUTPUT_DIR}/annotating/signalp/{wildcards.mag}.txt",
+        defense=lambda wildcards: f"{OUTPUT_DIR}/annotating/defensefinder/{wildcards.mag}/{wildcards.mag}_defense_finder_genes.tsv"
     threads:
         1
     conda:
@@ -224,17 +272,17 @@ rule merge_gene_annotations:
         echo "INFO Using python from $PYTHON_BIN"
         $PYTHON_BIN {params.package_dir}/workflow/scripts/merge_gene_annotations.py \
             -gff {input.gff} \
-            -kegg {input.kegg} \
-            -keggdb {params.kegg} \
-            -pfam {input.pfam} \
-            -ec {params.ec} \
-            -cazy {input.cazy} \
-            -vf {input.vf} \
-            -vfdb {params.vf} \
-            -amr {input.amr} \
-            -amrdb {params.amr} \
-            -signalp {input.sp} \
-            -defense {input.defense} \
+            -kegg {params.kegg} \
+            -keggdb {params.kegg_db} \
+            -pfam {params.pfam} \
+            -ec {params.ec_db} \
+            -cazy {params.cazy} \
+            -vf {params.vf} \
+            -vfdb {params.vf_db} \
+            -amr {params.amr} \
+            -amrdb {params.amr_db} \
+            -signalp {params.signalp} \
+            -defense {params.defense} \
             -o {output}
         """
 
@@ -490,14 +538,15 @@ rule genomad_regions:
 
 rule merge_cluster_annotations:
     input:
-        dbcan=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}.tsv",
-        genomad=f"{OUTPUT_DIR}/annotating/genomad/{{mag}}.tsv",
-        antismash=f"{OUTPUT_DIR}/annotating/antismash/{{mag}}.tsv",
-        defense=f"{OUTPUT_DIR}/annotating/defensefinder/{{mag}}/{{mag}}_defense_finder_systems.tsv"
+        selected=selected_cluster_annotation_inputs
     output:
         f"{OUTPUT_DIR}/annotating/final/{{mag}}_clusters.tsv"
     params:
-        package_dir={PACKAGE_DIR}
+        package_dir={PACKAGE_DIR},
+        dbcan=lambda wildcards: f"{OUTPUT_DIR}/annotating/dbcan/{wildcards.mag}.tsv",
+        genomad=lambda wildcards: f"{OUTPUT_DIR}/annotating/genomad/{wildcards.mag}.tsv",
+        antismash=lambda wildcards: f"{OUTPUT_DIR}/annotating/antismash/{wildcards.mag}.tsv",
+        defense=lambda wildcards: f"{OUTPUT_DIR}/annotating/defensefinder/{wildcards.mag}/{wildcards.mag}_defense_finder_systems.tsv"
     threads:
         1
     conda:
@@ -512,10 +561,10 @@ rule merge_cluster_annotations:
         PYTHON_BIN="${{CONDA_PREFIX}}/bin/python"
         echo "INFO Using python from $PYTHON_BIN"
         $PYTHON_BIN {params.package_dir}/workflow/scripts/merge_cluster_annotations.py \
-            -dbcan {input.dbcan} \
-            -genomad {input.genomad} \
-            -antismash {input.antismash} \
-            -defense {input.defense} \
+            -dbcan {params.dbcan} \
+            -genomad {params.genomad} \
+            -antismash {params.antismash} \
+            -defense {params.defense} \
             -o {output}
         """
 
