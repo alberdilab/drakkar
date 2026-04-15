@@ -76,6 +76,12 @@ if not IGNORE_QUALITY and not QUALITY_FILE:
             import re
             from pathlib import Path
 
+            def normalize_genome_name(value):
+                name = Path(str(value).strip()).name
+                name = re.sub(r"\.gz$", "", name, flags=re.IGNORECASE)
+                name = re.sub(r"\.(fa|fna|fasta)$", "", name, flags=re.IGNORECASE)
+                return name
+
             report_path = Path(input.report)
             df = pd.read_csv(report_path, sep="\t")
             lower_cols = {c.lower(): c for c in df.columns}
@@ -88,16 +94,17 @@ if not IGNORE_QUALITY and not QUALITY_FILE:
             genome_map = {}
             for genome_path in BINS_TO_FILES.values():
                 base = Path(genome_path).name
-                base_no_gz = re.sub(r"\\.gz$", "", base, flags=re.IGNORECASE)
-                base_no_ext = re.sub(r"\\.(fa|fna|fasta)$", "", base_no_gz, flags=re.IGNORECASE)
+                base_no_gz = re.sub(r"\.gz$", "", base, flags=re.IGNORECASE)
+                base_no_ext = normalize_genome_name(base)
                 genome_map.setdefault(base_no_ext, base_no_gz)
                 genome_map.setdefault(base_no_gz, base_no_gz)
+                genome_map.setdefault(f"{base_no_ext}.fa", base_no_gz)
 
             genomes = []
             missing = []
             for name in df[name_col].astype(str):
                 key = name.strip()
-                mapped = genome_map.get(key)
+                mapped = genome_map.get(key) or genome_map.get(normalize_genome_name(key))
                 if not mapped:
                     missing.append(key)
                     genomes.append(key)
