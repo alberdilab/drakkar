@@ -23,7 +23,8 @@ Key concepts
 ------------
 
 - **Modules**: Each workflow stage can be run independently (preprocessing,
-  cataloging, profiling, annotating, expressing, dereplicating, inspecting).
+  cataloging, profiling, annotating, expressing, dereplicating, database,
+  inspecting, transfer).
 - **Output directory**: All outputs are written under ``-o/--output``.
 - **Profiles**: Use ``-p/--profile`` to select a Snakemake profile (default:
   ``slurm``).
@@ -251,6 +252,49 @@ Options:
 - ``-e/--env_path``: shared Conda env dir.
 - ``-p/--profile``: Snakemake profile.
 
+Database
+^^^^^^^^
+
+Installs or updates one managed annotation database release at a time. This is
+a maintenance workflow and is not triggered by ``drakkar complete``.
+
+Supported database subcommands:
+
+- ``kegg`` (alias: ``kofams``)
+- ``cazy``
+- ``pfam``
+- ``vfdb``
+- ``amr``
+
+.. code-block:: console
+
+   $ drakkar database amr --directory /projects/alberdilab/data/databases/drakkar/amr --version 20260421
+
+.. code-block:: console
+
+   $ drakkar database kegg --directory /projects/alberdilab/data/databases/drakkar/kofams --version 20260421 --set-default
+
+Options:
+
+- ``--directory``: base directory where the release folder will be created.
+- ``--version``: folder name to create inside ``--directory``.
+- ``--set-default``: update the corresponding database path in ``config.yaml``
+  after the installation finishes successfully.
+- ``-e/--env_path``: shared Conda env dir.
+- ``-p/--profile``: Snakemake profile.
+
+Behavior:
+
+- The selected database is installed into ``--directory/--version/``.
+- Workflow modules still use the explicit database path stored in ``config.yaml``.
+- ``--set-default`` rewrites that config entry to the newly installed release.
+
+Version logging:
+
+- Each run writes ``database_versions.yaml`` inside the installed release directory.
+- The log records the requested version, resolved install directory, source URLs,
+  and SHA256 checksums and file sizes for the installed assets.
+
 Inspecting
 ^^^^^^^^^^
 
@@ -320,6 +364,7 @@ Key output locations:
 - ``annotating/`` annotation tables.
 - ``expressing/`` expression outputs.
 - ``dereplicating/`` dereplicated genomes (dereplicating-only mode).
+- ``<directory>/<version>/database_versions.yaml`` installation log for a managed database release.
 
 Troubleshooting
 ---------------

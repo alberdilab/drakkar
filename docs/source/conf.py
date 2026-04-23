@@ -1,12 +1,21 @@
 # Configuration file for the Sphinx documentation builder.
 
+from pathlib import Path
+import sys
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from drakkar import __version__
+
 # -- Project information
 
 project = 'Drakkar'
 author = 'Antton Alberdi'
 
-release = '1.0'
-version = '1.0.0'
+release = __version__
+version = __version__
 
 # -- General configuration
 

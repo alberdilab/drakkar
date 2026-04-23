@@ -10,6 +10,12 @@ from pathlib import Path
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
+from drakkar.database_registry import (
+    MANAGED_DATABASES,
+    database_release_dir,
+    database_target_path,
+    normalize_managed_database_name,
+)
 from drakkar.utils import *
 
 ###
@@ -71,6 +77,30 @@ def normalize_annotation_type(annotation_type):
 
     normalized = [opt for opt in option_order if opt in expanded]
     return ",".join(normalized)
+
+def validate_database_version(version):
+    version = (version or "").strip()
+    if not version or version in {".", ".."} or "/" in version or "\\" in version:
+        print(f"{ERROR}ERROR:{RESET} --version must be a single folder name, not a path.")
+        return None
+    return version
+
+
+def replace_config_value(config_key, new_value):
+    pattern = re.compile(rf"^({re.escape(config_key)}:\s*)(\".*?\"|'.*?'|[^\n#]+)(\s*(#.*)?)?$", re.MULTILINE)
+    config_text = CONFIG_PATH.read_text(encoding="utf-8")
+    replacement = rf'\1"{new_value}"\3'
+    updated_text, count = pattern.subn(replacement, config_text, count=1)
+    if count != 1:
+        raise ValueError(f"Could not update {config_key} in {CONFIG_PATH}")
+    CONFIG_PATH.write_text(updated_text, encoding="utf-8")
+
+
+def set_default_database_path(database_name, directory, version):
+    definition = MANAGED_DATABASES[database_name]
+    default_path = str(database_target_path(database_name, directory, version))
+    replace_config_value(definition["config_key"], default_path)
+    return default_path
 
 def validate_path(path_value, label, expect_dir=False):
     if not path_value:
@@ -561,6 +591,24 @@ def run_snakemake_expressing(workflow, project_name, output_dir, env_path, profi
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
 
+def run_snakemake_database(workflow, project_name, output_dir, env_path, profile, database_name, database_directory, database_version):
+    """Run a single database preparation workflow."""
+
+    snakemake_command = [
+        "/bin/bash", "-c",
+        f"module load {config_vars['SNAKEMAKE_MODULE']} && "
+        "snakemake "
+        f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
+        f"--directory {output_dir} "
+        f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
+        f"--configfile {CONFIG_PATH} "
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} "
+        f"database_name={database_name} database_directory={database_directory} database_version={database_version} "
+        f"--conda-prefix {env_path} "
+        f"--use-conda "
+    ]
+    subprocess.run(snakemake_command, shell=False, check=True)
+
 ###
 # Main function to launch workflows
 ###
@@ -674,6 +722,23 @@ def main():
     subparser_expressing.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_expressing.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
+    database_parent = argparse.ArgumentParser(add_help=False)
+    database_parent.add_argument("--directory", required=True, help="Base directory where the database release directory will be created")
+    database_parent.add_argument("--version", required=True, help="Release folder name to create inside --directory")
+    database_parent.add_argument("--set-default", action="store_true", help="Update config.yaml to use this installed database release by default")
+    database_parent.add_argument("-e", "--env_path", type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
+    database_parent.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
+
+    subparser_database = subparsers.add_parser("database", help="Install or update one managed annotation database")
+    database_subparsers = subparser_database.add_subparsers(dest="database_name", help="Managed databases")
+    database_subparsers.required = True
+
+    database_subparsers.add_parser("kegg", parents=[database_parent], help="Install or update the KEGG/KOfam database", aliases=["kofams"])
+    database_subparsers.add_parser("cazy", parents=[database_parent], help="Install or update the CAZy database")
+    database_subparsers.add_parser("pfam", parents=[database_parent], help="Install or update the PFAM database")
+    database_subparsers.add_parser("vfdb", parents=[database_parent], help="Install or update the VFDB database")
+    database_subparsers.add_parser("amr", parents=[database_parent], help="Install or update the AMR database")
+
     subparser_environments = subparsers.add_parser("environments", help="Pre-create conda environments")
     subparser_environments.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_environments.add_argument("--profile", default="local", choices=["local", "slurm"])
@@ -743,8 +808,24 @@ def main():
             return
         args.annotation_type = normalized_annotation_type
 
+    if args.command == "database":
+        normalized_database_name = normalize_managed_database_name(getattr(args, "database_name", None))
+        if not normalized_database_name:
+            print(f"{ERROR}ERROR:{RESET} Supported database commands are: {', '.join(MANAGED_DATABASES)}")
+            return
+        normalized_database_version = validate_database_version(getattr(args, "version", None))
+        if not normalized_database_version:
+            return
+        if Path(args.directory).exists() and Path(args.directory).is_file():
+            print(f"{ERROR}ERROR:{RESET} --directory must be a directory path, not a file: {args.directory}")
+            return
+        args.database_name = normalized_database_name
+        args.version = normalized_database_version
+
     if args.command == "transfer":
         output_dir = getattr(args, "local_dir", os.getcwd())
+    elif args.command == "database":
+        output_dir = database_release_dir(args.database_name, args.directory, args.version)
     else:
         output_dir = getattr(args, "output", os.getcwd())
     write_launch_metadata(args, output_dir, env_path=locals().get("env_path"))
@@ -782,6 +863,17 @@ def main():
         print(f"{HEADER1}CREATING CONDA ENVIRONMENTS...{RESET}", flush=True)
         print(f"", flush=True)
         run_snakemake_environments(args.command, args.env_path, args.profile)
+
+    elif args.command == "database":
+        print(f"{HEADER1}UPDATING DRAKKAR DATABASE...{RESET}", flush=True)
+        print(f"", flush=True)
+        release_dir = database_release_dir(args.database_name, args.directory, args.version).resolve()
+        project_name = os.path.basename(os.path.normpath(release_dir))
+        run_snakemake_database("database", project_name, release_dir, env_path, args.profile, args.database_name, Path(args.directory).resolve(), args.version)
+        if args.set_default:
+            default_path = set_default_database_path(args.database_name, Path(args.directory).resolve(), args.version)
+            print(f"{INFO}INFO:{RESET} Updated {MANAGED_DATABASES[args.database_name]['config_key']} in config.yaml to {default_path}")
+        return
 
     else:            
         project_name = os.path.basename(os.path.normpath(args.output))

@@ -28,6 +28,7 @@ DRAKKAR is organized into independent modules. Use `drakkar complete` to chain t
 - **Annotating**: taxonomic and functional annotations.
 - **Expressing**: metatranscriptomics mapping to annotated genes.
 - **Dereplicating**: dereplication only, no read mapping.
+- **Database**: install or update one managed annotation database release.
 - **Transfer**: SFTP transfer of selected outputs.
 
 ## Modules
@@ -144,6 +145,40 @@ Key options:
 drakkar dereplicating {arguments}
 ```
 
+### Database
+
+Installs or updates one managed annotation database release at a time. This is a maintenance module and is not run automatically by `drakkar complete`.
+
+Supported database commands:
+- `kegg` (`kofams` alias)
+- `cazy`
+- `pfam`
+- `vfdb`
+- `amr`
+
+Key options:
+- `--directory`: base directory where the release folder will be created.
+- `--version`: folder name to create inside `--directory`.
+- `--set-default`: update the matching database path in `drakkar/workflow/config.yaml` after a successful install.
+- `-e/--env_path`: conda environments directory.
+- `-p/--profile`: Snakemake profile.
+
+Behavior:
+- `drakkar` installs the selected database under `--directory/--version/`.
+- The active database used by the workflows is still the explicit path stored in `config.yaml`.
+- `--set-default` changes that config entry to the newly installed release path.
+
+Version logging:
+- Each run writes `database_versions.yaml` in the installed release directory.
+- The log records the requested version, resolved install directory, source URLs, and SHA256 checksums of the installed assets.
+
+Examples:
+
+```bash
+drakkar database amr --directory /projects/alberdilab/data/databases/drakkar/amr --version 20260421
+drakkar database kegg --directory /projects/alberdilab/data/databases/drakkar/kofams --version 20260421 --set-default
+```
+
 ### Transfer
 
 Transfers selected outputs via SFTP while preserving the original folder structure.
@@ -244,6 +279,7 @@ All modules write into the output directory you provide. Key locations:
 - `annotating/` annotation tables.
 - `expressing/` expression outputs.
 - `dereplicating/` dereplicated genomes (dereplication-only mode).
+- `<directory>/<version>/database_versions.yaml` database installation log for a managed database release.
 
 Each run also writes a metadata file `drakkar_YYYYMMDD-HHMMSS.yaml` capturing CLI arguments and run context.
 

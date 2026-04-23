@@ -15,6 +15,9 @@ REFERENCE = config.get("reference", None)
 FRACTION = config.get("fraction", None)
 PROFILING_TYPE = config["profiling_type"].split(",") if "profiling_type" in config else []
 ANNOTATING_TYPE = config["annotating_type"].split(",") if "annotating_type" in config else []
+DATABASE_NAME = config.get("database_name", None)
+DATABASE_DIRECTORY = config.get("database_directory", None)
+DATABASE_VERSION = config.get("database_version", None)
 
 FUNCTION_ANNOTATION_COMPONENTS = {
     "kegg", "cazy", "pfam", "virulence", "amr", "signalp",
@@ -75,6 +78,14 @@ def calculate_file_sizes(file_dict):
 
 if WORKFLOW == "environments":
     include: "rules/environments.smk"
+
+if WORKFLOW == "database":
+    rule all:
+        input:
+            f"{OUTPUT_DIR}/database_versions.yaml",
+            f"{OUTPUT_DIR}/{DATABASE_NAME}.done"
+
+    include: "rules/databases.smk"
 
 ####
 # Run pipelines

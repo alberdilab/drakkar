@@ -1,3 +1,4 @@
+include CHANGELOG.md
 include drakkar/profile/*
 include drakkar/profile/slurm/*
 include drakkar/profile/local/*
