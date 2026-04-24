@@ -38,7 +38,7 @@ class DatabaseCommandTests(unittest.TestCase):
     def test_cazy_database_sources_use_requested_upstream_version(self) -> None:
         self.assertEqual(
             database_sources("cazy", "V14"),
-            ["https://bcb.unl.edu/dbCAN2/download/Databases/V14/dbCAN-HMMdb-V14.txt"],
+            ["https://pro.unl.edu/dbCAN2/download_file.php?file=Databases/V14/dbCAN-HMMdb-V14.txt"],
         )
 
     def test_cazy_database_source_version_label_uses_requested_version(self) -> None:

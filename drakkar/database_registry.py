@@ -20,7 +20,7 @@ MANAGED_DATABASES = {
         "basename": "cazy",
         "version_label": "requested version",
         "sources": [
-            "https://bcb.unl.edu/dbCAN2/download/Databases/{version}/dbCAN-HMMdb-{version}.txt",
+            "https://pro.unl.edu/dbCAN2/download_file.php?file=Databases/{version}/dbCAN-HMMdb-{version}.txt",
         ],
     },
     "pfam": {
