@@ -273,7 +273,7 @@ Supported database subcommands:
 
 .. code-block:: console
 
-   $ drakkar database amr --directory /projects/alberdilab/data/databases/drakkar/amr --version 20260421
+   $ drakkar database amr --directory /projects/alberdilab/data/databases/drakkar/amr --version 2025-07-16.1
 
 .. code-block:: console
 
@@ -301,9 +301,10 @@ Options:
 - ``--version``: folder name to create inside ``--directory``. For ``kegg``,
   use the KEGG archive date such as ``2026-02-01``. For ``cazy``, use the
   upstream dbCAN release label such as ``V14``. For ``pfam``, use the Pfam
-  release directory name such as ``Pfam37.4``. For ``vfdb``, you can omit
-  ``--version`` and DRAKKAR will use the download date in UTC, for example
-  ``2026-04-24``.
+  release directory name such as ``Pfam37.4``. For ``amr``, use the NCBI
+  AMRFinder release directory name such as ``2025-07-16.1``. For ``vfdb``,
+  you can omit ``--version`` and DRAKKAR will use the download date in UTC,
+  for example ``2026-04-24``.
 - ``--download-runtime``: runtime in minutes for the database
   download/preparation rule (default: ``120``).
 - ``--set-default``: update the corresponding database path in ``config.yaml``

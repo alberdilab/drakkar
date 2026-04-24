@@ -46,10 +46,10 @@ MANAGED_DATABASES = {
         "aliases": [],
         "config_key": "AMR_DB",
         "basename": "amr",
-        "version_label": "NCBIfam-AMRFinder latest",
+        "version_label": "requested release version",
         "sources": [
-            "https://ftp.ncbi.nlm.nih.gov/hmm/NCBIfam-AMRFinder/latest/NCBIfam-AMRFinder.HMM.tar.gz",
-            "https://ftp.ncbi.nlm.nih.gov/hmm/NCBIfam-AMRFinder/latest/NCBIfam-AMRFinder.tsv",
+            "https://ftp.ncbi.nlm.nih.gov/hmm/NCBIfam-AMRFinder/{version}/NCBIfam-AMRFinder.HMM.tar.gz",
+            "https://ftp.ncbi.nlm.nih.gov/hmm/NCBIfam-AMRFinder/{version}/NCBIfam-AMRFinder.tsv",
         ],
     },
 }
@@ -94,4 +94,6 @@ def database_source_version_label(database_name: str, version: str | None = None
         return f"Pfam release {version}"
     if database_name == "vfdb" and version:
         return f"VFDB_setB downloaded {version}"
+    if database_name == "amr" and version:
+        return f"NCBIfam-AMRFinder {version}"
     return MANAGED_DATABASES[database_name]["version_label"]

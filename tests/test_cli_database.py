@@ -90,6 +90,18 @@ class DatabaseCommandTests(unittest.TestCase):
     def test_vfdb_database_source_version_label_uses_download_date(self) -> None:
         self.assertEqual(database_source_version_label("vfdb", "2026-04-24"), "VFDB_setB downloaded 2026-04-24")
 
+    def test_amr_database_sources_use_requested_release_version(self) -> None:
+        self.assertEqual(
+            database_sources("amr", "2025-07-16.1"),
+            [
+                "https://ftp.ncbi.nlm.nih.gov/hmm/NCBIfam-AMRFinder/2025-07-16.1/NCBIfam-AMRFinder.HMM.tar.gz",
+                "https://ftp.ncbi.nlm.nih.gov/hmm/NCBIfam-AMRFinder/2025-07-16.1/NCBIfam-AMRFinder.tsv",
+            ],
+        )
+
+    def test_amr_database_source_version_label_uses_requested_version(self) -> None:
+        self.assertEqual(database_source_version_label("amr", "2025-07-16.1"), "NCBIfam-AMRFinder 2025-07-16.1")
+
     def test_cazy_database_sources_use_requested_upstream_version(self) -> None:
         self.assertEqual(
             database_sources("cazy", "V14"),

@@ -179,6 +179,8 @@ if DATABASE_NAME == "amr":
             archive=f"{OUTPUT_DIR}/NCBIfam-AMRFinder.HMM.tar.gz",
             tsv=f"{TARGET_DB}.tsv",
             hmmdir=f"{OUTPUT_DIR}/HMM",
+            archive_url=DATABASE_SOURCES[0],
+            tsv_url=DATABASE_SOURCES[1],
             hmmer_module=HMMER_MODULE
         threads: 1
         shell:
@@ -187,12 +189,23 @@ if DATABASE_NAME == "amr":
             mkdir -p "{OUTPUT_DIR}"
             rm -f "{params.db}" "{params.db}.h3f" "{params.db}.h3i" "{params.db}.h3m" "{params.db}.h3p" "{params.archive}" "{params.tsv}"
             rm -rf "{params.hmmdir}"
-            wget -O "{params.archive}" "https://ftp.ncbi.nlm.nih.gov/hmm/NCBIfam-AMRFinder/latest/NCBIfam-AMRFinder.HMM.tar.gz"
+            if ! curl -L --fail --output "{params.archive}" "{params.archive_url}"; then
+                echo "Unable to download AMRFinder release: {params.archive_url}" >&2
+                echo "If this AMRFinder release does not exist, check available versions at https://ftp.ncbi.nlm.nih.gov/hmm/NCBIfam-AMRFinder/" >&2
+                rm -f "{params.archive}"
+                exit 1
+            fi
             tar -xzf "{params.archive}" -C "{OUTPUT_DIR}"
             find "{params.hmmdir}" -type f -name "*.HMM" | sort | xargs cat > "{params.db}"
-            wget -O "{params.tsv}" "https://ftp.ncbi.nlm.nih.gov/hmm/NCBIfam-AMRFinder/latest/NCBIfam-AMRFinder.tsv"
+            if ! curl -L --fail --output "{params.tsv}" "{params.tsv_url}"; then
+                echo "Unable to download AMRFinder metadata table: {params.tsv_url}" >&2
+                echo "If this AMRFinder release does not exist, check available versions at https://ftp.ncbi.nlm.nih.gov/hmm/NCBIfam-AMRFinder/" >&2
+                rm -f "{params.tsv}" "{params.archive}"
+                exit 1
+            fi
             module load {params.hmmer_module}
             hmmpress -f "{params.db}"
+            rm -f "{params.archive}"
             rm -rf "{params.hmmdir}"
             touch {output}
             """
