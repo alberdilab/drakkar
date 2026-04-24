@@ -8,6 +8,8 @@ from pathlib import Path
 
 from drakkar.cli import replace_config_value, validate_database_version
 from drakkar.database_registry import (
+    database_source_version_label,
+    database_sources,
     database_release_dir,
     database_target_path,
     normalize_managed_database_name,
@@ -32,6 +34,15 @@ class DatabaseCommandTests(unittest.TestCase):
     def test_database_target_path_uses_database_specific_basename(self) -> None:
         target_path = database_target_path("kegg", "/tmp/kegg", "20260421")
         self.assertEqual(target_path, Path("/tmp/kegg/20260421/kofams"))
+
+    def test_cazy_database_sources_use_requested_upstream_version(self) -> None:
+        self.assertEqual(
+            database_sources("cazy", "V14"),
+            ["https://bcb.unl.edu/dbCAN2/download/Databases/V14/dbCAN-HMMdb-V14.txt"],
+        )
+
+    def test_cazy_database_source_version_label_uses_requested_version(self) -> None:
+        self.assertEqual(database_source_version_label("cazy", "V14"), "dbCAN-HMMdb-V14")
 
     def test_replace_config_value_updates_single_key(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -4,9 +4,9 @@ This project tracks release notes here from this point forward.
 
 ## [Unreleased]
 
-### Added
+### Changed
 
-- No unreleased changes yet.
+- Fixed `drakkar database cazy` to download the requested upstream dbCAN release from the versioned `Databases/<version>/` endpoint instead of silently saving an HTML landing page.
 
 ## [1.1.0] - 2026-04-24
 

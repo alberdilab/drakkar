@@ -17,6 +17,8 @@ registry_spec.loader.exec_module(database_registry)
 
 MANAGED_DATABASES = database_registry.MANAGED_DATABASES
 database_target_path = database_registry.database_target_path
+database_sources = database_registry.database_sources
+database_source_version_label = database_registry.database_source_version_label
 normalize_managed_database_name = database_registry.normalize_managed_database_name
 
 HMMER_MODULE = config["HMMER_MODULE"]
@@ -32,6 +34,8 @@ if not DATABASE_NAME or DATABASE_NAME not in MANAGED_DATABASES:
 
 DATABASE_DEFINITION = MANAGED_DATABASES[DATABASE_NAME]
 TARGET_DB = database_target_path(DATABASE_NAME, DATABASE_DIRECTORY, DATABASE_VERSION)
+DATABASE_SOURCES = database_sources(DATABASE_NAME, DATABASE_VERSION)
+SOURCE_VERSION = database_source_version_label(DATABASE_NAME, DATABASE_VERSION)
 
 if INSTALL_DIR.resolve() != TARGET_DB.parent.resolve():
     raise ValueError(
@@ -74,14 +78,26 @@ if DATABASE_NAME == "cazy":
             touch(f"{OUTPUT_DIR}/cazy.done")
         params:
             db=str(TARGET_DB),
+            url=DATABASE_SOURCES[0],
             hmmer_module=HMMER_MODULE
         threads: 1
         shell:
             """
             set -euo pipefail
             mkdir -p "{OUTPUT_DIR}"
-            rm -f "{params.db}" "{params.db}.h3f" "{params.db}.h3i" "{params.db}.h3m" "{params.db}.h3p"
-            wget -O "{params.db}" "https://bcb.unl.edu/dbCAN2/download/dbCAN-HMMdb-V13.txt"
+            rm -f "{params.db}" "{params.db}.tmp" "{params.db}.h3f" "{params.db}.h3i" "{params.db}.h3m" "{params.db}.h3p"
+            wget -O "{params.db}.tmp" "{params.url}"
+            if grep -qiE '<!DOCTYPE html|<html' "{params.db}.tmp"; then
+                echo "Downloaded file for CAZy looks like HTML, not an HMM database: {params.url}" >&2
+                rm -f "{params.db}.tmp"
+                exit 1
+            fi
+            if ! grep -q "HMMER3/f" "{params.db}.tmp"; then
+                echo "Downloaded file for CAZy does not look like a dbCAN HMM database: {params.url}" >&2
+                rm -f "{params.db}.tmp"
+                exit 1
+            fi
+            mv "{params.db}.tmp" "{params.db}"
             module load {params.hmmer_module}
             hmmpress -f "{params.db}"
             touch {output}
@@ -212,8 +228,8 @@ rule write_database_versions:
             "base_directory": DATABASE_DIRECTORY,
             "release_directory": str(INSTALL_DIR),
             "requested_version": DATABASE_VERSION,
-            "source_version": DATABASE_DEFINITION["version_label"],
-            "sources": DATABASE_DEFINITION["sources"],
+            "source_version": SOURCE_VERSION,
+            "sources": DATABASE_SOURCES,
             "default_target": str(TARGET_DB),
             "files": file_info,
         }

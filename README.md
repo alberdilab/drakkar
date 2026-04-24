@@ -166,7 +166,7 @@ Supported database commands:
 
 Key options:
 - `--directory`: base directory where the release folder will be created.
-- `--version`: folder name to create inside `--directory`.
+- `--version`: folder name to create inside `--directory`. For `cazy`, use the upstream dbCAN release label such as `V14`.
 - `--set-default`: update the matching database path in `drakkar/workflow/config.yaml` after a successful install.
 - `-e/--env_path`: conda environments directory.
 - `-p/--profile`: Snakemake profile.
@@ -185,6 +185,7 @@ Examples:
 ```bash
 drakkar database amr --directory /projects/alberdilab/data/databases/drakkar/amr --version 20260421
 drakkar database kegg --directory /projects/alberdilab/data/databases/drakkar/kofams --version 20260421 --set-default
+drakkar database cazy --directory /projects/alberdilab/data/databases/drakkar/cazy --version V14 --set-default
 ```
 
 ### Transfer

@@ -279,10 +279,15 @@ Supported database subcommands:
 
    $ drakkar database kegg --directory /projects/alberdilab/data/databases/drakkar/kofams --version 20260421 --set-default
 
+.. code-block:: console
+
+   $ drakkar database cazy --directory /projects/alberdilab/data/databases/drakkar/cazy --version V14 --set-default
+
 Options:
 
 - ``--directory``: base directory where the release folder will be created.
-- ``--version``: folder name to create inside ``--directory``.
+- ``--version``: folder name to create inside ``--directory``. For ``cazy``,
+  use the upstream dbCAN release label such as ``V14``.
 - ``--set-default``: update the corresponding database path in ``config.yaml``
   after the installation finishes successfully.
 - ``-e/--env_path``: shared Conda env dir.

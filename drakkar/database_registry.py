@@ -18,9 +18,9 @@ MANAGED_DATABASES = {
         "aliases": [],
         "config_key": "CAZY_DB",
         "basename": "cazy",
-        "version_label": "dbCAN-HMMdb-V13",
+        "version_label": "requested version",
         "sources": [
-            "https://bcb.unl.edu/dbCAN2/download/dbCAN-HMMdb-V13.txt",
+            "https://bcb.unl.edu/dbCAN2/download/Databases/{version}/dbCAN-HMMdb-{version}.txt",
         ],
     },
     "pfam": {
@@ -78,3 +78,14 @@ def database_release_dir(database_name: str, base_directory: str | Path, version
 def database_target_path(database_name: str, base_directory: str | Path, version: str) -> Path:
     definition = MANAGED_DATABASES[database_name]
     return database_release_dir(database_name, base_directory, version) / definition["basename"]
+
+
+def database_sources(database_name: str, version: str | None = None) -> list[str]:
+    definition = MANAGED_DATABASES[database_name]
+    return [source.format(version=version) for source in definition["sources"]]
+
+
+def database_source_version_label(database_name: str, version: str | None = None) -> str:
+    if database_name == "cazy" and version:
+        return f"dbCAN-HMMdb-{version}"
+    return MANAGED_DATABASES[database_name]["version_label"]
