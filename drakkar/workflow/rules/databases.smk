@@ -54,6 +54,8 @@ if DATABASE_NAME == "kegg":
             db=str(TARGET_DB),
             archive=f"{OUTPUT_DIR}/profiles.tar.gz",
             json=f"{TARGET_DB}.json",
+            archive_url=DATABASE_SOURCES[0],
+            json_url=DATABASE_SOURCES[1],
             hmmer_module=HMMER_MODULE
         threads: 1
         shell:
@@ -62,10 +64,16 @@ if DATABASE_NAME == "kegg":
             mkdir -p "{OUTPUT_DIR}"
             rm -f "{params.db}" "{params.db}.h3f" "{params.db}.h3i" "{params.db}.h3m" "{params.db}.h3p" "{params.json}" "{params.archive}"
             rm -rf "{OUTPUT_DIR}/profiles"
-            wget -O "{params.archive}" "https://www.genome.jp/ftp/db/kofam/profiles.tar.gz"
-            curl -L -o "{params.json}" "https://www.kegg.jp/kegg-bin/download_htext?htext=ko00001.keg&format=json&filedir="
+            if ! curl -L --fail --output "{params.archive}" "{params.archive_url}"; then
+                echo "Unable to download KEGG KOfam archive: {params.archive_url}" >&2
+                echo "If this archive version does not exist, check available versions at https://www.genome.jp/ftp/db/kofam/archives/" >&2
+                rm -f "{params.archive}"
+                exit 1
+            fi
+            curl -L --fail --output "{params.json}" "{params.json_url}"
             tar -xzf "{params.archive}" -C "{OUTPUT_DIR}"
             find "{OUTPUT_DIR}/profiles" -type f -name "*.hmm" | sort | xargs cat > "{params.db}"
+            rm -f "{params.archive}"
             rm -rf "{OUTPUT_DIR}/profiles"
             module load {params.hmmer_module}
             hmmpress -f "{params.db}"
@@ -86,7 +94,12 @@ if DATABASE_NAME == "cazy":
             set -euo pipefail
             mkdir -p "{OUTPUT_DIR}"
             rm -f "{params.db}" "{params.db}.tmp" "{params.db}.h3f" "{params.db}.h3i" "{params.db}.h3m" "{params.db}.h3p"
-            curl -L --fail --output "{params.db}.tmp" "{params.url}"
+            if ! curl -L --fail --output "{params.db}.tmp" "{params.url}"; then
+                echo "Unable to download CAZy dbCAN database: {params.url}" >&2
+                echo "If this dbCAN release does not exist, check available versions at https://pro.unl.edu/dbCAN2/browse_download.php" >&2
+                rm -f "{params.db}.tmp"
+                exit 1
+            fi
             mv "{params.db}.tmp" "{params.db}"
             module load {params.hmmer_module}
             hmmpress -f "{params.db}"

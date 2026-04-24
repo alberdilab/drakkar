@@ -10,6 +10,7 @@ This project tracks release notes here from this point forward.
 
 ### Changed
 
+- Changed `drakkar database kegg` to download KOfam profiles from versioned KEGG monthly archive directories using `YYYY-MM-DD` archive dates, then merge and `hmmpress` the extracted HMMs.
 - Fixed `drakkar database cazy` to download the requested upstream dbCAN release from the versioned `Databases/<version>/` endpoint instead of silently saving an HTML landing page.
 
 ## [1.1.0] - 2026-04-24

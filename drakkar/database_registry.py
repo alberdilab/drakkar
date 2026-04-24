@@ -8,9 +8,9 @@ MANAGED_DATABASES = {
         "aliases": ["kofams"],
         "config_key": "KEGG_DB",
         "basename": "kofams",
-        "version_label": "current",
+        "version_label": "requested archive version",
         "sources": [
-            "https://www.genome.jp/ftp/db/kofam/profiles.tar.gz",
+            "https://www.genome.jp/ftp/db/kofam/archives/{version}/profiles.tar.gz",
             "https://www.kegg.jp/kegg-bin/download_htext?htext=ko00001.keg&format=json&filedir=",
         ],
     },
@@ -86,6 +86,8 @@ def database_sources(database_name: str, version: str | None = None) -> list[str
 
 
 def database_source_version_label(database_name: str, version: str | None = None) -> str:
+    if database_name == "kegg" and version:
+        return f"kofam archive {version}"
     if database_name == "cazy" and version:
         return f"dbCAN-HMMdb-{version}"
     return MANAGED_DATABASES[database_name]["version_label"]

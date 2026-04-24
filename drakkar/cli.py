@@ -88,6 +88,20 @@ def validate_database_version(version):
     return version
 
 
+def validate_managed_database_version(database_name, version):
+    version = validate_database_version(version)
+    if not version:
+        return None
+    if database_name == "kegg":
+        try:
+            parsed = datetime.strptime(version, "%Y-%m-%d")
+        except ValueError:
+            print(f"{ERROR}ERROR:{RESET} KEGG --version must be an archive date in YYYY-MM-DD format, e.g. 2026-02-01")
+            return None
+        return parsed.strftime("%Y-%m-%d")
+    return version
+
+
 def replace_config_value(config_key, new_value):
     pattern = re.compile(rf"^({re.escape(config_key)}:\s*)(\".*?\"|'.*?'|[^\n#]+)(\s*(#.*)?)?$", re.MULTILINE)
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
@@ -865,7 +879,7 @@ def main():
         if not normalized_database_name:
             print(f"{ERROR}ERROR:{RESET} Supported database commands are: {', '.join(MANAGED_DATABASES)}")
             return
-        normalized_database_version = validate_database_version(getattr(args, "version", None))
+        normalized_database_version = validate_managed_database_version(normalized_database_name, getattr(args, "version", None))
         if not normalized_database_version:
             return
         if Path(args.directory).exists() and Path(args.directory).is_file():

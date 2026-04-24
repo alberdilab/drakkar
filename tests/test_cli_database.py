@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from drakkar.cli import replace_config_value, validate_database_version
+from drakkar.cli import replace_config_value, validate_database_version, validate_managed_database_version
 from drakkar.database_registry import (
     database_source_version_label,
     database_sources,
@@ -27,6 +27,14 @@ class DatabaseCommandTests(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertIsNone(validate_database_version("2026/04/21"))
 
+    def test_validate_managed_database_version_accepts_kegg_archive_date(self) -> None:
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(validate_managed_database_version("kegg", "2026-02-01"), "2026-02-01")
+
+    def test_validate_managed_database_version_rejects_invalid_kegg_archive_date(self) -> None:
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertIsNone(validate_managed_database_version("kegg", "20260201"))
+
     def test_database_release_dir_joins_base_and_version(self) -> None:
         release_dir = database_release_dir("amr", "/tmp/amr", "20260421")
         self.assertEqual(release_dir, Path("/tmp/amr/20260421"))
@@ -34,6 +42,18 @@ class DatabaseCommandTests(unittest.TestCase):
     def test_database_target_path_uses_database_specific_basename(self) -> None:
         target_path = database_target_path("kegg", "/tmp/kegg", "20260421")
         self.assertEqual(target_path, Path("/tmp/kegg/20260421/kofams"))
+
+    def test_kegg_database_sources_use_requested_archive_version(self) -> None:
+        self.assertEqual(
+            database_sources("kegg", "2026-02-01"),
+            [
+                "https://www.genome.jp/ftp/db/kofam/archives/2026-02-01/profiles.tar.gz",
+                "https://www.kegg.jp/kegg-bin/download_htext?htext=ko00001.keg&format=json&filedir=",
+            ],
+        )
+
+    def test_kegg_database_source_version_label_uses_requested_version(self) -> None:
+        self.assertEqual(database_source_version_label("kegg", "2026-02-01"), "kofam archive 2026-02-01")
 
     def test_cazy_database_sources_use_requested_upstream_version(self) -> None:
         self.assertEqual(
