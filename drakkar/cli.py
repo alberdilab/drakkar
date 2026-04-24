@@ -88,7 +88,31 @@ def validate_database_version(version):
     return version
 
 
+def validate_download_runtime(value):
+    try:
+        runtime = int(value)
+    except (TypeError, ValueError):
+        print(f"{ERROR}ERROR:{RESET} --download-runtime must be a positive integer number of minutes.")
+        return None
+    if runtime <= 0:
+        print(f"{ERROR}ERROR:{RESET} --download-runtime must be a positive integer number of minutes.")
+        return None
+    return runtime
+
+
+def default_database_version(database_name):
+    if database_name == "vfdb":
+        return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return None
+
+
 def validate_managed_database_version(database_name, version):
+    if not version:
+        default_version = default_database_version(database_name)
+        if default_version:
+            return default_version
+        print(f"{ERROR}ERROR:{RESET} --version is required for {database_name}.")
+        return None
     version = validate_database_version(version)
     if not version:
         return None
@@ -651,7 +675,7 @@ def run_snakemake_expressing(workflow, project_name, output_dir, env_path, profi
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
 
-def run_snakemake_database(workflow, project_name, output_dir, env_path, profile, database_name, database_directory, database_version):
+def run_snakemake_database(workflow, project_name, output_dir, env_path, profile, database_name, database_directory, database_version, download_runtime):
     """Run a single database preparation workflow."""
 
     snakemake_command = [
@@ -664,6 +688,7 @@ def run_snakemake_database(workflow, project_name, output_dir, env_path, profile
         f"--configfile {CONFIG_PATH} "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} "
         f"database_name={database_name} database_directory={database_directory} database_version={database_version} "
+        f"database_download_runtime={download_runtime} "
         f"--conda-prefix {env_path} "
         f"--use-conda "
     ]
@@ -784,7 +809,8 @@ def main():
 
     database_parent = argparse.ArgumentParser(add_help=False)
     database_parent.add_argument("--directory", required=True, help="Base directory where the database release directory will be created")
-    database_parent.add_argument("--version", required=True, help="Release folder name to create inside --directory")
+    database_parent.add_argument("--version", required=False, help="Release folder name to create inside --directory (optional for vfdb; defaults to the UTC download date)")
+    database_parent.add_argument("--download-runtime", type=int, default=120, help="Runtime in minutes for the database download/preparation rule (default: 120)")
     database_parent.add_argument("--set-default", action="store_true", help="Update config.yaml to use this installed database release by default")
     database_parent.add_argument("-e", "--env_path", type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     database_parent.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
@@ -879,14 +905,21 @@ def main():
         if not normalized_database_name:
             print(f"{ERROR}ERROR:{RESET} Supported database commands are: {', '.join(MANAGED_DATABASES)}")
             return
+        version_was_provided = bool(getattr(args, "version", None))
         normalized_database_version = validate_managed_database_version(normalized_database_name, getattr(args, "version", None))
         if not normalized_database_version:
+            return
+        normalized_download_runtime = validate_download_runtime(getattr(args, "download_runtime", None))
+        if normalized_download_runtime is None:
             return
         if Path(args.directory).exists() and Path(args.directory).is_file():
             print(f"{ERROR}ERROR:{RESET} --directory must be a directory path, not a file: {args.directory}")
             return
         args.database_name = normalized_database_name
         args.version = normalized_database_version
+        args.download_runtime = normalized_download_runtime
+        if args.database_name == "vfdb" and not version_was_provided:
+            print(f"{INFO}INFO:{RESET} No --version provided for vfdb; using download date {args.version} (UTC).")
 
     if args.command == "transfer":
         output_dir = getattr(args, "local_dir", os.getcwd())
@@ -942,7 +975,7 @@ def main():
         print(f"", flush=True)
         release_dir = database_release_dir(args.database_name, args.directory, args.version).resolve()
         project_name = os.path.basename(os.path.normpath(release_dir))
-        run_snakemake_database("database", project_name, release_dir, env_path, args.profile, args.database_name, Path(args.directory).resolve(), args.version)
+        run_snakemake_database("database", project_name, release_dir, env_path, args.profile, args.database_name, Path(args.directory).resolve(), args.version, args.download_runtime)
         if args.set_default:
             default_path = set_default_database_path(args.database_name, Path(args.directory).resolve(), args.version)
             print(f"{INFO}INFO:{RESET} Updated {MANAGED_DATABASES[args.database_name]['config_key']} in config.yaml to {default_path}")

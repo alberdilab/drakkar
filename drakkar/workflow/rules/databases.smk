@@ -27,10 +27,13 @@ MMSEQS2_MODULE = config["MMSEQS2_MODULE"]
 DATABASE_NAME = normalize_managed_database_name(config.get("database_name", ""))
 DATABASE_DIRECTORY = config.get("database_directory", "")
 DATABASE_VERSION = config.get("database_version", "")
+DOWNLOAD_RUNTIME = int(config.get("database_download_runtime", 120))
 INSTALL_DIR = Path(OUTPUT_DIR)
 
 if not DATABASE_NAME or DATABASE_NAME not in MANAGED_DATABASES:
     raise ValueError(f"Unsupported database_name: {config.get('database_name')}")
+if DOWNLOAD_RUNTIME <= 0:
+    raise ValueError(f"database_download_runtime must be positive, got {DOWNLOAD_RUNTIME}")
 
 DATABASE_DEFINITION = MANAGED_DATABASES[DATABASE_NAME]
 TARGET_DB = database_target_path(DATABASE_NAME, DATABASE_DIRECTORY, DATABASE_VERSION)
@@ -58,6 +61,8 @@ if DATABASE_NAME == "kegg":
             json_url=DATABASE_SOURCES[1],
             hmmer_module=HMMER_MODULE
         threads: 1
+        resources:
+            runtime=lambda wildcards, attempt: DOWNLOAD_RUNTIME * 2 ** (attempt - 1)
         shell:
             """
             set -euo pipefail
@@ -113,6 +118,8 @@ if DATABASE_NAME == "pfam":
         params:
             db=str(TARGET_DB),
             ec=f"{TARGET_DB}_ec.tsv",
+            hmm_url=DATABASE_SOURCES[0],
+            ec_url=DATABASE_SOURCES[1],
             hmmer_module=HMMER_MODULE
         threads: 1
         shell:
@@ -120,9 +127,14 @@ if DATABASE_NAME == "pfam":
             set -euo pipefail
             mkdir -p "{OUTPUT_DIR}"
             rm -f "{params.db}" "{params.db}.gz" "{params.db}.h3f" "{params.db}.h3i" "{params.db}.h3m" "{params.db}.h3p" "{params.ec}"
-            wget -O "{params.db}.gz" "https://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.hmm.gz"
+            if ! curl -L --fail --output "{params.db}.gz" "{params.hmm_url}"; then
+                echo "Unable to download Pfam release: {params.hmm_url}" >&2
+                echo "If this Pfam release does not exist, check available versions at https://ftp.ebi.ac.uk/pub/databases/Pfam/releases/" >&2
+                rm -f "{params.db}.gz"
+                exit 1
+            fi
             gunzip -f "{params.db}.gz"
-            wget -O "{params.ec}" "https://ecdm.loria.fr/data/EC-Pfam_calculated_associations_Extended.csv"
+            curl -L --fail --output "{params.ec}" "{params.ec_url}"
             module load {params.hmmer_module}
             hmmpress -f "{params.db}"
             touch {output}

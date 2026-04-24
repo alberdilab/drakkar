@@ -5,8 +5,15 @@ import io
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from drakkar.cli import replace_config_value, validate_database_version, validate_managed_database_version
+from drakkar import cli as cli_module
+from drakkar.cli import (
+    replace_config_value,
+    validate_database_version,
+    validate_download_runtime,
+    validate_managed_database_version,
+)
 from drakkar.database_registry import (
     database_source_version_label,
     database_sources,
@@ -27,6 +34,14 @@ class DatabaseCommandTests(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertIsNone(validate_database_version("2026/04/21"))
 
+    def test_validate_download_runtime_accepts_positive_integer(self) -> None:
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(validate_download_runtime(120), 120)
+
+    def test_validate_download_runtime_rejects_non_positive_integer(self) -> None:
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertIsNone(validate_download_runtime(0))
+
     def test_validate_managed_database_version_accepts_kegg_archive_date(self) -> None:
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(validate_managed_database_version("kegg", "2026-02-01"), "2026-02-01")
@@ -34,6 +49,11 @@ class DatabaseCommandTests(unittest.TestCase):
     def test_validate_managed_database_version_rejects_invalid_kegg_archive_date(self) -> None:
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertIsNone(validate_managed_database_version("kegg", "20260201"))
+
+    def test_validate_managed_database_version_defaults_vfdb_to_download_date(self) -> None:
+        with patch.object(cli_module, "default_database_version", return_value="2026-04-24"):
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(validate_managed_database_version("vfdb", None), "2026-04-24")
 
     def test_database_release_dir_joins_base_and_version(self) -> None:
         release_dir = database_release_dir("amr", "/tmp/amr", "20260421")
@@ -54,6 +74,21 @@ class DatabaseCommandTests(unittest.TestCase):
 
     def test_kegg_database_source_version_label_uses_requested_version(self) -> None:
         self.assertEqual(database_source_version_label("kegg", "2026-02-01"), "kofam archive 2026-02-01")
+
+    def test_pfam_database_sources_use_requested_release_version(self) -> None:
+        self.assertEqual(
+            database_sources("pfam", "Pfam37.4"),
+            [
+                "https://ftp.ebi.ac.uk/pub/databases/Pfam/releases/Pfam37.4/Pfam-A.hmm.gz",
+                "https://ecdm.loria.fr/data/EC-Pfam_calculated_associations_Extended.csv",
+            ],
+        )
+
+    def test_pfam_database_source_version_label_uses_requested_version(self) -> None:
+        self.assertEqual(database_source_version_label("pfam", "Pfam37.4"), "Pfam release Pfam37.4")
+
+    def test_vfdb_database_source_version_label_uses_download_date(self) -> None:
+        self.assertEqual(database_source_version_label("vfdb", "2026-04-24"), "VFDB_setB downloaded 2026-04-24")
 
     def test_cazy_database_sources_use_requested_upstream_version(self) -> None:
         self.assertEqual(

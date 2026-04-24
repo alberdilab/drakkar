@@ -281,14 +281,31 @@ Supported database subcommands:
 
 .. code-block:: console
 
+   $ drakkar database kegg --directory /projects/alberdilab/data/databases/drakkar/kofams --version 2026-02-01 --download-runtime 180
+
+.. code-block:: console
+
    $ drakkar database cazy --directory /projects/alberdilab/data/databases/drakkar/cazy --version V14 --set-default
+
+.. code-block:: console
+
+   $ drakkar database pfam --directory /projects/alberdilab/data/databases/drakkar/pfam --version Pfam37.4 --set-default
+
+.. code-block:: console
+
+   $ drakkar database vfdb --directory /projects/alberdilab/data/databases/drakkar/vfdb --set-default
 
 Options:
 
 - ``--directory``: base directory where the release folder will be created.
 - ``--version``: folder name to create inside ``--directory``. For ``kegg``,
   use the KEGG archive date such as ``2026-02-01``. For ``cazy``, use the
-  upstream dbCAN release label such as ``V14``.
+  upstream dbCAN release label such as ``V14``. For ``pfam``, use the Pfam
+  release directory name such as ``Pfam37.4``. For ``vfdb``, you can omit
+  ``--version`` and DRAKKAR will use the download date in UTC, for example
+  ``2026-04-24``.
+- ``--download-runtime``: runtime in minutes for the database
+  download/preparation rule (default: ``120``).
 - ``--set-default``: update the corresponding database path in ``config.yaml``
   after the installation finishes successfully.
 - ``-e/--env_path``: shared Conda env dir.

@@ -27,9 +27,9 @@ MANAGED_DATABASES = {
         "aliases": [],
         "config_key": "PFAM_DB",
         "basename": "pfam",
-        "version_label": "current",
+        "version_label": "requested release version",
         "sources": [
-            "https://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.hmm.gz",
+            "https://ftp.ebi.ac.uk/pub/databases/Pfam/releases/{version}/Pfam-A.hmm.gz",
             "https://ecdm.loria.fr/data/EC-Pfam_calculated_associations_Extended.csv",
         ],
     },
@@ -90,4 +90,8 @@ def database_source_version_label(database_name: str, version: str | None = None
         return f"kofam archive {version}"
     if database_name == "cazy" and version:
         return f"dbCAN-HMMdb-{version}"
+    if database_name == "pfam" and version:
+        return f"Pfam release {version}"
+    if database_name == "vfdb" and version:
+        return f"VFDB_setB downloaded {version}"
     return MANAGED_DATABASES[database_name]["version_label"]
