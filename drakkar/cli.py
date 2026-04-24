@@ -15,7 +15,6 @@ from pathlib import PurePosixPath
 from drakkar.database_registry import (
     MANAGED_DATABASES,
     database_release_dir,
-    database_target_path,
     normalize_managed_database_name,
 )
 from drakkar.utils import *
@@ -138,7 +137,7 @@ def replace_config_value(config_key, new_value):
 
 def set_default_database_path(database_name, directory, version):
     definition = MANAGED_DATABASES[database_name]
-    default_path = str(database_target_path(database_name, directory, version))
+    default_path = str(database_release_dir(database_name, directory, version))
     replace_config_value(definition["config_key"], default_path)
     return default_path
 
@@ -185,6 +184,47 @@ def edit_config():
         print(f"{ERROR}ERROR:{RESET} Editor exited with code {exc.returncode}")
         return exc.returncode or 1
     return 0
+
+
+def overwrite_output_directory(output_dir):
+    output_path = Path(output_dir)
+    if output_path.exists():
+        shutil.rmtree(output_path)
+
+
+def prompt_overwrite_locked_directory(output_dir):
+    print(f"{INFO}INFO:{RESET} The output directory is locked: {output_dir}")
+    print("This usually means a previous Snakemake run ended unexpectedly.")
+    print("Overwriting will delete the entire directory and rerun from scratch.")
+    while True:
+        response = input("Delete the locked directory and overwrite it? [y/N]: ").strip().lower()
+        if response in {"y", "yes"}:
+            return True
+        if response in {"", "n", "no"}:
+            return False
+        print("Please answer y or n.")
+
+
+def prepare_output_directory(output_dir, overwrite=False):
+    output_path = Path(output_dir)
+    if not is_snakemake_locked(str(output_path)):
+        return True
+
+    if overwrite:
+        print(f"{INFO}INFO:{RESET} Removing locked output directory and overwriting: {output_path}")
+        overwrite_output_directory(output_path)
+        return True
+
+    if sys.stdin.isatty():
+        if prompt_overwrite_locked_directory(output_path):
+            overwrite_output_directory(output_path)
+            return True
+    else:
+        print(f"{ERROR}ERROR:{RESET} Output directory is locked and no interactive prompt is available.")
+
+    print(f"{ERROR}ERROR:{RESET} Output directory remains locked: {output_path}")
+    print(f"{INFO}Use --overwrite to delete it automatically, or 'drakkar unlock -o {output_path}' if you only want to clear the Snakemake lock.{RESET}")
+    return False
 
 def validate_path(path_value, label, expect_dir=False):
     if not path_value:
@@ -729,6 +769,7 @@ def main():
     subparser_complete.add_argument("-a", "--ani", required=False, type=float, default=0.98, help="ANI threshold for dRep dereplication (-sa). Default: 0.98")
     subparser_complete.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_complete.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
+    subparser_complete.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
 
     subparser_preprocessing = subparsers.add_parser("preprocessing", help="Run the preprocessing workflow (quality-filtering and host removal)")
     subparser_preprocessing.add_argument("-i", "--input", required=False, help="Input directory (required if no sample detail file is provided)")
@@ -737,6 +778,7 @@ def main():
     subparser_preprocessing.add_argument("-r", "--reference", required=False, help="Reference host genome file (fna.gz)")
     subparser_preprocessing.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_preprocessing.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
+    subparser_preprocessing.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
 
     subparser_cataloging = subparsers.add_parser("cataloging", help="Run the cataloging (assembly and binning) workflow")
     subparser_cataloging.add_argument("-i", "--input", required=False, help="Input directory (required if no sample detail file is provided)")
@@ -746,6 +788,7 @@ def main():
     subparser_cataloging.add_argument("-c", "--multicoverage", action="store_true", help="Map samples sharing the same coverage group to each other's individual assemblies")
     subparser_cataloging.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_cataloging.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
+    subparser_cataloging.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
 
     subparser_profiling = subparsers.add_parser("profiling", help="Run the profiling workflow")
     subparser_profiling.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
@@ -760,6 +803,7 @@ def main():
     subparser_profiling.add_argument("-q", "--quality", type=str, help="CSV/TSV with genome, completeness, contamination columns")
     subparser_profiling.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_profiling.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
+    subparser_profiling.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
 
     subparser_dereplicating = subparsers.add_parser("dereplicating", help="Run dereplication only (no mapping)")
     subparser_dereplicating.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
@@ -770,6 +814,7 @@ def main():
     subparser_dereplicating.add_argument("-q", "--quality", type=str, help="CSV/TSV with genome, completeness, contamination columns")
     subparser_dereplicating.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_dereplicating.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
+    subparser_dereplicating.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
 
     subparser_annotating = subparsers.add_parser("annotating", help="Run the annotating workflow")
     subparser_annotating.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa, .fna or .fasta, optionally including .gz) are stored")
@@ -788,6 +833,7 @@ def main():
     )
     subparser_annotating.add_argument("-e", "--env_path", type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_annotating.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
+    subparser_annotating.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
 
     subparser_inspecting = subparsers.add_parser("inspecting", help="Run the inspecting workflow")
     subparser_inspecting.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
@@ -797,6 +843,7 @@ def main():
     subparser_inspecting.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_inspecting.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_inspecting.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
+    subparser_inspecting.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
 
     subparser_expressing = subparsers.add_parser("expressing", help="Run the microbial gene expression workflow")
     subparser_expressing.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
@@ -806,11 +853,13 @@ def main():
     subparser_expressing.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_expressing.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_expressing.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
+    subparser_expressing.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
 
     database_parent = argparse.ArgumentParser(add_help=False)
     database_parent.add_argument("--directory", required=True, help="Base directory where the database release directory will be created")
     database_parent.add_argument("--version", required=False, help="Release folder name to create inside --directory (optional for vfdb; defaults to the UTC download date)")
     database_parent.add_argument("--download-runtime", type=int, default=120, help="Runtime in minutes for the database download/preparation rule (default: 120)")
+    database_parent.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
     database_parent.add_argument("--set-default", action="store_true", help="Update config.yaml to use this installed database release by default")
     database_parent.add_argument("-e", "--env_path", type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     database_parent.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
@@ -921,12 +970,21 @@ def main():
         if args.database_name == "vfdb" and not version_was_provided:
             print(f"{INFO}INFO:{RESET} No --version provided for vfdb; using download date {args.version} (UTC).")
 
+    overwrite_capable_commands = {
+        "complete", "preprocessing", "cataloging", "profiling", "dereplicating",
+        "annotating", "inspecting", "expressing", "database",
+    }
+
     if args.command == "transfer":
         output_dir = getattr(args, "local_dir", os.getcwd())
     elif args.command == "database":
         output_dir = database_release_dir(args.database_name, args.directory, args.version)
     else:
         output_dir = getattr(args, "output", os.getcwd())
+
+    if args.command in overwrite_capable_commands:
+        if not prepare_output_directory(output_dir, overwrite=getattr(args, "overwrite", False)):
+            return
     write_launch_metadata(args, output_dir, env_path=locals().get("env_path"))
 
     ###
@@ -983,15 +1041,6 @@ def main():
 
     else:            
         project_name = os.path.basename(os.path.normpath(args.output))
-
-        # Check if directory is locked
-        if is_snakemake_locked(args.output):
-            print(f"{ERROR}Error: directory is locked by Snakemake{RESET}", file=sys.stderr)
-            print(f"This usually happens when a workflow is interrupted suddenly,")
-            print(f"often while Slurm jobs are still running. Make sure all pending")
-            print(f"jobs are finished or killed before unlocking the working directory.")
-            print(f"{INFO}Run 'drakkar unlock' to unlock the working directory{RESET}")
-            sys.exit(2)
 
     ###
     # Preprocessing

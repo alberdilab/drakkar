@@ -10,6 +10,7 @@ DRAKKAR is a Snakemake-based, modular genome-resolved metagenomics pipeline opti
 - HPC-friendly: Snakemake + Slurm with resource-aware rules.
 - Reproducible outputs: consistent folder structure and metadata logs.
 - Flexible inputs: directories or sample info tables.
+- Recoverable runs: if an output directory is left locked by a broken Snakemake session, rerun with `--overwrite` to delete that directory and start cleanly.
 
 ## Quickstart
 
@@ -175,12 +176,20 @@ Key options:
 
 Behavior:
 - `drakkar` installs the selected database under `--directory/--version/`.
-- The active database used by the workflows is still the explicit path stored in `config.yaml`.
-- `--set-default` changes that config entry to the newly installed release path.
+- For managed annotation databases, `config.yaml` stores the release directory, not the internal HMM or MMseqs prefix file.
+- The workflow resolves the expected internal files automatically, for example `kofams`, `pfam`, `amr.tsv`, or `vfdb`.
+- `--set-default` changes that config entry to the newly installed release directory.
+
+Database-specific rules:
+- `kegg` (`kofams`): use a KEGG archive date in `YYYY-MM-DD` format, such as `2026-02-01`. DRAKKAR downloads `profiles.tar.gz` from `https://www.genome.jp/ftp/db/kofam/archives/<version>/`, extracts the HMM profiles, concatenates them into a single `kofams` database, downloads the KEGG hierarchy JSON, and runs `hmmpress`. If the archive is missing, DRAKKAR points you to `https://www.genome.jp/ftp/db/kofam/archives/`. The default `--download-runtime` is `120` minutes and is mainly intended for this large download.
+- `cazy`: use the dbCAN release label, such as `V14`. DRAKKAR downloads the dbCAN HMM database from `https://pro.unl.edu/dbCAN2/download_file.php?file=Databases/<version>/dbCAN-HMMdb-<version>.txt` and runs `hmmpress`. If the requested release is missing, DRAKKAR points you to `https://pro.unl.edu/dbCAN2/browse_download.php`.
+- `pfam`: use the Pfam release directory name, such as `Pfam37.4`. DRAKKAR downloads `Pfam-A.hmm.gz` from `https://ftp.ebi.ac.uk/pub/databases/Pfam/releases/<version>/`, downloads the EC mapping table, unzips the HMM file, and runs `hmmpress`. If the requested release is missing, DRAKKAR points you to `https://ftp.ebi.ac.uk/pub/databases/Pfam/releases/`.
+- `amr`: use the NCBI AMRFinder release directory name, such as `2025-07-16.1`. DRAKKAR downloads both `NCBIfam-AMRFinder.HMM.tar.gz` and `NCBIfam-AMRFinder.tsv` from `https://ftp.ncbi.nlm.nih.gov/hmm/NCBIfam-AMRFinder/<version>/`, merges the extracted HMMs into one database, and runs `hmmpress`. If the requested release is missing, DRAKKAR points you to `https://ftp.ncbi.nlm.nih.gov/hmm/NCBIfam-AMRFinder/`.
+- `vfdb`: there is no upstream version directory. DRAKKAR downloads the current `VFDB_setB_pro.fas.gz` from `https://www.mgc.ac.cn/VFs/Down/VFDB_setB_pro.fas.gz`, creates the MMseqs2 database, and if `--version` is omitted it uses the UTC download date as the release folder and logged version, for example `2026-04-24`.
 
 Version logging:
 - Each run writes `database_versions.yaml` in the installed release directory.
-- The log records the requested version, resolved install directory, source URLs, and SHA256 checksums of the installed assets.
+- The log records the requested version, resolved install directory, source URLs, source-version label, and SHA256 checksums of the installed assets.
 
 Examples:
 

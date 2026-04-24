@@ -15,6 +15,8 @@ from drakkar.cli import (
     validate_managed_database_version,
 )
 from drakkar.database_registry import (
+    database_artifact_path,
+    database_release_from_config,
     database_source_version_label,
     database_sources,
     database_release_dir,
@@ -62,6 +64,24 @@ class DatabaseCommandTests(unittest.TestCase):
     def test_database_target_path_uses_database_specific_basename(self) -> None:
         target_path = database_target_path("kegg", "/tmp/kegg", "20260421")
         self.assertEqual(target_path, Path("/tmp/kegg/20260421/kofams"))
+
+    def test_database_release_from_config_accepts_release_directory(self) -> None:
+        self.assertEqual(
+            database_release_from_config("pfam", "/tmp/pfam/Pfam37.4"),
+            Path("/tmp/pfam/Pfam37.4"),
+        )
+
+    def test_database_artifact_path_accepts_release_directory(self) -> None:
+        self.assertEqual(
+            database_artifact_path("pfam", "/tmp/pfam/Pfam37.4", "_ec.tsv"),
+            Path("/tmp/pfam/Pfam37.4/pfam_ec.tsv"),
+        )
+
+    def test_database_artifact_path_accepts_legacy_primary_path(self) -> None:
+        self.assertEqual(
+            database_artifact_path("amr", "/tmp/amr/2025-07-16.1/amr", ".tsv"),
+            Path("/tmp/amr/2025-07-16.1/amr.tsv"),
+        )
 
     def test_kegg_database_sources_use_requested_archive_version(self) -> None:
         self.assertEqual(
@@ -128,6 +148,25 @@ class DatabaseCommandTests(unittest.TestCase):
             self.assertEqual(
                 config_path.read_text(encoding="utf-8"),
                 'GTDB_DB: "/new/path"  # keep comment\nKEGG_DB: "/keep"\n',
+            )
+
+    def test_set_default_database_path_writes_release_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "config.yaml"
+            config_path.write_text('KEGG_DB: "/old/path"\n', encoding="utf-8")
+
+            from drakkar import cli as cli_module
+
+            original = cli_module.CONFIG_PATH
+            try:
+                cli_module.CONFIG_PATH = config_path
+                cli_module.set_default_database_path("kegg", "/tmp/kofams", "2026-02-01")
+            finally:
+                cli_module.CONFIG_PATH = original
+
+            self.assertEqual(
+                config_path.read_text(encoding="utf-8"),
+                'KEGG_DB: "/tmp/kofams/2026-02-01"\n',
             )
 
 

@@ -2,7 +2,17 @@
 # Config variables
 ####
 
+import importlib.util
+from pathlib import Path
+
 PACKAGE_DIR = config["package_dir"]
+registry_path = Path(PACKAGE_DIR) / "database_registry.py"
+registry_spec = importlib.util.spec_from_file_location("drakkar_database_registry", registry_path)
+if registry_spec is None or registry_spec.loader is None:
+    raise ImportError(f"Unable to load database registry from {registry_path}")
+
+database_registry = importlib.util.module_from_spec(registry_spec)
+registry_spec.loader.exec_module(database_registry)
 
 # Software modules
 GTDBTK_MODULE = config["GTDBTK_MODULE"]
@@ -13,11 +23,15 @@ SIGNALP_MODULE = config["SIGNALP_MODULE"]
 GENOMAD_MODULE = config["GENOMAD_MODULE"]
 
 # Annotation databases
-KEGG_DB = config["KEGG_DB"]
-CAZY_DB = config["CAZY_DB"]
-AMR_DB = config["AMR_DB"]
-PFAM_DB = config["PFAM_DB"]
-VFDB_DB = config["VFDB_DB"]
+KEGG_DB = str(database_registry.database_artifact_path("kegg", config["KEGG_DB"]))
+KEGG_DB_JSON = str(database_registry.database_artifact_path("kegg", config["KEGG_DB"], ".json"))
+CAZY_DB = str(database_registry.database_artifact_path("cazy", config["CAZY_DB"]))
+AMR_DB = str(database_registry.database_artifact_path("amr", config["AMR_DB"]))
+AMR_DB_TSV = str(database_registry.database_artifact_path("amr", config["AMR_DB"], ".tsv"))
+PFAM_DB = str(database_registry.database_artifact_path("pfam", config["PFAM_DB"]))
+PFAM_DB_EC = str(database_registry.database_artifact_path("pfam", config["PFAM_DB"], "_ec.tsv"))
+VFDB_DB = str(database_registry.database_artifact_path("vfdb", config["VFDB_DB"]))
+VFDB_DB_TSV = str(database_registry.database_artifact_path("vfdb", config["VFDB_DB"], ".tsv"))
 GENOMAD_DB = config["GENOMAD_DB"]
 DBCAN_DB = config["DBCAN_DB"]
 ANTISMASH_DB = config["ANTISMASH_DB"]
@@ -246,10 +260,10 @@ rule merge_gene_annotations:
         f"{OUTPUT_DIR}/annotating/final/{{mag}}_genes.tsv"
     params:
         package_dir={PACKAGE_DIR},
-        kegg_db=f"{KEGG_DB}.json",
-        ec_db=f"{PFAM_DB}_ec.tsv",
-        vf_db=f"{VFDB_DB}.tsv",
-        amr_db=f"{AMR_DB}.tsv",
+        kegg_db={KEGG_DB_JSON},
+        ec_db={PFAM_DB_EC},
+        vf_db={VFDB_DB_TSV},
+        amr_db={AMR_DB_TSV},
         kegg=lambda wildcards: f"{OUTPUT_DIR}/annotating/kegg/{wildcards.mag}.tsv",
         pfam=lambda wildcards: f"{OUTPUT_DIR}/annotating/pfam/{wildcards.mag}.tsv",
         cazy=lambda wildcards: f"{OUTPUT_DIR}/annotating/cazy/{wildcards.mag}.tsv",

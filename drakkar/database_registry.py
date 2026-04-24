@@ -80,6 +80,22 @@ def database_target_path(database_name: str, base_directory: str | Path, version
     return database_release_dir(database_name, base_directory, version) / definition["basename"]
 
 
+def database_release_from_config(database_name: str, configured_path: str | Path) -> Path:
+    path = Path(configured_path)
+    basename = MANAGED_DATABASES[database_name]["basename"]
+    if path.name == basename:
+        return path.parent
+    if path.name.startswith(f"{basename}.") or path.name.startswith(f"{basename}_"):
+        return path.parent
+    return path
+
+
+def database_artifact_path(database_name: str, configured_path: str | Path, suffix: str = "") -> Path:
+    release_dir = database_release_from_config(database_name, configured_path)
+    basename = MANAGED_DATABASES[database_name]["basename"]
+    return release_dir / f"{basename}{suffix}"
+
+
 def database_sources(database_name: str, version: str | None = None) -> list[str]:
     definition = MANAGED_DATABASES[database_name]
     return [source.format(version=version) for source in definition["sources"]]
