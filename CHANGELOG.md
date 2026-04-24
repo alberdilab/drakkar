@@ -6,6 +6,12 @@ This project tracks release notes here from this point forward.
 
 ### Added
 
+- No unreleased changes yet.
+
+## [1.1.0] - 2026-04-24
+
+### Added
+
 - Added a new `drakkar database <name>` maintenance command for installing one managed annotation database release at a time (`kegg`, `cazy`, `pfam`, `vfdb`, `amr`).
 - Added per-run database version logging in `database_versions.yaml`, including source URLs, requested versions, release directories, timestamps, and SHA256 checksums of installed assets.
 
