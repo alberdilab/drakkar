@@ -1,16 +1,16 @@
 Installation
 ============
 
-DRAKKAR can be installed with pip or accessed as an HPC module on supported
-systems (e.g., Mjolnir). The core workflow is executed with Snakemake and uses
-Conda environments for tool dependencies.
+DRAKKAR can be installed directly from the GitHub repository or accessed as an
+HPC module on supported systems (e.g., Mjolnir). The core workflow is executed
+with Snakemake and uses Conda environments for tool dependencies.
 
-Install with pip
-----------------
+Install From GitHub
+-------------------
 
 .. code-block:: console
 
-   $ pip install drakkar
+   $ pip install git+https://github.com/alberdilab/drakkar.git
 
 If you are working in a managed HPC environment, prefer using a dedicated
 Conda environment:
@@ -19,7 +19,7 @@ Conda environment:
 
    $ conda create -n drakkar python=3.12
    $ conda activate drakkar
-   $ pip install drakkar
+   $ pip install git+https://github.com/alberdilab/drakkar.git
 
 Use on Mjolnir (module)
 -----------------------

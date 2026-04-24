@@ -14,12 +14,15 @@ def is_url(value):
     parsed = urlparse(str(value))
     return parsed.scheme in {"http", "https", "ftp"}
 
-def download_to_cache(url, sample_name, column_name, output):
-    cache_dir = os.path.join(output, "data", "reads_cache")
+def download_to_cache(url, sample_name, column_name, output, cache_subdir="reads_cache", preserve_basename=False):
+    cache_dir = os.path.join(output, "data", cache_subdir)
     os.makedirs(cache_dir, exist_ok=True)
     parsed = urlparse(url)
     basename = os.path.basename(parsed.path) or f"{sample_name}_{column_name}"
-    filename = f"{sample_name}_{basename}" if sample_name else basename
+    if preserve_basename or not sample_name:
+        filename = basename
+    else:
+        filename = f"{sample_name}_{basename}"
     dest_path = os.path.join(cache_dir, filename)
     if os.path.exists(dest_path):
         print(f"Using cached {column_name} for {sample_name}: {dest_path}", flush=True)
@@ -283,7 +286,22 @@ def file_references_to_json(infofile, output):
     # Load sample info file
     df = pd.read_csv(infofile, sep="\t")
 
-    REFERENCE_TO_FILE = {ref_name: str(Path(ref_path).resolve()) for ref_name, ref_path in zip(df["reference_name"], df["reference_path"])}
+    REFERENCE_TO_FILE = {}
+    for ref_name, ref_path in zip(df["reference_name"], df["reference_path"]):
+        ref_name_value = str(ref_name)
+        ref_path_value = str(ref_path)
+        if is_url(ref_path_value):
+            resolved_ref_path = download_to_cache(
+                ref_path_value,
+                ref_name_value,
+                "reference_path",
+                output,
+                cache_subdir="references_cache",
+            )
+        else:
+            resolved_ref_path = str(Path(ref_path_value).resolve())
+        REFERENCE_TO_FILE[ref_name_value] = resolved_ref_path
+
     with open(f"{output}/data/reference_to_file.json", "w") as f:
         json.dump(REFERENCE_TO_FILE, f, indent=4)
 
@@ -332,7 +350,18 @@ def argument_samples_to_json(argument, output):
         json.dump(SAMPLE_TO_READS2, f)
 
 def argument_references_to_json(argument, sample_to_reads, output):
-    REFERENCE_TO_FILE = {"reference": [f"{argument}"]}
+    if is_url(argument):
+        reference_path = download_to_cache(
+            argument,
+            "reference",
+            "reference",
+            output,
+            cache_subdir="references_cache",
+        )
+    else:
+        reference_path = argument
+
+    REFERENCE_TO_FILE = {"reference": [reference_path]}
     os.makedirs(f"{output}/data", exist_ok=True)
     with open(f"{output}/data/reference_to_file.json", "w") as f:
         json.dump(REFERENCE_TO_FILE, f, indent=4)
@@ -515,6 +544,15 @@ def file_bins_to_json(paths_file=None, output=False):
             full_path = line.strip()
             if not full_path:
                 continue
+            if is_url(full_path):
+                full_path = download_to_cache(
+                    full_path,
+                    "",
+                    "genome",
+                    output,
+                    cache_subdir="genomes_cache",
+                    preserve_basename=True,
+                )
 
             # Extract filename without path and extension (supports .gz)
             filename = fasta_re.sub("", os.path.basename(full_path))
@@ -549,6 +587,7 @@ def path_bins_to_json(folder_path=None, output=False):
 # Create dictionary of bin names and paths from the input file
 def file_mags_to_json(paths_file=None, output=False):
     fasta_dict = {}
+    fasta_re = re.compile(r"\.(?:fa|fna|fasta)(?:\.gz)?$", re.IGNORECASE)
 
     # Read the paths file
     with open(paths_file, "r") as f:
@@ -556,9 +595,18 @@ def file_mags_to_json(paths_file=None, output=False):
             full_path = line.strip()
             if not full_path:
                 continue
+            if is_url(full_path):
+                full_path = download_to_cache(
+                    full_path,
+                    "",
+                    "genome",
+                    output,
+                    cache_subdir="genomes_cache",
+                    preserve_basename=True,
+                )
 
-            # Extract filename without path and extension
-            filename = os.path.splitext(os.path.basename(full_path))[0]
+            # Extract filename without path and extension (supports .gz)
+            filename = fasta_re.sub("", os.path.basename(full_path))
 
             # Store in dictionary
             fasta_dict[filename] = full_path

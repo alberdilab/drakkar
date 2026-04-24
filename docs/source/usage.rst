@@ -57,7 +57,7 @@ by the selected module are needed):
 - ``rawreads1``: path or URL to R1 reads.
 - ``rawreads2``: path or URL to R2 reads.
 - ``reference_name``: host reference label (preprocessing with host removal).
-- ``reference_path``: host reference fasta path.
+- ``reference_path``: host reference fasta path or URL.
 - ``coassembly``: labels that define co-assembly groups.
 - ``coverage``: mapping coverage groups for multicoverage.
 
@@ -72,6 +72,11 @@ Example:
 Notes:
 
 - Read files can be local paths or remote URLs (http/https/ftp).
+- ``reference_path`` values and genome path lists provided through options such as
+  ``-B/--bins_file`` can also use remote URLs (http/https/ftp); DRAKKAR downloads
+  them into a local cache before running.
+- Directory-style inputs such as ``-i/--input`` and ``-b/--bins_dir`` must remain
+  local filesystem paths.
 - The ``coassembly`` column groups samples for pooled assemblies.
 - ``-m individual`` adds per-sample assemblies in addition to co-assemblies.
 - ``--multicoverage`` maps samples that share the same coverage label to each

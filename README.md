@@ -13,6 +13,14 @@ DRAKKAR is a Snakemake-based, modular genome-resolved metagenomics pipeline opti
 
 ## Quickstart
 
+Install from GitHub if you are not using an HPC module:
+
+```bash
+pip install git+https://github.com/alberdilab/drakkar.git
+```
+
+Or, on Mjolnir:
+
 ```
 module load drakkar/1.0.0
 drakkar complete -f input_info.tsv -o drakkar_output
@@ -232,6 +240,8 @@ A tab-separated file with optional columns depending on module usage:
 
 Notes:
 - Input read files can be local paths or remote URLs (http/https/ftp).
+- `reference_path` values and genome path lists passed through options such as `-B/--bins_file` can also use remote URLs (http/https/ftp); DRAKKAR downloads them into a local cache before running.
+- Directory-style inputs such as `-i/--input` and `-b/--bins_dir` remain local filesystem paths.
 - The `coassembly` column defines which samples are pooled for co-assembly.
 - `-m individual` adds per-sample assemblies in addition to any co-assemblies.
 - If `--multicoverage` is set, samples sharing a coverage group map to each other's assemblies.
