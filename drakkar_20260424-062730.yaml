@@ -1,0 +1,15 @@
+timestamp: '2026-04-24T06:27:30.303351+00:00'
+command: config
+modules:
+- config
+working_directory: /Users/anttonalberdi/Github/drakkar
+output_directory: /Users/anttonalberdi/Github/drakkar
+arguments:
+  command: config
+  view: true
+  edit: false
+argv:
+- /Users/anttonalberdi/Github/drakkar/drakkar/cli.py
+- config
+- --view
+env_path: /projects/alberdilab/data/environments/drakkar

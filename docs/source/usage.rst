@@ -24,7 +24,7 @@ Key concepts
 
 - **Modules**: Each workflow stage can be run independently (preprocessing,
   cataloging, profiling, annotating, expressing, dereplicating, database,
-  inspecting, transfer).
+  config, inspecting, transfer).
 - **Output directory**: All outputs are written under ``-o/--output``.
 - **Profiles**: Use ``-p/--profile`` to select a Snakemake profile (default:
   ``slurm``).
@@ -304,6 +304,32 @@ Version logging:
 - Each run writes ``database_versions.yaml`` inside the installed release directory.
 - The log records the requested version, resolved install directory, source URLs,
   and SHA256 checksums and file sizes for the installed assets.
+
+Config
+^^^^^^
+
+Views or edits the installed DRAKKAR configuration file at
+``drakkar/workflow/config.yaml``.
+
+.. code-block:: console
+
+   $ drakkar config --view
+
+.. code-block:: console
+
+   $ drakkar config --edit
+
+Options:
+
+- ``--view``: print the config file path and contents.
+- ``--edit``: open the config file in a terminal editor.
+
+Behavior:
+
+- ``--edit`` uses ``$VISUAL``, then ``$EDITOR``, then falls back to ``nano``,
+  ``vim``, or ``vi``.
+- The command edits the installed package config directly, so changes affect
+  later workflow runs from that installation.
 
 Inspecting
 ^^^^^^^^^^

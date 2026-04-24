@@ -37,6 +37,7 @@ DRAKKAR is organized into independent modules. Use `drakkar complete` to chain t
 - **Expressing**: metatranscriptomics mapping to annotated genes.
 - **Dereplicating**: dereplication only, no read mapping.
 - **Database**: install or update one managed annotation database release.
+- **Config**: view or edit the installed `workflow/config.yaml`.
 - **Transfer**: SFTP transfer of selected outputs.
 
 ## Modules
@@ -186,6 +187,25 @@ Examples:
 drakkar database amr --directory /projects/alberdilab/data/databases/drakkar/amr --version 20260421
 drakkar database kegg --directory /projects/alberdilab/data/databases/drakkar/kofams --version 20260421 --set-default
 drakkar database cazy --directory /projects/alberdilab/data/databases/drakkar/cazy --version V14 --set-default
+```
+
+### Config
+
+Views or edits the installed DRAKKAR configuration file at `drakkar/workflow/config.yaml`.
+
+Key options:
+- `--view`: print the config file path and contents.
+- `--edit`: open the config file in a terminal editor.
+
+Behavior:
+- `--edit` uses `$VISUAL`, then `$EDITOR`, then falls back to `nano`, `vim`, or `vi`.
+- This command edits the installed package config directly, so changes affect subsequent workflow runs from that installation.
+
+Examples:
+
+```bash
+drakkar config --view
+drakkar config --edit
 ```
 
 ### Transfer

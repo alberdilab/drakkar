@@ -4,6 +4,10 @@ This project tracks release notes here from this point forward.
 
 ## [Unreleased]
 
+### Added
+
+- Added `drakkar config --view` and `drakkar config --edit` to inspect or modify the installed `workflow/config.yaml` from the CLI.
+
 ### Changed
 
 - Fixed `drakkar database cazy` to download the requested upstream dbCAN release from the versioned `Databases/<version>/` endpoint instead of silently saving an HTML landing page.

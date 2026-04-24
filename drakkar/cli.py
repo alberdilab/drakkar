@@ -5,6 +5,8 @@ import subprocess
 import yaml
 import re
 import json
+import shlex
+import shutil
 import pandas as pd
 from pathlib import Path
 from collections import defaultdict
@@ -101,6 +103,50 @@ def set_default_database_path(database_name, directory, version):
     default_path = str(database_target_path(database_name, directory, version))
     replace_config_value(definition["config_key"], default_path)
     return default_path
+
+
+def resolve_editor_command():
+    for env_var in ("VISUAL", "EDITOR"):
+        value = os.environ.get(env_var)
+        if value:
+            return shlex.split(value)
+    for candidate in ("nano", "vim", "vi"):
+        resolved = shutil.which(candidate)
+        if resolved:
+            return [resolved]
+    return None
+
+
+def view_config():
+    if not CONFIG_PATH.exists():
+        print(f"{ERROR}ERROR:{RESET} config.yaml not found: {CONFIG_PATH}")
+        return 1
+    print(CONFIG_PATH.resolve())
+    print("")
+    text = CONFIG_PATH.read_text(encoding="utf-8")
+    sys.stdout.write(text)
+    if text and not text.endswith("\n"):
+        sys.stdout.write("\n")
+    return 0
+
+
+def edit_config():
+    if not CONFIG_PATH.exists():
+        print(f"{ERROR}ERROR:{RESET} config.yaml not found: {CONFIG_PATH}")
+        return 1
+    editor_cmd = resolve_editor_command()
+    if not editor_cmd:
+        print(f"{ERROR}ERROR:{RESET} No terminal editor found. Set $VISUAL or $EDITOR.")
+        return 1
+    try:
+        subprocess.run([*editor_cmd, str(CONFIG_PATH)], check=True)
+    except FileNotFoundError:
+        print(f"{ERROR}ERROR:{RESET} Editor not found: {' '.join(editor_cmd)}")
+        return 1
+    except subprocess.CalledProcessError as exc:
+        print(f"{ERROR}ERROR:{RESET} Editor exited with code {exc.returncode}")
+        return exc.returncode or 1
+    return 0
 
 def validate_path(path_value, label, expect_dir=False):
     if not path_value:
@@ -769,13 +815,19 @@ def main():
     subparser_transfer.add_argument("-b", "--bins", action="store_true", help="Transfer cataloging bins")
     subparser_transfer.add_argument("-v", "--verbose", action="store_true", help="Log each transfer on screen")
 
+    subparser_config = subparsers.add_parser("config", help="View or edit drakkar workflow/config.yaml")
+    config_actions = subparser_config.add_mutually_exclusive_group(required=True)
+    config_actions.add_argument("--view", action="store_true", help="Print workflow/config.yaml")
+    config_actions.add_argument("--edit", action="store_true", help="Open workflow/config.yaml in a terminal editor")
+
     args = parser.parse_args()
 
     # Display ASCII logo before running any command or showing help
     display_drakkar()
 
     # Check screen session
-    check_screen_session()
+    if args.command != "config":
+        check_screen_session()
 
     path_checks = [
         (getattr(args, "input", None), "Input", True),
@@ -838,6 +890,13 @@ def main():
         print(f"{HEADER1}UNLOCKING DRAKKAR DIRECTORY...{RESET}", flush=True)
         print(f"", flush=True)
         run_unlock(args.command, args.output, args.profile)
+
+    elif args.command == "config":
+        if args.view:
+            return view_config()
+        if args.edit:
+            return edit_config()
+        return 0
 
     elif args.command == "transfer":
         print(f"{HEADER1}TRANSFERRING DRAKKAR OUTPUTS...{RESET}", flush=True)
