@@ -87,11 +87,6 @@ if DATABASE_NAME == "cazy":
             mkdir -p "{OUTPUT_DIR}"
             rm -f "{params.db}" "{params.db}.tmp" "{params.db}.h3f" "{params.db}.h3i" "{params.db}.h3m" "{params.db}.h3p"
             curl -L --fail --output "{params.db}.tmp" "{params.url}"
-            if ! head -n 5 "{params.db}.tmp" | grep -q "HMMER3/f"; then
-                echo "Downloaded file for CAZy does not look like a dbCAN HMM database: {params.url}" >&2
-                rm -f "{params.db}.tmp"
-                exit 1
-            fi
             mv "{params.db}.tmp" "{params.db}"
             module load {params.hmmer_module}
             hmmpress -f "{params.db}"
