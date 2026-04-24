@@ -3,11 +3,22 @@
 ####
 
 from datetime import datetime, timezone
+import importlib.util
 from pathlib import Path
 
-from drakkar.database_registry import MANAGED_DATABASES, database_target_path, normalize_managed_database_name
-
 PACKAGE_DIR = config["package_dir"]
+registry_path = Path(PACKAGE_DIR) / "database_registry.py"
+registry_spec = importlib.util.spec_from_file_location("drakkar_database_registry", registry_path)
+if registry_spec is None or registry_spec.loader is None:
+    raise ImportError(f"Unable to load database registry from {registry_path}")
+
+database_registry = importlib.util.module_from_spec(registry_spec)
+registry_spec.loader.exec_module(database_registry)
+
+MANAGED_DATABASES = database_registry.MANAGED_DATABASES
+database_target_path = database_registry.database_target_path
+normalize_managed_database_name = database_registry.normalize_managed_database_name
+
 HMMER_MODULE = config["HMMER_MODULE"]
 MMSEQS2_MODULE = config["MMSEQS2_MODULE"]
 
