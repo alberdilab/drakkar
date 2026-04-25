@@ -10,6 +10,9 @@ from urllib.request import urlopen
 from pathlib import Path
 from collections import defaultdict
 
+from drakkar import __version__
+from drakkar.output import print, prompt
+
 def is_url(value):
     parsed = urlparse(str(value))
     return parsed.scheme in {"http", "https", "ftp"}
@@ -84,7 +87,9 @@ def display_drakkar():
     ░░░░░░░░░░   ░░░░░   ░░░░░ ░░░░░   ░░░░░ ░░░░░   ░░░░ ░░░░░   ░░░░ ░░░░░   ░░░░░ ░░░░░   ░░░░░
     """
 
-    ascii_intro = r"""
+    ascii_intro = f"""
+
+    Version: {__version__}
 
     By Antton Alberdi [antton.alberdi@sund.ku.dk]
     Source code: https://github.com/alberdilab/drakkar
@@ -195,7 +200,7 @@ def check_screen_session():
 
         # Prompt user to continue
         while True:
-            user_input = input("    👉 Type '1' to ignore this warning and continue, or Ctrl+C to exit: ")
+            user_input = prompt("    👉 Type '1' to ignore this warning and continue, or Ctrl+C to exit: ")
             if user_input.strip() == "1":
                 break  # Continue execution
             else:

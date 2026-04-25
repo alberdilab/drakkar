@@ -3,6 +3,7 @@ pandas
 PyYAML
 plotly
 biopython
+rich
 
 [docs]
 sphinx<9,>=8

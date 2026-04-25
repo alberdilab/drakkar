@@ -6,6 +6,7 @@ setup.py
 drakkar/__init__.py
 drakkar/cli.py
 drakkar/database_registry.py
+drakkar/output.py
 drakkar/utils.py
 drakkar.egg-info/PKG-INFO
 drakkar.egg-info/SOURCES.txt
@@ -58,6 +59,8 @@ drakkar/workflow/scripts/rename_bins.py
 drakkar/workflow/scripts/select_ko.py
 drakkar/workflow/scripts/split_coverm.py
 drakkar/workflow/scripts/update_cgc_cazy_annotations.py
+tests/test_cli_config.py
 tests/test_cli_database.py
+tests/test_cli_overwrite.py
 tests/test_release_script.py
 tests/test_url_inputs.py

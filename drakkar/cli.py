@@ -12,12 +12,14 @@ from pathlib import Path
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
+from drakkar import __version__
 from drakkar.database_registry import (
     MANAGED_DATABASES,
     database_release_dir,
     normalize_managed_database_name,
 )
 from drakkar.utils import *
+from drakkar.output import print, prompt
 
 ###
 # Define and read config file
@@ -197,12 +199,20 @@ def prompt_overwrite_locked_directory(output_dir):
     print("This usually means a previous Snakemake run ended unexpectedly.")
     print("Overwriting will delete the entire directory and rerun from scratch.")
     while True:
-        response = input("Delete the locked directory and overwrite it? [y/N]: ").strip().lower()
+        response = prompt("Delete the locked directory and overwrite it? [y/N]: ").strip().lower()
         if response in {"y", "yes"}:
             return True
         if response in {"", "n", "no"}:
             return False
         print("Please answer y or n.")
+
+
+class RichArgumentParser(argparse.ArgumentParser):
+    """Route argparse help and errors through the Rich console."""
+
+    def _print_message(self, message, file=None):
+        if message:
+            print(message, end="", file=file)
 
 
 def prepare_output_directory(output_dir, overwrite=False):
@@ -739,10 +749,11 @@ def run_snakemake_database(workflow, project_name, output_dir, env_path, profile
 ###
 
 def main():
-    parser = argparse.ArgumentParser(
+    parser = RichArgumentParser(
         description="Drakkar: A Snakemake-based workflow for sequencing analysis",
         formatter_class=argparse.RawTextHelpFormatter
     )
+    parser.add_argument("--version", action="version", version=f"drakkar {__version__}")
     subparsers = parser.add_subparsers(dest="command", help="Available workflows")
 
     # Define subcommands for each workflow
@@ -855,7 +866,7 @@ def main():
     subparser_expressing.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
     subparser_expressing.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
 
-    database_parent = argparse.ArgumentParser(add_help=False)
+    database_parent = RichArgumentParser(add_help=False)
     database_parent.add_argument("--directory", required=True, help="Base directory where the database release directory will be created")
     database_parent.add_argument("--version", required=False, help="Release folder name to create inside --directory (optional for vfdb; defaults to the UTC download date)")
     database_parent.add_argument("--download-runtime", type=int, default=120, help="Runtime in minutes for the database download/preparation rule (default: 120)")

@@ -8,6 +8,12 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.1.2] - 2026-04-25
+
+### Added
+
+- Added Rich-backed CLI output, prompts, help rendering, and `drakkar --version` for the 1.1.2 release.
+
 ## [1.1.1] - 2026-04-24
 
 ### Added
