@@ -16,7 +16,6 @@ BINETTE_MODULE: "binette/1.0.5"
 DREP_MODULE: "drep/3.6.2"
 MASH_MODULE: "mash/2.3"
 COVERM_MODULE: "coverm/0.7.0"
-DREP_ANI: 0.98
 GTDBTK_MODULE: "gtdbtk/2.4.1"
 PRODIGAL_MODULE: "pprodigal/1.0.1"
 HMMER_MODULE: "hmmer/3.3.2"
@@ -36,7 +35,10 @@ GENOMAD_MODULE: "genomad/1.11.0"
 
 # Annotation databases
 CHECKM2_DB: "/maps/datasets/globe_databases/checkm2/20250215/CheckM2_database/uniref100.KO.1.dmnd"
-GTDB_DB: "/maps/datasets/globe_databases/gtdbtk_db/20241001"
+GTDB_DB: "/maps/datasets/globe_databases/gtdbtk_db/20260426/release232"
+GTDB_DB_232: "/maps/datasets/globe_databases/gtdbtk_db/20260426/release232"
+GTDB_DB_226: "/maps/datasets/globe_databases/gtdbtk_db/20250909/release226"
+GTDB_DB_220: "/maps/datasets/globe_databases/gtdbtk_db/20241001"
 KEGG_DB: "/maps/projects/alberdilab/data/databases/drakkar/kofams/2026-02-01"
 CAZY_DB: "/maps/projects/alberdilab/data/databases/drakkar/cazy/V14"
 AMR_DB: "/maps/projects/alberdilab/data/databases/drakkar/amr/2025-07-16.1"
@@ -57,3 +59,7 @@ DEFENSEFINDER_DB: "/projects/alberdilab/data/databases/drakkar/defensefinder"
 # Environments
 
 ENVIRONMENTS_DIR: "/projects/alberdilab/data/environments/drakkar"
+
+# Parameters
+DREP_ANI: 0.98
+SNAKEMAKE_MAX_GB: 1024

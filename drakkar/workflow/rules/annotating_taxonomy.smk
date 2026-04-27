@@ -10,7 +10,22 @@ PRODIGAL_MODULE = config["PRODIGAL_MODULE"]
 HMMER_MODULE = config["HMMER_MODULE"]
 
 # Annotation databases
-GTDB_DB = config["GTDB_DB"]
+GTDB_VERSION = str(config.get("gtdb_version", "") or "").strip()
+if GTDB_VERSION:
+    GTDB_DB_KEY = f"GTDB_DB_{GTDB_VERSION}"
+    if GTDB_DB_KEY not in config:
+        available = sorted(
+            key.replace("GTDB_DB_", "")
+            for key in config
+            if key.startswith("GTDB_DB_")
+        )
+        raise ValueError(
+            f"GTDB version {GTDB_VERSION} is not configured. "
+            f"Add {GTDB_DB_KEY} to config.yaml or choose one of: {', '.join(available)}"
+        )
+    GTDB_DB = config[GTDB_DB_KEY]
+else:
+    GTDB_DB = config["GTDB_DB"]
 
 ####
 # Workflow rules
@@ -50,7 +65,7 @@ rule gtdbtk:
     conda:
         f"{PACKAGE_DIR}/workflow/envs/annotating_taxonomy.yaml"
     resources:
-        mem_mb=lambda wildcards, attempt: 128*1024 * 2 ** (attempt - 1),
+        mem_mb=lambda wildcards, attempt: cap_mem_mb(128*1024 * 2 ** (attempt - 1)),
         runtime=lambda wildcards, attempt: 120 * 2 ** (attempt - 1)
     message: "Annotating taxonomy using GTDBTK..."
     shell:
@@ -74,7 +89,7 @@ rule gtdbtk_table:
         archaea2=f"{OUTPUT_DIR}/annotating/gtdbtk/classify/ar53.tsv"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, attempt: 1*1024 * 2 ** (attempt - 1),
+        mem_mb=lambda wildcards, attempt: cap_mem_mb(1*1024 * 2 ** (attempt - 1)),
         runtime=lambda wildcards, attempt: 5 * 2 ** (attempt - 1)
     message: "Annotating taxonomy using GTDBTK..."
     shell:

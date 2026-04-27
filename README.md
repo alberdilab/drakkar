@@ -110,6 +110,7 @@ Key options:
   - `genes` (gene-level only: `kegg,cazy,pfam,virulence,amr,signalp`)
   - `kegg`, `cazy`, `pfam`, `virulence` (`vfdb` alias), `amr`, `signalp`
   - `dbcan`, `antismash`, `defense`, `mobile` (`genomad` alias), `network`
+- `--gtdb-version`: GTDB release number for taxonomy annotation. DRAKKAR uses `GTDB_DB_<version>` from `config.yaml`, such as `GTDB_DB_232`; if omitted, it uses `GTDB_DB`.
 - `-e/--env_path`: conda environments directory.
 - `-p/--profile`: Snakemake profile.
 

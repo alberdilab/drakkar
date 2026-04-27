@@ -36,7 +36,7 @@ rule assembly:
         outputdir=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}"
     threads: 8
     resources:
-        mem_mb=lambda wildcards, input, attempt: min(1020*1024,max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1))),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(min(1020*1024,max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)))),
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 20) * 2 ** (attempt - 1))
     message: "Assembling {wildcards.assembly}..."
     shell:
@@ -69,7 +69,7 @@ rule assembly_index:
         basename=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 5) * 2 ** (attempt - 1))
     message: "Indexing assembly {wildcards.assembly}..."
     shell:
@@ -97,7 +97,7 @@ rule assembly_map:
         basename=lambda wildcards: f"{OUTPUT_DIR}/cataloging/megahit/{wildcards.assembly}/{wildcards.assembly}"
     threads: 8
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 3) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 3) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 5) * 2 ** (attempt - 1))
     message: "Mapping {wildcards.sample} reads to assembly {wildcards.assembly}..."
     shell:
@@ -128,7 +128,7 @@ rule assembly_map_depth:
         metabat2_module={METABAT2_MODULE}
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: min(20000,max(15, int(input.size_mb / 100) * 2 ** (attempt - 1)))
     message: "Calculating mapping states of assembly {wildcards.assembly}..."
     shell:
@@ -154,7 +154,7 @@ rule metabat2:
         metabat2_module={METABAT2_MODULE}
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 50) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 50) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 5) * 2 ** (attempt - 1))
     message: "Binning contigs from assembly {wildcards.assembly} using metabat2..."
     shell:
@@ -182,7 +182,7 @@ rule maxbin2:
         assembly_size_mb=lambda wildcards, input: int(Path(input.assembly).stat().st_size / (1024*1024))
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 50) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 50) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 3) * 2 ** (attempt - 1))
     message: "Binning contigs from assembly {wildcards.assembly} using maxbin2..."
     shell:
@@ -209,7 +209,7 @@ rule maxbin2_table:
         fastadir=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 5) * 2 ** (attempt - 1))
     shell:
         """
@@ -237,7 +237,7 @@ rule semibin2:
         assembly_size_mb=lambda wildcards, input: int(Path(input.assembly).stat().st_size / (1024*1024))
     threads: 8
     resources:
-        mem_mb=lambda wildcards, input, attempt: min(1000*1024,max(8*1024, int(input.size_mb * 30) * 2 ** (attempt - 1))),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(min(1000*1024,max(8*1024, int(input.size_mb * 30) * 2 ** (attempt - 1)))),
         runtime=lambda wildcards, input, attempt: min(20000,max(15, int(input.size_mb / 2) * 2 ** (attempt - 1)))
     message: "Binning contigs from assembly {wildcards.assembly} using semibin2..."
     shell:
@@ -262,7 +262,7 @@ rule semibin2_table:
         fastadir=f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/output_bins"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(1*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(1*1024, int(input.size_mb * 10) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(5, int(input.size_mb / 5) * 2 ** (attempt - 1))
     shell:
         """
@@ -296,7 +296,7 @@ checkpoint binette:
     conda:
         f"{PACKAGE_DIR}/workflow/envs/cataloging.yaml"
     resources:
-        mem_mb=lambda wildcards, input, attempt: min(1000*1024,max(32*1024, (row_count(input.metabat2) + row_count(input.maxbin2) + row_count(input.semibin2)) * 2 ** (attempt - 1))),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(min(1000*1024,max(32*1024, (row_count(input.metabat2) + row_count(input.maxbin2) + row_count(input.semibin2)) * 2 ** (attempt - 1)))),
         runtime=lambda wildcards, input, attempt: min(20000,max(15, int(input.size_mb) * 2 ** (attempt - 1)))
     message: "Refining bins from assembly {wildcards.assembly} using binette..."
     shell:
@@ -348,7 +348,7 @@ rule rename_bins:
         f"{OUTPUT_DIR}/cataloging/final/{{assembly}}/{{assembly}}_bin_{{bin_id}}.fa"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(1*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(1*1024, int(input.size_mb * 10) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(2, int(input.size_mb) * 2 ** (attempt - 1))
     message: "Copying bin {wildcards.bin_id} from assembly {wildcards.assembly}..."
     shell:
@@ -381,7 +381,7 @@ rule all_bins:
         package_dir={PACKAGE_DIR}
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(1*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(1*1024, int(input.size_mb * 10) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(2, int(input.size_mb) * 2 ** (attempt - 1))
     message: "Generating bin path file..."
     shell:

@@ -209,6 +209,9 @@ Options:
   - ``defense``: DefenseFinder systems and genes.
   - ``mobile`` (alias: ``genomad``): geNomad viral/mobile regions.
   - ``network``: metabolic network reconstruction.
+- ``--gtdb-version``: GTDB release number for taxonomy annotation. DRAKKAR
+  uses ``GTDB_DB_<version>`` from ``config.yaml``; if omitted, it uses
+  ``GTDB_DB``.
 - ``-e/--env_path``: shared Conda env dir.
 - ``-p/--profile``: Snakemake profile.
 

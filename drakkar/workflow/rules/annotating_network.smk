@@ -33,7 +33,7 @@ rule prodigal:
     params:
          prodigal_module={PRODIGAL_MODULE}
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(1*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(1*1024, int(input.size_mb * 10) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 1024) * 2 ** (attempt - 1))
     threads: 1
     shell:
@@ -62,7 +62,7 @@ rule carveme:
     conda:
         f"{PACKAGE_DIR}/workflow/envs/annotating_network.yaml"
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 8) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 8) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 100) * 2 ** (attempt - 1))
     shell:
         """
@@ -83,7 +83,7 @@ rule gapseq_find:
     conda:
         f"{PACKAGE_DIR}/workflow/envs/annotating_network.yaml"
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 500) * 2 ** (attempt - 1))
     shell:
         """
@@ -106,7 +106,7 @@ rule gapseq_find_transport:
     conda:
         f"{PACKAGE_DIR}/workflow/envs/annotating_network.yaml"
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 25) * 2 ** (attempt - 1))
     shell:
         """
@@ -134,7 +134,7 @@ rule gapseq_draft:
     conda:
         f"{PACKAGE_DIR}/workflow/envs/annotating_network.yaml"
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 800) * 2 ** (attempt - 1))
     shell:
         """
@@ -159,7 +159,7 @@ rule gapseq_fill:
     conda:
         f"{PACKAGE_DIR}/workflow/envs/annotating_network.yaml"
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 500) * 2 ** (attempt - 1))
     shell:
         """
@@ -180,7 +180,7 @@ rule mergem:
     conda:
         f"{PACKAGE_DIR}/workflow/envs/annotating_network.yaml"
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 1024 * 8) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 8) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 300) * 2 ** (attempt - 1))
     shell:
         """

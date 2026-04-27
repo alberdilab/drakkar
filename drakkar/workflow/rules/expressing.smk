@@ -24,7 +24,7 @@ rule prodigal:
     params:
         prodigal_module={PRODIGAL_MODULE}
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(1*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(1*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb * 10) * 2 ** (attempt - 1))
     threads: 1
     message: "Predicting genes of MAG {wildcards.mag}..."
@@ -45,7 +45,7 @@ rule merge_metagenome:
         f"{OUTPUT_DIR}/expressing/reference/metagenome.fna"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 1024 * 50) * 2 ** (attempt - 1))
     shell:
         """
@@ -66,7 +66,7 @@ rule merge_metagenome_gff:
         f"{OUTPUT_DIR}/expressing/reference/metagenome.gff"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 1024 * 50) * 2 ** (attempt - 1))
     shell:
         """
@@ -96,7 +96,7 @@ rule index_metagenome:
         basename=f"{OUTPUT_DIR}/expressing/reference/metagenome"
     threads: 8
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 1024 * 50) * 2 ** (attempt - 1))
     shell:
         """
@@ -117,7 +117,7 @@ rule map_to_metagenome:
         basename=f"{OUTPUT_DIR}/expressing/reference/metagenome"
     threads: 16
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb) ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb) ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 100) * 2 ** (attempt - 1))
     message: "Mapping {wildcards.sample} against genome catalogue..."
     shell:
@@ -138,7 +138,7 @@ rule quantify:
         subread_module={SUBREAD_MODULE},
         extra="-F GFF -t CDS,tRNA,rRNA -g ID -p"
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 200) * 2 ** (attempt - 1))
     shell:
         """

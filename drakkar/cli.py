@@ -81,6 +81,34 @@ def normalize_annotation_type(annotation_type):
     normalized = [opt for opt in option_order if opt in expanded]
     return ",".join(normalized)
 
+
+def available_gtdb_versions(config=None):
+    source = config if config is not None else config_vars
+    source = source or {}
+    versions = []
+    for key, value in source.items():
+        match = re.fullmatch(r"GTDB_DB_(\d+)", str(key))
+        if match and value:
+            versions.append(match.group(1))
+    return sorted(set(versions), key=lambda version: int(version), reverse=True)
+
+
+def validate_gtdb_version(version, config=None):
+    if not version:
+        return None
+    version = str(version).strip()
+    if not re.fullmatch(r"\d+", version):
+        print(f"{ERROR}ERROR:{RESET} --gtdb-version must be a GTDB release number such as 232.")
+        return None
+
+    versions = available_gtdb_versions(config)
+    if version not in versions:
+        supported = ", ".join(versions) if versions else "none configured"
+        print(f"{ERROR}ERROR:{RESET} --gtdb-version {version} is not configured. Available versions: {supported}.")
+        return None
+    return version
+
+
 def validate_database_version(version):
     version = (version or "").strip()
     if not version or version in {".", ".."} or "/" in version or "\\" in version:
@@ -674,9 +702,10 @@ def run_snakemake_dereplicating(workflow, project_name, output_dir, env_path, pr
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
 
-def run_snakemake_annotating(workflow, project_name, annotating_type, output_dir, env_path, profile):
+def run_snakemake_annotating(workflow, project_name, annotating_type, output_dir, env_path, profile, gtdb_version=None):
     """ Run the profiling workflow """
 
+    gtdb_config = f"gtdb_version={gtdb_version} " if gtdb_version else ""
     snakemake_command = [
         "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
@@ -685,7 +714,7 @@ def run_snakemake_annotating(workflow, project_name, annotating_type, output_dir
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} annotating_type={annotating_type} output_dir={output_dir} "
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} annotating_type={annotating_type} output_dir={output_dir} {gtdb_config}"
         f"--conda-prefix {env_path} "
         f"--use-conda "
     ]
@@ -775,6 +804,12 @@ def main():
             "defense, mobile (genomad), network. Default: taxonomy,function"
         ),
     )
+    subparser_complete.add_argument(
+        "--gtdb-version",
+        dest="gtdb_version",
+        required=False,
+        help="GTDB release number for taxonomy annotation, using GTDB_DB_<version> from config.yaml. Default: GTDB_DB.",
+    )
     subparser_complete.add_argument("-c", "--multicoverage", action="store_true", help="Map samples sharing the same coverage group to each other's individual assemblies")
     subparser_complete.add_argument("--fraction", required=False, action='store_true', help="Calculate microbial fraction using singlem")
     subparser_complete.add_argument("-a", "--ani", required=False, type=float, default=0.98, help="ANI threshold for dRep dereplication (-sa). Default: 0.98")
@@ -841,6 +876,12 @@ def main():
             "kegg, cazy, pfam, virulence (vfdb), amr, signalp, dbcan, antismash, "
             "defense, mobile (genomad), network. Default: taxonomy,function"
         ),
+    )
+    subparser_annotating.add_argument(
+        "--gtdb-version",
+        dest="gtdb_version",
+        required=False,
+        help="GTDB release number for taxonomy annotation, using GTDB_DB_<version> from config.yaml. Default: GTDB_DB.",
     )
     subparser_annotating.add_argument("-e", "--env_path", type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_annotating.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
@@ -959,6 +1000,10 @@ def main():
         if not normalized_annotation_type:
             return
         args.annotation_type = normalized_annotation_type
+        normalized_gtdb_version = validate_gtdb_version(getattr(args, "gtdb_version", None))
+        if getattr(args, "gtdb_version", None) and not normalized_gtdb_version:
+            return
+        args.gtdb_version = normalized_gtdb_version
 
     if args.command == "database":
         normalized_database_name = normalize_managed_database_name(getattr(args, "database_name", None))
@@ -1352,7 +1397,7 @@ def main():
                 print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
                 return
 
-        run_snakemake_annotating("annotating", project_name, args.annotation_type, args.output, env_path, args.profile)
+        run_snakemake_annotating("annotating", project_name, args.annotation_type, args.output, env_path, args.profile, getattr(args, "gtdb_version", None))
 
     ###
     # Inspecting

@@ -38,7 +38,7 @@ if not IGNORE_QUALITY and not QUALITY_FILE:
             genome_dir=f"{OUTPUT_DIR}/data/genomes"
         threads: 8
         resources:
-            mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
+            mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
             runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 10) * 2 ** (attempt - 1))
         message: "Estimating MAG completeness/contamination with CheckM2..."
         shell:
@@ -143,7 +143,7 @@ checkpoint dereplicate:
         use_genomeinfo_flag="true" if (QUALITY_FILE or not IGNORE_QUALITY) else "false"
     threads: 8
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 10) * 2 ** (attempt - 1))
     message: "Dereplicating bins using dRep..."
     shell:
@@ -222,7 +222,7 @@ rule index_catalogue:
         basename=f"{OUTPUT_DIR}/profiling_genomes/catalogue/genome_catalogue"
     threads: 8
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 1024 * 50) * 2 ** (attempt - 1))
     shell:
         """
@@ -243,7 +243,7 @@ rule map_to_catalogue:
         basename=f"{OUTPUT_DIR}/profiling_genomes/catalogue/genome_catalogue"
     threads: 16
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 20) * 2 ** (attempt - 1))
     message: "Mapping {wildcards.sample} against genome catalogue..."
     shell:
@@ -261,7 +261,7 @@ rule quantify_reads_catalogue:
         coverm_module={COVERM_MODULE}
     threads: 8
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb / 5) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb / 5) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 1024 / 5) * 2 ** (attempt - 1))
     message:
         "Generating mapping statistics with..."
@@ -288,7 +288,7 @@ rule profiling_stats:
         samtools_module={SAMTOOLS_MODULE}
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 100) * 2 ** (attempt - 1))
     message: "Calculating mapping stats of {wildcards.sample}..."
     shell:
@@ -348,7 +348,7 @@ rule singlem_profile:
         singlem_db={SINGLEM_DB}
     threads: 8
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 50) * 2 ** (attempt - 1))
     message: "Running singlem for {wildcards.sample}..."
     shell:
@@ -369,7 +369,7 @@ rule singlem_microbial_fraction:
         singlem_db={SINGLEM_DB}
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 20) * 2 ** (attempt - 1))
     message: "Running singlem for {wildcards.sample}..."
     shell:

@@ -47,6 +47,18 @@ RUN_CLUSTER_ANNOTATIONS = bool(ANNOTATING_TYPE_SET.intersection(CLUSTER_ANNOTATI
 
 import os
 
+SNAKEMAKE_MAX_GB = int(config.get("SNAKEMAKE_MAX_GB", 1024))
+if SNAKEMAKE_MAX_GB <= 0:
+    raise ValueError(f"SNAKEMAKE_MAX_GB must be positive, got {SNAKEMAKE_MAX_GB}")
+
+MAX_MEM_MB = SNAKEMAKE_MAX_GB * 1024
+
+
+def cap_mem_mb(value):
+    """Cap rule memory requests to the configured server limit."""
+    return min(MAX_MEM_MB, int(value))
+
+
 def calculate_file_sizes(file_dict):
     """Calculates file sizes in megabytes (MB) for both single-file and list-based dictionaries."""
     file_sizes = {}

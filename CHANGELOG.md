@@ -8,6 +8,17 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.1.3] - 2026-04-27
+
+### Added
+
+- Added a `.gitignore` for Python caches, test artifacts, build outputs, documentation builds, Snakemake state, and local OS/editor files.
+- Added `--gtdb-version` to `drakkar annotating` and `drakkar complete` to select numbered `GTDB_DB_<version>` config entries for taxonomy annotation.
+
+### Fixed
+
+- Capped dynamic Snakemake `mem_mb` resource requests using configurable `SNAKEMAKE_MAX_GB`, defaulting to 1024 GB.
+
 ## [1.1.2] - 2026-04-25
 
 ### Added
