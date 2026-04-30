@@ -51,8 +51,8 @@ Key options:
 - `-i/--input`: input directory containing raw reads.
 - `-f/--file`: sample info table (TSV) instead of an input directory.
 - `-o/--output`: output directory (defaults to current working directory).
-- `-r/--reference`: host reference genome file for host removal.
-- `-x/--reference-index`: tarball containing a host reference FASTA and Bowtie2 index files; incompatible with `-r/--reference`.
+- `-r/--reference`: local path or URL to a host reference genome file for host removal.
+- `-x/--reference-index`: local path or URL to a tarball containing a host reference FASTA and Bowtie2 index files; incompatible with `-r/--reference`.
 - `-e/--env_path`: conda environments directory (shared).
 - `-p/--profile`: Snakemake profile (default: slurm).
 
@@ -276,7 +276,7 @@ A tab-separated file with optional columns depending on module usage:
 
 Notes:
 - Input read files can be local paths or remote URLs (http/https/ftp).
-- `reference_path` values can point to either a FASTA/compressed FASTA or a tarball containing the FASTA plus Bowtie2 index files. Genome path lists passed through options such as `-B/--bins_file` can also use remote URLs (http/https/ftp); DRAKKAR downloads them into a local cache before running.
+- `-r/--reference`, `-x/--reference-index`, and `reference_path` values can point to either local files or remote URLs (http/https/ftp). Reference inputs may be FASTA/compressed FASTA files or tarballs containing the FASTA plus Bowtie2 index files. Genome path lists passed through options such as `-B/--bins_file` can also use remote URLs; DRAKKAR downloads them into a local cache before running.
 - Directory-style inputs such as `-i/--input` and `-b/--bins_dir` remain local filesystem paths.
 - The `coassembly` column defines which samples are pooled for co-assembly.
 - `-m individual` adds per-sample assemblies in addition to any co-assemblies.

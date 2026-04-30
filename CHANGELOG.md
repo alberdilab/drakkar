@@ -8,6 +8,12 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.2.1] - 2026-04-30
+
+### Fixed
+
+- Allowed preprocessing `-r/--reference` and `-x/--reference-index` to accept `http`, `https`, and `ftp` URLs.
+
 ## [1.2.0] - 2026-04-30
 
 ### Added

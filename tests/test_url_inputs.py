@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from drakkar import cli as cli_module
 from drakkar.utils import (
     argument_references_to_json,
     file_bins_to_json,
@@ -58,6 +59,31 @@ class UrlGenomeInputTests(unittest.TestCase):
 
             self.assertEqual(reference_to_file["reference"], [str(expected_path)])
             self.assertTrue(expected_path.exists())
+
+    def test_argument_references_to_json_downloads_reference_index_url(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sample_reads = Path(tmpdir) / "sample_to_reads1.json"
+            sample_reads.write_text('{"sample1": ["reads_1.fq.gz"]}', encoding="utf-8")
+
+            with patch("drakkar.utils.urlopen", return_value=FakeResponse(b"tarball")):
+                argument_references_to_json("https://example.org/host_index.tar.gz", str(sample_reads), tmpdir)
+
+            output_json = Path(tmpdir) / "data" / "reference_to_file.json"
+            reference_to_file = json.loads(output_json.read_text(encoding="utf-8"))
+            expected_path = Path(tmpdir) / "data" / "references_cache" / "reference_host_index.tar.gz"
+
+            self.assertEqual(reference_to_file["reference"], [str(expected_path)])
+            self.assertTrue(expected_path.exists())
+
+    def test_reference_cli_validation_accepts_urls_when_allowed(self) -> None:
+        self.assertTrue(cli_module.validate_path("https://example.org/ref.fna", "Reference", allow_url=True))
+        self.assertTrue(
+            cli_module.validate_path(
+                "https://example.org/host_index.tar.gz",
+                "Reference index tarball",
+                allow_url=True,
+            )
+        )
 
     def test_file_bins_to_json_downloads_genome_urls_to_cache(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

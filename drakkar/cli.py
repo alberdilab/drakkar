@@ -264,8 +264,10 @@ def prepare_output_directory(output_dir, overwrite=False):
     print(f"{INFO}Use --overwrite to delete it automatically, or 'drakkar unlock -o {output_path}' if you only want to clear the Snakemake lock.{RESET}")
     return False
 
-def validate_path(path_value, label, expect_dir=False):
+def validate_path(path_value, label, expect_dir=False, allow_url=False):
     if not path_value:
+        return True
+    if allow_url and not expect_dir and is_url(path_value):
         return True
     if expect_dir:
         exists = os.path.isdir(path_value)
@@ -1020,12 +1022,14 @@ def main():
         (getattr(args, "bins_file", None), "Bins file", False),
         (getattr(args, "reads_dir", None), "Reads directory", True),
         (getattr(args, "reads_file", None), "Reads file", False),
-        (getattr(args, "reference", None), "Reference", False),
-        (getattr(args, "reference_index", None), "Reference index tarball", False),
+        (getattr(args, "reference", None), "Reference", False, True),
+        (getattr(args, "reference_index", None), "Reference index tarball", False, True),
         (getattr(args, "cov_file", None), "Coverage file", False),
     ]
-    for path_value, label, expect_dir in path_checks:
-        if not validate_path(path_value, label, expect_dir):
+    for path_check in path_checks:
+        path_value, label, expect_dir, *options = path_check
+        allow_url = options[0] if options else False
+        if not validate_path(path_value, label, expect_dir, allow_url=allow_url):
             return
 
     ###
