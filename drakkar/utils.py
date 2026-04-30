@@ -307,6 +307,7 @@ def file_references_to_json(infofile, output):
             resolved_ref_path = str(Path(ref_path_value).resolve())
         REFERENCE_TO_FILE[ref_name_value] = resolved_ref_path
 
+    os.makedirs(f"{output}/data", exist_ok=True)
     with open(f"{output}/data/reference_to_file.json", "w") as f:
         json.dump(REFERENCE_TO_FILE, f, indent=4)
 

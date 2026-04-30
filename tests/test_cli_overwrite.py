@@ -55,6 +55,33 @@ class OverwriteCommandTests(unittest.TestCase):
             self.assertTrue(output_path.exists())
             self.assertIn("--overwrite", buffer.getvalue())
 
+    def test_validate_launch_metadata_directory_rejects_unwritable_output(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir)
+
+            buffer = io.StringIO()
+            with patch.object(cli_module.os, "access", return_value=False):
+                with contextlib.redirect_stdout(buffer):
+                    result = cli_module.validate_launch_metadata_directory(output_path)
+
+            self.assertFalse(result)
+            self.assertIn("Cannot write Drakkar run metadata", buffer.getvalue())
+            self.assertIn("-o/--output", buffer.getvalue())
+
+    def test_write_launch_metadata_returns_false_on_permission_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            args = type("Args", (), {"command": "annotating"})()
+
+            buffer = io.StringIO()
+            with patch.object(cli_module.os, "access", return_value=True):
+                with patch("builtins.open", side_effect=PermissionError("denied")):
+                    with contextlib.redirect_stdout(buffer):
+                        result = cli_module.write_launch_metadata(args, tmpdir)
+
+            self.assertFalse(result)
+            self.assertIn("Cannot write Drakkar run metadata", buffer.getvalue())
+            self.assertIn("PermissionError", buffer.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

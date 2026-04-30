@@ -113,8 +113,8 @@ if WORKFLOW == "preprocessing":
 
     samples = list(SAMPLE_TO_READS1.keys())
 
-    # The rules reference_index, reference_map, metagenomic_reads and host_reads are only run if
-    # the reference genome file is provided. Otherwise, the fastp rule already outputs the final files.
+    # Reference preparation, mapping, metagenomic read extraction, and host read summaries only run
+    # if a reference genome or prebuilt reference index is provided.
 
     if REFERENCE:
 
@@ -129,7 +129,7 @@ if WORKFLOW == "preprocessing":
         rule all:
             input:
                 expand(f"{OUTPUT_DIR}/data/references/{{reference}}.fna", reference=references),
-                expand(f"{OUTPUT_DIR}/data/references/{{reference}}.rev.1.bt2", reference=references),
+                expand(f"{OUTPUT_DIR}/data/references/{{reference}}.index.ready", reference=references),
                 expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz", sample=samples),
                 expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz", sample=samples),
                 expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam", sample=samples),

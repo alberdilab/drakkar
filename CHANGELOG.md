@@ -8,6 +8,16 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.2.0] - 2026-04-30
+
+### Added
+
+- Added `-x/--reference-index` for preprocessing and complete workflows to use tarballs containing a host FASTA plus prebuilt Bowtie2 index files, including tarballs listed in sample table `reference_path` values.
+
+### Fixed
+
+- Added a preflight check for current/output directory access before writing Drakkar run metadata, so protected directories produce a clear CLI error instead of a Python `PermissionError`.
+
 ## [1.1.3] - 2026-04-27
 
 ### Added
@@ -41,6 +51,7 @@ This project tracks release notes here from this point forward.
 - Changed `drakkar database pfam` to download `Pfam-A.hmm.gz` from versioned Pfam release directories such as `Pfam37.4`, then unzip and `hmmpress` the requested release.
 - Changed `drakkar database vfdb` so `--version` can be omitted and then defaults to the UTC download date, which is used as the release folder and logged version.
 - Fixed `drakkar database cazy` to download the requested upstream dbCAN release from the versioned `Databases/<version>/` endpoint instead of silently saving an HTML landing page.
+
 ## [1.1.0] - 2026-04-24
 
 ### Added

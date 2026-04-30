@@ -12,8 +12,8 @@ SINGLEM_MODULE = config["SINGLEM_MODULE"]
 # Workflow rules
 ####
 
-# The rules reference_index, reference_map, metagenomic_reads and host_reads are only run if
-# the reference genome file is provided. Otherwise, the fastp rule already outputs the final files.
+# Reference preparation, mapping, metagenomic read extraction, and host read summaries only run
+# if a reference genome or prebuilt reference index is provided.
 
 rule fastp:
     input:

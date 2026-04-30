@@ -53,36 +53,13 @@ rule fastp:
             --adapter_sequence_r2 AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
         """
 
-# Build a Bowtie2 index from the given reference genome FASTA file.  
-# Produces the index files required for read mapping and saves a copy of the reference sequence.
-
-rule reference_index:
-    input:
-        f"{OUTPUT_DIR}/data/references/{{reference}}.fna"
-    output:
-        index=f"{OUTPUT_DIR}/data/references/{{reference}}.rev.1.bt2"
-    params:
-        bowtie2_module={BOWTIE2_MODULE},
-        basename=f"{OUTPUT_DIR}/data/references/{{reference}}"
-    threads: 1
-    resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 20) * 2 ** (attempt - 1))
-    message: "Indexing reference genome {wildcards.reference}..."
-    shell:
-        """
-        module load {params.bowtie2_module}
-        bowtie2-build {input} {params.basename}
-        cat {input} > {params.basename}.fna
-        """
-
 # Align quality-filtered paired-end reads to the corresponding reference genome using Bowtie2.  
 # The alignments are converted to BAM format and sorted with samtools for downstream analyses.
 
 rule reference_map:
     input:
         index=lambda wildcards: expand(
-            f"{OUTPUT_DIR}/data/references/{{reference}}.rev.1.bt2",
+            f"{OUTPUT_DIR}/data/references/{{reference}}.index.ready",
             reference=[SAMPLE_TO_REFERENCE[wildcards.sample]]
         ),
         r1=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}_1.fq.gz",

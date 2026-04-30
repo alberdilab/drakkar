@@ -277,6 +277,31 @@ def validate_path(path_value, label, expect_dir=False):
         return False
     return True
 
+def validate_launch_metadata_directory(output_dir):
+    output_path = Path(output_dir)
+    existing_path = output_path
+    while not existing_path.exists() and existing_path.parent != existing_path:
+        existing_path = existing_path.parent
+
+    if not existing_path.exists():
+        print(f"{ERROR}ERROR:{RESET} Cannot find a parent directory for output path: {output_path}")
+        return False
+    if not existing_path.is_dir():
+        print(f"{ERROR}ERROR:{RESET} Output path parent is not a directory: {existing_path}")
+        return False
+
+    access_target = output_path if output_path.exists() else existing_path
+    if output_path.exists() and not output_path.is_dir():
+        print(f"{ERROR}ERROR:{RESET} Output path is not a directory: {output_path}")
+        return False
+    if not os.access(access_target, os.R_OK | os.W_OK | os.X_OK):
+        print(f"{ERROR}ERROR:{RESET} Cannot write Drakkar run metadata in: {output_path}")
+        print("The current/output directory must be readable, writable, and searchable.")
+        print("Run drakkar from a writable directory or pass -o/--output to a writable output directory.")
+        return False
+
+    return True
+
 def get_modules_to_run(command):
     if command == "complete":
         return ["preprocessing", "cataloging", "profiling", "annotating"]
@@ -286,7 +311,14 @@ def get_modules_to_run(command):
 
 def write_launch_metadata(args, output_dir, env_path=None):
     output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
+    if not validate_launch_metadata_directory(output_path):
+        return False
+    try:
+        output_path.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        print(f"{ERROR}ERROR:{RESET} Cannot create output directory for Drakkar run metadata: {output_path}")
+        print(f"{exc.__class__.__name__}: {exc}")
+        return False
     timestamp = datetime.now(timezone.utc)
     metadata = {
         "timestamp": timestamp.isoformat(),
@@ -301,8 +333,15 @@ def write_launch_metadata(args, output_dir, env_path=None):
         metadata["env_path"] = env_path
     filename_timestamp = timestamp.strftime("%Y%m%d-%H%M%S")
     metadata_path = output_path / f"drakkar_{filename_timestamp}.yaml"
-    with open(metadata_path, "w") as f:
-        yaml.safe_dump(metadata, f, sort_keys=False)
+    try:
+        with open(metadata_path, "w") as f:
+            yaml.safe_dump(metadata, f, sort_keys=False)
+    except OSError as exc:
+        print(f"{ERROR}ERROR:{RESET} Cannot write Drakkar run metadata: {metadata_path}")
+        print("Run drakkar from a writable directory or pass -o/--output to a writable output directory.")
+        print(f"{exc.__class__.__name__}: {exc}")
+        return False
+    return True
 
 def normalize_genome_name(name):
     if not name:
@@ -790,7 +829,9 @@ def main():
     subparser_complete.add_argument("-i", "--input", required=False, help="Input directory")
     subparser_complete.add_argument("-f", "--file", required=False, help="Sample detail file (required if no input directory is provided)")
     subparser_complete.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
-    subparser_complete.add_argument("-r", "--reference", required=False, help="Reference host genome")
+    complete_reference_group = subparser_complete.add_mutually_exclusive_group()
+    complete_reference_group.add_argument("-r", "--reference", required=False, help="Reference host genome FASTA")
+    complete_reference_group.add_argument("-x", "--reference-index", required=False, help="Tarball containing a reference FASTA and Bowtie2 index files")
     subparser_complete.add_argument("-m", "--mode", required=False, help="Comma-separated list of cataloging modes (e.g. individual,all)")
     subparser_complete.add_argument("-t", "--type", required=False, default="genomes", help="Either genomes or pangenomes profiling type. Default: genomes")
     subparser_complete.add_argument(
@@ -821,7 +862,9 @@ def main():
     subparser_preprocessing.add_argument("-i", "--input", required=False, help="Input directory (required if no sample detail file is provided)")
     subparser_preprocessing.add_argument("-f", "--file", required=False, help="Sample detail file (required if no input directory is provided)")
     subparser_preprocessing.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
-    subparser_preprocessing.add_argument("-r", "--reference", required=False, help="Reference host genome file (fna.gz)")
+    preprocessing_reference_group = subparser_preprocessing.add_mutually_exclusive_group()
+    preprocessing_reference_group.add_argument("-r", "--reference", required=False, help="Reference host genome FASTA")
+    preprocessing_reference_group.add_argument("-x", "--reference-index", required=False, help="Tarball containing a reference FASTA and Bowtie2 index files")
     subparser_preprocessing.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_preprocessing.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
     subparser_preprocessing.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
@@ -978,6 +1021,7 @@ def main():
         (getattr(args, "reads_dir", None), "Reads directory", True),
         (getattr(args, "reads_file", None), "Reads file", False),
         (getattr(args, "reference", None), "Reference", False),
+        (getattr(args, "reference_index", None), "Reference index tarball", False),
         (getattr(args, "cov_file", None), "Coverage file", False),
     ]
     for path_value, label, expect_dir in path_checks:
@@ -1041,7 +1085,8 @@ def main():
     if args.command in overwrite_capable_commands:
         if not prepare_output_directory(output_dir, overwrite=getattr(args, "overwrite", False)):
             return
-    write_launch_metadata(args, output_dir, env_path=locals().get("env_path"))
+    if not write_launch_metadata(args, output_dir, env_path=locals().get("env_path")):
+        return
 
     ###
     # Unlock, update or create environments
@@ -1128,19 +1173,21 @@ def main():
             return
 
         # Generate reference genome dictionaries
+        reference_argument = getattr(args, "reference", None) or getattr(args, "reference_index", None)
+        reference_source_label = "reference index tarball" if getattr(args, "reference_index", None) else "reference genome file"
 
-        if args.file and args.reference:
+        if args.file and reference_argument:
             if check_reference_columns(args.file):
                 print(f"")
-                print(f"Both sample info file and reference genome file were provided.")
+                print(f"Both sample info file and {reference_source_label} were provided.")
                 print(f"DRAKKAR will continue with the information provided in the sample info file.")
                 file_references_to_json(args.file,args.output)
                 REFERENCE = True
             else:
-                argument_references_to_json(args.reference,f"{args.output}/data/sample_to_reads1.json",args.output)
+                argument_references_to_json(reference_argument,f"{args.output}/data/sample_to_reads1.json",args.output)
                 REFERENCE = True
 
-        elif args.file and not args.reference:
+        elif args.file and not reference_argument:
             if check_reference_columns(args.file):
                 print(f"")
                 print(f"DRAKKAR will extract the reference genome information from the sample info file.")
@@ -1152,11 +1199,11 @@ def main():
                 print(f"DRAKKAR will run without mapping against a reference genome.")
                 REFERENCE = False
 
-        elif args.reference and not args.file:
+        elif reference_argument and not args.file:
             print(f"")
             print(f"No sample info file was provided.")
-            print(f"DRAKKAR will use the reference genome file.")
-            argument_references_to_json(args.reference,f"{args.output}/data/sample_to_reads1.json",args.output)
+            print(f"DRAKKAR will use the {reference_source_label}.")
+            argument_references_to_json(reference_argument,f"{args.output}/data/sample_to_reads1.json",args.output)
             REFERENCE = True
 
         else:

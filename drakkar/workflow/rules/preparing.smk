@@ -53,15 +53,49 @@ rule prepare_reference:
     input:
         lambda wildcards: REFERENCE_TO_FILE[wildcards.reference]
     output:
-        f"{OUTPUT_DIR}/data/references/{{reference}}.fna"
+        fna=f"{OUTPUT_DIR}/data/references/{{reference}}.fna",
+        ready=f"{OUTPUT_DIR}/data/references/{{reference}}.index.ready"
+    params:
+        bowtie2_module=config["BOWTIE2_MODULE"],
+        extract_script=f"{PACKAGE_DIR}/workflow/scripts/extract_reference_index.py",
+        reference_dir=f"{OUTPUT_DIR}/data/references",
+        basename=f"{OUTPUT_DIR}/data/references/{{reference}}"
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1))),
+        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 20) * 2 ** (attempt - 1))
     message: "Preparing reference genome of {wildcards.reference}..."
     shell:
         """
-        if [[ {input} == *.gz ]]; then
-            gunzip -c {input} > {output}
-        else
-            cp {input} {output}
+        reference_input={input:q}
+
+        case "$reference_input" in
+            *.tar|*.tar.gz|*.tgz|*.tar.bz2|*.tbz2|*.tar.xz|*.txz)
+                python {params.extract_script:q} \
+                    --archive "$reference_input" \
+                    --reference {wildcards.reference:q} \
+                    --output-dir {params.reference_dir:q}
+                ;;
+            *.gz)
+                gunzip -c "$reference_input" > {output.fna:q}
+                module load {params.bowtie2_module}
+                bowtie2-build {output.fna:q} {params.basename:q}
+                ;;
+            *)
+                cp "$reference_input" {output.fna:q}
+                module load {params.bowtie2_module}
+                bowtie2-build {output.fna:q} {params.basename:q}
+                ;;
+        esac
+        if [ ! -s {output.fna:q} ]; then
+            echo "ERROR: Reference preparation did not create the required FASTA file." >&2
+            exit 1
         fi
+        if [ ! -s {params.basename:q}.rev.1.bt2 ] && [ ! -s {params.basename:q}.rev.1.bt2l ]; then
+            echo "ERROR: Reference preparation did not create required FASTA and Bowtie2 index files." >&2
+            exit 1
+        fi
+        touch {output.ready:q}
         """
 
 rule concatenate_or_link_preprocessed:

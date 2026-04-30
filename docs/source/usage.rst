@@ -60,7 +60,8 @@ by the selected module are needed):
 - ``rawreads1``: path or URL to R1 reads.
 - ``rawreads2``: path or URL to R2 reads.
 - ``reference_name``: host reference label (preprocessing with host removal).
-- ``reference_path``: host reference fasta path or URL.
+- ``reference_path``: host reference FASTA path/URL, or a tarball containing
+  the FASTA plus Bowtie2 index files.
 - ``coassembly``: labels that define co-assembly groups.
 - ``coverage``: mapping coverage groups for multicoverage.
 
@@ -75,9 +76,10 @@ Example:
 Notes:
 
 - Read files can be local paths or remote URLs (http/https/ftp).
-- ``reference_path`` values and genome path lists provided through options such as
-  ``-B/--bins_file`` can also use remote URLs (http/https/ftp); DRAKKAR downloads
-  them into a local cache before running.
+- ``reference_path`` values can point to either a FASTA/compressed FASTA or a
+  tarball containing the FASTA plus Bowtie2 index files. Genome path lists
+  provided through options such as ``-B/--bins_file`` can also use remote URLs
+  (http/https/ftp); DRAKKAR downloads them into a local cache before running.
 - Directory-style inputs such as ``-i/--input`` and ``-b/--bins_dir`` must remain
   local filesystem paths.
 - The ``coassembly`` column groups samples for pooled assemblies.
@@ -100,6 +102,8 @@ Options:
 - ``-f/--file``: sample info table (TSV).
 - ``-o/--output``: output directory.
 - ``-r/--reference``: host reference genome for preprocessing.
+- ``-x/--reference-index``: tarball containing a host reference FASTA and
+  Bowtie2 index files; incompatible with ``-r/--reference``.
 - ``-m/--mode``: assembly modes (``individual``, ``all``).
 - ``-t/--type``: profiling type (``genomes`` or ``pangenomes``).
 - ``--annotation-type``: comma-separated targets. See *Annotating* for all values.
@@ -128,6 +132,8 @@ Options:
 - ``-f/--file``: sample info table.
 - ``-o/--output``: output directory.
 - ``-r/--reference``: host reference genome file.
+- ``-x/--reference-index``: tarball containing a host reference FASTA and
+  Bowtie2 index files; incompatible with ``-r/--reference``.
 - ``-e/--env_path``: shared Conda env dir.
 - ``-p/--profile``: Snakemake profile.
 
