@@ -628,7 +628,7 @@ def run_snakemake_environments(workflow, profile):
     ]
     subprocess.run(cmd, shell=False, check=True)
 
-def run_snakemake_preprocessing(workflow, project_name, output_dir, reference, env_path, profile):
+def run_snakemake_preprocessing(workflow, project_name, output_dir, reference, env_path, profile, fraction=False, nonpareil=False):
 
     """ Run the preprocessing workflow """
 
@@ -640,7 +640,7 @@ def run_snakemake_preprocessing(workflow, project_name, output_dir, reference, e
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} reference={reference} "
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} reference={reference} fraction={fraction} nonpareil={nonpareil} "
         f"--conda-prefix {env_path} "
         f"--conda-frontend mamba "
         f"--use-conda "
@@ -855,6 +855,7 @@ def main():
     )
     subparser_complete.add_argument("-c", "--multicoverage", action="store_true", help="Map samples sharing the same coverage group to each other's individual assemblies")
     subparser_complete.add_argument("--fraction", required=False, action='store_true', help="Calculate microbial fraction using singlem")
+    subparser_complete.add_argument("--nonpareil", required=False, action='store_true', help="Estimate metagenomic coverage and diversity using Nonpareil during preprocessing")
     subparser_complete.add_argument("-a", "--ani", required=False, type=float, default=0.98, help="ANI threshold for dRep dereplication (-sa). Default: 0.98")
     subparser_complete.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_complete.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
@@ -867,6 +868,8 @@ def main():
     preprocessing_reference_group = subparser_preprocessing.add_mutually_exclusive_group()
     preprocessing_reference_group.add_argument("-r", "--reference", required=False, help="Reference host genome FASTA")
     preprocessing_reference_group.add_argument("-x", "--reference-index", required=False, help="Tarball containing a reference FASTA and Bowtie2 index files")
+    subparser_preprocessing.add_argument("--fraction", required=False, action='store_true', help="Calculate microbial fraction using singlem")
+    subparser_preprocessing.add_argument("--nonpareil", required=False, action='store_true', help="Estimate metagenomic coverage and diversity using Nonpareil")
     subparser_preprocessing.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_preprocessing.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
     subparser_preprocessing.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
@@ -1215,7 +1218,7 @@ def main():
             print(f"Running DRAKKAR without mapping against a reference genome")
             REFERENCE = False
 
-        run_snakemake_preprocessing("preprocessing", project_name, Path(args.output).resolve(), REFERENCE, env_path, args.profile)
+        run_snakemake_preprocessing("preprocessing", project_name, Path(args.output).resolve(), REFERENCE, env_path, args.profile, args.fraction, args.nonpareil)
 
     ###
     # Cataloging

@@ -13,6 +13,7 @@ WORKFLOW = config.get("workflow", None)
 OUTPUT_DIR = config.get("output_dir", None)
 REFERENCE = config.get("reference", None)
 FRACTION = config.get("fraction", None)
+NONPAREIL = config.get("nonpareil", None)
 PROFILING_TYPE = config["profiling_type"].split(",") if "profiling_type" in config else []
 ANNOTATING_TYPE = config["annotating_type"].split(",") if "annotating_type" in config else []
 DATABASE_NAME = config.get("database_name", None)
@@ -133,6 +134,8 @@ if WORKFLOW == "preprocessing":
                 expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz", sample=samples),
                 expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz", sample=samples),
                 expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam", sample=samples),
+                *(expand(f"{OUTPUT_DIR}/preprocessing/singlem/{{sample}}_smf.tsv", sample=samples) if FRACTION else []),
+                *(expand(f"{OUTPUT_DIR}/preprocessing/nonpareil/{{sample}}_np.tsv", sample=samples) if NONPAREIL else []),
                 f"{OUTPUT_DIR}/preprocessing.tsv",
                 f"{OUTPUT_DIR}/preprocessing/preprocessing.html",
                 f"{OUTPUT_DIR}/drakkar_report.html"
@@ -140,18 +143,22 @@ if WORKFLOW == "preprocessing":
 
         include: "rules/preparing.smk"
         include: "rules/preprocessing_ref.smk"
+        include: "rules/preprocessing_nonpareil.smk"
 
     if not REFERENCE:
         rule all:
             input:
                 expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz", sample=samples),
                 expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz", sample=samples),
+                *(expand(f"{OUTPUT_DIR}/preprocessing/singlem/{{sample}}_smf.tsv", sample=samples) if FRACTION else []),
+                *(expand(f"{OUTPUT_DIR}/preprocessing/nonpareil/{{sample}}_np.tsv", sample=samples) if NONPAREIL else []),
                 f"{OUTPUT_DIR}/preprocessing.tsv",
                 f"{OUTPUT_DIR}/drakkar_report.html"
                 #f"{OUTPUT_DIR}/data/preprocessing_report.done"
 
         include: "rules/preparing.smk"
         include: "rules/preprocessing.smk"
+        include: "rules/preprocessing_nonpareil.smk"
 
 if WORKFLOW == "cataloging":
 

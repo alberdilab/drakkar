@@ -1,6 +1,7 @@
 # Software
 SNAKEMAKE_MODULE: "snakemake/8.25.3"
 FASTP_MODULE: "fastp/0.23.4"
+NONPAREIL_MODULE: "nonpareil/3.5.5"
 BOWTIE2_MODULE: "bowtie2/2.4.2"
 SAMTOOLS_MODULE: "samtools/1.21"
 SINGLEM_MODULE: "singlem/0.19.0"

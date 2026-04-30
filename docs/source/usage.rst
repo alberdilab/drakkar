@@ -111,6 +111,7 @@ Options:
 - ``--annotation-type``: comma-separated targets. See *Annotating* for all values.
 - ``-c/--multicoverage``: enable multicoverage mapping.
 - ``--fraction``: compute microbial fraction with singlem.
+- ``--nonpareil``: estimate metagenomic coverage and diversity with Nonpareil during preprocessing.
 - ``-a/--ani``: dRep ANI threshold (default: 0.98).
 - ``-e/--env_path``: shared Conda env dir.
 - ``-p/--profile``: Snakemake profile (default: slurm).
@@ -136,6 +137,8 @@ Options:
 - ``-r/--reference``: local path or URL to a host reference genome file.
 - ``-x/--reference-index``: local path or URL to a tarball containing a host
   reference FASTA and Bowtie2 index files; incompatible with ``-r/--reference``.
+- ``--fraction``: compute microbial fraction with SingleM after preprocessing.
+- ``--nonpareil``: estimate metagenomic coverage and diversity with Nonpareil after preprocessing.
 - ``-e/--env_path``: shared Conda env dir.
 - ``-p/--profile``: Snakemake profile.
 

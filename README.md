@@ -53,6 +53,8 @@ Key options:
 - `-o/--output`: output directory (defaults to current working directory).
 - `-r/--reference`: local path or URL to a host reference genome file for host removal.
 - `-x/--reference-index`: local path or URL to a tarball containing a host reference FASTA and Bowtie2 index files; incompatible with `-r/--reference`.
+- `--fraction`: compute microbial fraction with SingleM after preprocessing.
+- `--nonpareil`: estimate metagenomic coverage and diversity with Nonpareil after preprocessing.
 - `-e/--env_path`: conda environments directory (shared).
 - `-p/--profile`: Snakemake profile (default: slurm).
 
@@ -254,6 +256,8 @@ Run the full pipeline in one command:
 ```
 drakkar complete {arguments}
 ```
+
+`drakkar complete` accepts the preprocessing `--fraction` and `--nonpareil` options.
 
 ## Inputs
 

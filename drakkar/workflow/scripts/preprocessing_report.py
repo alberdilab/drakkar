@@ -7,16 +7,15 @@ import os
 def generate_html_chunk(df, bar_height=28):
     """Generates an HTML chunk containing two interactive stacked barplots."""
 
-    has_host = "bases_host" in df.columns  # Check if 'bases_host' exists
-
     # Sort samples in REVERSE alphabetical order
     df = df.sort_values(by="sample", ascending=False)
 
     # Extract values for each category
     sample_names = df["sample"]
-    bases_discarded = df["bases_discarded"]
-    bases_metagenomic = df["bases_metagenomic"]
-    bases_host = df["bases_host"] if has_host else [0] * len(df)
+    bases_discarded = pd.to_numeric(df["bases_discarded"], errors="coerce").fillna(0)
+    bases_metagenomic = pd.to_numeric(df["bases_metagenomic"], errors="coerce").fillna(0)
+    bases_host = pd.to_numeric(df["bases_host"], errors="coerce").fillna(0) if "bases_host" in df.columns else pd.Series(0, index=df.index)
+    has_host = "bases_host" in df.columns and bases_host.sum() > 0
 
     # Convert raw bases to gigabases (Gb)
     bases_discarded_gb = bases_discarded / 1e9
@@ -150,6 +149,12 @@ def update_html_report(input_html, input_data, output_html):
     # Load the sequencing data
     file_ext = os.path.splitext(input_data)[-1].lower()
     df = pd.read_csv(input_data, sep="\t" if file_ext in [".tsv", ".txt"] else ",")
+    if "bases_discarded" not in df.columns and {"bases_pre_fastp", "bases_post_fastp"}.issubset(df.columns):
+        df["bases_discarded"] = pd.to_numeric(df["bases_pre_fastp"], errors="coerce") - pd.to_numeric(df["bases_post_fastp"], errors="coerce")
+    if "bases_metagenomic" not in df.columns and "metagenomic_bases" in df.columns:
+        df["bases_metagenomic"] = df["metagenomic_bases"]
+    if "bases_host" not in df.columns and "host_bases" in df.columns:
+        df["bases_host"] = df["host_bases"]
 
     # Ensure required columns exist
     required_cols = {"sample", "bases_discarded", "bases_metagenomic"}

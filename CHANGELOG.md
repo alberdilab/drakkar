@@ -8,6 +8,14 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.2.2] - 2026-04-30
+
+### Added
+
+- Added `--fraction` to `drakkar preprocessing` so standalone preprocessing can run SingleM and SingleM microbial fraction outputs.
+- Added `--nonpareil` to `drakkar preprocessing` and `drakkar complete` to estimate Nonpareil coverage/diversity from preprocessed metagenomic reads.
+- Expanded `preprocessing.tsv` with fastp, host/metagenomic, SingleM fraction, and Nonpareil summary columns.
+
 ## [1.2.1] - 2026-04-30
 
 ### Fixed
