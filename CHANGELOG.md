@@ -8,6 +8,17 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.3.3] - 2026-05-01
+
+### Changed
+
+- Rendered argparse help with Rich panels and tables for command and subcommand help.
+
+### Fixed
+
+- Forced Drakkar CLI truecolor output for normal terminal streams so inherited non-color environment settings do not hide the Rich theme.
+- Merged SingleM microbial fraction rows whose sample names include read-mate suffixes such as `_1` back into the main preprocessing summary rows.
+
 ## [1.3.2] - 2026-05-01
 
 ### Changed

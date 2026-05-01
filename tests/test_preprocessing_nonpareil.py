@@ -153,6 +153,46 @@ class PreprocessingNonpareilTests(unittest.TestCase):
             self.assertEqual(row["nonpareil_C"], 0.91)
             self.assertEqual(row["nonpareil_modelR"], 0.98)
 
+    def test_preprocessing_stats_merges_singlem_read_mate_suffix(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            fastp_json = tmp_path / "sample1.json"
+            fastp_json.write_text(
+                json.dumps(
+                    {
+                        "summary": {
+                            "before_filtering": {"total_reads": 100, "total_bases": 1000},
+                            "after_filtering": {"total_reads": 90, "total_bases": 900},
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            smf = tmp_path / "sample1_smf.tsv"
+            smf.write_text("sample\tread_fraction\nsample1_1\t0.73\n", encoding="utf-8")
+
+            output = tmp_path / "preprocessing.tsv"
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(PREPROCESSING_SCRIPT),
+                    "-p",
+                    str(fastp_json),
+                    "-s",
+                    str(smf),
+                    "-o",
+                    str(output),
+                ],
+                check=True,
+            )
+
+            table = pd.read_csv(output, sep="\t")
+            self.assertEqual(len(table), 1)
+            row = table.iloc[0].to_dict()
+            self.assertEqual(row["sample"], "sample1")
+            self.assertEqual(row["singlem_fraction"], 0.73)
+
 
 if __name__ == "__main__":
     unittest.main()

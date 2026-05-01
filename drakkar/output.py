@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import builtins
+import os
 import re
 import sys
 from typing import Any, TextIO
@@ -42,13 +43,42 @@ STATUS_STYLES = {
     "PUT:": "drakkar.success",
 }
 
-console = Console(highlight=False, soft_wrap=True, theme=DRAKKAR_THEME) if Console else None
+def _color_disabled() -> bool:
+    return bool(os.environ.get("DRAKKAR_NO_COLOR"))
+
+
+def _should_force_terminal(stream: TextIO | None) -> bool:
+    if _color_disabled():
+        return False
+    return stream in {sys.__stdout__, sys.__stderr__}
+
+
+def _console_kwargs(stream: TextIO | None) -> dict[str, Any]:
+    force_terminal = _should_force_terminal(stream)
+    kwargs: dict[str, Any] = {
+        "highlight": False,
+        "soft_wrap": True,
+        "theme": DRAKKAR_THEME,
+        "force_terminal": force_terminal,
+    }
+    if force_terminal:
+        kwargs["color_system"] = "truecolor"
+        kwargs["no_color"] = False
+    return kwargs
+
+
+console = Console(**_console_kwargs(sys.stdout)) if Console else None
 
 
 def _target_console(file: TextIO | None):
     if Console is None:
         return None
-    return Console(file=file or sys.stdout, highlight=False, soft_wrap=True, theme=DRAKKAR_THEME)
+    stream = file or sys.stdout
+    return Console(file=stream, **_console_kwargs(stream))
+
+
+def get_console(file: TextIO | None = None):
+    return _target_console(file)
 
 
 def _strip_ansi(text: str) -> str:
@@ -99,16 +129,18 @@ def print(
 
 
 def section(title: str) -> None:
-    if console is None:
+    target = _target_console(None)
+    if target is None or Rule is None:
         builtins.print(f"\n{title}\n")
         return
-    console.print()
-    console.print(Rule(Text(title, style="drakkar.heading"), characters="=", style="drakkar.rule"))
+    target.print()
+    target.print(Rule(Text(title, style="drakkar.heading"), characters="=", style="drakkar.rule"))
 
 
 def prompt(message: str) -> str:
-    if console is not None:
-        console.print(message, end="", style="drakkar.prompt", markup=False, highlight=False)
+    target = _target_console(None)
+    if target is not None:
+        target.print(message, end="", style="drakkar.prompt", markup=False, highlight=False)
     else:
         builtins.print(message, end="")
     return builtins.input()

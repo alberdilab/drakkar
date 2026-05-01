@@ -2,6 +2,7 @@ import argparse
 import gzip
 import json
 import os
+import re
 
 import pandas as pd
 
@@ -32,6 +33,24 @@ def sample_from_path(path, suffix):
     if suffix and name.endswith(suffix):
         return name[: -len(suffix)]
     return name
+
+
+def strip_read_mate_suffix(sample):
+    return re.sub(r"([._-])(?:R)?[12]$", "", str(sample))
+
+
+def reconcile_singlem_samples(singlem_data, known_samples):
+    if not known_samples:
+        return singlem_data
+
+    reconciled = {}
+    for sample, fraction in singlem_data.items():
+        target_sample = sample
+        stripped_sample = strip_read_mate_suffix(sample)
+        if sample not in known_samples and stripped_sample in known_samples:
+            target_sample = stripped_sample
+        reconciled[target_sample] = fraction
+    return reconciled
 
 
 def first_present(mapping, keys, default="NA"):
@@ -190,21 +209,22 @@ def build_summary(args):
     host_reads_data = (
         extract_text_data(args.host_reads, ".hostreads") if args.host_reads else {}
     )
+    nonpareil_data = extract_nonpareil_data(args.nonpareil) if args.nonpareil else {}
     singlem_data = (
         extract_singlem_fraction(args.singlem_fraction) if args.singlem_fraction else {}
     )
-    nonpareil_data = extract_nonpareil_data(args.nonpareil) if args.nonpareil else {}
-
-    all_samples = (
+    known_samples = (
         set(fastp_data)
         | set(fastq_data)
         | set(metagenomic_bases_data)
         | set(metagenomic_reads_data)
         | set(host_bases_data)
         | set(host_reads_data)
-        | set(singlem_data)
         | set(nonpareil_data)
     )
+    singlem_data = reconcile_singlem_samples(singlem_data, known_samples)
+
+    all_samples = known_samples | set(singlem_data)
 
     rows = []
     for sample in sorted(all_samples):

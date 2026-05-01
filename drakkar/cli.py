@@ -12,6 +12,18 @@ from pathlib import Path
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
+try:
+    from rich import box as rich_box
+    from rich.console import Group as RichGroup
+    from rich.panel import Panel as RichPanel
+    from rich.table import Table as RichTable
+    from rich.text import Text as RichText
+except ImportError:  # pragma: no cover - only used if runtime deps are broken.
+    rich_box = None
+    RichGroup = None
+    RichPanel = None
+    RichTable = None
+    RichText = None
 from drakkar import __version__
 from drakkar.database_registry import (
     MANAGED_DATABASES,
@@ -19,7 +31,7 @@ from drakkar.database_registry import (
     normalize_managed_database_name,
 )
 from drakkar.utils import *
-from drakkar.output import print, prompt, section
+from drakkar.output import get_console, print, prompt, section
 
 ###
 # Define and read config file
@@ -235,8 +247,163 @@ def prompt_overwrite_locked_directory(output_dir):
         print("Please answer y or n.")
 
 
+def _rich_available():
+    return all((rich_box, RichGroup, RichPanel, RichTable, RichText))
+
+
+def _clean_usage(parser):
+    try:
+        formatter = parser._get_formatter()
+        formatter._width = 68
+        formatter.add_usage(
+            parser.usage,
+            parser._actions,
+            parser._mutually_exclusive_groups,
+        )
+        usage = formatter.format_help().strip()
+    except Exception:
+        usage = parser.format_usage().strip()
+    if usage.startswith("usage: "):
+        usage = usage[len("usage: "):]
+    return usage
+
+
+def _action_value(action):
+    if getattr(action, "nargs", None) == 0:
+        return ""
+    if action.metavar is not None:
+        if isinstance(action.metavar, tuple):
+            value = " ".join(str(item) for item in action.metavar)
+        else:
+            value = str(action.metavar)
+    elif action.choices is not None:
+        value = "{" + ",".join(str(choice) for choice in action.choices) + "}"
+    else:
+        value = str(action.dest).upper()
+
+    if action.nargs == "+":
+        return f"{value} ..."
+    if action.nargs == "*":
+        return f"[{value} ...]"
+    if action.nargs == "?":
+        return f"[{value}]"
+    return value
+
+
+def _expanded_action_help(parser, action):
+    if action.help in (None, argparse.SUPPRESS):
+        return ""
+    try:
+        help_text = parser._get_formatter()._expand_help(action)
+    except Exception:
+        help_text = str(action.help)
+    if getattr(action, "required", False):
+        help_text = f"{help_text} Required." if help_text else "Required."
+    return help_text
+
+
+def _display_group_title(title):
+    if title in {"options", "optional arguments"}:
+        return "Options"
+    if title == "positional arguments":
+        return "Arguments"
+    return str(title).replace("_", " ").title()
+
+
+def _rich_table(title):
+    table = RichTable(
+        title=RichText(title, style="drakkar.heading"),
+        box=rich_box.SIMPLE_HEAVY,
+        border_style="drakkar.rule",
+        header_style="drakkar.heading",
+        expand=True,
+        padding=(0, 1),
+    )
+    table.add_column("Option", style="bold #d6a642", no_wrap=True)
+    table.add_column("Value", style="#5f9ea0", no_wrap=True)
+    table.add_column("Description", style="drakkar.help")
+    return table
+
+
+def _rich_action_table(parser, action_group):
+    actions = [
+        action
+        for action in action_group._group_actions
+        if action.help is not argparse.SUPPRESS
+        and not isinstance(action, argparse._SubParsersAction)
+    ]
+    if not actions:
+        return None
+
+    table = _rich_table(_display_group_title(action_group.title))
+    for action in actions:
+        option = ", ".join(action.option_strings) if action.option_strings else action.dest
+        table.add_row(option, _action_value(action), _expanded_action_help(parser, action))
+    return table
+
+
+def _rich_subcommand_table(parser):
+    for action in parser._actions:
+        if not isinstance(action, argparse._SubParsersAction):
+            continue
+        table = RichTable(
+            title=RichText("Commands", style="drakkar.heading"),
+            box=rich_box.SIMPLE_HEAVY,
+            border_style="drakkar.rule",
+            header_style="drakkar.heading",
+            expand=True,
+            padding=(0, 1),
+        )
+        table.add_column("Command", style="bold #d6a642", no_wrap=True)
+        table.add_column("Purpose", style="drakkar.help")
+        for subaction in action._get_subactions():
+            table.add_row(str(subaction.metavar), subaction.help or "")
+        return table
+    return None
+
+
+def _rich_help_renderable(parser):
+    if not _rich_available():
+        return None
+
+    header = RichText()
+    if parser.description:
+        header.append(parser.description, style="drakkar.text")
+        header.append("\n\n")
+    header.append("Usage\n", style="drakkar.heading")
+    header.append(_clean_usage(parser), style="drakkar.help")
+
+    renderables = [
+        RichPanel(
+            header,
+            title=RichText(f" {parser.prog} ", style="drakkar.heading"),
+            border_style="drakkar.rule",
+            padding=(1, 2),
+        )
+    ]
+
+    command_table = _rich_subcommand_table(parser)
+    if command_table is not None:
+        renderables.append(command_table)
+
+    for action_group in parser._action_groups:
+        action_table = _rich_action_table(parser, action_group)
+        if action_table is not None:
+            renderables.append(action_table)
+
+    return RichGroup(*renderables)
+
+
 class RichArgumentParser(argparse.ArgumentParser):
-    """Route argparse help and errors through the Rich console."""
+    """Render argparse output through the shared Rich console."""
+
+    def print_help(self, file=None):
+        renderable = _rich_help_renderable(self)
+        target = get_console(file)
+        if target is not None and renderable is not None:
+            target.print(renderable)
+            return
+        super().print_help(file)
 
     def _print_message(self, message, file=None):
         if message:
@@ -825,6 +992,7 @@ def run_snakemake_database(workflow, project_name, output_dir, env_path, profile
 
 def main():
     parser = RichArgumentParser(
+        prog="drakkar",
         description="Drakkar: A Snakemake-based workflow for sequencing analysis",
         formatter_class=argparse.RawTextHelpFormatter
     )

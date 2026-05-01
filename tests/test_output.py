@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import contextlib
 import io
+import sys
 import unittest
+from unittest.mock import patch
 
 from drakkar import output
 
@@ -23,6 +25,18 @@ class OutputTests(unittest.TestCase):
             output.section("STARTING TEST PIPELINE")
 
         self.assertIn("STARTING TEST PIPELINE", buffer.getvalue())
+
+    def test_normal_cli_streams_force_color_unless_disabled(self) -> None:
+        with patch.dict(output.os.environ, {}, clear=True):
+            self.assertTrue(output._should_force_terminal(sys.__stdout__))
+            self.assertTrue(output._should_force_terminal(sys.__stderr__))
+            self.assertFalse(output._should_force_terminal(io.StringIO()))
+
+        with patch.dict(output.os.environ, {"NO_COLOR": "1"}, clear=True):
+            self.assertTrue(output._should_force_terminal(sys.__stdout__))
+
+        with patch.dict(output.os.environ, {"DRAKKAR_NO_COLOR": "1"}, clear=True):
+            self.assertFalse(output._should_force_terminal(sys.__stdout__))
 
 
 if __name__ == "__main__":
