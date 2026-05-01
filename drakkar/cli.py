@@ -19,7 +19,7 @@ from drakkar.database_registry import (
     normalize_managed_database_name,
 )
 from drakkar.utils import *
-from drakkar.output import print, prompt
+from drakkar.output import print, prompt, section
 
 ###
 # Define and read config file
@@ -240,7 +240,12 @@ class RichArgumentParser(argparse.ArgumentParser):
 
     def _print_message(self, message, file=None):
         if message:
-            print(message, end="", file=file)
+            print(message, end="", file=file, style="drakkar.help")
+
+    def error(self, message):
+        self.print_usage(sys.stderr)
+        print(f"ERROR: {message}", file=sys.stderr)
+        self.exit(2)
 
 
 def prepare_output_directory(output_dir, overwrite=False):
@@ -1100,8 +1105,7 @@ def main():
     ###
 
     if args.command == "unlock":
-        print(f"{HEADER1}UNLOCKING DRAKKAR DIRECTORY...{RESET}", flush=True)
-        print(f"", flush=True)
+        section("UNLOCKING DRAKKAR DIRECTORY")
         run_unlock(args.command, args.output, args.profile)
 
     elif args.command == "config":
@@ -1112,8 +1116,7 @@ def main():
         return 0
 
     elif args.command == "transfer":
-        print(f"{HEADER1}TRANSFERRING DRAKKAR OUTPUTS...{RESET}", flush=True)
-        print(f"", flush=True)
+        section("TRANSFERRING DRAKKAR OUTPUTS")
         run_sftp_transfer(args)
         return
 
@@ -1123,8 +1126,7 @@ def main():
                     "--upgrade", "--force-reinstall", "--no-deps",
                     "git+https://github.com/alberdilab/drakkar.git"
                 ]
-        print(f"{HEADER1}UPDATING DRAKKAR...{RESET}", flush=True)
-        print(f"", flush=True)
+        section("UPDATING DRAKKAR")
         try:
             update_code = subprocess.run(pip_cmd)
         except Exception as e:
@@ -1132,13 +1134,11 @@ def main():
             sys.exit(1)
 
     elif args.command == "environments":
-        print(f"{HEADER1}CREATING CONDA ENVIRONMENTS...{RESET}", flush=True)
-        print(f"", flush=True)
+        section("CREATING CONDA ENVIRONMENTS")
         run_snakemake_environments(args.command, args.env_path, args.profile)
 
     elif args.command == "database":
-        print(f"{HEADER1}UPDATING DRAKKAR DATABASE...{RESET}", flush=True)
-        print(f"", flush=True)
+        section("UPDATING DRAKKAR DATABASE")
         release_dir = database_release_dir(args.database_name, args.directory, args.version).resolve()
         project_name = os.path.basename(os.path.normpath(release_dir))
         run_snakemake_database("database", project_name, release_dir, env_path, args.profile, args.database_name, Path(args.directory).resolve(), args.version, args.download_runtime)
@@ -1155,9 +1155,7 @@ def main():
     ###
 
     if args.command in ("preprocessing", "complete"):
-        print(f"", flush=True)
-        print(f"{HEADER1}STARTING PREPROCESSING PIPELINE...{RESET}", flush=True)
-        print(f"", flush=True)
+        section("STARTING PREPROCESSING PIPELINE")
 
         # Generate raw data dictionaries
 
@@ -1225,9 +1223,7 @@ def main():
     ###
 
     if args.command in ("cataloging", "complete"):
-        print(f"", flush=True)
-        print(f"{HEADER1}STARTING CATALOGING PIPELINE...{RESET}", flush=True)
-        print(f"", flush=True)
+        section("STARTING CATALOGING PIPELINE")
 
         # Generate cataloging data dictionaries
 
@@ -1294,9 +1290,7 @@ def main():
     ###
 
     if args.command in ("profiling", "complete"):
-        print(f"", flush=True)
-        print(f"{HEADER1}STARTING PROFILING PIPELINE...{RESET}", flush=True)
-        print(f"", flush=True)
+        section("STARTING PROFILING PIPELINE")
 
         # Prepare bin dictionaries
 
@@ -1377,9 +1371,7 @@ def main():
     ###
 
     if args.command == "dereplicating":
-        print(f"", flush=True)
-        print(f"{HEADER1}STARTING DEREPLICATING PIPELINE...{RESET}", flush=True)
-        print(f"", flush=True)
+        section("STARTING DEREPLICATING PIPELINE")
 
         bins_dir = args.bins_dir
         bins_file = args.bins_file
@@ -1417,9 +1409,7 @@ def main():
     ###
 
     if args.command in ("annotating", "complete"):
-        print(f"", flush=True)
-        print(f"{HEADER1}STARTING ANNOTATING PIPELINE...{RESET}", flush=True)
-        print(f"", flush=True)
+        section("STARTING ANNOTATING PIPELINE")
 
         if args.command in ("annotating"):
             bins_dir = args.bins_dir
@@ -1458,9 +1448,7 @@ def main():
     ###
 
     if args.command == "inspecting":
-        print(f"", flush=True)
-        print(f"{HEADER1}STARTING INSPECTING PIPELINE...{RESET}", flush=True)
-        print(f"", flush=True)
+        section("STARTING INSPECTING PIPELINE")
 
         # Prepare bin dictionaries
         if args.bins_dir and args.bins_file:
@@ -1492,9 +1480,7 @@ def main():
     ###
 
     if args.command == "expressing":
-        print(f"", flush=True)
-        print(f"{HEADER1}STARTING EXPRESSING PIPELINE...{RESET}", flush=True)
-        print(f"", flush=True)
+        section("STARTING EXPRESSING PIPELINE")
 
         # Prepare bin dictionaries
         if args.bins_dir and args.bins_file:

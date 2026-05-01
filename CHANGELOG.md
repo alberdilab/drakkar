@@ -8,6 +8,12 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.3.2] - 2026-05-01
+
+### Changed
+
+- Moved the startup version badge to the ship banner, centered the intro against the DRAKKAR logo, and enriched CLI status/help styling through the shared Rich output layer.
+
 ## [1.3.1] - 2026-05-01
 
 ### Changed

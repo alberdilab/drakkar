@@ -58,25 +58,35 @@ def _version_badge_lines(version):
         "╰" + "─" * width + "╯",
     ]
 
-def _ascii_text_with_version(ascii_text, version):
+def _ascii_block_with_bottom_right_badge(ascii_text, version):
     lines = ascii_text.splitlines()
     if not lines:
         return ascii_text
 
-    try:
-        first_logo_line = next(index for index, line in enumerate(lines) if line.strip())
-    except StopIteration:
+    non_empty_line_indexes = [index for index, line in enumerate(lines) if line.strip()]
+    if not non_empty_line_indexes:
         return ascii_text
 
     badge_lines = _version_badge_lines(version)
-    logo_width = max(len(line) for line in lines)
-    badge_padding = 4
+    badge_width = max(len(line) for line in badge_lines)
+    block_width = max(len(line) for line in lines)
+    badge_start = max(0, block_width - badge_width)
+    first_badge_line = max(
+        non_empty_line_indexes[0],
+        non_empty_line_indexes[-1] - len(badge_lines) + 1,
+    )
+    target_indexes = [first_badge_line + offset for offset in range(len(badge_lines))]
+    content_width = max(
+        len(lines[index].rstrip()) for index in target_indexes if index < len(lines)
+    )
+    if content_width > badge_start:
+        badge_start = content_width + 2
 
     for offset, badge_line in enumerate(badge_lines):
-        line_index = first_logo_line + offset
+        line_index = first_badge_line + offset
         if line_index >= len(lines):
             lines.append("")
-        lines[line_index] = lines[line_index].ljust(logo_width + badge_padding) + badge_line
+        lines[line_index] = lines[line_index].ljust(badge_start) + badge_line
 
     return "\n".join(lines)
 
@@ -108,7 +118,7 @@ def _intro_box(target_width):
     return _center_block("\n".join(lines), target_width)
 
 def display_drakkar():
-    ascii_ship = r"""
+    ascii_ship = _ascii_block_with_bottom_right_badge(r"""
 
 
                                     =+:   :##=   .###    +##    *#-
@@ -136,9 +146,9 @@ def display_drakkar():
                  =-          =:    %@@@#*#######+*####@@:                    .
                             :=     %%--==.......:....:#@:
                                  :+@@--==:::::--.:=+*%@@:
-    """
+    """, __version__)
 
-    ascii_text = _ascii_text_with_version(r"""
+    ascii_text = r"""
      ██████████   ███████████     █████████   █████   ████ █████   ████   █████████   ███████████
     ░░███░░░░███ ░░███░░░░░███   ███░░░░░███ ░░███   ███░ ░░███   ███░   ███░░░░░███ ░░███░░░░░███
      ░███   ░░███ ░███    ░███  ░███    ░███  ░███  ███    ░███  ███    ░███    ░███  ░███    ░███
@@ -147,7 +157,7 @@ def display_drakkar():
      ░███    ███  ░███    ░███  ░███    ░███  ░███ ░░███   ░███ ░░███   ░███    ░███  ░███    ░███
      ██████████   █████   █████ █████   █████ █████ ░░████ █████ ░░████ █████   █████ █████   █████
     ░░░░░░░░░░   ░░░░░   ░░░░░ ░░░░░   ░░░░░ ░░░░░   ░░░░ ░░░░░   ░░░░ ░░░░░   ░░░░░ ░░░░░   ░░░░░
-    """, __version__)
+    """
 
     ascii_intro = _intro_box(_ascii_block_width(ascii_text))
 
