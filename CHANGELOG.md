@@ -8,6 +8,12 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.3.1] - 2026-05-01
+
+### Changed
+
+- Styled the startup banner with a logo-integrated version badge, centered intro frame, and Rich colors inspired by Viking sea, iron, and gold tones.
+
 ## [1.3.0] - 2026-05-01
 
 ### Added

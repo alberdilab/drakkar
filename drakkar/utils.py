@@ -13,6 +13,10 @@ from collections import defaultdict
 from drakkar import __version__
 from drakkar.output import print, prompt
 
+DRAKKAR_SHIP_STYLE = "bold #5f9ea0"
+DRAKKAR_LOGO_STYLE = "bold #d6a642"
+DRAKKAR_INTRO_STYLE = "bold #b7c7d3"
+
 def is_url(value):
     parsed = urlparse(str(value))
     return parsed.scheme in {"http", "https", "ftp"}
@@ -45,6 +49,64 @@ def download_to_cache(url, sample_name, column_name, output, cache_subdir="reads
     print(f"Saved {column_name} for {sample_name} to {dest_path}", flush=True)
     return dest_path
 
+def _version_badge_lines(version):
+    label = f"v{version}"
+    width = len(label) + 2
+    return [
+        "╭" + "─" * width + "╮",
+        f"│ {label} │",
+        "╰" + "─" * width + "╯",
+    ]
+
+def _ascii_text_with_version(ascii_text, version):
+    lines = ascii_text.splitlines()
+    if not lines:
+        return ascii_text
+
+    try:
+        first_logo_line = next(index for index, line in enumerate(lines) if line.strip())
+    except StopIteration:
+        return ascii_text
+
+    badge_lines = _version_badge_lines(version)
+    logo_width = max(len(line) for line in lines)
+    badge_padding = 4
+
+    for offset, badge_line in enumerate(badge_lines):
+        line_index = first_logo_line + offset
+        if line_index >= len(lines):
+            lines.append("")
+        lines[line_index] = lines[line_index].ljust(logo_width + badge_padding) + badge_line
+
+    return "\n".join(lines)
+
+def _ascii_block_width(ascii_text):
+    return max((len(line) for line in ascii_text.splitlines()), default=0)
+
+def _center_block(block, target_width):
+    block_width = _ascii_block_width(block)
+    padding = max(0, (target_width - block_width) // 2)
+    return "\n".join(
+        (" " * padding + line) if line.strip() else line
+        for line in block.splitlines()
+    )
+
+def _intro_box(target_width):
+    rows = [
+        "ᚱ  Antton Alberdi  ᚱ",
+        "antton.alberdi@sund.ku.dk",
+        "Source code: https://github.com/alberdilab/drakkar",
+        "Tutorial: https://drakkar.readthedocs.io/",
+    ]
+    content_width = max(len(row) for row in rows)
+    inner_width = content_width + 4
+    lines = [
+        "╭" + "─" * inner_width + "╮",
+        *[f"│  {row.center(content_width)}  │" for row in rows],
+        "╰" + "─" * inner_width + "╯",
+    ]
+    return _center_block("\n".join(lines), target_width)
+
 def display_drakkar():
     ascii_ship = r"""
 
@@ -76,7 +138,7 @@ def display_drakkar():
                                  :+@@--==:::::--.:=+*%@@:
     """
 
-    ascii_text = r"""
+    ascii_text = _ascii_text_with_version(r"""
      ██████████   ███████████     █████████   █████   ████ █████   ████   █████████   ███████████
     ░░███░░░░███ ░░███░░░░░███   ███░░░░░███ ░░███   ███░ ░░███   ███░   ███░░░░░███ ░░███░░░░░███
      ░███   ░░███ ░███    ░███  ░███    ░███  ░███  ███    ░███  ███    ░███    ░███  ░███    ░███
@@ -85,20 +147,13 @@ def display_drakkar():
      ░███    ███  ░███    ░███  ░███    ░███  ░███ ░░███   ░███ ░░███   ░███    ░███  ░███    ░███
      ██████████   █████   █████ █████   █████ █████ ░░████ █████ ░░████ █████   █████ █████   █████
     ░░░░░░░░░░   ░░░░░   ░░░░░ ░░░░░   ░░░░░ ░░░░░   ░░░░ ░░░░░   ░░░░ ░░░░░   ░░░░░ ░░░░░   ░░░░░
-    """
+    """, __version__)
 
-    ascii_intro = f"""
+    ascii_intro = _intro_box(_ascii_block_width(ascii_text))
 
-    Version: {__version__}
-
-    By Antton Alberdi [antton.alberdi@sund.ku.dk]
-    Source code: https://github.com/alberdilab/drakkar
-    Tutorial: https://drakkar.readthedocs.io/
-    """
-
-    print(ascii_ship)
-    print(ascii_text)
-    print(ascii_intro)
+    print(ascii_ship, style=DRAKKAR_SHIP_STYLE)
+    print(ascii_text, style=DRAKKAR_LOGO_STYLE)
+    print(ascii_intro, style=DRAKKAR_INTRO_STYLE)
 
 def display_unlock():
     ascii_swords = r"""
