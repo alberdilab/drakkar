@@ -109,8 +109,8 @@ rule samtools_stats:
         samtools stats {input} > {output.stats}
         """
 
-# Split mapped BAM files into metagenomic (unmapped) and host (mapped) read sets.  
-# Outputs paired FASTQ files for unmapped reads, a host-only BAM, and text files counting reads/bases in each category.
+# Split mapped BAM files into metagenomic (unmapped) and host (mapped) read sets.
+# Count sidecars are temporary inputs for preprocessing.tsv and are removed after use.
 
 rule split_reads:
     input:
@@ -118,11 +118,11 @@ rule split_reads:
     output:
         r1=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz",
         r2=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz",
-        metareads=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metareads",
-        metabases=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metabases",
+        metareads=temp(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metareads"),
+        metabases=temp(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metabases"),
         bam=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam",
-        hostreads=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostreads",
-        hostbases=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostbases"
+        hostreads=temp(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostreads"),
+        hostbases=temp(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostbases")
     params:
         bowtie2_module={BOWTIE2_MODULE},
         samtools_module={SAMTOOLS_MODULE}

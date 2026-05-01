@@ -65,6 +65,7 @@ drakkar preprocessing {arguments}
 ### Cataloging
 
 Builds assemblies and bins contigs into MAGs. It supports individual assemblies, co-assemblies, and coverage-based mapping strategies for binning.
+It also writes `cataloging.tsv` with assembly, mapping, and binning summary statistics.
 
 Key options:
 - `-i/--input`: input directory (preprocessed reads or sample info output).
@@ -331,6 +332,7 @@ All modules write into the output directory you provide. Key locations:
 
 - `preprocessing/` cleaned reads and summaries.
 - `cataloging/` assemblies, bins, and metadata.
+- `cataloging.tsv` assembly, mapping, and binning summary table.
 - `profiling_genomes/` dereplication, mapping, and abundance tables.
 - `annotating/` annotation tables.
 - `expressing/` expression outputs.

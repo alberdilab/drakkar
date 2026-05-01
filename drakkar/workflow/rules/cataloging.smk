@@ -8,6 +8,7 @@ PACKAGE_DIR = config["package_dir"]
 MEGAHIT_MODULE = config["MEGAHIT_MODULE"]
 BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
+QUAST_MODULE = config["QUAST_MODULE"]
 METABAT2_MODULE = config["METABAT2_MODULE"]
 MAXBIN2_MODULE = config["MAXBIN2_MODULE"]
 FRAGGENESCAN_MODULE = config["FRAGGENESCAN_MODULE"]
@@ -83,6 +84,36 @@ rule assembly_index:
         fi
         """
 
+rule assembly_quast:
+    input:
+        assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}.fna"
+    output:
+        report=f"{OUTPUT_DIR}/cataloging/quast/{{assembly}}/report.tsv"
+    params:
+        quast_module={QUAST_MODULE},
+        outdir=f"{OUTPUT_DIR}/cataloging/quast/{{assembly}}"
+    threads: 4
+    resources:
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(4*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
+        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 10) * 2 ** (attempt - 1))
+    message: "Calculating assembly statistics for {wildcards.assembly} with QUAST..."
+    shell:
+        """
+        if [ ! -s {input.assembly:q} ]; then
+            mkdir -p {params.outdir:q}
+            printf 'Assembly\t{wildcards.assembly}\n# contigs\t0\nLargest contig\t0\nTotal length\t0\nGC (%%)\tNA\nN50\t0\nN75\t0\nL50\t0\nL75\t0\n' > {output.report:q}
+        else
+            module load {params.quast_module}
+            rm -rf {params.outdir:q}
+            quast.py {input.assembly:q} \
+                --output-dir {params.outdir:q} \
+                --threads {threads} \
+                --no-html \
+                --no-plots \
+                --silent
+        fi
+        """
+
 rule assembly_map:
     input:
         index=lambda wildcards: f"{OUTPUT_DIR}/cataloging/megahit/{wildcards.assembly}/{wildcards.assembly}.rev.2.bt2",
@@ -111,6 +142,28 @@ rule assembly_map:
             R1_FILES=$(echo {input.r1} | tr ' ' ',')
             R2_FILES=$(echo {input.r2} | tr ' ' ',')
             bowtie2 -x {params.basename} -1 $R1_FILES -2 $R2_FILES | samtools view -bS - | samtools sort -o {output}
+        fi
+        """
+
+rule assembly_flagstat:
+    input:
+        f"{OUTPUT_DIR}/cataloging/bowtie2/{{assembly}}/{{sample}}.bam"
+    output:
+        f"{OUTPUT_DIR}/cataloging/bowtie2/{{assembly}}/{{sample}}.flagstat.txt"
+    params:
+        samtools_module={SAMTOOLS_MODULE}
+    threads: 1
+    resources:
+        mem_mb=1*1024,
+        runtime=5
+    message: "Calculating assembly mapping rate for {wildcards.sample} against {wildcards.assembly}..."
+    shell:
+        """
+        if [ ! -s {input:q} ]; then
+            printf '0 + 0 in total (QC-passed reads + QC-failed reads)\n0 + 0 mapped (0.00%% : N/A)\n' > {output:q}
+        else
+            module load {params.samtools_module}
+            samtools flagstat -@ {threads} {input:q} > {output:q}
         fi
         """
 
@@ -388,4 +441,40 @@ rule all_bins:
         """
         python {params.package_dir}/workflow/scripts/all_bin_paths.py {input} -o {output.paths}
         python {params.package_dir}/workflow/scripts/all_bin_metadata.py {input} -o {output.metadata}
+        """
+
+rule cataloging_stats:
+    input:
+        assembly_to_samples=f"{OUTPUT_DIR}/data/assembly_to_samples.json",
+        quast=expand(f"{OUTPUT_DIR}/cataloging/quast/{{assembly}}/report.tsv", assembly=assemblies),
+        flagstats=[
+            f"{OUTPUT_DIR}/cataloging/bowtie2/{assembly}/{sample}.flagstat.txt"
+            for assembly, samples in ASSEMBLY_TO_COVERAGE_SAMPLES.items()
+            for sample in samples
+        ],
+        metabat2=expand(f"{OUTPUT_DIR}/cataloging/metabat2/{{assembly}}/{{assembly}}.tsv", assembly=assemblies),
+        maxbin2=expand(f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}.tsv", assembly=assemblies),
+        semibin2=expand(f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/{{assembly}}.tsv", assembly=assemblies),
+        bins=expand(f"{OUTPUT_DIR}/cataloging/final/{{assembly}}.tsv", assembly=assemblies)
+    output:
+        f"{OUTPUT_DIR}/cataloging.tsv"
+    localrule: True
+    params:
+        package_dir={PACKAGE_DIR}
+    threads: 1
+    resources:
+        mem_mb=1*1024,
+        runtime=5
+    message: "Creating cataloging stats..."
+    shell:
+        """
+        python {params.package_dir}/workflow/scripts/cataloging_stats.py \
+            --assembly-to-samples {input.assembly_to_samples:q} \
+            --quast {input.quast} \
+            --flagstat {input.flagstats} \
+            --metabat2 {input.metabat2} \
+            --maxbin2 {input.maxbin2} \
+            --semibin2 {input.semibin2} \
+            --bins {input.bins} \
+            -o {output:q}
         """

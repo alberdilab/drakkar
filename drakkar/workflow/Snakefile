@@ -233,6 +233,7 @@ if WORKFLOW == "cataloging":
         input:
             f"{OUTPUT_DIR}/cataloging/final/all_bin_paths.txt",
             f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv",
+            f"{OUTPUT_DIR}/cataloging.tsv",
             #expand over multiple samples per assembly
             [f"{OUTPUT_DIR}/cataloging/bowtie2/{assembly}/{sample}.bam"
             for assembly, samples in ASSEMBLY_TO_COVERAGE_SAMPLES.items()

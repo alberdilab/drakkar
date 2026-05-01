@@ -145,7 +145,8 @@ Options:
 Cataloging
 ^^^^^^^^^^
 
-Assembles reads, bins contigs into MAGs, and generates bin metadata.
+Assembles reads, bins contigs into MAGs, generates bin metadata, and writes
+``cataloging.tsv`` with assembly, mapping, and binning summary statistics.
 
 .. code-block:: console
 
@@ -470,6 +471,7 @@ Key output locations:
 
 - ``preprocessing/`` cleaned reads and summaries.
 - ``cataloging/`` assemblies, bins, and metadata.
+- ``cataloging.tsv`` assembly, mapping, and binning summary table.
 - ``profiling_genomes/`` dereplication, mapping, and abundance tables.
 - ``profiling_pangenomes/`` pangenome profiling outputs.
 - ``annotating/`` annotation tables.

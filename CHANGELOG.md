@@ -8,6 +8,16 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.3.0] - 2026-05-01
+
+### Added
+
+- Cataloging now runs QUAST assembly statistics and samtools flagstat mapping summaries, then writes a root-level `cataloging.tsv` summary table.
+
+### Changed
+
+- Host/metagenomic read and base count sidecar files are now temporary preprocessing intermediates; the retained summary is `preprocessing.tsv`.
+
 ## [1.2.3] - 2026-05-01
 
 ### Added
