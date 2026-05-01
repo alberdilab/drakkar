@@ -9,6 +9,7 @@ FASTP_MODULE = config["FASTP_MODULE"]
 BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 SINGLEM_MODULE = config["SINGLEM_MODULE"]
+SINGLEM_DB = config["SINGLEM_DB"]
 MULTIQC_MODULE = config["MULTIQC_MODULE"]
 
 ####
@@ -152,7 +153,8 @@ rule singlem:
         otu=f"{OUTPUT_DIR}/preprocessing/singlem/{{sample}}_OTU.tsv",
         condense=f"{OUTPUT_DIR}/preprocessing/singlem/{{sample}}_cond.tsv"
     params:
-        singlem_module={SINGLEM_MODULE}
+        singlem_module={SINGLEM_MODULE},
+        singlem_db={SINGLEM_DB}
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
@@ -165,6 +167,7 @@ rule singlem:
             -2 {input.r2} \
             --otu-table {output.otu} \
             --taxonomic-profile {output.condense} \
+            --metapackage {params.singlem_db} \
             --threads {threads}
         """
 
@@ -179,7 +182,8 @@ rule singlem_mf:
     output:
         f"{OUTPUT_DIR}/preprocessing/singlem/{{sample}}_smf.tsv"
     params:
-        singlem_module={SINGLEM_MODULE}
+        singlem_module={SINGLEM_MODULE},
+        singlem_db={SINGLEM_DB}
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
@@ -191,6 +195,7 @@ rule singlem_mf:
             -1 {input.r1} \
             -2 {input.r2} \
             --input-profile {input.profile} \
+            --metapackage {params.singlem_db} \
             --output-tsv {output}
         """
 

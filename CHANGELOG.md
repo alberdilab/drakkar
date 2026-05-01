@@ -8,6 +8,12 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.2.3] - 2026-05-01
+
+### Added
+
+- All SingleM `pipe` and microbial fraction steps now use the configured `SINGLEM_DB` metapackage.
+
 ## [1.2.2] - 2026-04-30
 
 ### Added

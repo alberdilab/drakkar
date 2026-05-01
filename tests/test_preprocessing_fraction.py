@@ -54,15 +54,19 @@ class PreprocessingFractionTests(unittest.TestCase):
         rules = PREPROCESSING_RULES.read_text(encoding="utf-8")
         self.assertIn("rule singlem:", rules)
         self.assertIn("rule singlem_mf:", rules)
+        self.assertIn('SINGLEM_DB = config["SINGLEM_DB"]', rules)
         self.assertIn("singlem pipe", rules)
         self.assertIn("singlem microbial_fraction", rules)
+        self.assertEqual(rules.count("--metapackage {params.singlem_db}"), 2)
 
     def test_preprocessing_with_reference_has_singlem_rules(self) -> None:
         rules = PREPROCESSING_REF_RULES.read_text(encoding="utf-8")
         self.assertIn("rule singlem:", rules)
         self.assertIn("rule singlem_mf:", rules)
+        self.assertIn('SINGLEM_DB = config["SINGLEM_DB"]', rules)
         self.assertIn("singlem pipe", rules)
         self.assertIn("singlem microbial_fraction", rules)
+        self.assertEqual(rules.count("--metapackage {params.singlem_db}"), 2)
 
 
 if __name__ == "__main__":
