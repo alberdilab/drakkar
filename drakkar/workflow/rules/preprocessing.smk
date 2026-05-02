@@ -30,7 +30,7 @@ rule fastp:
     threads: 4
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 1024) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 1024) * 2 ** (attempt - 1)))
     message: "Quality-filtering sample {wildcards.sample}..."
     shell:
         """
@@ -67,7 +67,7 @@ rule singlem:
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 100) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 100) * 2 ** (attempt - 1)))
     shell:
         """
         module load {params.singlem_module}
@@ -95,7 +95,7 @@ rule singlem_mf:
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 100) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 100) * 2 ** (attempt - 1)))
     shell:
         """
         module load {params.singlem_module}
@@ -122,8 +122,8 @@ rule preprocessings_stats:
         nonpareil_arg=lambda wildcards, input: "-n " + " ".join(input.nonpareil) if input.nonpareil else ""
     threads: 1
     resources:
-        mem_mb= 1*1024,
-        runtime= 5
+        mem_mb= cap_mem_mb(1*1024),
+        runtime= cap_runtime(5)
     message: "Creating preprocessing stats..."
     shell:
         """

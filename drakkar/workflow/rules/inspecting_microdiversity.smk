@@ -26,7 +26,7 @@ rule subset_catalogue:
         seqtk_module={SEQTK_MODULE}
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 1024 * 50) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb / 1024 * 50) * 2 ** (attempt - 1)))
     shell:
         """
         module load {params.seqtk_module}
@@ -44,7 +44,7 @@ rule subset_bam:
         samtools_module={SAMTOOLS_MODULE}
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 1024 * 50) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb / 1024 * 50) * 2 ** (attempt - 1)))
     shell:
         """
         module load {params.samtools_module}
@@ -66,7 +66,7 @@ rule remove_duplicates:
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 1024 * 50) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb / 1024 * 50) * 2 ** (attempt - 1)))
     shell:
         """
         module load python/3.12.8 openjdk/17.0.8 {params.gatk_module}
@@ -86,7 +86,7 @@ rule create_dict:
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 1024 * 50) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb / 1024 * 50) * 2 ** (attempt - 1)))
     shell:
         """
         module load python/3.12.8 openjdk/17.0.8 {params.gatk_module} {params.samtools_module}
@@ -107,7 +107,7 @@ rule call_variants:
     threads: 16
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 20) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 20) * 2 ** (attempt - 1)))
     message: "Calling SNVs in sample {wildcards.sample}..."
     shell:
         """
@@ -126,7 +126,7 @@ rule merge_variants:
     threads: 16
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 20) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 20) * 2 ** (attempt - 1)))
     message: "Merging haplotypes across samples..."
     shell:
         """

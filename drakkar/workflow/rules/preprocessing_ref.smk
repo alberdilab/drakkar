@@ -33,7 +33,7 @@ rule fastp:
     threads: 4
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 1024 * 3) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 1024 * 3) * 2 ** (attempt - 1)))
     message: "Quality-filtering sample {wildcards.sample}..."
     shell:
         """
@@ -74,7 +74,7 @@ rule reference_map:
     threads: 16
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 20) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 20) * 2 ** (attempt - 1)))
     message: "Mapping {wildcards.sample} against reference genome..."
     shell:
         """
@@ -98,7 +98,7 @@ rule samtools_stats:
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 2) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: 10 * 2 ** (attempt - 1)
+        runtime=lambda wildcards, input, attempt: cap_runtime(10 * 2 ** (attempt - 1))
     message: "Generating mapping stats for {wildcards.sample}..."
     shell:
         """
@@ -129,7 +129,7 @@ rule split_reads:
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 100) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 100) * 2 ** (attempt - 1)))
     message: "Extracting metagenomic reads of {wildcards.sample}..."
     shell:
         """
@@ -158,7 +158,7 @@ rule singlem:
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 100) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 100) * 2 ** (attempt - 1)))
     shell:
         """
         module load {params.singlem_module}
@@ -187,7 +187,7 @@ rule singlem_mf:
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 100) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 100) * 2 ** (attempt - 1)))
     shell:
         """
         module load {params.singlem_module}
@@ -221,8 +221,8 @@ rule preprocessing_stats:
         nonpareil_arg=lambda wildcards, input: "-n " + " ".join(input.nonpareil) if input.nonpareil else ""
     threads: 1
     resources:
-        mem_mb=1*1024,
-        runtime=5
+        mem_mb=cap_mem_mb(1*1024),
+        runtime=cap_runtime(5)
     message: "Creating preprocessing stats..."
     shell:
         """
@@ -244,8 +244,8 @@ rule preprocessing_report:
         package_dir={PACKAGE_DIR}
     threads: 1
     resources:
-        mem_mb=1*1024,
-        runtime=5
+        mem_mb=cap_mem_mb(1*1024),
+        runtime=cap_runtime(5)
     message: "Creating preprocessing stats..."
     shell:
         """
@@ -270,7 +270,7 @@ rule preprocessing_multiqc:
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 100) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 100) * 2 ** (attempt - 1)))
     message: "Building MultiQC report..."
     shell:
         """

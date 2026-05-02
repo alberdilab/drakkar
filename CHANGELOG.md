@@ -8,6 +8,17 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.3.5] - 2026-05-02
+
+### Added
+
+- Added `--memory-multiplier` and `--time-multiplier` to Snakemake-running Drakkar commands.
+- Added `SNAKEMAKE_MAX_TIME` to cap runtime requests, defaulting to 20160 minutes (14 days).
+
+### Changed
+
+- Routed explicit workflow memory and runtime resources through capped scaling helpers, and scaled default Snakemake resources for rules without explicit resources.
+
 ## [1.3.4] - 2026-05-02
 
 ### Fixed

@@ -65,3 +65,6 @@ ENVIRONMENTS_DIR: "/projects/alberdilab/data/environments/drakkar"
 # Parameters
 DREP_ANI: 0.98
 SNAKEMAKE_MAX_GB: 1024
+SNAKEMAKE_MAX_TIME: 20160
+MEMORY_MULTIPLIER: 1
+TIME_MULTIPLIER: 1

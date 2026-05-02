@@ -32,7 +32,7 @@ if not IGNORE_QUALITY and not QUALITY_FILE:
         threads: 8
         resources:
             mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-            runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 10) * 2 ** (attempt - 1))
+            runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 10) * 2 ** (attempt - 1)))
         message: "Estimating MAG completeness/contamination with CheckM2..."
         shell:
             """
@@ -137,7 +137,7 @@ checkpoint dereplicate:
     threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: max(60, int(input.size_mb / 10) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(60, int(input.size_mb / 10) * 2 ** (attempt - 1)))
     message: "Dereplicating bins using dRep..."
     shell:
         """

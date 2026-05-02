@@ -62,7 +62,7 @@ if DATABASE_NAME == "kegg":
             hmmer_module=HMMER_MODULE
         threads: 1
         resources:
-            runtime=lambda wildcards, attempt: DOWNLOAD_RUNTIME * 2 ** (attempt - 1)
+            runtime=lambda wildcards, attempt: cap_runtime(DOWNLOAD_RUNTIME * 2 ** (attempt - 1))
         shell:
             """
             set -euo pipefail

@@ -18,8 +18,8 @@ rule create_report:
         project_name={project_name}
     threads: 1
     resources:
-        mem_mb=1*1024,
-        runtime=5
+        mem_mb=cap_mem_mb(1*1024),
+        runtime=cap_runtime(5)
     message: "Initialising DRAKKAR report..."
     shell:
         """
@@ -63,7 +63,7 @@ rule prepare_reference:
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 20) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 20) * 2 ** (attempt - 1)))
     message: "Preparing reference genome of {wildcards.reference}..."
     shell:
         """

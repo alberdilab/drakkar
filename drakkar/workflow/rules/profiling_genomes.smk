@@ -39,7 +39,7 @@ if not IGNORE_QUALITY and not QUALITY_FILE:
         threads: 8
         resources:
             mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-            runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 10) * 2 ** (attempt - 1))
+            runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 10) * 2 ** (attempt - 1)))
         message: "Estimating MAG completeness/contamination with CheckM2..."
         shell:
             """
@@ -144,7 +144,7 @@ checkpoint dereplicate:
     threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 10) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 10) * 2 ** (attempt - 1)))
     message: "Dereplicating bins using dRep..."
     shell:
         """
@@ -223,7 +223,7 @@ rule index_catalogue:
     threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: max(10, int(input.size_mb / 1024 * 50) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb / 1024 * 50) * 2 ** (attempt - 1)))
     shell:
         """
         module load {params.bowtie2_module}
@@ -244,7 +244,7 @@ rule map_to_catalogue:
     threads: 16
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 20) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 20) * 2 ** (attempt - 1)))
     message: "Mapping {wildcards.sample} against genome catalogue..."
     shell:
         """
@@ -262,7 +262,7 @@ rule quantify_reads_catalogue:
     threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb / 5) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 1024 / 5) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 1024 / 5) * 2 ** (attempt - 1)))
     message:
         "Generating mapping statistics with..."
     shell:
@@ -289,7 +289,7 @@ rule profiling_stats:
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 100) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 100) * 2 ** (attempt - 1)))
     message: "Calculating mapping stats of {wildcards.sample}..."
     shell:
         """
@@ -309,8 +309,8 @@ rule profiling_stats_merge:
         package_dir={PACKAGE_DIR}
     threads: 1
     resources:
-        mem_mb=1*1024,
-        runtime=5
+        mem_mb=cap_mem_mb(1*1024),
+        runtime=cap_runtime(5)
     message: "Creating profiling genomes stats file..."
     shell:
         """
@@ -327,8 +327,8 @@ rule split_coverm:
         package_dir={PACKAGE_DIR}
     threads: 1
     resources:
-        mem_mb = 1*1024,
-        runtime = 5
+        mem_mb = cap_mem_mb(1*1024),
+        runtime = cap_runtime(5)
     message: "Generating count and breadth files..."
     shell:
         """
@@ -349,7 +349,7 @@ rule singlem_profile:
     threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 50) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 50) * 2 ** (attempt - 1)))
     message: "Running singlem for {wildcards.sample}..."
     shell:
         """
@@ -370,7 +370,7 @@ rule singlem_microbial_fraction:
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: max(15, int(input.size_mb / 20) * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 20) * 2 ** (attempt - 1)))
     message: "Running singlem for {wildcards.sample}..."
     shell:
         """
@@ -386,8 +386,8 @@ rule singlem_merge:
     localrule: True
     threads: 1
     resources:
-        mem_mb=1*1024,
-        runtime=5
+        mem_mb=cap_mem_mb(1*1024),
+        runtime=cap_runtime(5)
     message: "Merging singlem outputs..."
     shell:
         """

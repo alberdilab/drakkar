@@ -1,4 +1,5 @@
 import os
+import math
 import gzip
 import json
 import pandas as pd
@@ -46,18 +47,36 @@ RUN_CLUSTER_ANNOTATIONS = bool(ANNOTATING_TYPE_SET.intersection(CLUSTER_ANNOTATI
 # Calculate optimal resources for computing
 ####
 
-import os
+def positive_config_int(key, default):
+    value = int(config.get(key, default))
+    if value <= 0:
+        raise ValueError(f"{key} must be positive, got {value}")
+    return value
 
-SNAKEMAKE_MAX_GB = int(config.get("SNAKEMAKE_MAX_GB", 1024))
-if SNAKEMAKE_MAX_GB <= 0:
-    raise ValueError(f"SNAKEMAKE_MAX_GB must be positive, got {SNAKEMAKE_MAX_GB}")
+
+SNAKEMAKE_MAX_GB = positive_config_int("SNAKEMAKE_MAX_GB", 1024)
+SNAKEMAKE_MAX_TIME = positive_config_int("SNAKEMAKE_MAX_TIME", 14 * 24 * 60)
+MEMORY_MULTIPLIER = positive_config_int(
+    "memory_multiplier",
+    config.get("MEMORY_MULTIPLIER", 1),
+)
+TIME_MULTIPLIER = positive_config_int(
+    "time_multiplier",
+    config.get("TIME_MULTIPLIER", 1),
+)
 
 MAX_MEM_MB = SNAKEMAKE_MAX_GB * 1024
+MAX_RUNTIME_MIN = SNAKEMAKE_MAX_TIME
 
 
 def cap_mem_mb(value):
-    """Cap rule memory requests to the configured server limit."""
-    return min(MAX_MEM_MB, int(value))
+    """Scale and cap rule memory requests to the configured server limit."""
+    return min(MAX_MEM_MB, int(math.ceil(float(value))) * MEMORY_MULTIPLIER)
+
+
+def cap_runtime(value):
+    """Scale and cap rule runtimes to the configured server limit."""
+    return min(MAX_RUNTIME_MIN, int(math.ceil(float(value))) * TIME_MULTIPLIER)
 
 
 def calculate_file_sizes(file_dict):

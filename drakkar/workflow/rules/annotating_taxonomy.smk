@@ -41,8 +41,8 @@ rule gtdbtk_input:
     localrule: True
     threads: 1
     resources:
-        mem_mb = 1*1024,
-        runtime = 5
+        mem_mb = cap_mem_mb(1*1024),
+        runtime = cap_runtime(5)
     message: "Generating bin path file..."
     shell:
         """
@@ -66,7 +66,7 @@ rule gtdbtk:
         f"{PACKAGE_DIR}/workflow/envs/annotating_taxonomy.yaml"
     resources:
         mem_mb=lambda wildcards, attempt: cap_mem_mb(128*1024 * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: 120 * 2 ** (attempt - 1)
+        runtime=lambda wildcards, attempt: cap_runtime(120 * 2 ** (attempt - 1))
     message: "Annotating taxonomy using GTDBTK..."
     shell:
         """
@@ -90,7 +90,7 @@ rule gtdbtk_table:
     threads: 1
     resources:
         mem_mb=lambda wildcards, attempt: cap_mem_mb(1*1024 * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: 5 * 2 ** (attempt - 1)
+        runtime=lambda wildcards, attempt: cap_runtime(5 * 2 ** (attempt - 1))
     message: "Annotating taxonomy using GTDBTK..."
     shell:
         """

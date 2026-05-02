@@ -141,6 +141,49 @@ def validate_download_runtime(value):
     return runtime
 
 
+def positive_int(value):
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise argparse.ArgumentTypeError("must be a positive integer") from exc
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return parsed
+
+
+def add_resource_multiplier_arguments(parser):
+    parser.add_argument(
+        "--memory-multiplier",
+        type=positive_int,
+        default=1,
+        help=(
+            "Multiply Snakemake memory requests before applying SNAKEMAKE_MAX_GB. "
+            "Default: 1"
+        ),
+    )
+    parser.add_argument(
+        "--time-multiplier",
+        type=positive_int,
+        default=1,
+        help=(
+            "Multiply Snakemake runtime requests before applying SNAKEMAKE_MAX_TIME. "
+            "Default: 1"
+        ),
+    )
+
+
+def resource_config(memory_multiplier=1, time_multiplier=1):
+    return f"memory_multiplier={memory_multiplier} time_multiplier={time_multiplier} "
+
+
+def default_resource_args(memory_multiplier=1, time_multiplier=1):
+    max_mem_mb = int(config_vars.get("SNAKEMAKE_MAX_GB", 1024)) * 1024
+    max_runtime = int(config_vars.get("SNAKEMAKE_MAX_TIME", 14 * 24 * 60))
+    default_mem_mb = min(max_mem_mb, 8 * 1024 * memory_multiplier)
+    default_runtime = min(max_runtime, 10 * time_multiplier)
+    return f"--default-resources mem_mb={default_mem_mb} runtime={default_runtime} "
+
+
 def default_database_version(database_name):
     if database_name == "vfdb":
         return datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -785,7 +828,9 @@ def run_unlock(workflow, output_dir, profile):
     print(f"The output directory {output_dir} has been succesfully unlocked")
     print(f"You can now rerun a new workflow using any drakkar command:")
 
-def run_snakemake_environments(workflow, profile):
+def run_snakemake_environments(workflow, env_path, profile, memory_multiplier=1, time_multiplier=1):
+    resource_overrides = resource_config(memory_multiplier, time_multiplier)
+    default_resources = default_resource_args(memory_multiplier, time_multiplier)
     cmd = [
         "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
@@ -794,16 +839,30 @@ def run_snakemake_environments(workflow, profile):
         f"--directory {Path.cwd()} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} workflow={workflow} "
+        f"--config package_dir={PACKAGE_DIR} workflow={workflow} {resource_overrides}"
+        f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--use-conda "
     ]
     subprocess.run(cmd, shell=False, check=True)
 
-def run_snakemake_preprocessing(workflow, project_name, output_dir, reference, env_path, profile, fraction=False, nonpareil=False):
+def run_snakemake_preprocessing(
+    workflow,
+    project_name,
+    output_dir,
+    reference,
+    env_path,
+    profile,
+    fraction=False,
+    nonpareil=False,
+    memory_multiplier=1,
+    time_multiplier=1,
+):
 
     """ Run the preprocessing workflow """
 
+    resource_overrides = resource_config(memory_multiplier, time_multiplier)
+    default_resources = default_resource_args(memory_multiplier, time_multiplier)
     snakemake_command = [
         "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
@@ -812,7 +871,8 @@ def run_snakemake_preprocessing(workflow, project_name, output_dir, reference, e
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} reference={reference} fraction={fraction} nonpareil={nonpareil} "
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} reference={reference} fraction={fraction} nonpareil={nonpareil} {resource_overrides}"
+        f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--conda-frontend mamba "
         f"--use-conda "
@@ -822,10 +882,12 @@ def run_snakemake_preprocessing(workflow, project_name, output_dir, reference, e
     subprocess.run(snakemake_command, shell=False, check=True)
 
 
-def run_snakemake_cataloging(workflow, project_name, output_dir, env_path, profile):
+def run_snakemake_cataloging(workflow, project_name, output_dir, env_path, profile, memory_multiplier=1, time_multiplier=1):
 
     """ Run the cataloging workflow """
 
+    resource_overrides = resource_config(memory_multiplier, time_multiplier)
+    default_resources = default_resource_args(memory_multiplier, time_multiplier)
     snakemake_command = [
         "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
@@ -834,7 +896,8 @@ def run_snakemake_cataloging(workflow, project_name, output_dir, env_path, profi
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} "
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} {resource_overrides}"
+        f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--conda-frontend mamba "
         f"--use-conda "
@@ -843,10 +906,12 @@ def run_snakemake_cataloging(workflow, project_name, output_dir, env_path, profi
     subprocess.run(snakemake_command, shell=False, check=True)
 
 #Screen output control
-def run_snakemake_cataloging2(workflow, project_name, output_dir, env_path, profile):
+def run_snakemake_cataloging2(workflow, project_name, output_dir, env_path, profile, memory_multiplier=1, time_multiplier=1):
 
     """ Run the cataloging workflow """
 
+    resource_overrides = resource_config(memory_multiplier, time_multiplier)
+    default_resources = default_resource_args(memory_multiplier, time_multiplier)
     snakemake_command = [
         "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
@@ -855,7 +920,8 @@ def run_snakemake_cataloging2(workflow, project_name, output_dir, env_path, prof
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} "
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} {resource_overrides}"
+        f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--conda-frontend mamba "
         f"--use-conda "
@@ -880,9 +946,24 @@ def run_snakemake_cataloging2(workflow, project_name, output_dir, env_path, prof
     else:
         display_end()
 
-def run_snakemake_profiling(workflow, project_name, profiling_type, output_dir, env_path, profile, fraction, ani, ignore_quality, quality_file):
+def run_snakemake_profiling(
+    workflow,
+    project_name,
+    profiling_type,
+    output_dir,
+    env_path,
+    profile,
+    fraction,
+    ani,
+    ignore_quality,
+    quality_file,
+    memory_multiplier=1,
+    time_multiplier=1,
+):
     """ Run the profiling workflow """
 
+    resource_overrides = resource_config(memory_multiplier, time_multiplier)
+    default_resources = default_resource_args(memory_multiplier, time_multiplier)
     snakemake_command = [
         "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
@@ -892,15 +973,29 @@ def run_snakemake_profiling(workflow, project_name, profiling_type, output_dir, 
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} profiling_type={profiling_type} output_dir={output_dir} fraction={fraction} DREP_ANI={ani} "
-        f"IGNORE_QUALITY={ignore_quality} QUALITY_FILE={bool(quality_file)} "
+        f"IGNORE_QUALITY={ignore_quality} QUALITY_FILE={bool(quality_file)} {resource_overrides}"
+        f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--use-conda "
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
 
-def run_snakemake_dereplicating(workflow, project_name, output_dir, env_path, profile, ani, ignore_quality, quality_file):
+def run_snakemake_dereplicating(
+    workflow,
+    project_name,
+    output_dir,
+    env_path,
+    profile,
+    ani,
+    ignore_quality,
+    quality_file,
+    memory_multiplier=1,
+    time_multiplier=1,
+):
     """ Run the dereplicating workflow """
 
+    resource_overrides = resource_config(memory_multiplier, time_multiplier)
+    default_resources = default_resource_args(memory_multiplier, time_multiplier)
     snakemake_command = [
         "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
@@ -909,16 +1004,29 @@ def run_snakemake_dereplicating(workflow, project_name, output_dir, env_path, pr
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} DREP_ANI={ani} IGNORE_QUALITY={ignore_quality} QUALITY_FILE={bool(quality_file)} "
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} DREP_ANI={ani} IGNORE_QUALITY={ignore_quality} QUALITY_FILE={bool(quality_file)} {resource_overrides}"
+        f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--use-conda "
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
 
-def run_snakemake_annotating(workflow, project_name, annotating_type, output_dir, env_path, profile, gtdb_version=None):
+def run_snakemake_annotating(
+    workflow,
+    project_name,
+    annotating_type,
+    output_dir,
+    env_path,
+    profile,
+    gtdb_version=None,
+    memory_multiplier=1,
+    time_multiplier=1,
+):
     """ Run the profiling workflow """
 
     gtdb_config = f"gtdb_version={gtdb_version} " if gtdb_version else ""
+    resource_overrides = resource_config(memory_multiplier, time_multiplier)
+    default_resources = default_resource_args(memory_multiplier, time_multiplier)
     snakemake_command = [
         "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
@@ -927,15 +1035,18 @@ def run_snakemake_annotating(workflow, project_name, annotating_type, output_dir
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} annotating_type={annotating_type} output_dir={output_dir} {gtdb_config}"
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} annotating_type={annotating_type} output_dir={output_dir} {gtdb_config}{resource_overrides}"
+        f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--use-conda "
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
 
-def run_snakemake_inspecting(workflow, project_name, output_dir, env_path, profile):
+def run_snakemake_inspecting(workflow, project_name, output_dir, env_path, profile, memory_multiplier=1, time_multiplier=1):
     """ Run the profiling workflow """
 
+    resource_overrides = resource_config(memory_multiplier, time_multiplier)
+    default_resources = default_resource_args(memory_multiplier, time_multiplier)
     snakemake_command = [
         "/bin/bash", "-c", 
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
@@ -944,15 +1055,18 @@ def run_snakemake_inspecting(workflow, project_name, output_dir, env_path, profi
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} "
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} {resource_overrides}"
+        f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--use-conda "
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
 
-def run_snakemake_expressing(workflow, project_name, output_dir, env_path, profile):
+def run_snakemake_expressing(workflow, project_name, output_dir, env_path, profile, memory_multiplier=1, time_multiplier=1):
     """ Run the expressing workflow """
 
+    resource_overrides = resource_config(memory_multiplier, time_multiplier)
+    default_resources = default_resource_args(memory_multiplier, time_multiplier)
     snakemake_command = [
         "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
@@ -961,15 +1075,30 @@ def run_snakemake_expressing(workflow, project_name, output_dir, env_path, profi
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} "
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} {resource_overrides}"
+        f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--use-conda "
     ]
     subprocess.run(snakemake_command, shell=False, check=True)
 
-def run_snakemake_database(workflow, project_name, output_dir, env_path, profile, database_name, database_directory, database_version, download_runtime):
+def run_snakemake_database(
+    workflow,
+    project_name,
+    output_dir,
+    env_path,
+    profile,
+    database_name,
+    database_directory,
+    database_version,
+    download_runtime,
+    memory_multiplier=1,
+    time_multiplier=1,
+):
     """Run a single database preparation workflow."""
 
+    resource_overrides = resource_config(memory_multiplier, time_multiplier)
+    default_resources = default_resource_args(memory_multiplier, time_multiplier)
     snakemake_command = [
         "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
@@ -980,7 +1109,8 @@ def run_snakemake_database(workflow, project_name, output_dir, env_path, profile
         f"--configfile {CONFIG_PATH} "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} "
         f"database_name={database_name} database_directory={database_directory} database_version={database_version} "
-        f"database_download_runtime={download_runtime} "
+        f"database_download_runtime={download_runtime} {resource_overrides}"
+        f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--use-conda "
     ]
@@ -1033,6 +1163,7 @@ def main():
     subparser_complete.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_complete.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
     subparser_complete.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
+    add_resource_multiplier_arguments(subparser_complete)
 
     subparser_preprocessing = subparsers.add_parser("preprocessing", help="Run the preprocessing workflow (quality-filtering and host removal)")
     subparser_preprocessing.add_argument("-i", "--input", required=False, help="Input directory (required if no sample detail file is provided)")
@@ -1046,6 +1177,7 @@ def main():
     subparser_preprocessing.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_preprocessing.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
     subparser_preprocessing.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
+    add_resource_multiplier_arguments(subparser_preprocessing)
 
     subparser_cataloging = subparsers.add_parser("cataloging", help="Run the cataloging (assembly and binning) workflow")
     subparser_cataloging.add_argument("-i", "--input", required=False, help="Input directory (required if no sample detail file is provided)")
@@ -1056,6 +1188,7 @@ def main():
     subparser_cataloging.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_cataloging.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
     subparser_cataloging.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
+    add_resource_multiplier_arguments(subparser_cataloging)
 
     subparser_profiling = subparsers.add_parser("profiling", help="Run the profiling workflow")
     subparser_profiling.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
@@ -1071,6 +1204,7 @@ def main():
     subparser_profiling.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_profiling.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
     subparser_profiling.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
+    add_resource_multiplier_arguments(subparser_profiling)
 
     subparser_dereplicating = subparsers.add_parser("dereplicating", help="Run dereplication only (no mapping)")
     subparser_dereplicating.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
@@ -1082,6 +1216,7 @@ def main():
     subparser_dereplicating.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_dereplicating.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
     subparser_dereplicating.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
+    add_resource_multiplier_arguments(subparser_dereplicating)
 
     subparser_annotating = subparsers.add_parser("annotating", help="Run the annotating workflow")
     subparser_annotating.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa, .fna or .fasta, optionally including .gz) are stored")
@@ -1107,6 +1242,7 @@ def main():
     subparser_annotating.add_argument("-e", "--env_path", type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_annotating.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
     subparser_annotating.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
+    add_resource_multiplier_arguments(subparser_annotating)
 
     subparser_inspecting = subparsers.add_parser("inspecting", help="Run the inspecting workflow")
     subparser_inspecting.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
@@ -1117,6 +1253,7 @@ def main():
     subparser_inspecting.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_inspecting.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
     subparser_inspecting.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
+    add_resource_multiplier_arguments(subparser_inspecting)
 
     subparser_expressing = subparsers.add_parser("expressing", help="Run the microbial gene expression workflow")
     subparser_expressing.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
@@ -1127,6 +1264,7 @@ def main():
     subparser_expressing.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_expressing.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
     subparser_expressing.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
+    add_resource_multiplier_arguments(subparser_expressing)
 
     database_parent = RichArgumentParser(add_help=False)
     database_parent.add_argument("--directory", required=True, help="Base directory where the database release directory will be created")
@@ -1136,6 +1274,7 @@ def main():
     database_parent.add_argument("--set-default", action="store_true", help="Update config.yaml to use this installed database release by default")
     database_parent.add_argument("-e", "--env_path", type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     database_parent.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
+    add_resource_multiplier_arguments(database_parent)
 
     subparser_database = subparsers.add_parser("database", help="Install or update one managed annotation database")
     database_subparsers = subparser_database.add_subparsers(dest="database_name", help="Managed databases")
@@ -1150,6 +1289,7 @@ def main():
     subparser_environments = subparsers.add_parser("environments", help="Pre-create conda environments")
     subparser_environments.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_environments.add_argument("--profile", default="local", choices=["local", "slurm"])
+    add_resource_multiplier_arguments(subparser_environments)
 
     subparser_unlock = subparsers.add_parser("unlock", help="Unlock snakemake")
     subparser_unlock.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
@@ -1303,13 +1443,31 @@ def main():
 
     elif args.command == "environments":
         section("CREATING CONDA ENVIRONMENTS")
-        run_snakemake_environments(args.command, args.env_path, args.profile)
+        run_snakemake_environments(
+            args.command,
+            args.env_path,
+            args.profile,
+            args.memory_multiplier,
+            args.time_multiplier,
+        )
 
     elif args.command == "database":
         section("UPDATING DRAKKAR DATABASE")
         release_dir = database_release_dir(args.database_name, args.directory, args.version).resolve()
         project_name = os.path.basename(os.path.normpath(release_dir))
-        run_snakemake_database("database", project_name, release_dir, env_path, args.profile, args.database_name, Path(args.directory).resolve(), args.version, args.download_runtime)
+        run_snakemake_database(
+            "database",
+            project_name,
+            release_dir,
+            env_path,
+            args.profile,
+            args.database_name,
+            Path(args.directory).resolve(),
+            args.version,
+            args.download_runtime,
+            args.memory_multiplier,
+            args.time_multiplier,
+        )
         if args.set_default:
             default_path = set_default_database_path(args.database_name, Path(args.directory).resolve(), args.version)
             print(f"{INFO}INFO:{RESET} Updated {MANAGED_DATABASES[args.database_name]['config_key']} in config.yaml to {default_path}")
@@ -1384,7 +1542,18 @@ def main():
             print(f"Running DRAKKAR without mapping against a reference genome")
             REFERENCE = False
 
-        run_snakemake_preprocessing("preprocessing", project_name, Path(args.output).resolve(), REFERENCE, env_path, args.profile, args.fraction, args.nonpareil)
+        run_snakemake_preprocessing(
+            "preprocessing",
+            project_name,
+            Path(args.output).resolve(),
+            REFERENCE,
+            env_path,
+            args.profile,
+            args.fraction,
+            args.nonpareil,
+            args.memory_multiplier,
+            args.time_multiplier,
+        )
 
     ###
     # Cataloging
@@ -1451,7 +1620,15 @@ def main():
             else:
                 print("No coverage information provided; all samples will be mapped against all assemblies.")
 
-        run_snakemake_cataloging("cataloging", project_name, Path(args.output).resolve(), env_path, args.profile)
+        run_snakemake_cataloging(
+            "cataloging",
+            project_name,
+            Path(args.output).resolve(),
+            env_path,
+            args.profile,
+            args.memory_multiplier,
+            args.time_multiplier,
+        )
 
     ###
     # Profiling
@@ -1532,7 +1709,20 @@ def main():
             if not validate_and_write_quality_file(quality_file, args.output):
                 return
             ignore_quality = True
-        run_snakemake_profiling("profiling", project_name, args.type, args.output, env_path, args.profile, args.fraction, args.ani, ignore_quality, quality_file)
+        run_snakemake_profiling(
+            "profiling",
+            project_name,
+            args.type,
+            args.output,
+            env_path,
+            args.profile,
+            args.fraction,
+            args.ani,
+            ignore_quality,
+            quality_file,
+            args.memory_multiplier,
+            args.time_multiplier,
+        )
 
     ###
     # Dereplicating
@@ -1570,7 +1760,18 @@ def main():
             if not validate_and_write_quality_file(quality_file, args.output):
                 return
             ignore_quality = True
-        run_snakemake_dereplicating("dereplicating", project_name, args.output, env_path, args.profile, args.ani, ignore_quality, quality_file)
+        run_snakemake_dereplicating(
+            "dereplicating",
+            project_name,
+            args.output,
+            env_path,
+            args.profile,
+            args.ani,
+            ignore_quality,
+            quality_file,
+            args.memory_multiplier,
+            args.time_multiplier,
+        )
 
     ###
     # Annotating
@@ -1609,7 +1810,17 @@ def main():
                 print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
                 return
 
-        run_snakemake_annotating("annotating", project_name, args.annotation_type, args.output, env_path, args.profile, getattr(args, "gtdb_version", None))
+        run_snakemake_annotating(
+            "annotating",
+            project_name,
+            args.annotation_type,
+            args.output,
+            env_path,
+            args.profile,
+            getattr(args, "gtdb_version", None),
+            args.memory_multiplier,
+            args.time_multiplier,
+        )
 
     ###
     # Inspecting
@@ -1640,7 +1851,15 @@ def main():
                 print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
                 return
             
-        run_snakemake_inspecting("annotating", project_name,  args.type, args.output, env_path, args.profile)
+        run_snakemake_inspecting(
+            "inspecting",
+            project_name,
+            args.output,
+            env_path,
+            args.profile,
+            args.memory_multiplier,
+            args.time_multiplier,
+        )
 
 
     ###
@@ -1702,7 +1921,15 @@ def main():
                 print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
                 return
 
-        run_snakemake_inspecting("expressing", project_name, args.output, env_path, args.profile)
+        run_snakemake_expressing(
+            "expressing",
+            project_name,
+            args.output,
+            env_path,
+            args.profile,
+            args.memory_multiplier,
+            args.time_multiplier,
+        )
 
 
 if __name__ == "__main__":
