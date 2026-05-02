@@ -43,6 +43,18 @@ COLUMNS = [
     "best_bin_N50",
 ]
 
+BINNER_METHODS = [
+    ("metabat2_bins", "metabat2"),
+    ("maxbin2_bins", "maxbin2"),
+    ("semibin2_bins", "semibin2"),
+]
+
+BINNER_ALIASES = {
+    "metabat2_bins": ("metabat2", "metabat"),
+    "maxbin2_bins": ("maxbin2", "maxbin"),
+    "semibin2_bins": ("semibin2", "semibin"),
+}
+
 
 def sample_from_path(path, suffix):
     name = os.path.basename(path)
@@ -141,6 +153,8 @@ def read_flagstat(path):
 
 
 def read_tsv_row_count(path):
+    if not path:
+        return 0
     try:
         with open(path, "r", encoding="utf-8") as handle:
             lines = [line for line in handle if line.strip()]
@@ -153,6 +167,77 @@ def read_tsv_row_count(path):
     first_fields = {field.strip().lower() for field in lines[0].rstrip("\n").split("\t")}
     has_header = bool(first_fields.intersection({"bin_id", "contig", "contig_name", "file_name"}))
     return max(0, len(lines) - 1) if has_header else len(lines)
+
+
+def read_quality_report_count(path):
+    try:
+        table = pd.read_csv(path, sep="\t")
+    except (OSError, pd.errors.ParserError, pd.errors.EmptyDataError) as error:
+        print(f"Error processing {path}: {error}")
+        return 0, None
+
+    method = infer_binner_method(path, table)
+    return len(table), method
+
+
+def infer_binner_method(path, table):
+    basename = os.path.basename(path)
+    searchable = [basename, os.path.splitext(basename)[0]]
+    for column in ("origin", "original_name", "name", "bin_id"):
+        if column in table.columns:
+            searchable.extend(str(value) for value in table[column].dropna().head(20))
+
+    text = clean_metric_name(" ".join(searchable))
+    for method, aliases in BINNER_ALIASES.items():
+        if any(clean_metric_name(alias) in text for alias in aliases):
+            return method
+    return None
+
+
+def binette_report_paths(report_root, assembly):
+    report_dir = os.path.join(report_root, assembly, "input_bins_quality_reports")
+    if not os.path.isdir(report_dir):
+        return []
+
+    paths = []
+    for root, _, files in os.walk(report_dir):
+        for filename in files:
+            if filename.startswith("."):
+                continue
+            if filename.lower().endswith((".tsv", ".txt", ".csv")):
+                paths.append(os.path.join(root, filename))
+    return sorted(paths)
+
+
+def read_binette_input_bin_counts(report_root, assembly, method_inputs):
+    counts = {method: 0 for method, _ in BINNER_METHODS}
+    report_paths = binette_report_paths(report_root, assembly)
+    if not report_paths:
+        return counts
+
+    unmatched_counts = []
+    assigned_methods = set()
+    for path in report_paths:
+        count, method = read_quality_report_count(path)
+        if method in counts:
+            counts[method] = count
+            assigned_methods.add(method)
+        else:
+            unmatched_counts.append(count)
+
+    valid_methods = [
+        method
+        for method, _ in BINNER_METHODS
+        if read_tsv_row_count(method_inputs.get(method, "")) > 0
+    ]
+    if not valid_methods:
+        valid_methods = [method for method, _ in BINNER_METHODS]
+
+    unassigned_methods = [method for method in valid_methods if method not in assigned_methods]
+    for method, count in zip(unassigned_methods, unmatched_counts):
+        counts[method] = count
+
+    return counts
 
 
 def assembly_from_final_tsv(path):
@@ -262,6 +347,7 @@ def build_summary(args):
         assemblies.add(assembly)
 
     method_counts = {assembly: {} for assembly in assemblies}
+    method_inputs = {}
     for method, paths in [
         ("metabat2_bins", args.metabat2),
         ("maxbin2_bins", args.maxbin2),
@@ -270,6 +356,7 @@ def build_summary(args):
         for path in paths:
             assembly = assembly_from_final_tsv(path)
             method_counts.setdefault(assembly, {})[method] = read_tsv_row_count(path)
+            method_inputs.setdefault(assembly, {})[method] = path
             assemblies.add(assembly)
 
     bin_data = {}
@@ -277,6 +364,14 @@ def build_summary(args):
         assembly, data = read_bin_summary(path)
         bin_data[assembly] = data
         assemblies.add(assembly)
+
+    if args.binette_report_root:
+        for assembly in assemblies:
+            method_counts[assembly] = read_binette_input_bin_counts(
+                args.binette_report_root,
+                assembly,
+                method_inputs.get(assembly, {}),
+            )
 
     rows = []
     for assembly in sorted(assemblies):
@@ -321,6 +416,10 @@ def main():
     parser.add_argument("--metabat2", nargs="*", default=[], help="MetaBAT2 contig-to-bin TSV files")
     parser.add_argument("--maxbin2", nargs="*", default=[], help="MaxBin2 contig-to-bin TSV files")
     parser.add_argument("--semibin2", nargs="*", default=[], help="SemiBin2 contig-to-bin TSV files")
+    parser.add_argument(
+        "--binette-report-root",
+        help="Root cataloging/binette directory containing per-assembly input_bins_quality_reports directories",
+    )
     parser.add_argument("--bins", nargs="*", default=[], help="Final per-assembly bin metadata TSV files")
     parser.add_argument("-o", "--output", required=True, help="Output cataloging TSV file")
 

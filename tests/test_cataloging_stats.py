@@ -31,6 +31,15 @@ class CatalogingStatsTests(unittest.TestCase):
         self.assertIn("samtools flagstat", rules)
         self.assertIn("rule cataloging_stats:", rules)
         self.assertIn("cataloging_stats.py", rules)
+        self.assertIn("--binette-report-root {params.binette_report_root:q}", rules)
+
+    def test_semibin2_table_uses_reclustered_output_bins(self) -> None:
+        rules = CATALOGING_RULES.read_text(encoding="utf-8")
+        semibin2_table = rules.split("rule semibin2_table:", 1)[1].split("checkpoint binette:", 1)[0]
+
+        self.assertIn('fastadir=f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/output_bins"', semibin2_table)
+        self.assertIn("fastas_to_bintable.py -d {params.fastadir} -e fa -o {output}", semibin2_table)
+        self.assertNotIn("tail -n +2 {input} > {output}", semibin2_table)
 
     def test_cataloging_stats_script_writes_assembly_mapping_and_binning_summary(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -38,8 +47,9 @@ class CatalogingStatsTests(unittest.TestCase):
             data_dir = tmp_path / "data"
             quast_dir = tmp_path / "cataloging" / "quast" / "assembly1"
             bowtie_dir = tmp_path / "cataloging" / "bowtie2" / "assembly1"
+            binette_report_dir = tmp_path / "cataloging" / "binette" / "assembly1" / "input_bins_quality_reports"
             final_dir = tmp_path / "cataloging" / "final"
-            for directory in [data_dir, quast_dir, bowtie_dir, final_dir]:
+            for directory in [data_dir, quast_dir, bowtie_dir, binette_report_dir, final_dir]:
                 directory.mkdir(parents=True)
 
             assembly_to_samples = data_dir / "assembly_to_samples.json"
@@ -78,9 +88,24 @@ class CatalogingStatsTests(unittest.TestCase):
             metabat2 = tmp_path / "cataloging" / "metabat2" / "assembly1" / "assembly1.tsv"
             maxbin2 = tmp_path / "cataloging" / "maxbin2" / "assembly1" / "assembly1.tsv"
             semibin2 = tmp_path / "cataloging" / "semibin2" / "assembly1" / "assembly1.tsv"
-            for path, rows in [(metabat2, 2), (maxbin2, 1), (semibin2, 3)]:
+            for path, rows in [(metabat2, 5), (maxbin2, 4), (semibin2, 7)]:
                 path.parent.mkdir(parents=True)
                 path.write_text("\n".join(f"c{i}\tb{i}" for i in range(rows)) + "\n", encoding="utf-8")
+
+            for report_name, origin, bin_count in [
+                ("input_bins_1.maxbin2_all_all.tsv", "maxbin2/all/all", 1),
+                ("input_bins_2.metabat2_all_all.tsv", "metabat2/all/all", 2),
+                ("input_bins_3.semibin2_all_all.tsv", "semibin2/all/all", 3),
+            ]:
+                rows = "\n".join(
+                    f"{idx}\t{origin}\tbin_{idx}\t95\t2\t90\t10000\t4000\t10"
+                    for idx in range(bin_count)
+                )
+                (binette_report_dir / report_name).write_text(
+                    "bin_id\torigin\tname\tcompleteness\tcontamination\tscore\tsize\tN50\tcontig_count\n"
+                    f"{rows}\n",
+                    encoding="utf-8",
+                )
 
             bins = final_dir / "assembly1.tsv"
             bins.write_text(
@@ -109,6 +134,8 @@ class CatalogingStatsTests(unittest.TestCase):
                     str(maxbin2),
                     "--semibin2",
                     str(semibin2),
+                    "--binette-report-root",
+                    str(tmp_path / "cataloging" / "binette"),
                     "--bins",
                     str(bins),
                     "-o",

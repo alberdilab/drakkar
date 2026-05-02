@@ -319,7 +319,11 @@ rule semibin2_table:
         runtime=lambda wildcards, input, attempt: max(5, int(input.size_mb / 5) * 2 ** (attempt - 1))
     shell:
         """
-        tail -n +2 {input} > {output}
+        if [ ! -s {input} ]; then
+            touch {output}
+        else
+            python {params.package_dir}/workflow/scripts/fastas_to_bintable.py -d {params.fastadir} -e fa -o {output}
+        fi
         """
 
 # Script to calculate resources based on the number of bins
@@ -460,7 +464,8 @@ rule cataloging_stats:
         f"{OUTPUT_DIR}/cataloging.tsv"
     localrule: True
     params:
-        package_dir={PACKAGE_DIR}
+        package_dir={PACKAGE_DIR},
+        binette_report_root=f"{OUTPUT_DIR}/cataloging/binette"
     threads: 1
     resources:
         mem_mb=1*1024,
@@ -475,6 +480,7 @@ rule cataloging_stats:
             --metabat2 {input.metabat2} \
             --maxbin2 {input.maxbin2} \
             --semibin2 {input.semibin2} \
+            --binette-report-root {params.binette_report_root:q} \
             --bins {input.bins} \
             -o {output:q}
         """

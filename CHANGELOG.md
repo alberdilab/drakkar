@@ -8,6 +8,13 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.3.4] - 2026-05-02
+
+### Fixed
+
+- Changed the SemiBin2 cataloging table to read reclustered `output_bins/*.fa` files instead of pre-reclustering `contig_bins.tsv`.
+- Counted MetaBAT2, MaxBin2, and SemiBin2 bins in `cataloging.tsv` from Binette input quality reports instead of contig-to-bin table rows.
+
 ## [1.3.3] - 2026-05-01
 
 ### Changed
