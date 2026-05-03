@@ -26,6 +26,16 @@ class DisplayBannerTests(unittest.TestCase):
         self.assertEqual(mocked_print.call_args_list[1].kwargs["style"], utils.DRAKKAR_LOGO_STYLE)
         self.assertEqual(mocked_print.call_args_list[2].kwargs["style"], utils.DRAKKAR_INTRO_STYLE)
 
+    def test_display_update_success_replaces_version_placeholder(self) -> None:
+        with patch("drakkar.utils.print") as mocked_print:
+            utils.display_update_success("1.4.0")
+
+        banner = mocked_print.call_args.args[0]
+        self.assertIn("You have succesfully installed", banner)
+        self.assertIn("DRAKKAR version", banner)
+        self.assertIn("1.4.0", banner)
+        self.assertNotIn("X.X.XX", banner)
+
 
 if __name__ == "__main__":
     unittest.main()

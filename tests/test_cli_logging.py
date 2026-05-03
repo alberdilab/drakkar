@@ -87,10 +87,66 @@ class LoggingCommandTests(unittest.TestCase):
             output = buffer.getvalue()
             self.assertEqual(exit_code, 0)
             self.assertIn("RUN SUMMARY", output)
+            self.assertIn("EXECUTION SUMMARY", output)
             self.assertIn("Status: failed", output)
             self.assertIn("Most recent failure excerpt:", output)
             self.assertIn("RuleException in rule map_reads:", output)
             self.assertIn("output: sample.bam", output)
+
+    def test_run_logging_summary_reports_progress_rules_and_error_types(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            args = argparse.Namespace(command="cataloging", output=tmpdir)
+            run_info = cli_module.write_launch_metadata(args, tmpdir)
+            cli_module.update_launch_metadata(
+                run_info["metadata_path"],
+                status="failed",
+                current_workflow="cataloging",
+                exit_code=1,
+            )
+            Path(run_info["snakemake_log_path"]).write_text(
+                "\n".join(
+                    [
+                        "Job stats:",
+                        "job            count",
+                        "-----------  -------",
+                        "all                1",
+                        "map_reads          2",
+                        "dereplicate        1",
+                        "total              4",
+                        "",
+                        "rule map_reads:",
+                        "    jobid: 1",
+                        "Finished jobid: 1 (Rule: map_reads)",
+                        "1 of 4 steps (25%) done",
+                        "",
+                        "rule map_reads:",
+                        "    jobid: 2",
+                        "Finished jobid: 2 (Rule: map_reads)",
+                        "2 of 4 steps (50%) done",
+                        "",
+                        "localrule dereplicate:",
+                        "    jobid: 3",
+                        "RuleException in rule dereplicate:",
+                        "Error in rule dereplicate:",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                exit_code = cli_module.run_logging(tmpdir, summary=True)
+
+            output = buffer.getvalue()
+            self.assertEqual(exit_code, 0)
+            self.assertIn("EXECUTION SUMMARY", output)
+            self.assertIn("Planned jobs: 4", output)
+            self.assertIn("Workflow progress: 50% (2/4 steps)", output)
+            self.assertIn("Rules observed: 2 unique, 3 executions", output)
+            self.assertIn("Failed rules detected: 1", output)
+            self.assertIn("Error types: RuleException (1), RuleError (1)", output)
+            self.assertNotIn("SNAKEMAKE LOG", output)
 
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
 CLI Reference
 =============
 
-This page summarizes DRAKKAR's command-line interface. For worked examples
-and guidance, see :doc:`usage`.
+This page summarizes DRAKKAR's command-line interface. For worked examples and
+workflow guidance, see :doc:`usage`, :doc:`workflows`, and :doc:`operations`.
 
 Global
 ------

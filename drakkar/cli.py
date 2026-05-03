@@ -8,8 +8,16 @@ import json
 import shlex
 import shutil
 import pandas as pd
+try:
+    from importlib.metadata import PackageNotFoundError, version as get_distribution_version
+except ImportError:  # pragma: no cover - Python < 3.8 fallback
+    try:
+        from importlib_metadata import PackageNotFoundError, version as get_distribution_version
+    except ImportError:  # pragma: no cover - fallback if backport is absent
+        PackageNotFoundError = Exception
+        get_distribution_version = None
 from pathlib import Path
-from collections import defaultdict, deque
+from collections import Counter, defaultdict, deque
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
 try:
@@ -369,6 +377,14 @@ def _display_group_title(title):
     return str(title).replace("_", " ").title()
 
 
+def _set_help_metadata(parser, *, category=None, examples=None, sections=None, command_groups=None):
+    parser._help_category = category
+    parser._help_examples = list(examples or [])
+    parser._help_sections = list(sections or [])
+    parser._help_command_groups = list(command_groups or [])
+    return parser
+
+
 def _rich_table(title):
     table = RichTable(
         title=RichText(title, style="drakkar.heading"),
@@ -382,6 +398,15 @@ def _rich_table(title):
     table.add_column("Value", style="#5f9ea0", no_wrap=True)
     table.add_column("Description", style="drakkar.help")
     return table
+
+
+def _find_action_by_key(parser, key):
+    for action in parser._actions:
+        if action.dest == key:
+            return action
+        if key in getattr(action, "option_strings", ()):
+            return action
+    return None
 
 
 def _rich_action_table(parser, action_group):
@@ -401,24 +426,134 @@ def _rich_action_table(parser, action_group):
     return table
 
 
-def _rich_subcommand_table(parser):
+def _subparser_action(parser):
     for action in parser._actions:
-        if not isinstance(action, argparse._SubParsersAction):
-            continue
-        table = RichTable(
-            title=RichText("Commands", style="drakkar.heading"),
-            box=rich_box.SIMPLE_HEAVY,
-            border_style="drakkar.rule",
-            header_style="drakkar.heading",
-            expand=True,
-            padding=(0, 1),
-        )
-        table.add_column("Command", style="bold #d6a642", no_wrap=True)
-        table.add_column("Purpose", style="drakkar.help")
-        for subaction in action._get_subactions():
-            table.add_row(str(subaction.metavar), subaction.help or "")
-        return table
+        if isinstance(action, argparse._SubParsersAction):
+            return action
     return None
+
+
+def _rich_command_table(title, rows):
+    if not rows:
+        return None
+    table = RichTable(
+        title=RichText(title, style="drakkar.heading"),
+        box=rich_box.SIMPLE_HEAVY,
+        border_style="drakkar.rule",
+        header_style="drakkar.heading",
+        expand=True,
+        padding=(0, 1),
+    )
+    table.add_column("Command", style="bold #d6a642", no_wrap=True)
+    table.add_column("Purpose", style="drakkar.help")
+    for command, purpose in rows:
+        table.add_row(command, purpose or "")
+    return table
+
+
+def _rich_subcommand_tables(parser):
+    action = _subparser_action(parser)
+    if action is None:
+        return []
+
+    rows_by_name = {}
+    for subaction in action._get_subactions():
+        command_name = str(subaction.metavar)
+        rows_by_name[command_name] = (command_name, subaction.help or "")
+
+    tables = []
+    grouped_names = set()
+    for title, names in getattr(parser, "_help_command_groups", []):
+        rows = []
+        for name in names:
+            matched_name = None
+            if name in rows_by_name:
+                matched_name = name
+            else:
+                for row_name in rows_by_name:
+                    if row_name.startswith(f"{name} "):
+                        matched_name = row_name
+                        break
+            if matched_name is not None:
+                rows.append(rows_by_name[matched_name])
+                grouped_names.add(matched_name)
+        table = _rich_command_table(title, rows)
+        if table is not None:
+            tables.append(table)
+
+    remaining_rows = [rows_by_name[name] for name in rows_by_name if name not in grouped_names]
+    remaining_table = _rich_command_table("Commands", remaining_rows)
+    if remaining_table is not None:
+        tables.append(remaining_table)
+    return tables
+
+
+def _rich_examples_panel(parser):
+    examples = getattr(parser, "_help_examples", None) or []
+    if not examples:
+        return None
+
+    body = RichText()
+    for index, example in enumerate(examples):
+        if index:
+            body.append("\n")
+        body.append("$ ", style="drakkar.heading")
+        body.append(example, style="drakkar.help")
+    return RichPanel(
+        body,
+        title=RichText(" Examples ", style="drakkar.heading"),
+        border_style="drakkar.rule",
+        padding=(1, 2),
+    )
+
+
+def _rich_action_tables(parser):
+    custom_sections = getattr(parser, "_help_sections", None) or []
+    if not custom_sections:
+        return [
+            table
+            for action_group in parser._action_groups
+            for table in [_rich_action_table(parser, action_group)]
+            if table is not None
+        ]
+
+    tables = []
+    assigned = set()
+    for title, keys in custom_sections:
+        actions = []
+        for key in keys:
+            action = _find_action_by_key(parser, key)
+            if (
+                action is None
+                or action in assigned
+                or action.help is argparse.SUPPRESS
+                or isinstance(action, argparse._SubParsersAction)
+            ):
+                continue
+            actions.append(action)
+            assigned.add(action)
+        if not actions:
+            continue
+        table = _rich_table(title)
+        for action in actions:
+            option = ", ".join(action.option_strings) if action.option_strings else action.dest
+            table.add_row(option, _action_value(action), _expanded_action_help(parser, action))
+        tables.append(table)
+
+    remaining = [
+        action
+        for action in parser._actions
+        if action not in assigned
+        and action.help is not argparse.SUPPRESS
+        and not isinstance(action, argparse._SubParsersAction)
+    ]
+    if remaining:
+        table = _rich_table("General")
+        for action in remaining:
+            option = ", ".join(action.option_strings) if action.option_strings else action.dest
+            table.add_row(option, _action_value(action), _expanded_action_help(parser, action))
+        tables.append(table)
+    return tables
 
 
 def _rich_help_renderable(parser):
@@ -428,6 +563,11 @@ def _rich_help_renderable(parser):
     header = RichText()
     if parser.description:
         header.append(parser.description, style="drakkar.text")
+        header.append("\n\n")
+    category = getattr(parser, "_help_category", None)
+    if category:
+        header.append("Category\n", style="drakkar.heading")
+        header.append(str(category), style="drakkar.help")
         header.append("\n\n")
     header.append("Usage\n", style="drakkar.heading")
     header.append(_clean_usage(parser), style="drakkar.help")
@@ -441,14 +581,13 @@ def _rich_help_renderable(parser):
         )
     ]
 
-    command_table = _rich_subcommand_table(parser)
-    if command_table is not None:
-        renderables.append(command_table)
+    renderables.extend(_rich_subcommand_tables(parser))
 
-    for action_group in parser._action_groups:
-        action_table = _rich_action_table(parser, action_group)
-        if action_table is not None:
-            renderables.append(action_table)
+    examples_panel = _rich_examples_panel(parser)
+    if examples_panel is not None:
+        renderables.append(examples_panel)
+
+    renderables.extend(_rich_action_tables(parser))
 
     return RichGroup(*renderables)
 
@@ -761,7 +900,156 @@ def extract_failure_excerpt(path, line_count=40):
     return lines[start:end]
 
 
-def run_logging(output_dir, run_id=None, tail=50, full=False, paths=False, list_runs=False):
+def classify_error_line(line):
+    known_error_types = (
+        "RuleException",
+        "MissingInputException",
+        "WorkflowError",
+        "CalledProcessError",
+        "LockException",
+        "InputFunctionException",
+        "ChildIOException",
+    )
+    if line.startswith("Error in rule "):
+        return "RuleError"
+    for error_type in known_error_types:
+        if re.search(rf"\b{re.escape(error_type)}\b", line):
+            return error_type
+    match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*(?:Exception|Error))(?::|\b)", line)
+    if match:
+        return match.group(1)
+    return None
+
+
+def summarize_snakemake_log(path, metadata=None):
+    summary = {
+        "planned_jobs": None,
+        "completed_steps": None,
+        "total_steps": None,
+        "percent_complete": None,
+        "unique_rules": 0,
+        "rule_executions": 0,
+        "failed_rules": 0,
+        "error_types": Counter(),
+        "most_active_rules": [],
+    }
+    if path is None or not Path(path).exists():
+        return summary
+
+    rule_counter = Counter()
+    finished_job_ids = set()
+    started_job_ids = set()
+    planned_jobs = None
+    best_progress = None
+    failed_rules = 0
+    error_types = Counter()
+
+    with open(path, "r", encoding="utf-8", errors="replace") as handle:
+        for raw_line in handle:
+            line = raw_line.rstrip("\n")
+            stripped = line.strip()
+            if not stripped:
+                continue
+
+            match = re.match(r"^(?:local)?rule\s+(.+?):\s*$", stripped)
+            if match:
+                rule_counter[match.group(1)] += 1
+
+            match = re.search(r"\bjobid:\s*(\d+)\b", stripped)
+            if match:
+                started_job_ids.add(match.group(1))
+
+            match = re.search(r"Finished jobid:\s*(\d+)", stripped)
+            if match:
+                finished_job_ids.add(match.group(1))
+
+            match = re.match(r"(\d+)\s+of\s+(\d+)\s+steps\s+\((\d+)%\)\s+done", stripped)
+            if match:
+                progress = (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+                if best_progress is None or progress[2] > best_progress[2] or (
+                    progress[2] == best_progress[2] and progress[0] > best_progress[0]
+                ):
+                    best_progress = progress
+
+            match = re.match(r"total\s+(\d+)\s*$", stripped)
+            if match:
+                count = int(match.group(1))
+                planned_jobs = count if planned_jobs is None else max(planned_jobs, count)
+
+            if stripped.startswith("Error in rule "):
+                failed_rules += 1
+
+            error_type = classify_error_line(stripped)
+            if error_type:
+                error_types[error_type] += 1
+
+    completed_steps = best_progress[0] if best_progress else None
+    total_steps = best_progress[1] if best_progress else None
+    percent_complete = best_progress[2] if best_progress else None
+
+    if completed_steps is None and finished_job_ids:
+        completed_steps = len(finished_job_ids)
+    if total_steps is None and planned_jobs is not None:
+        total_steps = planned_jobs
+    if percent_complete is None and completed_steps is not None and total_steps:
+        percent_complete = int(round((completed_steps / total_steps) * 100))
+
+    status = str((metadata or {}).get("status", "")).strip().lower()
+    if status == "success":
+        if total_steps is None:
+            total_steps = planned_jobs or len(finished_job_ids) or len(started_job_ids) or None
+        if total_steps is not None:
+            completed_steps = total_steps
+            percent_complete = 100
+
+    summary.update(
+        {
+            "planned_jobs": planned_jobs,
+            "completed_steps": completed_steps,
+            "total_steps": total_steps,
+            "percent_complete": percent_complete,
+            "unique_rules": len(rule_counter),
+            "rule_executions": sum(rule_counter.values()),
+            "failed_rules": failed_rules,
+            "error_types": error_types,
+            "most_active_rules": rule_counter.most_common(5),
+        }
+    )
+    return summary
+
+
+def print_snakemake_summary(summary):
+    section("EXECUTION SUMMARY")
+    planned_jobs = summary.get("planned_jobs")
+    completed_steps = summary.get("completed_steps")
+    total_steps = summary.get("total_steps")
+    percent_complete = summary.get("percent_complete")
+    unique_rules = summary.get("unique_rules", 0)
+    rule_executions = summary.get("rule_executions", 0)
+    failed_rules = summary.get("failed_rules", 0)
+    error_types = summary.get("error_types") or Counter()
+    most_active_rules = summary.get("most_active_rules") or []
+
+    print(f"Planned jobs: {planned_jobs if planned_jobs is not None else 'unknown'}")
+    if percent_complete is not None and completed_steps is not None and total_steps is not None:
+        print(f"Workflow progress: {percent_complete}% ({completed_steps}/{total_steps} steps)")
+    elif completed_steps is not None:
+        print(f"Completed steps observed: {completed_steps}")
+    else:
+        print("Workflow progress: unknown")
+    print(f"Rules observed: {unique_rules} unique, {rule_executions} executions")
+    print(f"Failed rules detected: {failed_rules}")
+    if error_types:
+        formatted_types = ", ".join(f"{name} ({count})" for name, count in error_types.most_common())
+        print(f"Error types: {formatted_types}")
+    else:
+        print("Error types: none detected")
+    if most_active_rules:
+        formatted_rules = ", ".join(f"{name} ({count})" for name, count in most_active_rules)
+        print(f"Most active rules: {formatted_rules}")
+
+
+def run_logging(output_dir, run_id=None, tail=50, full=False, paths=False, list_runs=False, summary=False):
     output_path = Path(output_dir).resolve()
     if not output_path.exists():
         print(f"{ERROR}ERROR:{RESET} Output directory not found: {output_path}")
@@ -822,6 +1110,10 @@ def run_logging(output_dir, run_id=None, tail=50, full=False, paths=False, list_
     else:
         print(f"{INFO}INFO:{RESET} No workflow metadata found. Falling back to Snakemake logs only.")
 
+    log_summary = summarize_snakemake_log(snakemake_log_path, metadata=metadata)
+    if snakemake_log_path is not None and snakemake_log_path.exists():
+        print_snakemake_summary(log_summary)
+
     if paths:
         section("LOG PATHS")
         if snakemake_log_path is not None:
@@ -839,6 +1131,9 @@ def run_logging(output_dir, run_id=None, tail=50, full=False, paths=False, list_
 
     if snakemake_log_path is None or not snakemake_log_path.exists():
         print(f"{INFO}INFO:{RESET} No Snakemake log file found in {output_path}.")
+        return 0
+
+    if summary and not full:
         return 0
 
     section("SNAKEMAKE LOG")
@@ -1422,6 +1717,34 @@ def run_snakemake_database(
     ]
     run_subprocess_with_logging(snakemake_command, run_info=run_info, workflow_name=workflow)
 
+
+def get_installed_drakkar_version():
+    if get_distribution_version is None:
+        return __version__
+    try:
+        return get_distribution_version("drakkar")
+    except PackageNotFoundError:
+        return __version__
+    except Exception:
+        return __version__
+
+
+def run_update():
+    pip_cmd = [
+        sys.executable, "-m", "pip", "install",
+        "--upgrade", "--force-reinstall", "--no-deps",
+        "git+https://github.com/alberdilab/drakkar.git",
+    ]
+    try:
+        update_result = subprocess.run(pip_cmd)
+    except Exception as exc:
+        print(f"Update failed: {exc}", file=sys.stderr, flush=True)
+        return 1
+    if update_result.returncode != 0:
+        return update_result.returncode
+    display_update_success(get_installed_drakkar_version())
+    return 0
+
 ###
 # Main function to launch workflows
 ###
@@ -1586,11 +1909,11 @@ def main():
     database_subparsers = subparser_database.add_subparsers(dest="database_name", help="Managed databases")
     database_subparsers.required = True
 
-    database_subparsers.add_parser("kegg", parents=[database_parent], help="Install or update the KEGG/KOfam database", aliases=["kofams"])
-    database_subparsers.add_parser("cazy", parents=[database_parent], help="Install or update the CAZy database")
-    database_subparsers.add_parser("pfam", parents=[database_parent], help="Install or update the PFAM database")
-    database_subparsers.add_parser("vfdb", parents=[database_parent], help="Install or update the VFDB database")
-    database_subparsers.add_parser("amr", parents=[database_parent], help="Install or update the AMR database")
+    database_kegg = database_subparsers.add_parser("kegg", parents=[database_parent], help="Install or update the KEGG/KOfam database", aliases=["kofams"])
+    database_cazy = database_subparsers.add_parser("cazy", parents=[database_parent], help="Install or update the CAZy database")
+    database_pfam = database_subparsers.add_parser("pfam", parents=[database_parent], help="Install or update the PFAM database")
+    database_vfdb = database_subparsers.add_parser("vfdb", parents=[database_parent], help="Install or update the VFDB database")
+    database_amr = database_subparsers.add_parser("amr", parents=[database_parent], help="Install or update the AMR database")
 
     subparser_environments = subparsers.add_parser("environments", help="Pre-create conda environments")
     subparser_environments.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
@@ -1631,10 +1954,306 @@ def main():
     subparser_logging = subparsers.add_parser("logging", help="Inspect Drakkar run metadata and Snakemake logs")
     subparser_logging.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_logging.add_argument("--run", required=False, help="Specific run ID (YYYYMMDD-HHMMSS) or drakkar_<run_id>.yaml file name")
-    subparser_logging.add_argument("--tail", required=False, type=positive_int, default=50, help="Number of log lines to show when no failure excerpt is found. Default: 50")
+    subparser_logging.add_argument("--tail", required=False, type=positive_int, default=50, help="Number of log lines to show when no failure excerpt is found and --summary is not used. Default: 50")
+    subparser_logging.add_argument("--summary", action="store_true", help="Print only the parsed workflow summary without log excerpts or tails")
     subparser_logging.add_argument("--full", action="store_true", help="Print the full Snakemake log instead of only the failure excerpt or tail")
     subparser_logging.add_argument("--paths", action="store_true", help="List relevant metadata and log paths")
     subparser_logging.add_argument("--list", action="store_true", help="List available workflow runs in the output directory")
+
+    parser.description = "Genome-resolved metagenomics workflows, database setup, and run management."
+    _set_help_metadata(
+        parser,
+        category="Workflow launcher and operations hub",
+        examples=[
+            "drakkar complete -f input_info.tsv -o drakkar_output",
+            "drakkar preprocessing -i reads/ -o drakkar_output",
+            "drakkar logging -o drakkar_output --summary",
+        ],
+        command_groups=[
+            ("Start Here", ["complete"]),
+            ("Data Generation Workflows", ["preprocessing", "cataloging"]),
+            ("Analysis Workflows", ["profiling", "dereplicating", "annotating", "inspecting", "expressing"]),
+            ("Operations and Management", ["database", "environments", "logging", "transfer", "config", "unlock", "update"]),
+        ],
+        sections=[
+            ("General", ["help", "--version"]),
+        ],
+    )
+
+    subparser_complete.description = "Run preprocessing, cataloging, profiling, and annotation as a single end-to-end workflow."
+    _set_help_metadata(
+        subparser_complete,
+        category="End-to-end workflow",
+        examples=[
+            "drakkar complete -f input_info.tsv -o drakkar_output",
+            "drakkar complete -i reads/ -o drakkar_output -m individual,all",
+            "drakkar complete -f input_info.tsv --annotation-type taxonomy,genes -o drakkar_output",
+        ],
+        sections=[
+            ("Input Sources", ["input", "file", "reference", "reference_index"]),
+            ("Workflow Scope", ["mode", "type", "annotation_type", "gtdb_version", "multicoverage", "fraction", "nonpareil", "ani"]),
+            ("Run Configuration", ["output", "env_path", "profile", "overwrite"]),
+            ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
+        ],
+    )
+
+    subparser_preprocessing.description = "Quality-filter reads, optionally remove host reads, and prepare datasets for downstream workflows."
+    _set_help_metadata(
+        subparser_preprocessing,
+        category="Data generation workflow",
+        examples=[
+            "drakkar preprocessing -i reads/ -o drakkar_output",
+            "drakkar preprocessing -f input_info.tsv -r host.fna -o drakkar_output",
+        ],
+        sections=[
+            ("Input Sources", ["input", "file", "reference", "reference_index"]),
+            ("Optional Analyses", ["fraction", "nonpareil"]),
+            ("Run Configuration", ["output", "env_path", "profile", "overwrite"]),
+            ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
+        ],
+    )
+
+    subparser_cataloging.description = "Assemble reads, bin genomes, and build the MAG catalog used by later workflows."
+    _set_help_metadata(
+        subparser_cataloging,
+        category="Data generation workflow",
+        examples=[
+            "drakkar cataloging -i reads/ -o drakkar_output",
+            "drakkar cataloging -f input_info.tsv -m individual,all -c -o drakkar_output",
+        ],
+        sections=[
+            ("Input Sources", ["input", "file"]),
+            ("Assembly Strategy", ["mode", "multicoverage"]),
+            ("Run Configuration", ["output", "env_path", "profile", "overwrite"]),
+            ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
+        ],
+    )
+
+    subparser_profiling.description = "Dereplicate MAGs and quantify genomes or pangenomes across metagenomic samples."
+    _set_help_metadata(
+        subparser_profiling,
+        category="Analysis workflow",
+        examples=[
+            "drakkar profiling -b genomes/ -R input_info.tsv -o drakkar_output",
+            "drakkar profiling -o drakkar_output -a 0.95",
+            "drakkar profiling -B bins.txt -R input_info.tsv -q mag_qualities.tsv -o drakkar_output",
+        ],
+        sections=[
+            ("Input Sources", ["bins_dir", "bins_file", "reads_dir", "reads_file"]),
+            ("Analysis Settings", ["type", "fraction", "ani", "ignore_quality", "quality"]),
+            ("Run Configuration", ["output", "env_path", "profile", "overwrite"]),
+            ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
+        ],
+    )
+
+    subparser_dereplicating.description = "Run only MAG dereplication and export dereplicated genomes without read mapping."
+    _set_help_metadata(
+        subparser_dereplicating,
+        category="Analysis workflow",
+        examples=[
+            "drakkar dereplicating -b genomes/ -o drakkar_output",
+            "drakkar dereplicating -B bins.txt -q mag_qualities.csv -o drakkar_output",
+        ],
+        sections=[
+            ("Input Genomes", ["bins_dir", "bins_file"]),
+            ("Dereplication Settings", ["ani", "ignore_quality", "quality"]),
+            ("Run Configuration", ["output", "env_path", "profile", "overwrite"]),
+            ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
+        ],
+    )
+
+    subparser_annotating.description = "Annotate MAGs with taxonomy and selected functional modules."
+    _set_help_metadata(
+        subparser_annotating,
+        category="Analysis workflow",
+        examples=[
+            "drakkar annotating -b genomes/ -o drakkar_output",
+            "drakkar annotating -B bins.txt --annotation-type taxonomy,kegg,dbcan -o drakkar_output",
+        ],
+        sections=[
+            ("Input Genomes", ["bins_dir", "bins_file"]),
+            ("Annotation Scope", ["annotation_type", "gtdb_version"]),
+            ("Run Configuration", ["output", "env_path", "profile", "overwrite"]),
+            ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
+        ],
+    )
+
+    subparser_inspecting.description = "Combine bins and mapping coverage into inspection-ready summaries."
+    _set_help_metadata(
+        subparser_inspecting,
+        category="Analysis workflow",
+        examples=[
+            "drakkar inspecting -b genomes/ -m mapping/ -o drakkar_output",
+            "drakkar inspecting -B bins.txt -c coverage.tsv -o drakkar_output",
+        ],
+        sections=[
+            ("Input Sources", ["bins_dir", "bins_file", "mapping_dir", "cov_file"]),
+            ("Run Configuration", ["output", "env_path", "profile", "overwrite"]),
+            ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
+        ],
+    )
+
+    subparser_expressing.description = "Quantify microbial gene expression from reads and MAG references."
+    _set_help_metadata(
+        subparser_expressing,
+        category="Analysis workflow",
+        examples=[
+            "drakkar expressing -b genomes/ -R input_info.tsv -o drakkar_output",
+            "drakkar expressing -B bins.txt -r reads/ -o drakkar_output",
+        ],
+        sections=[
+            ("Input Sources", ["bins_dir", "bins_file", "reads_dir", "reads_file"]),
+            ("Run Configuration", ["output", "env_path", "profile", "overwrite"]),
+            ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
+        ],
+    )
+
+    subparser_database.description = "Install or update one managed annotation database release and optionally make it the default in config.yaml."
+    _set_help_metadata(
+        subparser_database,
+        category="Operations and management",
+        examples=[
+            "drakkar database kegg --directory /db/kofams --version 2026-02-01",
+            "drakkar database vfdb --directory /db/vfdb --set-default",
+        ],
+        command_groups=[
+            ("Managed Databases", ["kegg", "cazy", "pfam", "vfdb", "amr"]),
+        ],
+        sections=[
+            ("General", ["help"]),
+        ],
+    )
+
+    database_descriptions = {
+        database_kegg: (
+            "Install a versioned KEGG/KOfam profile release and prepare the pressed HMM database.",
+            [
+                "drakkar database kegg --directory /db/kofams --version 2026-02-01",
+                "drakkar database kegg --directory /db/kofams --version 2026-02-01 --set-default",
+            ],
+        ),
+        database_cazy: (
+            "Install a dbCAN HMM release for CAZy-style annotation and prepare the pressed HMM database.",
+            [
+                "drakkar database cazy --directory /db/cazy --version V14",
+                "drakkar database cazy --directory /db/cazy --version V14 --set-default",
+            ],
+        ),
+        database_pfam: (
+            "Install a Pfam release and prepare the pressed HMM database used by annotation rules.",
+            [
+                "drakkar database pfam --directory /db/pfam --version Pfam37.4",
+            ],
+        ),
+        database_vfdb: (
+            "Install the latest VFDB protein set and store it under a download-date release folder.",
+            [
+                "drakkar database vfdb --directory /db/vfdb",
+                "drakkar database vfdb --directory /db/vfdb --set-default",
+            ],
+        ),
+        database_amr: (
+            "Install a versioned NCBIfam-AMRFinder release used for antimicrobial resistance annotation.",
+            [
+                "drakkar database amr --directory /db/amr --version 2025-07-16.1",
+            ],
+        ),
+    }
+    for db_parser, (description, examples) in database_descriptions.items():
+        db_parser.description = description
+        _set_help_metadata(
+            db_parser,
+            category="Database management",
+            examples=examples,
+            sections=[
+                ("Release Settings", ["directory", "version", "download_runtime", "set_default"]),
+                ("Run Configuration", ["env_path", "profile", "overwrite"]),
+                ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
+            ],
+        )
+
+    subparser_environments.description = "Pre-build workflow conda environments before launching production runs."
+    _set_help_metadata(
+        subparser_environments,
+        category="Operations and management",
+        examples=[
+            "drakkar environments --profile local",
+            "drakkar environments -e /shared/drakkar_envs --profile slurm",
+        ],
+        sections=[
+            ("Environment Setup", ["env_path", "profile"]),
+            ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
+        ],
+    )
+
+    subparser_unlock.description = "Clear a Snakemake lock from an output directory when you are sure no workflow is running."
+    _set_help_metadata(
+        subparser_unlock,
+        category="Operations and management",
+        examples=[
+            "drakkar unlock -o drakkar_output",
+        ],
+        sections=[
+            ("Target Directory", ["output"]),
+            ("Execution", ["env_path", "profile"]),
+        ],
+    )
+
+    subparser_update.description = "Reinstall the current Drakkar package directly from GitHub in the active Python environment."
+    _set_help_metadata(
+        subparser_update,
+        category="Operations and management",
+        examples=[
+            "drakkar update",
+        ],
+        sections=[
+            ("Execution", ["env_path"]),
+        ],
+    )
+
+    subparser_transfer.description = "Copy selected Drakkar outputs to an SFTP destination while preserving the project folder structure."
+    _set_help_metadata(
+        subparser_transfer,
+        category="Operations and management",
+        examples=[
+            "drakkar transfer -l drakkar_output -r remote/project --results --annotations",
+            "drakkar transfer --erda -l drakkar_output -r holocamp/project --data -v",
+        ],
+        sections=[
+            ("Connection", ["host", "user", "port", "identity", "erda"]),
+            ("Locations", ["local_dir", "remote_dir"]),
+            ("What to Transfer", ["all", "data", "results", "annotations", "mags", "profile", "expression", "bins"]),
+            ("Display", ["verbose"]),
+        ],
+    )
+
+    subparser_config.description = "View or edit the installed workflow/config.yaml used by the current Drakkar installation."
+    _set_help_metadata(
+        subparser_config,
+        category="Operations and management",
+        examples=[
+            "drakkar config --view",
+            "drakkar config --edit",
+        ],
+        sections=[
+            ("Actions", ["view", "edit"]),
+        ],
+    )
+
+    subparser_logging.description = "Inspect run metadata and Snakemake logs to troubleshoot failed, interrupted, or incomplete workflows."
+    _set_help_metadata(
+        subparser_logging,
+        category="Operations and management",
+        examples=[
+            "drakkar logging -o drakkar_output",
+            "drakkar logging -o drakkar_output --summary",
+            "drakkar logging -o drakkar_output --run 20260503-101530 --paths",
+        ],
+        sections=[
+            ("Target Run", ["output", "run"]),
+            ("Display Options", ["summary", "tail", "full", "paths", "list"]),
+        ],
+    )
 
     args = parser.parse_args()
 
@@ -1745,6 +2364,7 @@ def main():
             args.output,
             run_id=args.run,
             tail=args.tail,
+            summary=args.summary,
             full=args.full,
             paths=args.paths,
             list_runs=args.list,
@@ -1756,17 +2376,8 @@ def main():
         return
 
     elif args.command == "update":
-        pip_cmd = [
-                    sys.executable, "-m", "pip", "install",
-                    "--upgrade", "--force-reinstall", "--no-deps",
-                    "git+https://github.com/alberdilab/drakkar.git"
-                ]
         section("UPDATING DRAKKAR")
-        try:
-            update_code = subprocess.run(pip_cmd)
-        except Exception as e:
-            print(f"Update failed: {e}", file=sys.stderr, flush=True)
-            sys.exit(1)
+        return run_update()
 
     elif args.command == "environments":
         section("CREATING CONDA ENVIRONMENTS")

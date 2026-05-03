@@ -8,6 +8,17 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.5.0] - 2026-05-03
+
+### Added
+
+- Added parsed execution summaries to ``drakkar logging``, including planned jobs, observed rule executions, workflow progress, and detected error types, plus a ``--summary`` mode for summary-only output.
+- Added a version-aware success banner at the end of ``drakkar update`` showing the version that was just installed.
+
+### Changed
+
+- Moved DRAKKAR ASCII art assets into ``drakkar/ascii.py`` so display helpers in ``utils.py`` only handle formatting and printing.
+- Reworked ``drakkar --help`` and subcommand help into grouped Rich layouts with workflow categories, command families, option sections, and concrete examples.
 ## [1.4.0] - 2026-05-03
 
 ### Added

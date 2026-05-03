@@ -28,7 +28,7 @@ If your cluster provides a DRAKKAR module, load it before running any command:
 
 .. code-block:: console
 
-   $ module load drakkar/1.0.0
+   $ module load drakkar/<version>
 
 Verify installation
 -------------------
