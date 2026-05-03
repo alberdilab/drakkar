@@ -556,6 +556,13 @@ def _rich_action_tables(parser):
     return tables
 
 
+def _rich_help_banner_renderables():
+    renderables = []
+    for block, style in get_drakkar_banner_blocks(include_intro=False):
+        renderables.append(RichText(block, style=style, no_wrap=True, overflow="ignore"))
+    return renderables
+
+
 def _rich_help_renderable(parser):
     if not _rich_available():
         return None
@@ -572,7 +579,7 @@ def _rich_help_renderable(parser):
     header.append("Usage\n", style="drakkar.heading")
     header.append(_clean_usage(parser), style="drakkar.help")
 
-    renderables = [
+    renderables = _rich_help_banner_renderables() + [
         RichPanel(
             header,
             title=RichText(f" {parser.prog} ", style="drakkar.heading"),
@@ -601,7 +608,15 @@ class RichArgumentParser(argparse.ArgumentParser):
         if target is not None and renderable is not None:
             target.print(renderable)
             return
-        super().print_help(file)
+        output_file = file if file is not None else sys.stdout
+        for block, _style in get_drakkar_banner_blocks(include_intro=False):
+            output_file.write(block + "\n")
+        super().print_help(output_file)
+        if not _rich_available():
+            output_file.write(
+                "\nNote: Rich-styled help is unavailable because the 'rich' package is not installed in this environment.\n"
+                "Reinstall Drakkar with dependencies or run 'python -m pip install rich'.\n"
+            )
 
     def _print_message(self, message, file=None):
         if message:
@@ -1732,7 +1747,7 @@ def get_installed_drakkar_version():
 def run_update():
     pip_cmd = [
         sys.executable, "-m", "pip", "install",
-        "--upgrade", "--force-reinstall", "--no-deps",
+        "--upgrade", "--force-reinstall",
         "git+https://github.com/alberdilab/drakkar.git",
     ]
     try:
@@ -1759,7 +1774,7 @@ def main():
     subparsers = parser.add_subparsers(dest="command", help="Available workflows")
 
     # Define subcommands for each workflow
-    subparser_complete = subparsers.add_parser("complete", help="Run the complete workflow")
+    subparser_complete = subparsers.add_parser("complete", help="Run the end-to-end workflow from raw reads to catalog, profiling, and annotation outputs")
     subparser_complete.add_argument("-i", "--input", required=False, help="Input directory")
     subparser_complete.add_argument("-f", "--file", required=False, help="Sample detail file (required if no input directory is provided)")
     subparser_complete.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
@@ -1794,7 +1809,7 @@ def main():
     subparser_complete.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
     add_resource_multiplier_arguments(subparser_complete)
 
-    subparser_preprocessing = subparsers.add_parser("preprocessing", help="Run the preprocessing workflow (quality-filtering and host removal)")
+    subparser_preprocessing = subparsers.add_parser("preprocessing", help="Quality-filter reads, optionally remove host sequences, and prepare cleaned datasets for downstream analysis")
     subparser_preprocessing.add_argument("-i", "--input", required=False, help="Input directory (required if no sample detail file is provided)")
     subparser_preprocessing.add_argument("-f", "--file", required=False, help="Sample detail file (required if no input directory is provided)")
     subparser_preprocessing.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
@@ -1808,7 +1823,7 @@ def main():
     subparser_preprocessing.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
     add_resource_multiplier_arguments(subparser_preprocessing)
 
-    subparser_cataloging = subparsers.add_parser("cataloging", help="Run the cataloging (assembly and binning) workflow")
+    subparser_cataloging = subparsers.add_parser("cataloging", help="Assemble reads, bin genomes, and build the MAG catalog used by downstream workflows")
     subparser_cataloging.add_argument("-i", "--input", required=False, help="Input directory (required if no sample detail file is provided)")
     subparser_cataloging.add_argument("-f", "--file", required=False, help="Sample detail file (required if no input directory is provided)")
     subparser_cataloging.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
@@ -1819,7 +1834,7 @@ def main():
     subparser_cataloging.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
     add_resource_multiplier_arguments(subparser_cataloging)
 
-    subparser_profiling = subparsers.add_parser("profiling", help="Run the profiling workflow")
+    subparser_profiling = subparsers.add_parser("profiling", help="Dereplicate MAGs and quantify genome or pangenome abundance across metagenomic samples")
     subparser_profiling.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
     subparser_profiling.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
     subparser_profiling.add_argument("-r", "--reads_dir", required=False, help="Directory in which metagenomic reads are stored")
@@ -1835,7 +1850,7 @@ def main():
     subparser_profiling.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
     add_resource_multiplier_arguments(subparser_profiling)
 
-    subparser_dereplicating = subparsers.add_parser("dereplicating", help="Run dereplication only (no mapping)")
+    subparser_dereplicating = subparsers.add_parser("dereplicating", help="Dereplicate genome collections and export representative MAG FASTA files without mapping reads")
     subparser_dereplicating.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
     subparser_dereplicating.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
     subparser_dereplicating.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
@@ -1847,7 +1862,7 @@ def main():
     subparser_dereplicating.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
     add_resource_multiplier_arguments(subparser_dereplicating)
 
-    subparser_annotating = subparsers.add_parser("annotating", help="Run the annotating workflow")
+    subparser_annotating = subparsers.add_parser("annotating", help="Assign taxonomy and functional annotations to MAGs, genes, and derived feature tables")
     subparser_annotating.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa, .fna or .fasta, optionally including .gz) are stored")
     subparser_annotating.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
     subparser_annotating.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
@@ -1873,7 +1888,7 @@ def main():
     subparser_annotating.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
     add_resource_multiplier_arguments(subparser_annotating)
 
-    subparser_inspecting = subparsers.add_parser("inspecting", help="Run the inspecting workflow")
+    subparser_inspecting = subparsers.add_parser("inspecting", help="Combine bins and coverage or mapping inputs into inspection-ready summaries for follow-up exploration")
     subparser_inspecting.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
     subparser_inspecting.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
     subparser_inspecting.add_argument("-m", "--mapping_dir", required=False, help="Directory containing the mapping (.bam) files")
@@ -1884,7 +1899,7 @@ def main():
     subparser_inspecting.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
     add_resource_multiplier_arguments(subparser_inspecting)
 
-    subparser_expressing = subparsers.add_parser("expressing", help="Run the microbial gene expression workflow")
+    subparser_expressing = subparsers.add_parser("expressing", help="Quantify microbial gene expression from reads against MAG-derived gene predictions")
     subparser_expressing.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
     subparser_expressing.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
     subparser_expressing.add_argument("-r", "--reads_dir", required=False, help="Directory in which metagenomic reads are stored")
@@ -1905,7 +1920,7 @@ def main():
     database_parent.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
     add_resource_multiplier_arguments(database_parent)
 
-    subparser_database = subparsers.add_parser("database", help="Install or update one managed annotation database")
+    subparser_database = subparsers.add_parser("database", help="Install or update managed annotation database releases used by Drakkar workflows")
     database_subparsers = subparser_database.add_subparsers(dest="database_name", help="Managed databases")
     database_subparsers.required = True
 
@@ -1915,20 +1930,20 @@ def main():
     database_vfdb = database_subparsers.add_parser("vfdb", parents=[database_parent], help="Install or update the VFDB database")
     database_amr = database_subparsers.add_parser("amr", parents=[database_parent], help="Install or update the AMR database")
 
-    subparser_environments = subparsers.add_parser("environments", help="Pre-create conda environments")
+    subparser_environments = subparsers.add_parser("environments", help="Pre-build Drakkar conda environments before launching workflow jobs")
     subparser_environments.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_environments.add_argument("--profile", default="local", choices=["local", "slurm"])
     add_resource_multiplier_arguments(subparser_environments)
 
-    subparser_unlock = subparsers.add_parser("unlock", help="Unlock snakemake")
+    subparser_unlock = subparsers.add_parser("unlock", help="Remove a stale Snakemake lock from a Drakkar output directory")
     subparser_unlock.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_unlock.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_unlock.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
 
-    subparser_update = subparsers.add_parser("update", help="Reinstall Drakkar from the Git repo (forces reinstall in this environment)")
+    subparser_update = subparsers.add_parser("update", help="Reinstall Drakkar from GitHub in the current Python environment")
     subparser_update.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
 
-    subparser_transfer = subparsers.add_parser("transfer", help="Transfer outputs via sftp")
+    subparser_transfer = subparsers.add_parser("transfer", help="Transfer selected Drakkar outputs to a remote SFTP destination while preserving folder structure")
     subparser_transfer.add_argument("--host", help="SFTP host")
     subparser_transfer.add_argument("--user", help="SFTP user")
     subparser_transfer.add_argument("--port", type=int, default=22, help="SFTP port")
@@ -1946,12 +1961,12 @@ def main():
     subparser_transfer.add_argument("-b", "--bins", action="store_true", help="Transfer cataloging bins")
     subparser_transfer.add_argument("-v", "--verbose", action="store_true", help="Log each transfer on screen")
 
-    subparser_config = subparsers.add_parser("config", help="View or edit drakkar workflow/config.yaml")
+    subparser_config = subparsers.add_parser("config", help="View or edit the installed workflow/config.yaml used by this Drakkar environment")
     config_actions = subparser_config.add_mutually_exclusive_group(required=True)
     config_actions.add_argument("--view", action="store_true", help="Print workflow/config.yaml")
     config_actions.add_argument("--edit", action="store_true", help="Open workflow/config.yaml in a terminal editor")
 
-    subparser_logging = subparsers.add_parser("logging", help="Inspect Drakkar run metadata and Snakemake logs")
+    subparser_logging = subparsers.add_parser("logging", help="Inspect run metadata, progress summaries, and Snakemake logs to troubleshoot workflows")
     subparser_logging.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_logging.add_argument("--run", required=False, help="Specific run ID (YYYYMMDD-HHMMSS) or drakkar_<run_id>.yaml file name")
     subparser_logging.add_argument("--tail", required=False, type=positive_int, default=50, help="Number of log lines to show when no failure excerpt is found and --summary is not used. Default: 50")
@@ -1970,9 +1985,7 @@ def main():
             "drakkar logging -o drakkar_output --summary",
         ],
         command_groups=[
-            ("Start Here", ["complete"]),
-            ("Data Generation Workflows", ["preprocessing", "cataloging"]),
-            ("Analysis Workflows", ["profiling", "dereplicating", "annotating", "inspecting", "expressing"]),
+            ("Data Generation and Analysis", ["complete", "preprocessing", "cataloging", "profiling", "dereplicating", "annotating", "inspecting", "expressing"]),
             ("Operations and Management", ["database", "environments", "logging", "transfer", "config", "unlock", "update"]),
         ],
         sections=[

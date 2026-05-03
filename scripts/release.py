@@ -206,8 +206,17 @@ def release_changelog(content: str, version: str, release_date: str) -> str:
         )
 
     released_section = f"## [{version}] - {release_date}\n\n{release_body}\n"
-    new_unreleased = f"{header_line}\n\n{UNRELEASED_PLACEHOLDER}"
-    return content[:unreleased_start] + new_unreleased + "\n" + released_section + remainder.lstrip("\n")
+    new_unreleased = f"{header_line}\n\n{UNRELEASED_PLACEHOLDER.strip()}\n"
+
+    sections = [
+        content[:unreleased_start].rstrip("\n"),
+        new_unreleased.rstrip("\n"),
+        released_section.rstrip("\n"),
+    ]
+    remainder = remainder.lstrip("\n").rstrip("\n")
+    if remainder:
+        sections.append(remainder)
+    return "\n\n".join(sections) + "\n"
 
 
 def require_module(module_name: str) -> None:

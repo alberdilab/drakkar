@@ -120,13 +120,20 @@ def _intro_box(target_width):
     ]
     return _center_block("\n".join(lines), target_width)
 
-def display_drakkar():
+def get_drakkar_banner_blocks(include_intro=True):
     ascii_ship = _ascii_block_with_bottom_right_badge(DRAKKAR_SHIP_ART, __version__)
-    ascii_intro = _intro_box(_ascii_block_width(DRAKKAR_LOGO_ART))
+    blocks = [
+        (ascii_ship, DRAKKAR_SHIP_STYLE),
+        (DRAKKAR_LOGO_ART, DRAKKAR_LOGO_STYLE),
+    ]
+    if include_intro:
+        ascii_intro = _intro_box(_ascii_block_width(DRAKKAR_LOGO_ART))
+        blocks.append((ascii_intro, DRAKKAR_INTRO_STYLE))
+    return blocks
 
-    print(ascii_ship, style=DRAKKAR_SHIP_STYLE)
-    print(DRAKKAR_LOGO_ART, style=DRAKKAR_LOGO_STYLE)
-    print(ascii_intro, style=DRAKKAR_INTRO_STYLE)
+def display_drakkar():
+    for block, style in get_drakkar_banner_blocks():
+        print(block, style=style)
 
 def display_unlock():
     print(UNLOCK_ART)

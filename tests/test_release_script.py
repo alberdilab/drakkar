@@ -67,6 +67,8 @@ class ReleaseScriptTests(unittest.TestCase):
         self.assertIn("- New release item", updated)
         self.assertIn("- Important bug fix", updated)
         self.assertIn("## [1.0.1] - 2026-04-21", updated)
+        self.assertIn("## [1.0.2] - 2026-04-22\n\n### Added", updated)
+        self.assertIn("- Important bug fix\n\n## [1.0.1] - 2026-04-21", updated)
 
     def test_release_changelog_rejects_placeholder_only_unreleased_section(self) -> None:
         release = _load_release_module()
@@ -80,6 +82,25 @@ class ReleaseScriptTests(unittest.TestCase):
 """
         with self.assertRaises(release.ReleaseError):
             release.release_changelog(content, "1.0.2", "2026-04-22")
+
+    def test_release_changelog_normalizes_blank_line_between_versions(self) -> None:
+        release = _load_release_module()
+        content = """# Changelog
+
+## [Unreleased]
+
+### Changed
+
+- New formatting safeguard
+## [1.0.1] - 2026-04-21
+
+### Changed
+
+- Previous release item
+"""
+        updated = release.release_changelog(content, "1.0.2", "2026-04-22")
+        self.assertIn("## [1.0.2] - 2026-04-22\n\n### Changed", updated)
+        self.assertIn("- New formatting safeguard\n\n## [1.0.1] - 2026-04-21", updated)
 
 
 if __name__ == "__main__":

@@ -22,7 +22,7 @@ class UpdateCommandTests(unittest.TestCase):
             run_mock.call_args.args[0],
             [
                 sys.executable, "-m", "pip", "install",
-                "--upgrade", "--force-reinstall", "--no-deps",
+                "--upgrade", "--force-reinstall",
                 "git+https://github.com/alberdilab/drakkar.git",
             ],
         )

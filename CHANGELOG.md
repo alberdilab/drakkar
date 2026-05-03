@@ -8,6 +8,21 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.5.1] - 2026-05-03
+
+### Added
+
+- Added a plain-help fallback note explaining when Rich-styled help is unavailable because the ``rich`` dependency is missing.
+
+### Changed
+
+- Rendered the DRAKKAR ship and logo above CLI help output, consolidated the top-level workflow table into ``Data Generation and Analysis``, and expanded workflow descriptions in the top-level help menu.
+
+### Fixed
+
+- Changed ``drakkar update`` to reinstall package dependencies instead of skipping them, so upgraded environments can pick up required runtime packages such as ``rich``.
+- Normalized release-changelog generation so published versions always remain separated by a blank line.
+
 ## [1.5.0] - 2026-05-03
 
 ### Added
@@ -19,12 +34,14 @@ This project tracks release notes here from this point forward.
 
 - Moved DRAKKAR ASCII art assets into ``drakkar/ascii.py`` so display helpers in ``utils.py`` only handle formatting and printing.
 - Reworked ``drakkar --help`` and subcommand help into grouped Rich layouts with workflow categories, command families, option sections, and concrete examples.
+
 ## [1.4.0] - 2026-05-03
 
 ### Added
 
 - Accepted ``assembly`` as the preferred sample-table column for cataloging assembly groups, while keeping legacy ``coassembly`` support.
 - Added ``drakkar logging`` plus persistent per-run Snakemake logs under ``log/drakkar_<run_id>.snakemake.log`` to help troubleshoot failed or locked workflow directories.
+
 ## [1.3.5] - 2026-05-02
 
 ### Added
