@@ -121,6 +121,17 @@ def print(
         builtins.print(*objects, sep=sep, end=end, file=file, flush=flush)
         return
 
+    if (
+        Text is not None
+        and style is None
+        and len(objects) == 1
+        and isinstance(objects[0], Text)
+    ):
+        target.print(objects[0], end=end, markup=False, highlight=False)
+        if flush:
+            target.file.flush()
+        return
+
     text = sep.join(str(obj) for obj in objects)
     rendered = Text(text, style=style) if style and Text is not None else _status_text(text)
     target.print(rendered, end=end, markup=False, highlight=False)

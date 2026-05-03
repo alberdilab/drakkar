@@ -19,11 +19,12 @@ from drakkar.ascii import (
     UNLOCK_ART,
     UPDATE_SUCCESS_ASCII_TEMPLATE,
 )
-from drakkar.output import print, prompt
+from drakkar.output import Text as RichText, print, prompt
 
 DRAKKAR_SHIP_STYLE = "bold #5f9ea0"
 DRAKKAR_LOGO_STYLE = "bold #d6a642"
 DRAKKAR_INTRO_STYLE = "bold #b7c7d3"
+DRAKKAR_VERSION_BADGE_STYLE = DRAKKAR_LOGO_STYLE
 ASSEMBLY_COLUMN_CANDIDATES = ("assembly", "coassembly")
 
 def is_url(value):
@@ -120,6 +121,23 @@ def _intro_box(target_width):
     ]
     return _center_block("\n".join(lines), target_width)
 
+def _styled_ascii_art(ascii_text, base_style, accent_chunks=None, accent_style=None):
+    if RichText is None:
+        return ascii_text
+
+    rendered = RichText(ascii_text, style=base_style, no_wrap=True, overflow="ignore")
+    if accent_chunks and accent_style:
+        search_start = 0
+        for chunk in accent_chunks:
+            start = ascii_text.find(chunk, search_start)
+            if start == -1:
+                start = ascii_text.find(chunk)
+            if start == -1:
+                continue
+            rendered.stylize(accent_style, start, start + len(chunk))
+            search_start = start + len(chunk)
+    return rendered
+
 def get_drakkar_banner_blocks(include_intro=True):
     ascii_ship = _ascii_block_with_bottom_right_badge(DRAKKAR_SHIP_ART, __version__)
     blocks = [
@@ -131,9 +149,25 @@ def get_drakkar_banner_blocks(include_intro=True):
         blocks.append((ascii_intro, DRAKKAR_INTRO_STYLE))
     return blocks
 
+def get_drakkar_banner_renderables(include_intro=True):
+    ascii_ship = _ascii_block_with_bottom_right_badge(DRAKKAR_SHIP_ART, __version__)
+    renderables = [
+        _styled_ascii_art(
+            ascii_ship,
+            DRAKKAR_SHIP_STYLE,
+            accent_chunks=_version_badge_lines(__version__),
+            accent_style=DRAKKAR_VERSION_BADGE_STYLE,
+        ),
+        _styled_ascii_art(DRAKKAR_LOGO_ART, DRAKKAR_LOGO_STYLE),
+    ]
+    if include_intro:
+        ascii_intro = _intro_box(_ascii_block_width(DRAKKAR_LOGO_ART))
+        renderables.append(_styled_ascii_art(ascii_intro, DRAKKAR_INTRO_STYLE))
+    return renderables
+
 def display_drakkar():
-    for block, style in get_drakkar_banner_blocks():
-        print(block, style=style)
+    for renderable in get_drakkar_banner_renderables():
+        print(renderable)
 
 def display_unlock():
     print(UNLOCK_ART)
@@ -147,7 +181,7 @@ def _format_update_success_ascii(version):
 
 
 def display_update_success(version):
-    print(_format_update_success_ascii(version))
+    print(_styled_ascii_art(_format_update_success_ascii(version), DRAKKAR_SHIP_STYLE))
 
 def is_snakemake_locked(workdir: str) -> bool:
     locks_dir = os.path.join(workdir, ".snakemake", "locks")

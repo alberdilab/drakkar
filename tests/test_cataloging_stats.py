@@ -42,6 +42,16 @@ class CatalogingStatsTests(unittest.TestCase):
         self.assertIn("fastas_to_bintable.py -d {params.fastadir} -e fa -o {output}", semibin2_table)
         self.assertNotIn("tail -n +2 {input} > {output}", semibin2_table)
 
+    def test_binette_handles_empty_diamond_results(self) -> None:
+        rules = CATALOGING_RULES.read_text(encoding="utf-8")
+        binette_rule = rules.split("checkpoint binette:", 1)[1].split("# Regenerate the bin_id wildcard", 1)[0]
+
+        self.assertIn('DIAMOND_RESULT_TSV="{params.outdir}/temporary_files/diamond_result.tsv"', binette_rule)
+        self.assertIn('DIAMOND_RESULT_TSV_GZ="{params.outdir}/temporary_files/diamond_result.tsv.gz"', binette_rule)
+        self.assertIn('EMPTY_DIAMOND_RESULT=0', binette_rule)
+        self.assertIn('printf "$EMPTY_OUTPUT_HEADER" > {output}', binette_rule)
+        self.assertIn('exit "$BINETTE_STATUS"', binette_rule)
+
     def test_cataloging_stats_script_writes_assembly_mapping_and_binning_summary(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)

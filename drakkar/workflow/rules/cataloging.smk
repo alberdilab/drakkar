@@ -385,11 +385,37 @@ checkpoint binette:
         fi
 
         # Run binette only with non-empty TSV files
+        DIAMOND_RESULT_TSV="{params.outdir}/temporary_files/diamond_result.tsv"
+        DIAMOND_RESULT_TSV_GZ="{params.outdir}/temporary_files/diamond_result.tsv.gz"
+        EMPTY_OUTPUT_HEADER='bin_id\tcompleteness\tcontamination\tscore\tsize\tN50\tcontig_count\n'
+
+        set +e
         binette --contig2bin_tables $VALID_TSV_FILES \
                 --contigs {input.fasta} \
                 --outdir {params.outdir} \
                 --checkm2_db {params.checkm_db} \
                 --threads {threads}
+        BINETTE_STATUS=$?
+        set -e
+
+        if [ "$BINETTE_STATUS" -eq 0 ]; then
+            exit 0
+        fi
+
+        EMPTY_DIAMOND_RESULT=0
+        if [ -f "$DIAMOND_RESULT_TSV" ] && [ ! -s "$DIAMOND_RESULT_TSV" ]; then
+            EMPTY_DIAMOND_RESULT=1
+        elif [ -f "$DIAMOND_RESULT_TSV_GZ" ] && [ "$(gzip -cd "$DIAMOND_RESULT_TSV_GZ" 2>/dev/null | wc -c | tr -d '[:space:]')" = "0" ]; then
+            EMPTY_DIAMOND_RESULT=1
+        fi
+
+        if [ "$EMPTY_DIAMOND_RESULT" -eq 1 ]; then
+            echo "Binette produced an empty diamond_result file, exporting an empty final_bins_quality_reports.tsv..."
+            printf "$EMPTY_OUTPUT_HEADER" > {output}
+            exit 0
+        fi
+
+        exit "$BINETTE_STATUS"
         """
 
 # Regenerate the bin_id wildcard based on the checkpoint results

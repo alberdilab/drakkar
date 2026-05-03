@@ -12,7 +12,7 @@ class DisplayBannerTests(unittest.TestCase):
         with patch("drakkar.utils.print") as mocked_print:
             utils.display_drakkar()
 
-        printed_chunks = [call.args[0] for call in mocked_print.call_args_list]
+        printed_chunks = [getattr(call.args[0], "plain", call.args[0]) for call in mocked_print.call_args_list]
         self.assertEqual(len(printed_chunks), 3)
         ship, logo, intro = printed_chunks
         self.assertIn(f"│ v{__version__} │", ship)
@@ -22,15 +22,14 @@ class DisplayBannerTests(unittest.TestCase):
         self.assertIn("╭", printed_chunks[2])
         self.assertNotIn("Version:", "\n".join(printed_chunks))
         self.assertEqual(intro, utils._intro_box(utils._ascii_block_width(logo)))
-        self.assertEqual(mocked_print.call_args_list[0].kwargs["style"], utils.DRAKKAR_SHIP_STYLE)
-        self.assertEqual(mocked_print.call_args_list[1].kwargs["style"], utils.DRAKKAR_LOGO_STYLE)
-        self.assertEqual(mocked_print.call_args_list[2].kwargs["style"], utils.DRAKKAR_INTRO_STYLE)
+        ship_renderable = mocked_print.call_args_list[0].args[0]
+        self.assertTrue(any(span.style == utils.DRAKKAR_VERSION_BADGE_STYLE for span in ship_renderable.spans))
 
     def test_display_update_success_replaces_version_placeholder(self) -> None:
         with patch("drakkar.utils.print") as mocked_print:
             utils.display_update_success("1.4.0")
 
-        banner = mocked_print.call_args.args[0]
+        banner = getattr(mocked_print.call_args.args[0], "plain", mocked_print.call_args.args[0])
         self.assertIn("You have succesfully installed", banner)
         self.assertIn("DRAKKAR version", banner)
         self.assertIn("1.4.0", banner)

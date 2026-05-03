@@ -557,10 +557,7 @@ def _rich_action_tables(parser):
 
 
 def _rich_help_banner_renderables():
-    renderables = []
-    for block, style in get_drakkar_banner_blocks(include_intro=False):
-        renderables.append(RichText(block, style=style, no_wrap=True, overflow="ignore"))
-    return renderables
+    return get_drakkar_banner_renderables(include_intro=False)
 
 
 def _rich_help_renderable(parser):

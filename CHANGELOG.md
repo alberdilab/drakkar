@@ -8,6 +8,16 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.5.3] - 2026-05-03
+
+### Changed
+
+- Styled the update-success ASCII banner with the same ship color as the main DRAKKAR banner and rendered the ship version badge with a separate accent color when Rich output is available.
+
+### Fixed
+
+- Made the cataloging Binette checkpoint tolerate empty ``temporary_files/diamond_result.tsv`` or ``diamond_result.tsv.gz`` files by exporting a header-only ``final_bins_quality_reports.tsv`` instead of failing the workflow.
+
 ## [1.5.2] - 2026-05-03
 
 ### Changed
