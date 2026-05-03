@@ -38,6 +38,7 @@ DRAKKAR is organized into independent modules. Use `drakkar complete` to chain t
 - **Expressing**: metatranscriptomics mapping to annotated genes.
 - **Dereplicating**: dereplication only, no read mapping.
 - **Database**: install or update one managed annotation database release.
+- **Logging**: inspect workflow metadata and Snakemake logs for troubleshooting.
 - **Config**: view or edit the installed `workflow/config.yaml`.
 - **Transfer**: SFTP transfer of selected outputs.
 
@@ -226,6 +227,32 @@ drakkar config --view
 drakkar config --edit
 ```
 
+### Logging
+
+Inspects workflow metadata and persistent Snakemake logs to troubleshoot failed or interrupted runs.
+
+Key options:
+- `-o/--output`: DRAKKAR output directory to inspect.
+- `--run`: specific run ID (`YYYYMMDD-HHMMSS`) or `drakkar_<run_id>.yaml`.
+- `--tail`: number of trailing log lines to show if no failure excerpt is detected (default: `50`).
+- `--full`: print the full Snakemake log.
+- `--paths`: list relevant metadata and log file paths.
+- `--list`: list available workflow runs in the output directory.
+
+Behavior:
+- Workflow runs write root metadata files such as `drakkar_20260503-101530.yaml`.
+- Snakemake stdout/stderr is captured persistently in `log/drakkar_20260503-101530.snakemake.log`.
+- If the output directory is locked, `drakkar logging -o <output_dir>` is the first command to run before `drakkar unlock` or `--overwrite`.
+
+Examples:
+
+```bash
+drakkar logging -o drakkar_output
+drakkar logging -o drakkar_output --list
+drakkar logging -o drakkar_output --run 20260503-101530 --paths
+drakkar logging -o drakkar_output --full
+```
+
 ### Transfer
 
 Transfers selected outputs via SFTP while preserving the original folder structure.
@@ -274,7 +301,7 @@ drakkar complete -i {input_path} -o {output_path}
 
 A tab-separated file with optional columns depending on module usage:
 
-|sample|rawreads1|rawreads2|reference_name|reference_path|coassembly|coverage|
+|sample|rawreads1|rawreads2|reference_name|reference_path|assembly|coverage|
 |---|---|---|---|---|---|---|
 |sample1|path/sample1_1.fq.gz|path/sample1_2.fq.gz|ref1|path/ref1.fna|assembly1,all|coverage1|
 |sample2|path/sample2_1.fq.gz|path/sample2_2.fq.gz|ref1|path/ref1.fna|assembly2,all|coverage2|
@@ -283,7 +310,9 @@ Notes:
 - Input read files can be local paths or remote URLs (http/https/ftp).
 - `-r/--reference`, `-x/--reference-index`, and `reference_path` values can point to either local files or remote URLs (http/https/ftp). Reference inputs may be FASTA/compressed FASTA files or tarballs containing the FASTA plus Bowtie2 index files. Genome path lists passed through options such as `-B/--bins_file` can also use remote URLs; DRAKKAR downloads them into a local cache before running.
 - Directory-style inputs such as `-i/--input` and `-b/--bins_dir` remain local filesystem paths.
-- The `coassembly` column defines which samples are pooled for co-assembly.
+- The preferred column name is `assembly`. The legacy name `coassembly` is still accepted for backward compatibility.
+- The `assembly` column defines which samples are pooled for each assembly group.
+- Assembly labels can be any identifiers you choose, so assembly names do not need to match sample names. Distinct values such as `assembly1` and `assembly2` create separate per-sample assemblies with those names.
 - `-m individual` adds per-sample assemblies in addition to any co-assemblies.
 - If `--multicoverage` is set, samples sharing a coverage group map to each other's assemblies.
 - Co-assemblies are not compatible with `--multicoverage`.
@@ -337,9 +366,10 @@ All modules write into the output directory you provide. Key locations:
 - `annotating/` annotation tables.
 - `expressing/` expression outputs.
 - `dereplicating/` dereplicated genomes (dereplication-only mode).
+- `log/drakkar_<run_id>.snakemake.log` persistent Snakemake stdout/stderr capture for a workflow run.
 - `<directory>/<version>/database_versions.yaml` database installation log for a managed database release.
 
-Each run also writes a metadata file `drakkar_YYYYMMDD-HHMMSS.yaml` capturing CLI arguments and run context.
+Each workflow run also writes a metadata file `drakkar_YYYYMMDD-HHMMSS.yaml` capturing CLI arguments, run context, and the persistent Snakemake log path.
 
 ## Transfer flags
 

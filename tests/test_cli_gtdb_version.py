@@ -30,7 +30,7 @@ class GtdbVersionTests(unittest.TestCase):
 
     def test_run_snakemake_annotating_passes_requested_gtdb_version(self) -> None:
         with patch.object(cli_module, "config_vars", {"SNAKEMAKE_MODULE": "snakemake"}):
-            with patch.object(cli_module.subprocess, "run") as run_mock:
+            with patch.object(cli_module, "run_subprocess_with_logging") as run_mock:
                 cli_module.run_snakemake_annotating(
                     "annotating",
                     "project",
@@ -46,7 +46,7 @@ class GtdbVersionTests(unittest.TestCase):
 
     def test_run_snakemake_annotating_uses_default_gtdb_when_version_omitted(self) -> None:
         with patch.object(cli_module, "config_vars", {"SNAKEMAKE_MODULE": "snakemake"}):
-            with patch.object(cli_module.subprocess, "run") as run_mock:
+            with patch.object(cli_module, "run_subprocess_with_logging") as run_mock:
                 cli_module.run_snakemake_annotating(
                     "annotating",
                     "project",

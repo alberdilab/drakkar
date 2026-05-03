@@ -24,13 +24,14 @@ Key concepts
 
 - **Modules**: Each workflow stage can be run independently (preprocessing,
   cataloging, profiling, annotating, expressing, dereplicating, database,
-  config, inspecting, transfer).
+  logging, config, inspecting, transfer).
 - **Output directory**: All outputs are written under ``-o/--output``.
 - **Profiles**: Use ``-p/--profile`` to select a Snakemake profile (default:
   ``slurm``).
 - **Environments**: Use ``-e/--env_path`` to set a shared Conda env directory.
-- **Run logs**: Every run writes a metadata file ``drakkar_YYYYMMDD-HHMMSS.yaml``
-  to the output directory.
+- **Run logs**: Every workflow run writes a metadata file
+  ``drakkar_YYYYMMDD-HHMMSS.yaml`` to the output directory and captures
+  Snakemake stdout/stderr in ``log/drakkar_<run_id>.snakemake.log``.
 - **Locked runs**: Output-writing workflows support ``--overwrite`` to delete a
   locked output directory and rerun from scratch after a broken Snakemake
   session.
@@ -62,14 +63,15 @@ by the selected module are needed):
 - ``reference_name``: host reference label (preprocessing with host removal).
 - ``reference_path``: local path or URL to a host reference FASTA, or to a
   tarball containing the FASTA plus Bowtie2 index files.
-- ``coassembly``: labels that define co-assembly groups.
+- ``assembly``: labels that define assembly groups. Legacy ``coassembly`` is
+  still accepted.
 - ``coverage``: mapping coverage groups for multicoverage.
 
 Example:
 
 .. code-block:: text
 
-   sample\trawreads1\trawreads2\treference_name\treference_path\tcoassembly\tcoverage
+   sample\trawreads1\trawreads2\treference_name\treference_path\tassembly\tcoverage
    sample1\tpath/sample1_1.fq.gz\tpath/sample1_2.fq.gz\tref1\tpath/ref1.fna\tassembly1,all\tcoverage1
    sample2\tpath/sample2_1.fq.gz\tpath/sample2_2.fq.gz\tref1\tpath/ref1.fna\tassembly2,all\tcoverage2
 
@@ -84,7 +86,12 @@ Notes:
   local cache before running.
 - Directory-style inputs such as ``-i/--input`` and ``-b/--bins_dir`` must remain
   local filesystem paths.
-- The ``coassembly`` column groups samples for pooled assemblies.
+- The preferred column name is ``assembly``. The legacy name ``coassembly`` is
+  still accepted for backward compatibility.
+- The ``assembly`` column groups samples for pooled assemblies.
+- Assembly labels can be any identifiers you choose, so assembly names do not
+  need to match sample names. Distinct values such as ``assembly1`` and
+  ``assembly2`` create separate per-sample assemblies with those names.
 - ``-m individual`` adds per-sample assemblies in addition to co-assemblies.
 - ``--multicoverage`` maps samples that share the same coverage label to each
   other's individual assemblies (not compatible with co-assemblies).
@@ -407,6 +414,44 @@ Behavior:
 - The command edits the installed package config directly, so changes affect
   later workflow runs from that installation.
 
+Logging
+^^^^^^^
+
+Inspects workflow metadata and persistent Snakemake logs to troubleshoot failed
+or interrupted runs.
+
+.. code-block:: console
+
+   $ drakkar logging -o drakkar_output
+
+.. code-block:: console
+
+   $ drakkar logging -o drakkar_output --list
+
+.. code-block:: console
+
+   $ drakkar logging -o drakkar_output --run 20260503-101530 --paths
+
+Options:
+
+- ``-o/--output``: output directory to inspect.
+- ``--run``: specific run ID (``YYYYMMDD-HHMMSS``) or
+  ``drakkar_<run_id>.yaml`` file name.
+- ``--tail``: number of trailing log lines to show if no failure excerpt is
+  found (default: ``50``).
+- ``--full``: print the full Snakemake log.
+- ``--paths``: list relevant metadata and log file paths.
+- ``--list``: list available workflow runs in the output directory.
+
+Behavior:
+
+- Workflow runs write root metadata files such as
+  ``drakkar_20260503-101530.yaml``.
+- Snakemake stdout/stderr is captured persistently in
+  ``log/drakkar_20260503-101530.snakemake.log``.
+- If the output directory is locked, run ``drakkar logging -o <output_dir>``
+  before using ``drakkar unlock`` or ``--overwrite``.
+
 Inspecting
 ^^^^^^^^^^
 
@@ -477,12 +522,16 @@ Key output locations:
 - ``annotating/`` annotation tables.
 - ``expressing/`` expression outputs.
 - ``dereplicating/`` dereplicated genomes (dereplicating-only mode).
+- ``log/drakkar_<run_id>.snakemake.log`` persistent Snakemake stdout/stderr
+  capture for a workflow run.
 - ``<directory>/<version>/database_versions.yaml`` installation log for a managed database release.
 
 Troubleshooting
 ---------------
 
-- **Locked directory**: run ``drakkar unlock -o <output_dir>``.
+- **Locked directory**: first run ``drakkar logging -o <output_dir>`` to inspect
+  the latest workflow log, then use ``drakkar unlock -o <output_dir>`` or
+  rerun with ``--overwrite``.
 - **Missing bins**: provide ``-b/--bins_dir`` or ``-B/--bins_file``.
 - **Missing reads**: provide ``-r/--reads_dir`` or ``-R/--reads_file``.
 - **SFTP errors**: ensure the remote directory exists and credentials are valid.

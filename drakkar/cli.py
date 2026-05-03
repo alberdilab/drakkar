@@ -9,7 +9,7 @@ import shlex
 import shutil
 import pandas as pd
 from pathlib import Path
-from collections import defaultdict
+from collections import defaultdict, deque
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
 try:
@@ -57,6 +57,21 @@ HEADER1 = "\033[1;95m"
 ERROR = "\033[1;31m"
 INFO = "\033[1;34m"
 RESET = "\033[0m"
+
+WORKFLOW_RUN_COMMANDS = {
+    "complete",
+    "preprocessing",
+    "cataloging",
+    "profiling",
+    "dereplicating",
+    "annotating",
+    "inspecting",
+    "expressing",
+    "database",
+    "environments",
+}
+
+READ_ONLY_COMMANDS = {"config", "logging"}
 
 ###
 # Define helper functions
@@ -280,6 +295,7 @@ def overwrite_output_directory(output_dir):
 def prompt_overwrite_locked_directory(output_dir):
     print(f"{INFO}INFO:{RESET} The output directory is locked: {output_dir}")
     print("This usually means a previous Snakemake run ended unexpectedly.")
+    print(f"Use 'drakkar logging -o {output_dir}' to inspect the latest Snakemake log before unlocking or overwriting.")
     print("Overwriting will delete the entire directory and rerun from scratch.")
     while True:
         response = prompt("Delete the locked directory and overwrite it? [y/N]: ").strip().lower()
@@ -476,7 +492,7 @@ def prepare_output_directory(output_dir, overwrite=False):
         print(f"{ERROR}ERROR:{RESET} Output directory is locked and no interactive prompt is available.")
 
     print(f"{ERROR}ERROR:{RESET} Output directory remains locked: {output_path}")
-    print(f"{INFO}Use --overwrite to delete it automatically, or 'drakkar unlock -o {output_path}' if you only want to clear the Snakemake lock.{RESET}")
+    print(f"{INFO}Use 'drakkar logging -o {output_path}' to inspect the latest Snakemake log, --overwrite to delete it automatically, or 'drakkar unlock -o {output_path}' if you only want to clear the Snakemake lock.{RESET}")
     return False
 
 def validate_path(path_value, label, expect_dir=False, allow_url=False):
@@ -526,30 +542,48 @@ def get_modules_to_run(command):
         return [command]
     return []
 
+def build_snakemake_log_path(output_dir, run_id):
+    return Path(output_dir) / "log" / f"drakkar_{run_id}.snakemake.log"
+
+
 def write_launch_metadata(args, output_dir, env_path=None):
     output_path = Path(output_dir)
     if not validate_launch_metadata_directory(output_path):
-        return False
+        return None
     try:
         output_path.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
         print(f"{ERROR}ERROR:{RESET} Cannot create output directory for Drakkar run metadata: {output_path}")
         print(f"{exc.__class__.__name__}: {exc}")
-        return False
+        return None
     timestamp = datetime.now(timezone.utc)
+    run_id = timestamp.strftime("%Y%m%d-%H%M%S")
+    snakemake_log_path = None
+    if args.command in WORKFLOW_RUN_COMMANDS:
+        snakemake_log_path = build_snakemake_log_path(output_path, run_id)
+        try:
+            snakemake_log_path.parent.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            print(f"{ERROR}ERROR:{RESET} Cannot create log directory for Drakkar run metadata: {snakemake_log_path.parent}")
+            print(f"{exc.__class__.__name__}: {exc}")
+            return None
     metadata = {
+        "run_id": run_id,
         "timestamp": timestamp.isoformat(),
+        "started_at": timestamp.isoformat(),
         "command": args.command,
         "modules": get_modules_to_run(args.command),
         "working_directory": str(Path.cwd()),
         "output_directory": str(output_path.resolve()),
         "arguments": vars(args),
         "argv": sys.argv,
+        "status": "prepared",
     }
     if env_path is not None:
         metadata["env_path"] = env_path
-    filename_timestamp = timestamp.strftime("%Y%m%d-%H%M%S")
-    metadata_path = output_path / f"drakkar_{filename_timestamp}.yaml"
+    if snakemake_log_path is not None:
+        metadata["snakemake_log"] = str(snakemake_log_path.resolve())
+    metadata_path = output_path / f"drakkar_{run_id}.yaml"
     try:
         with open(metadata_path, "w") as f:
             yaml.safe_dump(metadata, f, sort_keys=False)
@@ -557,8 +591,275 @@ def write_launch_metadata(args, output_dir, env_path=None):
         print(f"{ERROR}ERROR:{RESET} Cannot write Drakkar run metadata: {metadata_path}")
         print("Run drakkar from a writable directory or pass -o/--output to a writable output directory.")
         print(f"{exc.__class__.__name__}: {exc}")
-        return False
-    return True
+        return None
+    return {
+        "run_id": run_id,
+        "metadata_path": metadata_path,
+        "snakemake_log_path": snakemake_log_path,
+    }
+
+
+def update_launch_metadata(metadata_path, **updates):
+    if not metadata_path:
+        return None
+    metadata_path = Path(metadata_path)
+    if not metadata_path.exists():
+        return None
+    try:
+        with open(metadata_path, "r", encoding="utf-8") as handle:
+            metadata = yaml.safe_load(handle) or {}
+    except OSError:
+        return None
+    metadata.update(updates)
+    try:
+        with open(metadata_path, "w", encoding="utf-8") as handle:
+            yaml.safe_dump(metadata, handle, sort_keys=False)
+    except OSError:
+        return None
+    return metadata
+
+
+def finalize_launch_metadata(run_info, status, exit_code=None, current_workflow=None):
+    if not run_info:
+        return None
+    payload = {
+        "status": status,
+        "finished_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if exit_code is not None:
+        payload["exit_code"] = exit_code
+    if current_workflow is not None:
+        payload["current_workflow"] = current_workflow
+    return update_launch_metadata(run_info["metadata_path"], **payload)
+
+
+def run_subprocess_with_logging(command, run_info=None, workflow_name=None):
+    metadata_path = run_info["metadata_path"] if run_info else None
+    log_path = Path(run_info["snakemake_log_path"]) if run_info and run_info.get("snakemake_log_path") else None
+    if metadata_path:
+        update_launch_metadata(
+            metadata_path,
+            status="running",
+            current_workflow=workflow_name,
+        )
+
+    log_handle = None
+    try:
+        if log_path is not None:
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            log_handle = open(log_path, "a", encoding="utf-8")
+        process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+        if process.stdout is not None:
+            try:
+                for line in process.stdout:
+                    print(line, end="")
+                    if log_handle is not None:
+                        log_handle.write(line)
+            finally:
+                process.stdout.close()
+        return_code = process.wait()
+    except Exception:
+        if log_handle is not None:
+            log_handle.flush()
+            log_handle.close()
+        finalize_launch_metadata(run_info, "failed", current_workflow=workflow_name)
+        raise
+    finally:
+        if log_handle is not None and not log_handle.closed:
+            log_handle.flush()
+            log_handle.close()
+
+    if return_code != 0:
+        finalize_launch_metadata(run_info, "failed", return_code, current_workflow=workflow_name)
+        raise subprocess.CalledProcessError(return_code, command)
+
+    finalize_launch_metadata(run_info, "success", 0, current_workflow=workflow_name)
+    return return_code
+
+
+def workflow_run_sort_key(metadata_path):
+    path = Path(metadata_path)
+    match = re.search(r"drakkar_(\d{8}-\d{6})\.ya?ml$", path.name)
+    if match:
+        return match.group(1)
+    return path.name
+
+
+def discover_run_metadata(output_dir):
+    output_path = Path(output_dir)
+    runs = []
+    for metadata_path in sorted(output_path.glob("drakkar_*.yaml"), key=workflow_run_sort_key, reverse=True):
+        try:
+            with open(metadata_path, "r", encoding="utf-8") as handle:
+                metadata = yaml.safe_load(handle) or {}
+        except OSError:
+            continue
+        command = metadata.get("command")
+        if command not in WORKFLOW_RUN_COMMANDS:
+            continue
+        runs.append((metadata_path, metadata))
+    return runs
+
+
+def resolve_run_metadata(output_dir, run_id=None):
+    runs = discover_run_metadata(output_dir)
+    if not runs:
+        return None, None
+    if not run_id:
+        return runs[0]
+
+    selector = str(run_id).strip()
+    normalized_selector = selector.removeprefix("drakkar_").removesuffix(".yaml")
+    for metadata_path, metadata in runs:
+        run_value = str(metadata.get("run_id", "")).strip()
+        if selector == metadata_path.name or normalized_selector == run_value:
+            return metadata_path, metadata
+    return None, None
+
+
+def discover_snakemake_fallback_logs(output_dir):
+    log_dir = Path(output_dir) / ".snakemake" / "log"
+    if not log_dir.exists():
+        return []
+    return sorted((path for path in log_dir.glob("*") if path.is_file()), key=lambda path: path.stat().st_mtime, reverse=True)
+
+
+def tail_file(path, line_count):
+    lines = deque(maxlen=line_count)
+    with open(path, "r", encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            lines.append(line.rstrip("\n"))
+    return list(lines)
+
+
+def extract_failure_excerpt(path, line_count=40):
+    markers = (
+        "RuleException",
+        "MissingInputException",
+        "WorkflowError",
+        "CalledProcessError",
+        "LockException",
+        "Error in rule",
+        "Traceback (most recent call last):",
+    )
+    with open(path, "r", encoding="utf-8", errors="replace") as handle:
+        lines = [line.rstrip("\n") for line in handle]
+    last_index = None
+    for index, line in enumerate(lines):
+        if any(marker in line for marker in markers):
+            last_index = index
+    if last_index is None:
+        return []
+    start = max(0, last_index - 5)
+    end = min(len(lines), last_index + line_count)
+    return lines[start:end]
+
+
+def run_logging(output_dir, run_id=None, tail=50, full=False, paths=False, list_runs=False):
+    output_path = Path(output_dir).resolve()
+    if not output_path.exists():
+        print(f"{ERROR}ERROR:{RESET} Output directory not found: {output_path}")
+        return 1
+    if not output_path.is_dir():
+        print(f"{ERROR}ERROR:{RESET} Output path is not a directory: {output_path}")
+        return 1
+
+    section("DRAKKAR LOGGING")
+    print(f"Output directory: {output_path}")
+    print(f"Locked: {'yes' if is_snakemake_locked(str(output_path)) else 'no'}")
+
+    runs = discover_run_metadata(output_path)
+    if list_runs:
+        if not runs:
+            print(f"{INFO}INFO:{RESET} No workflow run metadata found in {output_path}.")
+        else:
+            section("AVAILABLE RUNS")
+            for metadata_path, metadata in runs:
+                run_value = metadata.get("run_id", metadata_path.stem.removeprefix("drakkar_"))
+                command = metadata.get("command", "unknown")
+                status = metadata.get("status", "unknown")
+                print(f"{run_value}: command={command}, status={status}")
+        return 0
+
+    metadata_path, metadata = resolve_run_metadata(output_path, run_id)
+    if run_id and metadata is None:
+        print(f"{ERROR}ERROR:{RESET} Run not found in {output_path}: {run_id}")
+        return 1
+    snakemake_log_path = None
+    fallback_logs = discover_snakemake_fallback_logs(output_path)
+    if metadata is not None:
+        configured_log = metadata.get("snakemake_log")
+        if configured_log:
+            snakemake_log_path = Path(configured_log)
+        elif metadata.get("run_id"):
+            candidate = build_snakemake_log_path(output_path, metadata["run_id"])
+            if candidate.exists():
+                snakemake_log_path = candidate
+    if snakemake_log_path is None and fallback_logs:
+        snakemake_log_path = fallback_logs[0]
+
+    if metadata is not None:
+        section("RUN SUMMARY")
+        print(f"Run ID: {metadata.get('run_id', metadata_path.stem.removeprefix('drakkar_'))}")
+        print(f"Command: {metadata.get('command', 'unknown')}")
+        modules = metadata.get("modules") or []
+        print(f"Modules: {', '.join(modules) if modules else 'unknown'}")
+        print(f"Status: {metadata.get('status', 'unknown')}")
+        print(f"Started: {metadata.get('started_at', metadata.get('timestamp', 'unknown'))}")
+        if metadata.get("finished_at"):
+            print(f"Finished: {metadata['finished_at']}")
+        if "exit_code" in metadata:
+            print(f"Exit code: {metadata['exit_code']}")
+        if metadata.get("current_workflow"):
+            print(f"Current workflow: {metadata['current_workflow']}")
+        print(f"Metadata file: {metadata_path}")
+    else:
+        print(f"{INFO}INFO:{RESET} No workflow metadata found. Falling back to Snakemake logs only.")
+
+    if paths:
+        section("LOG PATHS")
+        if snakemake_log_path is not None:
+            print(f"Main Snakemake log: {snakemake_log_path}")
+        else:
+            print("Main Snakemake log: not found")
+        for fallback_log in fallback_logs[:5]:
+            print(f"Snakemake fallback log: {fallback_log}")
+        extra_logs = sorted(
+            path for path in (output_path / "log").rglob("*")
+            if path.is_file() and path != snakemake_log_path
+        ) if (output_path / "log").exists() else []
+        for extra_log in extra_logs[:20]:
+            print(f"Additional log: {extra_log}")
+
+    if snakemake_log_path is None or not snakemake_log_path.exists():
+        print(f"{INFO}INFO:{RESET} No Snakemake log file found in {output_path}.")
+        return 0
+
+    section("SNAKEMAKE LOG")
+    print(f"Log file: {snakemake_log_path}")
+    if full:
+        with open(snakemake_log_path, "r", encoding="utf-8", errors="replace") as handle:
+            for line in handle:
+                print(line, end="")
+        return 0
+
+    excerpt = extract_failure_excerpt(snakemake_log_path)
+    if excerpt:
+        print("Most recent failure excerpt:")
+        for line in excerpt:
+            print(line)
+        return 0
+
+    print(f"Last {tail} lines:")
+    for line in tail_file(snakemake_log_path, tail):
+        print(line)
+    return 0
 
 def normalize_genome_name(name):
     if not name:
@@ -828,7 +1129,7 @@ def run_unlock(workflow, output_dir, profile):
     print(f"The output directory {output_dir} has been succesfully unlocked")
     print(f"You can now rerun a new workflow using any drakkar command:")
 
-def run_snakemake_environments(workflow, env_path, profile, memory_multiplier=1, time_multiplier=1):
+def run_snakemake_environments(workflow, env_path, profile, memory_multiplier=1, time_multiplier=1, run_info=None):
     resource_overrides = resource_config(memory_multiplier, time_multiplier)
     default_resources = default_resource_args(memory_multiplier, time_multiplier)
     cmd = [
@@ -844,7 +1145,7 @@ def run_snakemake_environments(workflow, env_path, profile, memory_multiplier=1,
         f"--conda-prefix {env_path} "
         f"--use-conda "
     ]
-    subprocess.run(cmd, shell=False, check=True)
+    run_subprocess_with_logging(cmd, run_info=run_info, workflow_name=workflow)
 
 def run_snakemake_preprocessing(
     workflow,
@@ -857,6 +1158,7 @@ def run_snakemake_preprocessing(
     nonpareil=False,
     memory_multiplier=1,
     time_multiplier=1,
+    run_info=None,
 ):
 
     """ Run the preprocessing workflow """
@@ -879,10 +1181,10 @@ def run_snakemake_preprocessing(
         f"--slurm-delete-logfiles-older-than 0"
     ]
 
-    subprocess.run(snakemake_command, shell=False, check=True)
+    run_subprocess_with_logging(snakemake_command, run_info=run_info, workflow_name=workflow)
 
 
-def run_snakemake_cataloging(workflow, project_name, output_dir, env_path, profile, memory_multiplier=1, time_multiplier=1):
+def run_snakemake_cataloging(workflow, project_name, output_dir, env_path, profile, memory_multiplier=1, time_multiplier=1, run_info=None):
 
     """ Run the cataloging workflow """
 
@@ -903,7 +1205,7 @@ def run_snakemake_cataloging(workflow, project_name, output_dir, env_path, profi
         f"--use-conda "
     ]
 
-    subprocess.run(snakemake_command, shell=False, check=True)
+    run_subprocess_with_logging(snakemake_command, run_info=run_info, workflow_name=workflow)
 
 #Screen output control
 def run_snakemake_cataloging2(workflow, project_name, output_dir, env_path, profile, memory_multiplier=1, time_multiplier=1):
@@ -959,6 +1261,7 @@ def run_snakemake_profiling(
     quality_file,
     memory_multiplier=1,
     time_multiplier=1,
+    run_info=None,
 ):
     """ Run the profiling workflow """
 
@@ -978,7 +1281,7 @@ def run_snakemake_profiling(
         f"--conda-prefix {env_path} "
         f"--use-conda "
     ]
-    subprocess.run(snakemake_command, shell=False, check=True)
+    run_subprocess_with_logging(snakemake_command, run_info=run_info, workflow_name=workflow)
 
 def run_snakemake_dereplicating(
     workflow,
@@ -991,6 +1294,7 @@ def run_snakemake_dereplicating(
     quality_file,
     memory_multiplier=1,
     time_multiplier=1,
+    run_info=None,
 ):
     """ Run the dereplicating workflow """
 
@@ -1009,7 +1313,7 @@ def run_snakemake_dereplicating(
         f"--conda-prefix {env_path} "
         f"--use-conda "
     ]
-    subprocess.run(snakemake_command, shell=False, check=True)
+    run_subprocess_with_logging(snakemake_command, run_info=run_info, workflow_name=workflow)
 
 def run_snakemake_annotating(
     workflow,
@@ -1021,6 +1325,7 @@ def run_snakemake_annotating(
     gtdb_version=None,
     memory_multiplier=1,
     time_multiplier=1,
+    run_info=None,
 ):
     """ Run the profiling workflow """
 
@@ -1040,9 +1345,9 @@ def run_snakemake_annotating(
         f"--conda-prefix {env_path} "
         f"--use-conda "
     ]
-    subprocess.run(snakemake_command, shell=False, check=True)
+    run_subprocess_with_logging(snakemake_command, run_info=run_info, workflow_name=workflow)
 
-def run_snakemake_inspecting(workflow, project_name, output_dir, env_path, profile, memory_multiplier=1, time_multiplier=1):
+def run_snakemake_inspecting(workflow, project_name, output_dir, env_path, profile, memory_multiplier=1, time_multiplier=1, run_info=None):
     """ Run the profiling workflow """
 
     resource_overrides = resource_config(memory_multiplier, time_multiplier)
@@ -1060,9 +1365,9 @@ def run_snakemake_inspecting(workflow, project_name, output_dir, env_path, profi
         f"--conda-prefix {env_path} "
         f"--use-conda "
     ]
-    subprocess.run(snakemake_command, shell=False, check=True)
+    run_subprocess_with_logging(snakemake_command, run_info=run_info, workflow_name=workflow)
 
-def run_snakemake_expressing(workflow, project_name, output_dir, env_path, profile, memory_multiplier=1, time_multiplier=1):
+def run_snakemake_expressing(workflow, project_name, output_dir, env_path, profile, memory_multiplier=1, time_multiplier=1, run_info=None):
     """ Run the expressing workflow """
 
     resource_overrides = resource_config(memory_multiplier, time_multiplier)
@@ -1080,7 +1385,7 @@ def run_snakemake_expressing(workflow, project_name, output_dir, env_path, profi
         f"--conda-prefix {env_path} "
         f"--use-conda "
     ]
-    subprocess.run(snakemake_command, shell=False, check=True)
+    run_subprocess_with_logging(snakemake_command, run_info=run_info, workflow_name=workflow)
 
 def run_snakemake_database(
     workflow,
@@ -1094,6 +1399,7 @@ def run_snakemake_database(
     download_runtime,
     memory_multiplier=1,
     time_multiplier=1,
+    run_info=None,
 ):
     """Run a single database preparation workflow."""
 
@@ -1114,7 +1420,7 @@ def run_snakemake_database(
         f"--conda-prefix {env_path} "
         f"--use-conda "
     ]
-    subprocess.run(snakemake_command, shell=False, check=True)
+    run_subprocess_with_logging(snakemake_command, run_info=run_info, workflow_name=workflow)
 
 ###
 # Main function to launch workflows
@@ -1322,13 +1628,21 @@ def main():
     config_actions.add_argument("--view", action="store_true", help="Print workflow/config.yaml")
     config_actions.add_argument("--edit", action="store_true", help="Open workflow/config.yaml in a terminal editor")
 
+    subparser_logging = subparsers.add_parser("logging", help="Inspect Drakkar run metadata and Snakemake logs")
+    subparser_logging.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
+    subparser_logging.add_argument("--run", required=False, help="Specific run ID (YYYYMMDD-HHMMSS) or drakkar_<run_id>.yaml file name")
+    subparser_logging.add_argument("--tail", required=False, type=positive_int, default=50, help="Number of log lines to show when no failure excerpt is found. Default: 50")
+    subparser_logging.add_argument("--full", action="store_true", help="Print the full Snakemake log instead of only the failure excerpt or tail")
+    subparser_logging.add_argument("--paths", action="store_true", help="List relevant metadata and log paths")
+    subparser_logging.add_argument("--list", action="store_true", help="List available workflow runs in the output directory")
+
     args = parser.parse_args()
 
     # Display ASCII logo before running any command or showing help
     display_drakkar()
 
     # Check screen session
-    if args.command != "config":
+    if args.command not in READ_ONLY_COMMANDS:
         check_screen_session()
 
     path_checks = [
@@ -1405,8 +1719,11 @@ def main():
     if args.command in overwrite_capable_commands:
         if not prepare_output_directory(output_dir, overwrite=getattr(args, "overwrite", False)):
             return
-    if not write_launch_metadata(args, output_dir, env_path=locals().get("env_path")):
-        return
+    run_info = None
+    if args.command in WORKFLOW_RUN_COMMANDS:
+        run_info = write_launch_metadata(args, output_dir, env_path=locals().get("env_path"))
+        if not run_info:
+            return
 
     ###
     # Unlock, update or create environments
@@ -1422,6 +1739,16 @@ def main():
         if args.edit:
             return edit_config()
         return 0
+
+    elif args.command == "logging":
+        return run_logging(
+            args.output,
+            run_id=args.run,
+            tail=args.tail,
+            full=args.full,
+            paths=args.paths,
+            list_runs=args.list,
+        )
 
     elif args.command == "transfer":
         section("TRANSFERRING DRAKKAR OUTPUTS")
@@ -1445,10 +1772,11 @@ def main():
         section("CREATING CONDA ENVIRONMENTS")
         run_snakemake_environments(
             args.command,
-            args.env_path,
+            env_path,
             args.profile,
             args.memory_multiplier,
             args.time_multiplier,
+            run_info,
         )
 
     elif args.command == "database":
@@ -1467,6 +1795,7 @@ def main():
             args.download_runtime,
             args.memory_multiplier,
             args.time_multiplier,
+            run_info,
         )
         if args.set_default:
             default_path = set_default_database_path(args.database_name, Path(args.directory).resolve(), args.version)
@@ -1553,6 +1882,7 @@ def main():
             args.nonpareil,
             args.memory_multiplier,
             args.time_multiplier,
+            run_info,
         )
 
     ###
@@ -1628,6 +1958,7 @@ def main():
             args.profile,
             args.memory_multiplier,
             args.time_multiplier,
+            run_info,
         )
 
     ###
@@ -1722,6 +2053,7 @@ def main():
             quality_file,
             args.memory_multiplier,
             args.time_multiplier,
+            run_info,
         )
 
     ###
@@ -1771,6 +2103,7 @@ def main():
             quality_file,
             args.memory_multiplier,
             args.time_multiplier,
+            run_info,
         )
 
     ###
@@ -1820,6 +2153,7 @@ def main():
             getattr(args, "gtdb_version", None),
             args.memory_multiplier,
             args.time_multiplier,
+            run_info,
         )
 
     ###
@@ -1859,6 +2193,7 @@ def main():
             args.profile,
             args.memory_multiplier,
             args.time_multiplier,
+            run_info,
         )
 
 
@@ -1929,6 +2264,7 @@ def main():
             args.profile,
             args.memory_multiplier,
             args.time_multiplier,
+            run_info,
         )
 
 

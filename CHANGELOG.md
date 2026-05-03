@@ -8,6 +8,12 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.4.0] - 2026-05-03
+
+### Added
+
+- Accepted ``assembly`` as the preferred sample-table column for cataloging assembly groups, while keeping legacy ``coassembly`` support.
+- Added ``drakkar logging`` plus persistent per-run Snakemake logs under ``log/drakkar_<run_id>.snakemake.log`` to help troubleshoot failed or locked workflow directories.
 ## [1.3.5] - 2026-05-02
 
 ### Added

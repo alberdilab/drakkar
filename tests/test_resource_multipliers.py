@@ -10,7 +10,7 @@ from drakkar import cli as cli_module
 class ResourceMultiplierTests(unittest.TestCase):
     def command_from_run(self, run_callable):
         with patch.object(cli_module, "config_vars", {"SNAKEMAKE_MODULE": "snakemake"}):
-            with patch.object(cli_module.subprocess, "run") as run_mock:
+            with patch.object(cli_module, "run_subprocess_with_logging") as run_mock:
                 run_callable()
         return run_mock.call_args.args[0][2]
 

@@ -23,7 +23,7 @@ PREPROCESSING_SCRIPT = ROOT / "drakkar" / "workflow" / "scripts" / "preprocessin
 class PreprocessingNonpareilTests(unittest.TestCase):
     def test_run_snakemake_preprocessing_passes_nonpareil_config(self) -> None:
         with patch.object(cli_module, "config_vars", {"SNAKEMAKE_MODULE": "snakemake"}):
-            with patch.object(cli_module.subprocess, "run") as run_mock:
+            with patch.object(cli_module, "run_subprocess_with_logging") as run_mock:
                 cli_module.run_snakemake_preprocessing(
                     "preprocessing",
                     "project",
@@ -39,7 +39,7 @@ class PreprocessingNonpareilTests(unittest.TestCase):
 
     def test_run_snakemake_preprocessing_defaults_nonpareil_to_false(self) -> None:
         with patch.object(cli_module, "config_vars", {"SNAKEMAKE_MODULE": "snakemake"}):
-            with patch.object(cli_module.subprocess, "run") as run_mock:
+            with patch.object(cli_module, "run_subprocess_with_logging") as run_mock:
                 cli_module.run_snakemake_preprocessing(
                     "preprocessing",
                     "project",

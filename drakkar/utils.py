@@ -16,6 +16,7 @@ from drakkar.output import print, prompt
 DRAKKAR_SHIP_STYLE = "bold #5f9ea0"
 DRAKKAR_LOGO_STYLE = "bold #d6a642"
 DRAKKAR_INTRO_STYLE = "bold #b7c7d3"
+ASSEMBLY_COLUMN_CANDIDATES = ("assembly", "coassembly")
 
 def is_url(value):
     parsed = urlparse(str(value))
@@ -284,16 +285,21 @@ def check_reference_columns(file_path):
         return False
     return True
 
+def get_assembly_column_name(df):
+    for column in ASSEMBLY_COLUMN_CANDIDATES:
+        if column in df.columns:
+            return column
+    return None
+
 def check_assembly_column(file_path):
-    """Checks if a file contains the column 'coassembly' with non-NA values."""
+    """Checks if a file contains the preferred 'assembly' column or legacy 'coassembly' values."""
     # Read the file (assumed to be TSV, change sep="," for CSV)
     df = pd.read_csv(file_path, sep="\t")
-    # Check if required columns exist
-    required_columns = {"coassembly"}
-    if not required_columns.issubset(df.columns):
+    assembly_column = get_assembly_column_name(df)
+    if not assembly_column:
         return False
-    # Check if both columns have at least one non-NA value
-    if df["coassembly"].dropna().empty:
+    values = df[assembly_column].dropna().astype(str).str.strip()
+    if values.empty or (values == "").all():
         return False
     return True
 
@@ -542,13 +548,14 @@ def file_assemblies_to_json(infofile=None, samples=None, individual=False, all=F
 
     if infofile is not None:
         df = pd.read_csv(infofile, sep="\t")
-        if "coassembly" in df.columns:
+        assembly_column = get_assembly_column_name(df)
+        if assembly_column:
             for _, row in df.iterrows():
                 sample = row["sample"]
-                coassembly_value = row["coassembly"]
-                if pd.isna(coassembly_value) or str(coassembly_value).strip() == "":
+                assembly_value = row[assembly_column]
+                if pd.isna(assembly_value) or str(assembly_value).strip() == "":
                     continue
-                assembly_list = str(coassembly_value).split(",")
+                assembly_list = str(assembly_value).split(",")
 
                 for assembly in assembly_list:
                     assembly = assembly.strip()
@@ -563,7 +570,7 @@ def file_assemblies_to_json(infofile=None, samples=None, individual=False, all=F
         if all:
             assemblies["all"].extend(samples)
 
-    ASSEMBLY_TO_SAMPLE = {key: list(set(value)) for key, value in assemblies.items()} # remove duplicates
+    ASSEMBLY_TO_SAMPLE = {key: sorted(set(value)) for key, value in assemblies.items()}
 
     os.makedirs(f"{output}/data", exist_ok=True)
     with open(f"{output}/data/assembly_to_samples.json", "w") as f:

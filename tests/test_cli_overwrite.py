@@ -54,6 +54,7 @@ class OverwriteCommandTests(unittest.TestCase):
             self.assertFalse(result)
             self.assertTrue(output_path.exists())
             self.assertIn("--overwrite", buffer.getvalue())
+            self.assertIn("drakkar logging", buffer.getvalue())
 
     def test_validate_launch_metadata_directory_rejects_unwritable_output(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

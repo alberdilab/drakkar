@@ -16,7 +16,7 @@ PREPROCESSING_REF_RULES = ROOT / "drakkar" / "workflow" / "rules" / "preprocessi
 class PreprocessingFractionTests(unittest.TestCase):
     def test_run_snakemake_preprocessing_passes_fraction_config(self) -> None:
         with patch.object(cli_module, "config_vars", {"SNAKEMAKE_MODULE": "snakemake"}):
-            with patch.object(cli_module.subprocess, "run") as run_mock:
+            with patch.object(cli_module, "run_subprocess_with_logging") as run_mock:
                 cli_module.run_snakemake_preprocessing(
                     "preprocessing",
                     "project",
@@ -32,7 +32,7 @@ class PreprocessingFractionTests(unittest.TestCase):
 
     def test_run_snakemake_preprocessing_defaults_fraction_to_false(self) -> None:
         with patch.object(cli_module, "config_vars", {"SNAKEMAKE_MODULE": "snakemake"}):
-            with patch.object(cli_module.subprocess, "run") as run_mock:
+            with patch.object(cli_module, "run_subprocess_with_logging") as run_mock:
                 cli_module.run_snakemake_preprocessing(
                     "preprocessing",
                     "project",
