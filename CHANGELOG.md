@@ -8,6 +8,17 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.5.2] - 2026-05-03
+
+### Changed
+
+- Stopped ``drakkar logging`` from dumping the Snakemake log by default, and replaced that section with a short guide showing how to inspect summaries, excerpts, paths, full logs, and available runs.
+- Added an explicit ``--excerpt`` mode to ``drakkar logging`` so failure excerpts or fallback tails are shown only on request.
+
+### Fixed
+
+- Ensured cataloging still writes ``cataloging/final/all_bin_metadata.csv`` when Binette yields zero bins, by materializing an empty metadata table with the expected columns.
+
 ## [1.5.1] - 2026-05-03
 
 ### Added

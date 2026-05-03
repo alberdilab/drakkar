@@ -56,7 +56,7 @@ class LoggingCommandTests(unittest.TestCase):
             self.assertIn("alpha", buffer.getvalue())
             self.assertIn("beta", buffer.getvalue())
 
-    def test_run_logging_shows_failure_excerpt_from_latest_run(self) -> None:
+    def test_run_logging_default_shows_summary_and_usage_guide(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             args = argparse.Namespace(command="profiling", output=tmpdir)
             run_info = cli_module.write_launch_metadata(args, tmpdir)
@@ -89,6 +89,42 @@ class LoggingCommandTests(unittest.TestCase):
             self.assertIn("RUN SUMMARY", output)
             self.assertIn("EXECUTION SUMMARY", output)
             self.assertIn("Status: failed", output)
+            self.assertIn("HOW TO INSPECT MORE", output)
+            self.assertIn("Failure excerpt or tail:", output)
+            self.assertNotIn("SNAKEMAKE LOG", output)
+            self.assertNotIn("Most recent failure excerpt:", output)
+
+    def test_run_logging_excerpt_shows_failure_excerpt_from_latest_run(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            args = argparse.Namespace(command="profiling", output=tmpdir)
+            run_info = cli_module.write_launch_metadata(args, tmpdir)
+            cli_module.update_launch_metadata(
+                run_info["metadata_path"],
+                status="failed",
+                current_workflow="profiling",
+                exit_code=1,
+            )
+            Path(run_info["snakemake_log_path"]).write_text(
+                "\n".join(
+                    [
+                        "Building DAG of jobs...",
+                        "Something happened",
+                        "RuleException in rule map_reads:",
+                        "jobid: 7",
+                        "output: sample.bam",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                exit_code = cli_module.run_logging(tmpdir, tail=5, excerpt=True)
+
+            output = buffer.getvalue()
+            self.assertEqual(exit_code, 0)
+            self.assertIn("SNAKEMAKE LOG", output)
             self.assertIn("Most recent failure excerpt:", output)
             self.assertIn("RuleException in rule map_reads:", output)
             self.assertIn("output: sample.bam", output)
@@ -146,6 +182,7 @@ class LoggingCommandTests(unittest.TestCase):
             self.assertIn("Rules observed: 2 unique, 3 executions", output)
             self.assertIn("Failed rules detected: 1", output)
             self.assertIn("Error types: RuleException (1), RuleError (1)", output)
+            self.assertIn("HOW TO INSPECT MORE", output)
             self.assertNotIn("SNAKEMAKE LOG", output)
 
 

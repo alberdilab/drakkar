@@ -15,6 +15,7 @@ CONFIG_PATH = ROOT / "drakkar" / "workflow" / "config.yaml"
 SNAKEFILE = ROOT / "drakkar" / "workflow" / "Snakefile"
 CATALOGING_RULES = ROOT / "drakkar" / "workflow" / "rules" / "cataloging.smk"
 CATALOGING_STATS_SCRIPT = ROOT / "drakkar" / "workflow" / "scripts" / "cataloging_stats.py"
+ALL_BIN_METADATA_SCRIPT = ROOT / "drakkar" / "workflow" / "scripts" / "all_bin_metadata.py"
 
 
 class CatalogingStatsTests(unittest.TestCase):
@@ -164,6 +165,35 @@ class CatalogingStatsTests(unittest.TestCase):
             self.assertEqual(row["low_quality_bins"], 1)
             self.assertEqual(row["best_bin"], 1)
             self.assertEqual(row["best_bin_score"], 90)
+
+    def test_all_bin_metadata_writes_empty_csv_when_binette_reports_zero_bins(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            empty_bins = tmp_path / "assembly1.tsv"
+            empty_bins.write_text(
+                "bin_id\tcompleteness\tcontamination\tscore\tsize\tN50\tcontig_count\n",
+                encoding="utf-8",
+            )
+            output = tmp_path / "all_bin_metadata.csv"
+
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ALL_BIN_METADATA_SCRIPT),
+                    str(empty_bins),
+                    "-o",
+                    str(output),
+                ],
+                check=True,
+            )
+
+            self.assertTrue(output.exists())
+            table = pd.read_csv(output)
+            self.assertEqual(
+                table.columns.tolist(),
+                ["genome", "completeness", "contamination", "score", "size", "N50", "contig_count"],
+            )
+            self.assertTrue(table.empty)
 
 
 if __name__ == "__main__":

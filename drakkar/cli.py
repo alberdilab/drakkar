@@ -1064,7 +1064,26 @@ def print_snakemake_summary(summary):
         print(f"Most active rules: {formatted_rules}")
 
 
-def run_logging(output_dir, run_id=None, tail=50, full=False, paths=False, list_runs=False, summary=False):
+def print_logging_usage_guide(output_path, selected_run_id=None):
+    section("HOW TO INSPECT MORE")
+    output_arg = shlex.quote(str(output_path))
+    summary_cmd = f"drakkar logging -o {output_arg} --summary"
+    paths_cmd = f"drakkar logging -o {output_arg} --paths"
+    excerpt_cmd = f"drakkar logging -o {output_arg} --excerpt"
+    full_cmd = f"drakkar logging -o {output_arg} --full"
+    list_cmd = f"drakkar logging -o {output_arg} --list"
+    print("Use these commands to inspect more detail:")
+    print(f"  Summary only: {summary_cmd}")
+    if selected_run_id:
+        run_cmd = f"drakkar logging -o {output_arg} --run {selected_run_id} --summary"
+        print(f"  Specific run summary: {run_cmd}")
+    print(f"  Relevant paths: {paths_cmd}")
+    print(f"  Failure excerpt or tail: {excerpt_cmd}")
+    print(f"  Full Snakemake log: {full_cmd}")
+    print(f"  Available runs: {list_cmd}")
+
+
+def run_logging(output_dir, run_id=None, tail=50, full=False, paths=False, list_runs=False, summary=False, excerpt=False):
     output_path = Path(output_dir).resolve()
     if not output_path.exists():
         print(f"{ERROR}ERROR:{RESET} Output directory not found: {output_path}")
@@ -1109,7 +1128,8 @@ def run_logging(output_dir, run_id=None, tail=50, full=False, paths=False, list_
 
     if metadata is not None:
         section("RUN SUMMARY")
-        print(f"Run ID: {metadata.get('run_id', metadata_path.stem.removeprefix('drakkar_'))}")
+        selected_run_id = metadata.get('run_id', metadata_path.stem.removeprefix('drakkar_'))
+        print(f"Run ID: {selected_run_id}")
         print(f"Command: {metadata.get('command', 'unknown')}")
         modules = metadata.get("modules") or []
         print(f"Modules: {', '.join(modules) if modules else 'unknown'}")
@@ -1123,6 +1143,7 @@ def run_logging(output_dir, run_id=None, tail=50, full=False, paths=False, list_
             print(f"Current workflow: {metadata['current_workflow']}")
         print(f"Metadata file: {metadata_path}")
     else:
+        selected_run_id = None
         print(f"{INFO}INFO:{RESET} No workflow metadata found. Falling back to Snakemake logs only.")
 
     log_summary = summarize_snakemake_log(snakemake_log_path, metadata=metadata)
@@ -1148,7 +1169,14 @@ def run_logging(output_dir, run_id=None, tail=50, full=False, paths=False, list_
         print(f"{INFO}INFO:{RESET} No Snakemake log file found in {output_path}.")
         return 0
 
-    if summary and not full:
+    if not full and not excerpt:
+        print_logging_usage_guide(output_path, selected_run_id=selected_run_id)
+        if summary:
+            return 0
+        if not paths:
+            return 0
+
+    if summary and not full and not excerpt:
         return 0
 
     section("SNAKEMAKE LOG")
@@ -1969,9 +1997,10 @@ def main():
     subparser_logging = subparsers.add_parser("logging", help="Inspect run metadata, progress summaries, and Snakemake logs to troubleshoot workflows")
     subparser_logging.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_logging.add_argument("--run", required=False, help="Specific run ID (YYYYMMDD-HHMMSS) or drakkar_<run_id>.yaml file name")
-    subparser_logging.add_argument("--tail", required=False, type=positive_int, default=50, help="Number of log lines to show when no failure excerpt is found and --summary is not used. Default: 50")
-    subparser_logging.add_argument("--summary", action="store_true", help="Print only the parsed workflow summary without log excerpts or tails")
-    subparser_logging.add_argument("--full", action="store_true", help="Print the full Snakemake log instead of only the failure excerpt or tail")
+    subparser_logging.add_argument("--tail", required=False, type=positive_int, default=50, help="Number of log lines to show when --excerpt is used and no failure excerpt is found. Default: 50")
+    subparser_logging.add_argument("--summary", action="store_true", help="Print the parsed workflow summary without showing log content")
+    subparser_logging.add_argument("--excerpt", action="store_true", help="Print the most recent failure excerpt, or the last --tail lines if no excerpt is found")
+    subparser_logging.add_argument("--full", action="store_true", help="Print the full Snakemake log")
     subparser_logging.add_argument("--paths", action="store_true", help="List relevant metadata and log paths")
     subparser_logging.add_argument("--list", action="store_true", help="List available workflow runs in the output directory")
 
@@ -2260,11 +2289,12 @@ def main():
         examples=[
             "drakkar logging -o drakkar_output",
             "drakkar logging -o drakkar_output --summary",
+            "drakkar logging -o drakkar_output --excerpt",
             "drakkar logging -o drakkar_output --run 20260503-101530 --paths",
         ],
         sections=[
             ("Target Run", ["output", "run"]),
-            ("Display Options", ["summary", "tail", "full", "paths", "list"]),
+            ("Display Options", ["summary", "excerpt", "tail", "full", "paths", "list"]),
         ],
     )
 
@@ -2378,6 +2408,7 @@ def main():
             run_id=args.run,
             tail=args.tail,
             summary=args.summary,
+            excerpt=args.excerpt,
             full=args.full,
             paths=args.paths,
             list_runs=args.list,
