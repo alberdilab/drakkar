@@ -3,6 +3,7 @@ import sys
 import yaml
 import re
 import json
+import time
 import pandas as pd
 import shutil
 from urllib.parse import urlparse
@@ -25,6 +26,7 @@ DRAKKAR_SHIP_STYLE = "bold #5f9ea0"
 DRAKKAR_LOGO_STYLE = "bold #d6a642"
 DRAKKAR_INTRO_STYLE = "bold #b7c7d3"
 DRAKKAR_VERSION_BADGE_STYLE = DRAKKAR_LOGO_STYLE
+BANNER_DELAY_SECONDS = 0.3
 ASSEMBLY_COLUMN_CANDIDATES = ("assembly", "coassembly")
 
 def is_url(value):
@@ -58,6 +60,20 @@ def download_to_cache(url, sample_name, column_name, output, cache_subdir="reads
     os.replace(tmp_path, dest_path)
     print(f"Saved {column_name} for {sample_name} to {dest_path}", flush=True)
     return dest_path
+
+def resolve_input_manifest(manifest_path, output, cache_subdir="manifests_cache", label="manifest"):
+    if is_url(manifest_path):
+        if not output:
+            raise ValueError(f"An output directory is required to download the remote {label}.")
+        return download_to_cache(
+            manifest_path,
+            "",
+            label,
+            output,
+            cache_subdir=cache_subdir,
+            preserve_basename=True,
+        )
+    return manifest_path
 
 def _version_badge_lines(version):
     label = f"v{version}"
@@ -165,9 +181,23 @@ def get_drakkar_banner_renderables(include_intro=True):
         renderables.append(_styled_ascii_art(ascii_intro, DRAKKAR_INTRO_STYLE))
     return renderables
 
-def display_drakkar():
-    for renderable in get_drakkar_banner_renderables():
-        print(renderable)
+def _banner_animation_enabled(stream=None):
+    if os.environ.get("DRAKKAR_NO_ANIMATION"):
+        return False
+    stream = stream or sys.stdout
+    return bool(getattr(stream, "isatty", lambda: False)())
+
+def display_banner_sequence(renderables, file=None, delay_after=False):
+    delay_enabled = _banner_animation_enabled(file)
+    rendered = list(renderables)
+    for index, renderable in enumerate(rendered):
+        is_last = index == len(rendered) - 1
+        print(renderable, file=file)
+        if delay_enabled and (not is_last or delay_after):
+            time.sleep(BANNER_DELAY_SECONDS)
+
+def display_drakkar(file=None):
+    display_banner_sequence(get_drakkar_banner_renderables(), file=file)
 
 def display_unlock():
     print(UNLOCK_ART)
@@ -542,6 +572,8 @@ def file_coverages_to_json(infofile=None, samples=None, output=False):
 def file_bins_to_json(paths_file=None, output=False):
     fasta_dict = {}
 
+    paths_file = resolve_input_manifest(paths_file, output, label="bins_file")
+
     if not os.path.isfile(paths_file):
             raise FileNotFoundError(f"Bin file not found: {paths_file}")
 
@@ -597,6 +629,11 @@ def path_bins_to_json(folder_path=None, output=False):
 def file_mags_to_json(paths_file=None, output=False):
     fasta_dict = {}
     fasta_re = re.compile(r"\.(?:fa|fna|fasta)(?:\.gz)?$", re.IGNORECASE)
+
+    paths_file = resolve_input_manifest(paths_file, output, label="mags_file")
+
+    if not os.path.isfile(paths_file):
+        raise FileNotFoundError(f"MAG file not found: {paths_file}")
 
     # Read the paths file
     with open(paths_file, "r") as f:

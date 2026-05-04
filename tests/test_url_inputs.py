@@ -100,6 +100,26 @@ class UrlGenomeInputTests(unittest.TestCase):
             self.assertEqual(bins_to_files["bin_001"], str(expected_path))
             self.assertTrue(expected_path.exists())
 
+    def test_file_bins_to_json_downloads_remote_manifest_and_genome_urls(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch(
+                "drakkar.utils.urlopen",
+                side_effect=[
+                    FakeResponse(b"https://example.org/bin_002.fna.gz\n"),
+                    FakeResponse(b">bin\nACGT\n"),
+                ],
+            ):
+                file_bins_to_json("https://example.org/bins.txt", tmpdir)
+
+            output_json = Path(tmpdir) / "data" / "bins_to_files.json"
+            bins_to_files = json.loads(output_json.read_text(encoding="utf-8"))
+            expected_manifest = Path(tmpdir) / "data" / "manifests_cache" / "bins.txt"
+            expected_path = Path(tmpdir) / "data" / "genomes_cache" / "bin_002.fna.gz"
+
+            self.assertTrue(expected_manifest.exists())
+            self.assertEqual(bins_to_files["bin_002"], str(expected_path))
+            self.assertTrue(expected_path.exists())
+
     def test_file_mags_to_json_downloads_genome_urls_and_normalizes_ids(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             mags_file = Path(tmpdir) / "mags.txt"
@@ -114,6 +134,29 @@ class UrlGenomeInputTests(unittest.TestCase):
 
             self.assertEqual(mags_to_files["MAG_01"], str(expected_path))
             self.assertTrue(expected_path.exists())
+
+    def test_file_mags_to_json_downloads_remote_manifest_and_genome_urls(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch(
+                "drakkar.utils.urlopen",
+                side_effect=[
+                    FakeResponse(b"https://example.org/MAG_02.fna.gz\n"),
+                    FakeResponse(b">mag\nACGT\n"),
+                ],
+            ):
+                file_mags_to_json("https://example.org/mags.txt", tmpdir)
+
+            output_json = Path(tmpdir) / "data" / "mags_to_files.json"
+            mags_to_files = json.loads(output_json.read_text(encoding="utf-8"))
+            expected_manifest = Path(tmpdir) / "data" / "manifests_cache" / "mags.txt"
+            expected_path = Path(tmpdir) / "data" / "genomes_cache" / "MAG_02.fna.gz"
+
+            self.assertTrue(expected_manifest.exists())
+            self.assertEqual(mags_to_files["MAG_02"], str(expected_path))
+            self.assertTrue(expected_path.exists())
+
+    def test_bins_file_cli_validation_accepts_urls(self) -> None:
+        self.assertTrue(cli_module.validate_path("https://example.org/mags.txt", "Bins file", allow_url=True))
 
 
 if __name__ == "__main__":

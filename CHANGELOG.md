@@ -8,6 +8,14 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.5.4] - 2026-05-04
+
+### Changed
+
+- Animated the DRAKKAR banner sequence in interactive terminals so the ship appears first, the logo follows after a short pause, and the remaining intro or help content appears after a second pause.
+- Allowed ``-B/--bins_file`` in profiling, dereplicating, annotating, inspecting, and expressing to point to a remote manifest URL, downloading the manifest and any referenced remote MAG/bin FASTA files into the local cache.
+- Made ``--quality`` genome-name matching more flexible so MAG/bin names are accepted with or without FASTA extensions and still map back to the canonical genome filenames used internally.
+
 ## [1.5.3] - 2026-05-03
 
 ### Changed

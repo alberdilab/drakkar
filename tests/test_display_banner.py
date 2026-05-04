@@ -35,6 +35,17 @@ class DisplayBannerTests(unittest.TestCase):
         self.assertIn("1.4.0", banner)
         self.assertNotIn("X.X.XX", banner)
 
+    def test_display_drakkar_pauses_between_banner_blocks_when_animation_enabled(self) -> None:
+        with (
+            patch("drakkar.utils.print"),
+            patch("drakkar.utils._banner_animation_enabled", return_value=True),
+            patch("drakkar.utils.time.sleep") as mocked_sleep,
+        ):
+            utils.display_drakkar()
+
+        self.assertEqual(mocked_sleep.call_count, 2)
+        mocked_sleep.assert_called_with(utils.BANNER_DELAY_SECONDS)
+
 
 if __name__ == "__main__":
     unittest.main()

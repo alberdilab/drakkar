@@ -556,10 +556,6 @@ def _rich_action_tables(parser):
     return tables
 
 
-def _rich_help_banner_renderables():
-    return get_drakkar_banner_renderables(include_intro=False)
-
-
 def _rich_help_renderable(parser):
     if not _rich_available():
         return None
@@ -576,7 +572,7 @@ def _rich_help_renderable(parser):
     header.append("Usage\n", style="drakkar.heading")
     header.append(_clean_usage(parser), style="drakkar.help")
 
-    renderables = _rich_help_banner_renderables() + [
+    renderables = [
         RichPanel(
             header,
             title=RichText(f" {parser.prog} ", style="drakkar.heading"),
@@ -603,11 +599,11 @@ class RichArgumentParser(argparse.ArgumentParser):
         renderable = _rich_help_renderable(self)
         target = get_console(file)
         if target is not None and renderable is not None:
+            display_banner_sequence(get_drakkar_banner_renderables(include_intro=False), file=file, delay_after=True)
             target.print(renderable)
             return
         output_file = file if file is not None else sys.stdout
-        for block, _style in get_drakkar_banner_blocks(include_intro=False):
-            output_file.write(block + "\n")
+        display_banner_sequence(get_drakkar_banner_renderables(include_intro=False), file=output_file, delay_after=True)
         super().print_help(output_file)
         if not _rich_available():
             output_file.write(
@@ -1235,25 +1231,37 @@ def validate_and_write_quality_file(quality_path, output_dir):
         print(f"{ERROR}ERROR:{RESET} bins_to_files.json not found; cannot validate quality file.")
         return False
 
-    # Build mapping from stem and basename to basename-with-extension
-    stem_to_base = {}
-    base_set = set()
-    for path in bins_map.values():
+    alias_to_base = {}
+    for bin_id, path in bins_map.items():
         base = os.path.basename(path)
-        if base.endswith(".gz"):
-            base = base[:-3]
-        base_set.add(base)
-        stem_to_base[normalize_genome_name(base)] = base
+        base_without_gz = base[:-3] if base.endswith(".gz") else base
+        canonical = base_without_gz
+        aliases = {
+            str(bin_id).strip(),
+            normalize_genome_name(bin_id),
+            base,
+            base_without_gz,
+            normalize_genome_name(base),
+            normalize_genome_name(base_without_gz),
+        }
+        for alias in aliases:
+            if alias:
+                alias_to_base[str(alias)] = canonical
 
     mapped = []
     missing = []
     for name in df["genome"].astype(str):
-        key = name.strip()
-        if key in base_set:
-            mapped.append(key)
-            continue
-        stem = normalize_genome_name(key)
-        mapped_base = stem_to_base.get(stem)
+        key = os.path.basename(name.strip())
+        candidates = [
+            key,
+            key[:-3] if key.endswith(".gz") else None,
+            normalize_genome_name(key),
+        ]
+        mapped_base = None
+        for candidate in candidates:
+            if candidate and candidate in alias_to_base:
+                mapped_base = alias_to_base[candidate]
+                break
         if mapped_base:
             mapped.append(mapped_base)
         else:
@@ -2308,7 +2316,7 @@ def main():
         (getattr(args, "input", None), "Input", True),
         (getattr(args, "file", None), "Sample detail file", False),
         (getattr(args, "bins_dir", None), "Bins directory", True),
-        (getattr(args, "bins_file", None), "Bins file", False),
+        (getattr(args, "bins_file", None), "Bins file", False, True),
         (getattr(args, "reads_dir", None), "Reads directory", True),
         (getattr(args, "reads_file", None), "Reads file", False),
         (getattr(args, "reference", None), "Reference", False, True),
@@ -2777,7 +2785,7 @@ def main():
         if bins_dir and bins_file:
             print(f"Both bin path file and input directory were provided.")
             print(f"DRAKKAR will continue with the information provided in the path file.")
-            file_mags_to_json(bins_dir,args.output)
+            file_mags_to_json(bins_file,args.output)
         elif bins_file and not bins_dir:
             print(f"DRAKKAR will run with the information provided in the sample info file.")
             file_mags_to_json(bins_file,args.output)
@@ -2819,7 +2827,7 @@ def main():
         if args.bins_dir and args.bins_file:
             print(f"Both bin path file and input directory were provided.")
             print(f"DRAKKAR will continue with the information provided in the path file.")
-            file_mags_to_json(args.bins_dir,args.output)
+            file_mags_to_json(args.bins_file,args.output)
         elif args.bins_file and not args.bins_dir:
             print(f"DRAKKAR will run with the information provided in the sample info file.")
             file_mags_to_json(args.bins_file,args.output)
@@ -2860,7 +2868,7 @@ def main():
         if args.bins_dir and args.bins_file:
             print(f"Both bin path file and input directory were provided.")
             print(f"DRAKKAR will continue with the information provided in the path file.")
-            file_mags_to_json(args.bins_dir,args.output)
+            file_mags_to_json(args.bins_file,args.output)
         elif args.bins_file and not args.bins_dir:
             print(f"DRAKKAR will run with the information provided in the sample info file.")
             file_mags_to_json(args.bins_file,args.output)
