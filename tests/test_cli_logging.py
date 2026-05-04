@@ -6,6 +6,7 @@ import io
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import yaml
 
@@ -33,6 +34,13 @@ class LoggingCommandTests(unittest.TestCase):
             self.assertEqual(metadata["status"], "prepared")
             self.assertEqual(metadata["command"], "cataloging")
             self.assertIn("snakemake_log", metadata)
+            self.assertIn("benchmark_jobs", metadata)
+            self.assertIn("benchmark_rules", metadata)
+            self.assertIn("benchmark_summary", metadata)
+            self.assertEqual(
+                Path(metadata["benchmark_summary"]).resolve(),
+                (Path(tmpdir) / f"drakkar_{run_info['run_id']}_resources.yaml").resolve(),
+            )
 
     def test_run_subprocess_with_logging_updates_metadata_and_writes_log(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -184,6 +192,222 @@ class LoggingCommandTests(unittest.TestCase):
             self.assertIn("Error types: RuleException (1), RuleError (1)", output)
             self.assertIn("HOW TO INSPECT MORE", output)
             self.assertNotIn("SNAKEMAKE LOG", output)
+
+    def test_parse_snakemake_submitted_launches_infers_attempts_and_skips_localrules(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = Path(tmpdir) / "drakkar_test.snakemake.log"
+            log_path.write_text(
+                "\n".join(
+                    [
+                        "rule map_reads:",
+                        "    jobid: 1",
+                        "    wildcards: sample=A",
+                        "    threads: 8",
+                        "    resources: mem_mb=16000, runtime=30, tmpdir=/tmp",
+                        "Submitted job 1 with external jobid '101'.",
+                        "",
+                        "rule map_reads:",
+                        "    jobid: 2",
+                        "    wildcards: sample=A",
+                        "    threads: 8",
+                        "    resources: mem_mb=32000, runtime=60, tmpdir=/tmp",
+                        "Submitted job 2 with external jobid '102'.",
+                        "",
+                        "localrule summarize:",
+                        "    jobid: 3",
+                        "    threads: 1",
+                        "Submitted job 3 with external jobid '103'.",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            launches = cli_module.parse_snakemake_submitted_launches(log_path)
+
+            self.assertEqual(len(launches), 2)
+            self.assertEqual([launch["attempt"] for launch in launches], [1, 2])
+            self.assertEqual([launch["external_jobid"] for launch in launches], ["101", "102"])
+            self.assertEqual(launches[0]["requested_mem_mb"], 16000.0)
+            self.assertEqual(launches[1]["requested_runtime_min"], 60.0)
+
+    def test_generate_run_benchmark_writes_reports_and_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            args = argparse.Namespace(command="cataloging", output=tmpdir, profile="slurm")
+            run_info = cli_module.write_launch_metadata(args, tmpdir)
+            cli_module.update_launch_metadata(
+                run_info["metadata_path"],
+                status="failed",
+                current_workflow="cataloging",
+                exit_code=1,
+            )
+            Path(run_info["snakemake_log_path"]).write_text(
+                "\n".join(
+                    [
+                        "rule assemble:",
+                        "    jobid: 1",
+                        "    wildcards: assembly=A",
+                        "    threads: 4",
+                        "    resources: mem_mb=8000, runtime=30, tmpdir=/tmp",
+                        "Submitted job 1 with external jobid '201'.",
+                        "",
+                        "rule assemble:",
+                        "    jobid: 2",
+                        "    wildcards: assembly=A",
+                        "    threads: 4",
+                        "    resources: mem_mb=16000, runtime=60, tmpdir=/tmp",
+                        "Submitted job 2 with external jobid '202'.",
+                        "",
+                        "rule annotate:",
+                        "    jobid: 3",
+                        "    wildcards: mag=M1",
+                        "    threads: 1",
+                        "    resources: mem_mb=4000, runtime=15, tmpdir=/tmp",
+                        "Submitted job 3 with external jobid '203'.",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            accounting = {
+                "201": {
+                    "external_jobid": "201",
+                    "state": "OUT_OF_MEMORY",
+                    "exit_code": "0:0",
+                    "elapsed_sec": 300,
+                    "cpu_time_sec": 900,
+                    "alloc_cpus": 4,
+                    "max_rss_mb": 7900.0,
+                    "timelimit_raw_min": 30,
+                },
+                "202": {
+                    "external_jobid": "202",
+                    "state": "COMPLETED",
+                    "exit_code": "0:0",
+                    "elapsed_sec": 600,
+                    "cpu_time_sec": 2000,
+                    "alloc_cpus": 4,
+                    "max_rss_mb": 12000.0,
+                    "timelimit_raw_min": 60,
+                },
+                "203": {
+                    "external_jobid": "203",
+                    "state": "TIMEOUT",
+                    "exit_code": "0:0",
+                    "elapsed_sec": 900,
+                    "cpu_time_sec": 800,
+                    "alloc_cpus": 1,
+                    "max_rss_mb": 3500.0,
+                    "timelimit_raw_min": 15,
+                },
+            }
+
+            with patch.object(cli_module, "query_sacct_for_jobs", return_value=accounting):
+                result = cli_module.generate_run_benchmark(tmpdir, metadata_path=run_info["metadata_path"], quiet=True)
+
+            self.assertIsNotNone(result)
+            self.assertEqual(result["status"], "generated")
+            self.assertEqual(result["summary"]["benchmarked_launches"], 3)
+            self.assertEqual(result["summary"]["retries"], 1)
+            self.assertEqual(result["summary"]["oom_launches"], 1)
+            self.assertEqual(result["summary"]["timeout_launches"], 1)
+
+            jobs_path = Path(result["paths"]["jobs"])
+            rules_path = Path(result["paths"]["rules"])
+            summary_path = Path(result["paths"]["summary"])
+            self.assertTrue(jobs_path.exists())
+            self.assertTrue(rules_path.exists())
+            self.assertTrue(summary_path.exists())
+            self.assertEqual(summary_path, Path(tmpdir) / f"drakkar_{run_info['run_id']}_resources.yaml")
+
+            jobs_text = jobs_path.read_text(encoding="utf-8")
+            self.assertIn("attempt", jobs_text)
+            self.assertIn("OUT_OF_MEMORY", jobs_text)
+            self.assertIn("\t2\tassemble|wildcards|assembly=A\t", jobs_text)
+
+            summary = yaml.safe_load(summary_path.read_text(encoding="utf-8"))
+            self.assertEqual(summary["status"], "generated")
+            self.assertEqual(summary["benchmarked_launches"], 3)
+            self.assertEqual(summary["retries"], 1)
+            self.assertIn("rules", summary)
+
+    def test_generate_run_benchmark_writes_root_status_file_for_non_slurm_runs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            args = argparse.Namespace(command="cataloging", output=tmpdir, profile="local")
+            run_info = cli_module.write_launch_metadata(args, tmpdir)
+
+            result = cli_module.generate_run_benchmark(tmpdir, metadata_path=run_info["metadata_path"], quiet=True)
+
+            self.assertIsNotNone(result)
+            self.assertEqual(result["status"], "unsupported_profile")
+            summary_path = Path(result["paths"]["summary"])
+            self.assertTrue(summary_path.exists())
+            self.assertEqual(summary_path, Path(tmpdir) / f"drakkar_{run_info['run_id']}_resources.yaml")
+
+            summary = yaml.safe_load(summary_path.read_text(encoding="utf-8"))
+            self.assertEqual(summary["status"], "unsupported_profile")
+            self.assertEqual(summary["profile"], "local")
+
+    def test_run_logging_summary_prints_benchmark_section_for_slurm_runs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            args = argparse.Namespace(command="cataloging", output=tmpdir, profile="slurm")
+            run_info = cli_module.write_launch_metadata(args, tmpdir)
+            cli_module.update_launch_metadata(
+                run_info["metadata_path"],
+                status="success",
+                current_workflow="cataloging",
+                exit_code=0,
+            )
+            Path(run_info["snakemake_log_path"]).write_text(
+                "\n".join(
+                    [
+                        "Job stats:",
+                        "job            count",
+                        "-----------  -------",
+                        "assemble           1",
+                        "total              1",
+                        "",
+                        "rule assemble:",
+                        "    jobid: 1",
+                        "    wildcards: assembly=A",
+                        "    threads: 4",
+                        "    resources: mem_mb=8000, runtime=30, tmpdir=/tmp",
+                        "Submitted job 1 with external jobid '301'.",
+                        "Finished jobid: 1 (Rule: assemble)",
+                        "1 of 1 steps (100%) done",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with patch.object(
+                cli_module,
+                "query_sacct_for_jobs",
+                return_value={
+                    "301": {
+                        "external_jobid": "301",
+                        "state": "COMPLETED",
+                        "exit_code": "0:0",
+                        "elapsed_sec": 600,
+                        "cpu_time_sec": 1800,
+                        "alloc_cpus": 4,
+                        "max_rss_mb": 6000.0,
+                        "timelimit_raw_min": 30,
+                    }
+                },
+            ):
+                buffer = io.StringIO()
+                with contextlib.redirect_stdout(buffer):
+                    exit_code = cli_module.run_logging(tmpdir, summary=True)
+
+            output = buffer.getvalue()
+            self.assertEqual(exit_code, 0)
+            self.assertIn("RESOURCE BENCHMARK", output)
+            self.assertIn("Benchmarked launches: 1", output)
+            self.assertIn("Relaunches detected: 0", output)
+            self.assertIn("Weighted CPU efficiency: 75.0%", output)
 
 
 if __name__ == "__main__":

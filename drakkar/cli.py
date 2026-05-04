@@ -1,4 +1,5 @@
 import argparse
+import csv
 import os
 import sys
 import subprocess
@@ -7,6 +8,7 @@ import re
 import json
 import shlex
 import shutil
+import statistics
 import pandas as pd
 try:
     from importlib.metadata import PackageNotFoundError, version as get_distribution_version
@@ -693,6 +695,633 @@ def build_snakemake_log_path(output_dir, run_id):
     return Path(output_dir) / "log" / f"drakkar_{run_id}.snakemake.log"
 
 
+def build_benchmark_paths(output_dir, run_id):
+    benchmark_dir = Path(output_dir) / "benchmark"
+    base_name = f"drakkar_{run_id}"
+    return {
+        "dir": benchmark_dir,
+        "jobs": benchmark_dir / f"{base_name}.jobs.tsv",
+        "rules": benchmark_dir / f"{base_name}.rules.tsv",
+        "summary": Path(output_dir) / f"{base_name}_resources.yaml",
+    }
+
+
+def load_metadata_file(metadata_path):
+    if not metadata_path:
+        return None
+    try:
+        with open(metadata_path, "r", encoding="utf-8") as handle:
+            return yaml.safe_load(handle) or {}
+    except OSError:
+        return None
+
+
+def get_run_profile(metadata):
+    arguments = (metadata or {}).get("arguments") or {}
+    return str(arguments.get("profile", "")).strip().lower() or None
+
+
+def should_benchmark_run(metadata):
+    return get_run_profile(metadata) == "slurm"
+
+
+def parse_int_or_none(value):
+    if value in (None, ""):
+        return None
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_float_or_none(value):
+    if value in (None, ""):
+        return None
+    try:
+        return float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_resource_assignments(text):
+    resources = {}
+    if not text:
+        return resources
+    for item in str(text).split(","):
+        if "=" not in item:
+            continue
+        key, value = item.split("=", 1)
+        resources[key.strip()] = value.strip()
+    return resources
+
+
+def parse_slurm_memory_to_mb(value):
+    text = str(value or "").strip()
+    if not text or text in {"Unknown", "None", "N/A"}:
+        return None
+    if text[-1:].lower() in {"c", "n"}:
+        text = text[:-1]
+    match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)([kmgtpe]?)", text, flags=re.IGNORECASE)
+    if not match:
+        return None
+    amount = float(match.group(1))
+    unit = match.group(2).upper()
+    factors = {
+        "": 1,
+        "K": 1 / 1024,
+        "M": 1,
+        "G": 1024,
+        "T": 1024 * 1024,
+        "P": 1024 * 1024 * 1024,
+        "E": 1024 * 1024 * 1024 * 1024,
+    }
+    factor = factors.get(unit)
+    if factor is None:
+        return None
+    return round(amount * factor, 3)
+
+
+def safe_ratio(numerator, denominator):
+    if numerator in (None, "") or denominator in (None, "", 0):
+        return None
+    try:
+        denominator_value = float(denominator)
+        if denominator_value == 0:
+            return None
+        return float(numerator) / denominator_value
+    except (TypeError, ValueError, ZeroDivisionError):
+        return None
+
+
+def median_or_none(values):
+    filtered = [float(value) for value in values if value not in (None, "")]
+    if not filtered:
+        return None
+    return statistics.median(filtered)
+
+
+def format_hours(value):
+    if value is None:
+        return "unknown"
+    return f"{value:.2f}"
+
+
+def format_megabytes(value):
+    if value is None:
+        return "unknown"
+    if value >= 1024:
+        return f"{value / 1024:.2f} GB"
+    return f"{value:.0f} MB"
+
+
+def format_percent(value):
+    if value is None:
+        return "unknown"
+    return f"{value * 100:.1f}%"
+
+
+def build_logical_job_key(launch):
+    for field in ("wildcards", "output", "input"):
+        value = str(launch.get(field, "")).strip()
+        if value:
+            return f"{launch.get('rule', 'unknown')}|{field}|{value}"
+    return f"{launch.get('rule', 'unknown')}|singleton"
+
+
+def parse_snakemake_submitted_launches(log_path):
+    path = Path(log_path)
+    if not path.exists():
+        return []
+
+    block_by_jobid = {}
+    current_block = None
+    launches = []
+    launch_order = 0
+
+    with open(path, "r", encoding="utf-8", errors="replace") as handle:
+        for raw_line in handle:
+            stripped = raw_line.strip()
+            if not stripped:
+                continue
+
+            block_match = re.match(r"^(localrule|localcheckpoint|rule|checkpoint)\s+(.+?):\s*$", stripped)
+            if block_match:
+                current_block = {
+                    "rule_type": block_match.group(1),
+                    "rule": block_match.group(2),
+                    "local": block_match.group(1).startswith("local"),
+                    "internal_jobid": None,
+                    "threads": None,
+                    "wildcards": "",
+                    "input": "",
+                    "output": "",
+                    "resources_raw": "",
+                    "resources": {},
+                }
+                continue
+
+            if current_block is not None:
+                match = re.match(r"^jobid:\s*(\d+)\s*$", stripped)
+                if match:
+                    current_block["internal_jobid"] = match.group(1)
+                    block_by_jobid[match.group(1)] = current_block
+                    continue
+                if stripped.startswith("threads:"):
+                    current_block["threads"] = parse_int_or_none(stripped.split(":", 1)[1])
+                    continue
+                if stripped.startswith("wildcards:"):
+                    current_block["wildcards"] = stripped.split(":", 1)[1].strip()
+                    continue
+                if stripped.startswith("input:"):
+                    current_block["input"] = stripped.split(":", 1)[1].strip()
+                    continue
+                if stripped.startswith("output:"):
+                    current_block["output"] = stripped.split(":", 1)[1].strip()
+                    continue
+                if stripped.startswith("resources:"):
+                    current_block["resources_raw"] = stripped.split(":", 1)[1].strip()
+                    current_block["resources"] = parse_resource_assignments(current_block["resources_raw"])
+                    continue
+
+            submission_match = re.search(
+                r"Submitted job(?:id)?\s+(\d+)\s+with external jobid ['\"]?([^'\"\s]+)['\"]?",
+                stripped,
+            )
+            if not submission_match:
+                continue
+
+            internal_jobid = submission_match.group(1)
+            block = block_by_jobid.get(internal_jobid)
+            if not block or block.get("local"):
+                continue
+
+            launch_order += 1
+            resources = block.get("resources") or {}
+            requested_mem_mb = parse_float_or_none(resources.get("mem_mb"))
+            if requested_mem_mb is None:
+                requested_mem_mb = parse_float_or_none(resources.get("mem_mib"))
+            requested_runtime_min = parse_float_or_none(resources.get("runtime"))
+            launch = {
+                "launch_index": launch_order,
+                "rule": block.get("rule"),
+                "rule_type": block.get("rule_type"),
+                "internal_jobid": internal_jobid,
+                "external_jobid": submission_match.group(2),
+                "threads": block.get("threads"),
+                "requested_cpus": block.get("threads"),
+                "requested_mem_mb": requested_mem_mb,
+                "requested_runtime_min": requested_runtime_min,
+                "wildcards": block.get("wildcards", ""),
+                "input": block.get("input", ""),
+                "output": block.get("output", ""),
+                "resources": resources,
+            }
+            launch["logical_job_key"] = build_logical_job_key(launch)
+            launches.append(launch)
+
+    attempt_counter = Counter()
+    for launch in launches:
+        attempt_counter[launch["logical_job_key"]] += 1
+        launch["attempt"] = attempt_counter[launch["logical_job_key"]]
+
+    return launches
+
+
+def query_sacct_for_jobs(job_ids):
+    if not job_ids:
+        return {}
+
+    command = [
+        "sacct",
+        "-X",
+        "-P",
+        "-n",
+        "--units=M",
+        "-j",
+        ",".join(str(job_id) for job_id in job_ids),
+        "--format",
+        "JobIDRaw,State,ExitCode,ElapsedRaw,CPUTimeRAW,AllocCPUS,MaxRSS,TimelimitRaw",
+    ]
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, check=False)
+    except FileNotFoundError:
+        return None
+    if result.returncode != 0:
+        return None
+
+    rows = {}
+    for raw_line in result.stdout.splitlines():
+        if not raw_line.strip():
+            continue
+        parts = raw_line.split("|")
+        if len(parts) != 8:
+            continue
+        job_id = parts[0].strip()
+        if not job_id:
+            continue
+        rows[job_id] = {
+            "external_jobid": job_id,
+            "state": parts[1].strip(),
+            "exit_code": parts[2].strip(),
+            "elapsed_sec": parse_int_or_none(parts[3]),
+            "cpu_time_sec": parse_int_or_none(parts[4]),
+            "alloc_cpus": parse_int_or_none(parts[5]),
+            "max_rss_mb": parse_slurm_memory_to_mb(parts[6]),
+            "timelimit_raw_min": parse_int_or_none(parts[7]),
+        }
+    return rows
+
+
+def benchmark_job_row(launch, accounting_row):
+    row = {
+        "launch_index": launch.get("launch_index"),
+        "rule": launch.get("rule"),
+        "attempt": launch.get("attempt"),
+        "logical_job_key": launch.get("logical_job_key"),
+        "internal_jobid": launch.get("internal_jobid"),
+        "external_jobid": launch.get("external_jobid"),
+        "wildcards": launch.get("wildcards", ""),
+        "requested_cpus": launch.get("requested_cpus"),
+        "requested_mem_mb": launch.get("requested_mem_mb"),
+        "requested_runtime_min": launch.get("requested_runtime_min"),
+        "state": None,
+        "exit_code": None,
+        "alloc_cpus": None,
+        "elapsed_sec": None,
+        "cpu_time_sec": None,
+        "max_rss_mb": None,
+        "cpu_efficiency": None,
+        "memory_efficiency": None,
+        "runtime_efficiency": None,
+        "oom": False,
+        "timeout": False,
+    }
+    if accounting_row:
+        row.update(
+            {
+                "state": accounting_row.get("state"),
+                "exit_code": accounting_row.get("exit_code"),
+                "alloc_cpus": accounting_row.get("alloc_cpus"),
+                "elapsed_sec": accounting_row.get("elapsed_sec"),
+                "cpu_time_sec": accounting_row.get("cpu_time_sec"),
+                "max_rss_mb": accounting_row.get("max_rss_mb"),
+            }
+        )
+        alloc_cpus = row.get("alloc_cpus")
+        elapsed_sec = row.get("elapsed_sec")
+        cpu_time_sec = row.get("cpu_time_sec")
+        if alloc_cpus and elapsed_sec:
+            row["cpu_efficiency"] = safe_ratio(cpu_time_sec, alloc_cpus * elapsed_sec)
+        requested_mem_mb = row.get("requested_mem_mb")
+        if requested_mem_mb:
+            row["memory_efficiency"] = safe_ratio(row.get("max_rss_mb"), requested_mem_mb)
+        requested_runtime_min = row.get("requested_runtime_min")
+        if requested_runtime_min:
+            row["runtime_efficiency"] = safe_ratio(elapsed_sec, requested_runtime_min * 60)
+        state = str(row.get("state", "")).upper()
+        row["oom"] = state.startswith("OUT_OF_MEMORY")
+        row["timeout"] = state.startswith("TIMEOUT")
+    return row
+
+
+def write_tsv(path, fieldnames, rows):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, delimiter="\t", extrasaction="ignore")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
+
+
+def write_benchmark_summary_file(path, payload):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as handle:
+        yaml.safe_dump(payload, handle, sort_keys=False)
+
+
+def summarize_benchmark_rows(job_rows):
+    if not job_rows:
+        return {
+            "benchmarked_launches": 0,
+            "logical_jobs": 0,
+            "retries": 0,
+            "failed_launches": 0,
+            "oom_launches": 0,
+            "timeout_launches": 0,
+            "max_alloc_cpus": None,
+            "peak_max_rss_mb": None,
+            "total_elapsed_sec": 0,
+            "allocated_cpu_sec": 0,
+            "used_cpu_sec": 0,
+            "weighted_cpu_efficiency": None,
+            "jobs_missing_accounting": 0,
+            "most_retried_rules": [],
+        }
+
+    attempt_rows = [row for row in job_rows if row.get("attempt", 1) > 1]
+    peak_max_rss_mb = max((row["max_rss_mb"] for row in job_rows if row.get("max_rss_mb") is not None), default=None)
+    max_alloc_cpus = max((row["alloc_cpus"] for row in job_rows if row.get("alloc_cpus") is not None), default=None)
+    total_elapsed_sec = sum(row.get("elapsed_sec") or 0 for row in job_rows)
+    allocated_cpu_sec = sum((row.get("alloc_cpus") or 0) * (row.get("elapsed_sec") or 0) for row in job_rows)
+    used_cpu_sec = sum(row.get("cpu_time_sec") or 0 for row in job_rows)
+    retry_counter = Counter(row["rule"] for row in attempt_rows)
+    return {
+        "benchmarked_launches": len(job_rows),
+        "logical_jobs": len({row["logical_job_key"] for row in job_rows}),
+        "retries": len(attempt_rows),
+        "failed_launches": sum(1 for row in job_rows if str(row.get("state", "")).upper() not in {"", "COMPLETED"}),
+        "oom_launches": sum(1 for row in job_rows if row.get("oom")),
+        "timeout_launches": sum(1 for row in job_rows if row.get("timeout")),
+        "max_alloc_cpus": max_alloc_cpus,
+        "peak_max_rss_mb": peak_max_rss_mb,
+        "total_elapsed_sec": total_elapsed_sec,
+        "allocated_cpu_sec": allocated_cpu_sec,
+        "used_cpu_sec": used_cpu_sec,
+        "weighted_cpu_efficiency": safe_ratio(used_cpu_sec, allocated_cpu_sec),
+        "jobs_missing_accounting": sum(1 for row in job_rows if row.get("state") is None),
+        "most_retried_rules": retry_counter.most_common(5),
+    }
+
+
+def summarize_benchmark_rules(job_rows):
+    grouped = defaultdict(list)
+    for row in job_rows:
+        grouped[row["rule"]].append(row)
+
+    summaries = []
+    for rule_name in sorted(grouped):
+        rows = grouped[rule_name]
+        summaries.append(
+            {
+                "rule": rule_name,
+                "launches": len(rows),
+                "logical_jobs": len({row["logical_job_key"] for row in rows}),
+                "retries": sum(1 for row in rows if row.get("attempt", 1) > 1),
+                "failed_launches": sum(1 for row in rows if str(row.get("state", "")).upper() not in {"", "COMPLETED"}),
+                "oom_launches": sum(1 for row in rows if row.get("oom")),
+                "timeout_launches": sum(1 for row in rows if row.get("timeout")),
+                "median_requested_cpus": median_or_none(row.get("requested_cpus") for row in rows),
+                "median_alloc_cpus": median_or_none(row.get("alloc_cpus") for row in rows),
+                "median_requested_mem_mb": median_or_none(row.get("requested_mem_mb") for row in rows),
+                "median_max_rss_mb": median_or_none(row.get("max_rss_mb") for row in rows),
+                "median_memory_efficiency": median_or_none(row.get("memory_efficiency") for row in rows),
+                "median_requested_runtime_min": median_or_none(row.get("requested_runtime_min") for row in rows),
+                "median_elapsed_sec": median_or_none(row.get("elapsed_sec") for row in rows),
+                "median_runtime_efficiency": median_or_none(row.get("runtime_efficiency") for row in rows),
+                "allocated_cpu_sec": sum((row.get("alloc_cpus") or 0) * (row.get("elapsed_sec") or 0) for row in rows),
+                "used_cpu_sec": sum(row.get("cpu_time_sec") or 0 for row in rows),
+                "weighted_cpu_efficiency": safe_ratio(
+                    sum(row.get("cpu_time_sec") or 0 for row in rows),
+                    sum((row.get("alloc_cpus") or 0) * (row.get("elapsed_sec") or 0) for row in rows),
+                ),
+            }
+        )
+    return summaries
+
+
+def generate_benchmark_reports(output_dir, run_id, job_rows):
+    paths = build_benchmark_paths(output_dir, run_id)
+    summary = summarize_benchmark_rows(job_rows)
+    rule_rows = summarize_benchmark_rules(job_rows)
+
+    write_tsv(
+        paths["jobs"],
+        [
+            "launch_index",
+            "rule",
+            "attempt",
+            "logical_job_key",
+            "internal_jobid",
+            "external_jobid",
+            "wildcards",
+            "requested_cpus",
+            "requested_mem_mb",
+            "requested_runtime_min",
+            "state",
+            "exit_code",
+            "alloc_cpus",
+            "elapsed_sec",
+            "cpu_time_sec",
+            "max_rss_mb",
+            "cpu_efficiency",
+            "memory_efficiency",
+            "runtime_efficiency",
+            "oom",
+            "timeout",
+        ],
+        job_rows,
+    )
+    write_tsv(
+        paths["rules"],
+        [
+            "rule",
+            "launches",
+            "logical_jobs",
+            "retries",
+            "failed_launches",
+            "oom_launches",
+            "timeout_launches",
+            "median_requested_cpus",
+            "median_alloc_cpus",
+            "median_requested_mem_mb",
+            "median_max_rss_mb",
+            "median_memory_efficiency",
+            "median_requested_runtime_min",
+            "median_elapsed_sec",
+            "median_runtime_efficiency",
+            "allocated_cpu_sec",
+            "used_cpu_sec",
+            "weighted_cpu_efficiency",
+        ],
+        rule_rows,
+    )
+    write_benchmark_summary_file(
+        paths["summary"],
+        {
+            "status": "generated",
+            **summary,
+            "allocated_cpu_hours": round(summary["allocated_cpu_sec"] / 3600, 4),
+            "used_cpu_hours": round(summary["used_cpu_sec"] / 3600, 4),
+            "rules": rule_rows,
+        },
+    )
+    return {
+        "paths": paths,
+        "summary": summary,
+        "rules": rule_rows,
+    }
+
+
+def generate_run_benchmark(output_dir, metadata_path=None, metadata=None, quiet=True):
+    metadata = metadata or load_metadata_file(metadata_path)
+    if not metadata:
+        return None
+
+    run_id = metadata.get("run_id")
+    if not run_id:
+        return None
+
+    output_dir = Path(output_dir)
+    paths = build_benchmark_paths(output_dir, run_id)
+    base_summary = {
+        "run_id": run_id,
+        "command": metadata.get("command"),
+        "profile": get_run_profile(metadata),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    if not should_benchmark_run(metadata):
+        payload = {
+            **base_summary,
+            "status": "unsupported_profile",
+            "message": "Resource benchmarking currently supports only runs launched with the slurm profile.",
+        }
+        write_benchmark_summary_file(paths["summary"], payload)
+        update_launch_metadata(
+            metadata_path,
+            benchmark_status=payload["status"],
+            benchmark_summary=str(paths["summary"]),
+            benchmark_jobs=str(paths["jobs"]),
+            benchmark_rules=str(paths["rules"]),
+            benchmark_generated_at=payload["generated_at"],
+        )
+        return {
+            "status": payload["status"],
+            "paths": paths,
+            "summary": None,
+        }
+
+    configured_log = metadata.get("snakemake_log")
+    if configured_log:
+        snakemake_log_path = Path(configured_log)
+    else:
+        snakemake_log_path = build_snakemake_log_path(output_dir, run_id)
+    if not snakemake_log_path.exists():
+        payload = {
+            **base_summary,
+            "status": "log_missing",
+            "message": "Snakemake log not found; no benchmark information could be generated.",
+        }
+        write_benchmark_summary_file(paths["summary"], payload)
+        update_launch_metadata(
+            metadata_path,
+            benchmark_status=payload["status"],
+            benchmark_summary=str(paths["summary"]),
+            benchmark_jobs=str(paths["jobs"]),
+            benchmark_rules=str(paths["rules"]),
+            benchmark_generated_at=payload["generated_at"],
+        )
+        return {
+            "status": payload["status"],
+            "paths": paths,
+            "summary": None,
+        }
+
+    launches = parse_snakemake_submitted_launches(snakemake_log_path)
+    if not launches:
+        payload = {
+            **base_summary,
+            "status": "no_submitted_jobs",
+            **summarize_benchmark_rows([]),
+            "message": "No submitted non-local SLURM jobs were detected in the Snakemake log.",
+            "rules": [],
+        }
+        write_benchmark_summary_file(paths["summary"], payload)
+        result = {
+            "status": payload["status"],
+            "paths": paths,
+            "summary": summarize_benchmark_rows([]),
+        }
+        update_launch_metadata(
+            metadata_path,
+            benchmark_status=result["status"],
+            benchmark_summary=str(paths["summary"]),
+            benchmark_jobs=str(paths["jobs"]),
+            benchmark_rules=str(paths["rules"]),
+            benchmark_generated_at=payload["generated_at"],
+        )
+        return result
+
+    sacct_rows = query_sacct_for_jobs([launch["external_jobid"] for launch in launches])
+    if sacct_rows is None:
+        payload = {
+            **base_summary,
+            "status": "accounting_unavailable",
+            "benchmarked_launches": len(launches),
+            "message": "SLURM sacct data could not be queried, so actual resource usage could not be summarized.",
+        }
+        write_benchmark_summary_file(paths["summary"], payload)
+        result = {
+            "status": payload["status"],
+            "paths": paths,
+            "summary": None,
+        }
+        update_launch_metadata(
+            metadata_path,
+            benchmark_status=result["status"],
+            benchmark_summary=str(paths["summary"]),
+            benchmark_jobs=str(paths["jobs"]),
+            benchmark_rules=str(paths["rules"]),
+            benchmark_generated_at=payload["generated_at"],
+        )
+        if not quiet:
+            print(f"{INFO}INFO:{RESET} SLURM accounting information is unavailable; benchmark files were not generated.")
+        return result
+
+    job_rows = [benchmark_job_row(launch, sacct_rows.get(launch["external_jobid"])) for launch in launches]
+    result = generate_benchmark_reports(output_dir, run_id, job_rows)
+    result["status"] = "generated"
+    update_launch_metadata(
+        metadata_path,
+        benchmark_status=result["status"],
+        benchmark_summary=str(paths["summary"]),
+        benchmark_jobs=str(paths["jobs"]),
+        benchmark_rules=str(paths["rules"]),
+        benchmark_generated_at=base_summary["generated_at"],
+    )
+    return result
+
+
 def write_launch_metadata(args, output_dir, env_path=None):
     output_path = Path(output_dir)
     if not validate_launch_metadata_directory(output_path):
@@ -708,12 +1337,15 @@ def write_launch_metadata(args, output_dir, env_path=None):
     snakemake_log_path = None
     if args.command in WORKFLOW_RUN_COMMANDS:
         snakemake_log_path = build_snakemake_log_path(output_path, run_id)
+        benchmark_paths = build_benchmark_paths(output_path, run_id)
         try:
             snakemake_log_path.parent.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
             print(f"{ERROR}ERROR:{RESET} Cannot create log directory for Drakkar run metadata: {snakemake_log_path.parent}")
             print(f"{exc.__class__.__name__}: {exc}")
             return None
+    else:
+        benchmark_paths = None
     metadata = {
         "run_id": run_id,
         "timestamp": timestamp.isoformat(),
@@ -730,6 +1362,11 @@ def write_launch_metadata(args, output_dir, env_path=None):
         metadata["env_path"] = env_path
     if snakemake_log_path is not None:
         metadata["snakemake_log"] = str(snakemake_log_path.resolve())
+    if benchmark_paths is not None:
+        metadata["benchmark_jobs"] = str(benchmark_paths["jobs"].resolve())
+        metadata["benchmark_rules"] = str(benchmark_paths["rules"].resolve())
+        metadata["benchmark_summary"] = str(benchmark_paths["summary"].resolve())
+        metadata["benchmark_status"] = "pending"
     metadata_path = output_path / f"drakkar_{run_id}.yaml"
     try:
         with open(metadata_path, "w") as f:
@@ -743,6 +1380,7 @@ def write_launch_metadata(args, output_dir, env_path=None):
         "run_id": run_id,
         "metadata_path": metadata_path,
         "snakemake_log_path": snakemake_log_path,
+        "benchmark_paths": benchmark_paths,
     }
 
 
@@ -752,10 +1390,8 @@ def update_launch_metadata(metadata_path, **updates):
     metadata_path = Path(metadata_path)
     if not metadata_path.exists():
         return None
-    try:
-        with open(metadata_path, "r", encoding="utf-8") as handle:
-            metadata = yaml.safe_load(handle) or {}
-    except OSError:
+    metadata = load_metadata_file(metadata_path)
+    if metadata is None:
         return None
     metadata.update(updates)
     try:
@@ -783,6 +1419,10 @@ def finalize_launch_metadata(run_info, status, exit_code=None, current_workflow=
 def run_subprocess_with_logging(command, run_info=None, workflow_name=None):
     metadata_path = run_info["metadata_path"] if run_info else None
     log_path = Path(run_info["snakemake_log_path"]) if run_info and run_info.get("snakemake_log_path") else None
+    output_dir = None
+    if run_info and metadata_path:
+        metadata = load_metadata_file(metadata_path) or {}
+        output_dir = metadata.get("output_directory")
     if metadata_path:
         update_launch_metadata(
             metadata_path,
@@ -824,9 +1464,13 @@ def run_subprocess_with_logging(command, run_info=None, workflow_name=None):
 
     if return_code != 0:
         finalize_launch_metadata(run_info, "failed", return_code, current_workflow=workflow_name)
+        if output_dir:
+            generate_run_benchmark(output_dir, metadata_path=metadata_path, quiet=True)
         raise subprocess.CalledProcessError(return_code, command)
 
     finalize_launch_metadata(run_info, "success", 0, current_workflow=workflow_name)
+    if output_dir:
+        generate_run_benchmark(output_dir, metadata_path=metadata_path, quiet=True)
     return return_code
 
 
@@ -1057,6 +1701,57 @@ def print_snakemake_summary(summary):
         print(f"Most active rules: {formatted_rules}")
 
 
+def print_benchmark_summary(benchmark_result):
+    if not benchmark_result:
+        return
+
+    status = benchmark_result.get("status")
+    if status == "accounting_unavailable":
+        section("RESOURCE BENCHMARK")
+        print("SLURM accounting data could not be queried, so no benchmark summary is available for this run.")
+        return
+    if status == "unsupported_profile":
+        section("RESOURCE BENCHMARK")
+        print("Resource benchmarking is currently available only for runs launched with the slurm profile.")
+        return
+    if status == "log_missing":
+        section("RESOURCE BENCHMARK")
+        print("Snakemake log not found, so no resource benchmark summary is available for this run.")
+        return
+
+    summary = benchmark_result.get("summary") or {}
+    if status == "no_submitted_jobs":
+        section("RESOURCE BENCHMARK")
+        print("No submitted non-local SLURM jobs were detected in the Snakemake log.")
+        return
+
+    section("RESOURCE BENCHMARK")
+    print(f"Benchmarked launches: {summary.get('benchmarked_launches', 0)}")
+    print(f"Logical jobs: {summary.get('logical_jobs', 0)}")
+    print(f"Relaunches detected: {summary.get('retries', 0)}")
+    print(f"Failed launches: {summary.get('failed_launches', 0)}")
+    print(
+        f"Timeouts / OOM: {summary.get('timeout_launches', 0)} / {summary.get('oom_launches', 0)}"
+    )
+    print(f"Jobs missing sacct data: {summary.get('jobs_missing_accounting', 0)}")
+    print(f"Peak allocated CPUs (single launch): {summary.get('max_alloc_cpus', 'unknown')}")
+    print(f"Peak memory observed: {format_megabytes(summary.get('peak_max_rss_mb'))}")
+    print(f"Total elapsed wall time: {format_hours((summary.get('total_elapsed_sec') or 0) / 3600)} hours")
+    print(
+        "Allocated CPU time: "
+        f"{format_hours((summary.get('allocated_cpu_sec') or 0) / 3600)} CPU-hours"
+    )
+    print(
+        "Used CPU time: "
+        f"{format_hours((summary.get('used_cpu_sec') or 0) / 3600)} CPU-hours"
+    )
+    print(f"Weighted CPU efficiency: {format_percent(summary.get('weighted_cpu_efficiency'))}")
+    most_retried = summary.get("most_retried_rules") or []
+    if most_retried:
+        formatted = ", ".join(f"{name} ({count})" for name, count in most_retried)
+        print(f"Most retried rules: {formatted}")
+
+
 def print_logging_usage_guide(output_path, selected_run_id=None):
     section("HOW TO INSPECT MORE")
     output_arg = shlex.quote(str(output_path))
@@ -1074,6 +1769,7 @@ def print_logging_usage_guide(output_path, selected_run_id=None):
     print(f"  Failure excerpt or tail: {excerpt_cmd}")
     print(f"  Full Snakemake log: {full_cmd}")
     print(f"  Available runs: {list_cmd}")
+    print("  Benchmark tables: inspect benchmark/drakkar_<run_id>.jobs.tsv and .rules.tsv when present")
 
 
 def run_logging(output_dir, run_id=None, tail=50, full=False, paths=False, list_runs=False, summary=False, excerpt=False):
@@ -1120,6 +1816,8 @@ def run_logging(output_dir, run_id=None, tail=50, full=False, paths=False, list_
         snakemake_log_path = fallback_logs[0]
 
     if metadata is not None:
+        benchmark_result = generate_run_benchmark(output_path, metadata_path=metadata_path, metadata=metadata, quiet=True)
+        metadata = load_metadata_file(metadata_path) or metadata
         section("RUN SUMMARY")
         selected_run_id = metadata.get('run_id', metadata_path.stem.removeprefix('drakkar_'))
         print(f"Run ID: {selected_run_id}")
@@ -1137,11 +1835,14 @@ def run_logging(output_dir, run_id=None, tail=50, full=False, paths=False, list_
         print(f"Metadata file: {metadata_path}")
     else:
         selected_run_id = None
+        benchmark_result = None
         print(f"{INFO}INFO:{RESET} No workflow metadata found. Falling back to Snakemake logs only.")
 
     log_summary = summarize_snakemake_log(snakemake_log_path, metadata=metadata)
     if snakemake_log_path is not None and snakemake_log_path.exists():
         print_snakemake_summary(log_summary)
+    if benchmark_result is not None:
+        print_benchmark_summary(benchmark_result)
 
     if paths:
         section("LOG PATHS")
@@ -1157,6 +1858,11 @@ def run_logging(output_dir, run_id=None, tail=50, full=False, paths=False, list_
         ) if (output_path / "log").exists() else []
         for extra_log in extra_logs[:20]:
             print(f"Additional log: {extra_log}")
+        if metadata is not None:
+            for key in ("benchmark_jobs", "benchmark_rules", "benchmark_summary"):
+                benchmark_path = metadata.get(key)
+                if benchmark_path:
+                    print(f"{key.replace('_', ' ').title()}: {benchmark_path}")
 
     if snakemake_log_path is None or not snakemake_log_path.exists():
         print(f"{INFO}INFO:{RESET} No Snakemake log file found in {output_path}.")
@@ -1777,12 +2483,14 @@ def get_installed_drakkar_version():
         return __version__
 
 
-def run_update():
+def run_update(skip_deps=False):
     pip_cmd = [
         sys.executable, "-m", "pip", "install",
         "--upgrade", "--force-reinstall",
-        "git+https://github.com/alberdilab/drakkar.git",
     ]
+    if skip_deps:
+        pip_cmd.append("--no-deps")
+    pip_cmd.append("git+https://github.com/alberdilab/drakkar.git")
     try:
         update_result = subprocess.run(pip_cmd)
     except Exception as exc:
@@ -1975,6 +2683,7 @@ def main():
 
     subparser_update = subparsers.add_parser("update", help="Reinstall Drakkar from GitHub in the current Python environment")
     subparser_update.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
+    subparser_update.add_argument("--skip-deps", action="store_true", help="Skip reinstalling Python package dependencies during the update")
 
     subparser_transfer = subparsers.add_parser("transfer", help="Transfer selected Drakkar outputs to a remote SFTP destination while preserving folder structure")
     subparser_transfer.add_argument("--host", help="SFTP host")
@@ -2252,9 +2961,10 @@ def main():
         category="Operations and management",
         examples=[
             "drakkar update",
+            "drakkar update --skip-deps",
         ],
         sections=[
-            ("Execution", ["env_path"]),
+            ("Execution", ["env_path", "skip_deps"]),
         ],
     )
 
@@ -2426,7 +3136,7 @@ def main():
 
     elif args.command == "update":
         section("UPDATING DRAKKAR")
-        return run_update()
+        return run_update(skip_deps=args.skip_deps)
 
     elif args.command == "environments":
         section("CREATING CONDA ENVIRONMENTS")

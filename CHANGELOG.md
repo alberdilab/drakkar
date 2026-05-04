@@ -8,6 +8,13 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.6.0] - 2026-05-04
+
+### Added
+
+- Added a first SLURM-backed benchmark layer that parses submitted non-local Snakemake jobs, infers relaunch attempts, joins them to `sacct`, writes per-run benchmark tables under `benchmark/`, emits a root-level `drakkar_<run_id>_resources.yaml` summary for every workflow run, and exposes a compact resource-efficiency summary through `drakkar logging`.
+- Added a richer root-level `profiling_genomes.tsv` summary with input reads, input bases, mapped reads, mapping percentage, and mapped bases per sample, and added a new root-level `dereplicating.tsv` summary for profiling and dereplicating runs with input/output bin counts plus average completeness and contamination when quality metadata are available.
+
 ## [1.5.4] - 2026-05-04
 
 ### Changed
@@ -15,6 +22,7 @@ This project tracks release notes here from this point forward.
 - Animated the DRAKKAR banner sequence in interactive terminals so the ship appears first, the logo follows after a short pause, and the remaining intro or help content appears after a second pause.
 - Allowed ``-B/--bins_file`` in profiling, dereplicating, annotating, inspecting, and expressing to point to a remote manifest URL, downloading the manifest and any referenced remote MAG/bin FASTA files into the local cache.
 - Made ``--quality`` genome-name matching more flexible so MAG/bin names are accepted with or without FASTA extensions and still map back to the canonical genome filenames used internally.
+- Added ``drakkar update --skip-deps`` to let users skip reinstalling Python dependencies during an update when they only want to refresh the package itself.
 
 ## [1.5.3] - 2026-05-03
 

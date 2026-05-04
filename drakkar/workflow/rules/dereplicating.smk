@@ -209,3 +209,33 @@ rule finalize_derep:
         mkdir -p {OUTPUT_DIR}/dereplicating/final
         cp {input.derep} {output}
         """
+
+rule dereplicating_stats:
+    input:
+        bins_map=f"{OUTPUT_DIR}/data/bins_to_files.json",
+        wdb=lambda wildcards: checkpoints.dereplicate.get(**wildcards).output[0],
+        metadata=lambda wildcards: f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv" if (QUALITY_FILE or not IGNORE_QUALITY) else []
+    output:
+        f"{OUTPUT_DIR}/dereplicating.tsv"
+    localrule: True
+    params:
+        package_dir={PACKAGE_DIR},
+        ani={DREP_ANI}
+    threads: 1
+    resources:
+        mem_mb=cap_mem_mb(1*1024),
+        runtime=cap_runtime(5)
+    message: "Creating dereplication stats file..."
+    shell:
+        """
+        metadata_arg=""
+        if [ -n "{input.metadata}" ]; then
+            metadata_arg="--metadata {input.metadata}"
+        fi
+        python {params.package_dir}/workflow/scripts/dereplicating_stats.py \
+            --bins-map {input.bins_map} \
+            --wdb {input.wdb} \
+            --ani {params.ani} \
+            $metadata_arg \
+            -o {output}
+        """

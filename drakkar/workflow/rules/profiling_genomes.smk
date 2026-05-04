@@ -298,10 +298,31 @@ rule profiling_stats:
         samtools view -F12 -@ {threads} {input} | awk '{{sum += length($10)}} END {{print sum}}' > {output.mappedbases}
         """
 
+rule profiling_total_reads:
+    input:
+        r1=lambda wildcards: PREPROCESSED_TO_READS1[wildcards.sample],
+        r2=lambda wildcards: PREPROCESSED_TO_READS2[wildcards.sample]
+    output:
+        reads=f"{OUTPUT_DIR}/profiling_genomes/bowtie2/{{sample}}.totalreads",
+        bases=f"{OUTPUT_DIR}/profiling_genomes/bowtie2/{{sample}}.totalbases"
+    params:
+        package_dir={PACKAGE_DIR}
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(1*1024, int(input.size_mb * 2) * 2 ** (attempt - 1))),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb / 50) * 2 ** (attempt - 1)))
+    message: "Counting input reads of {wildcards.sample}..."
+    shell:
+        """
+        python {params.package_dir}/workflow/scripts/count_total_reads.py {input.r1} {input.r2} -o {output.reads} -b {output.bases}
+        """
+
 rule profiling_stats_merge:
     input:
         mappedreads=expand(f"{OUTPUT_DIR}/profiling_genomes/bowtie2/{{sample}}.mappedreads", sample=samples),
-        mappedbases=expand(f"{OUTPUT_DIR}/profiling_genomes/bowtie2/{{sample}}.mappedbases", sample=samples)
+        mappedbases=expand(f"{OUTPUT_DIR}/profiling_genomes/bowtie2/{{sample}}.mappedbases", sample=samples),
+        totalreads=expand(f"{OUTPUT_DIR}/profiling_genomes/bowtie2/{{sample}}.totalreads", sample=samples),
+        totalbases=expand(f"{OUTPUT_DIR}/profiling_genomes/bowtie2/{{sample}}.totalbases", sample=samples)
     output:
         f"{OUTPUT_DIR}/profiling_genomes.tsv"
     localrule: True
@@ -314,7 +335,37 @@ rule profiling_stats_merge:
     message: "Creating profiling genomes stats file..."
     shell:
         """
-        python {params.package_dir}/workflow/scripts/profiling_genomes_stats.py -r {input.mappedreads} -b {input.mappedbases} -o {output}
+        python {params.package_dir}/workflow/scripts/profiling_genomes_stats.py -r {input.mappedreads} -b {input.mappedbases} -t {input.totalreads} -B {input.totalbases} -o {output}
+        """
+
+rule dereplicating_stats:
+    input:
+        bins_map=f"{OUTPUT_DIR}/data/bins_to_files.json",
+        wdb=lambda wildcards: checkpoints.dereplicate.get(**wildcards).output[0],
+        metadata=lambda wildcards: f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv" if (QUALITY_FILE or not IGNORE_QUALITY) else []
+    output:
+        f"{OUTPUT_DIR}/dereplicating.tsv"
+    localrule: True
+    params:
+        package_dir={PACKAGE_DIR},
+        ani={DREP_ANI}
+    threads: 1
+    resources:
+        mem_mb=cap_mem_mb(1*1024),
+        runtime=cap_runtime(5)
+    message: "Creating dereplication stats file..."
+    shell:
+        """
+        metadata_arg=""
+        if [ -n "{input.metadata}" ]; then
+            metadata_arg="--metadata {input.metadata}"
+        fi
+        python {params.package_dir}/workflow/scripts/dereplicating_stats.py \
+            --bins-map {input.bins_map} \
+            --wdb {input.wdb} \
+            --ani {params.ani} \
+            $metadata_arg \
+            -o {output}
         """
 
 rule split_coverm:

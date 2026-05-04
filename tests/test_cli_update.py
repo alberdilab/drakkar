@@ -28,6 +28,25 @@ class UpdateCommandTests(unittest.TestCase):
         )
         display_mock.assert_called_once_with("1.4.0")
 
+    def test_run_update_skip_deps_uses_no_deps_flag(self) -> None:
+        completed = subprocess.CompletedProcess(args=["pip"], returncode=0)
+        with patch.object(cli_module.subprocess, "run", return_value=completed) as run_mock:
+            with patch.object(cli_module, "get_installed_drakkar_version", return_value="1.5.4"):
+                with patch.object(cli_module, "display_update_success") as display_mock:
+                    exit_code = cli_module.run_update(skip_deps=True)
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(
+            run_mock.call_args.args[0],
+            [
+                sys.executable, "-m", "pip", "install",
+                "--upgrade", "--force-reinstall",
+                "--no-deps",
+                "git+https://github.com/alberdilab/drakkar.git",
+            ],
+        )
+        display_mock.assert_called_once_with("1.5.4")
+
     def test_run_update_returns_failure_code_without_success_banner(self) -> None:
         completed = subprocess.CompletedProcess(args=["pip"], returncode=3)
         with patch.object(cli_module.subprocess, "run", return_value=completed):

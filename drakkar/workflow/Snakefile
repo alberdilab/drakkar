@@ -281,6 +281,7 @@ if WORKFLOW == "profiling":
             *([f"{OUTPUT_DIR}/profiling_genomes/final/counts.tsv"] if "genomes" in PROFILING_TYPE else []),
             *([f"{OUTPUT_DIR}/profiling_genomes/final/bases.tsv"] if "genomes" in PROFILING_TYPE else []),
             *([f"{OUTPUT_DIR}/profiling_genomes.tsv"] if "genomes" in PROFILING_TYPE else []),
+            *([f"{OUTPUT_DIR}/dereplicating.tsv"] if "genomes" in PROFILING_TYPE else []),
             *([f"{OUTPUT_DIR}/profiling_genomes/singlem/microbial_fraction.tsv"] if ("genomes" in PROFILING_TYPE and FRACTION) else []),
             *([f"{OUTPUT_DIR}/profiling_genomes/genome_gene.csv"] if "pangenomes" in PROFILING_TYPE else []),
             *([f"{OUTPUT_DIR}/profiling_pangenomes/final/final.tsv"] if "pangenomes" in PROFILING_TYPE else [])
@@ -302,7 +303,8 @@ if WORKFLOW == "dereplicating":
 
     rule all:
         input:
-            get_derep_final_files
+            get_derep_final_files,
+            f"{OUTPUT_DIR}/dereplicating.tsv"
 
 if WORKFLOW == "annotating":
 
