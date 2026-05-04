@@ -62,6 +62,9 @@ for the chosen workflow are required.
 - ``sample``: sample name.
 - ``rawreads1``: path or URL to R1 reads.
 - ``rawreads2``: path or URL to R2 reads.
+- ``accession``: ENA/SRA paired-end run accession such as ``ERR4303216`` or
+  ``SRR12345678``. Use this instead of ``rawreads1`` and ``rawreads2`` when
+  you want DRAKKAR to download the read pair automatically.
 - ``reference_name``: host reference label for host-removal workflows.
 - ``reference_path``: local path or URL to a host FASTA, or to a tarball
   containing the FASTA plus Bowtie2 index files.
@@ -74,14 +77,17 @@ Example:
 
 .. code-block:: text
 
-   sample\trawreads1\trawreads2\treference_name\treference_path\tassembly\tcoverage
-   sample1\tpath/sample1_1.fq.gz\tpath/sample1_2.fq.gz\tref1\tpath/ref1.fna\tassembly1,all\tcoverage1
-   sample2\tpath/sample2_1.fq.gz\tpath/sample2_2.fq.gz\tref1\tpath/ref1.fna\tassembly2,all\tcoverage2
+   sample\trawreads1\trawreads2\taccession\treference_name\treference_path\tassembly\tcoverage
+   sample1\tpath/sample1_1.fq.gz\tpath/sample1_2.fq.gz\t\tref1\tpath/ref1.fna\tassembly1,all\tcoverage1
+   sample2\t\t\tERR4303216\tref1\tpath/ref1.fna\tassembly2,all\tcoverage2
 
 Input notes
 ^^^^^^^^^^^
 
 - Read files can be local paths or remote URLs (http/https/ftp).
+- Sample tables can also use an ``accession`` column with ENA/SRA paired-end
+  run accessions; DRAKKAR resolves and downloads the matching R1 and R2 FASTQ
+  files automatically.
 - ``-r/--reference``, ``-x/--reference-index``, and ``reference_path`` values
   can be local files or remote URLs.
 - Reference inputs may be FASTA files, compressed FASTA files, or tarballs

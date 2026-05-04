@@ -1,3 +1,4 @@
+import csv
 import os
 import sys
 import yaml
@@ -6,7 +7,7 @@ import json
 import time
 import pandas as pd
 import shutil
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlencode
 from urllib.request import urlopen
 from pathlib import Path
 from collections import defaultdict
@@ -28,10 +29,20 @@ DRAKKAR_INTRO_STYLE = "bold #b7c7d3"
 DRAKKAR_VERSION_BADGE_STYLE = DRAKKAR_INTRO_STYLE
 BANNER_DELAY_SECONDS = 0.3
 ASSEMBLY_COLUMN_CANDIDATES = ("assembly", "coassembly")
+READ1_BASENAME_PATTERN = re.compile(r"(?:^|[._-])(?:R?1)(?:[._-]|$)", re.IGNORECASE)
+READ2_BASENAME_PATTERN = re.compile(r"(?:^|[._-])(?:R?2)(?:[._-]|$)", re.IGNORECASE)
 
 def is_url(value):
     parsed = urlparse(str(value))
     return parsed.scheme in {"http", "https", "ftp"}
+
+def _has_value(value):
+    return not (pd.isna(value) or str(value).strip() == "")
+
+def _normalized_value(value):
+    if pd.isna(value):
+        return ""
+    return str(value).strip()
 
 def download_to_cache(url, sample_name, column_name, output, cache_subdir="reads_cache", preserve_basename=False):
     cache_dir = os.path.join(output, "data", cache_subdir)
@@ -74,6 +85,157 @@ def resolve_input_manifest(manifest_path, output, cache_subdir="manifests_cache"
             preserve_basename=True,
         )
     return manifest_path
+
+def _resolve_reads_path(read_value, sample_name, column_name, output, row_number):
+    if is_url(read_value):
+        return download_to_cache(read_value, sample_name, column_name, output)
+
+    resolved_path = str(Path(read_value).resolve())
+    if not os.path.exists(resolved_path):
+        print(f"ERROR: {column_name} file not found on row {row_number}: {resolved_path}")
+        sys.exit(1)
+    return resolved_path
+
+def _normalize_ena_fastq_url(url):
+    normalized = _normalized_value(url)
+    if not normalized:
+        return None
+    if is_url(normalized):
+        return normalized
+    return f"https://{normalized.lstrip('/')}"
+
+def _split_paired_fastq_urls(urls, accession):
+    read1_urls = []
+    read2_urls = []
+    unclassified = []
+
+    for url in urls:
+        basename = os.path.basename(urlparse(url).path)
+        if READ1_BASENAME_PATTERN.search(basename):
+            read1_urls.append(url)
+        elif READ2_BASENAME_PATTERN.search(basename):
+            read2_urls.append(url)
+        else:
+            unclassified.append(url)
+
+    if unclassified:
+        if len(urls) == 2 and not read1_urls and not read2_urls:
+            return [urls[0]], [urls[1]]
+        print(
+            "ERROR: Could not determine forward and reverse FASTQ files "
+            f"for accession {accession}. Use explicit rawreads1/rawreads2 paths instead."
+        )
+        sys.exit(1)
+
+    if not read1_urls or not read2_urls or len(read1_urls) != len(read2_urls):
+        print(
+            f"ERROR: Accession {accession} did not resolve to a balanced paired-end FASTQ set. "
+            "Use explicit rawreads1/rawreads2 paths instead."
+        )
+        sys.exit(1)
+
+    return sorted(read1_urls), sorted(read2_urls)
+
+def resolve_accession_to_reads(accession, sample_name, output, row_number):
+    accession_value = _normalized_value(accession)
+    query_url = (
+        "https://www.ebi.ac.uk/ena/portal/api/filereport?"
+        + urlencode(
+            {
+                "accession": accession_value,
+                "result": "read_run",
+                "fields": "run_accession,library_layout,fastq_ftp",
+                "format": "tsv",
+            }
+        )
+    )
+    try:
+        with urlopen(query_url) as response:
+            payload = response.read().decode("utf-8")
+    except Exception as exc:
+        print(f"ERROR: Failed to resolve accession {accession_value} on row {row_number}: {exc}")
+        sys.exit(1)
+
+    reader = csv.DictReader(payload.splitlines(), delimiter="\t")
+    rows = [row for row in reader if any(_normalized_value(value) for value in row.values())]
+    if not rows:
+        print(
+            f"ERROR: No ENA/SRA FASTQ metadata were found for accession {accession_value} "
+            f"on row {row_number}."
+        )
+        sys.exit(1)
+
+    matching_rows = [row for row in rows if _normalized_value(row.get("run_accession")) == accession_value]
+    selected_row = matching_rows[0] if matching_rows else rows[0]
+    library_layout = _normalized_value(selected_row.get("library_layout")).upper()
+    fastq_field = _normalized_value(selected_row.get("fastq_ftp"))
+
+    if library_layout and library_layout != "PAIRED":
+        print(
+            f"ERROR: Accession {accession_value} on row {row_number} is reported as "
+            f"{library_layout.lower()}, but DRAKKAR expects paired-end reads here."
+        )
+        sys.exit(1)
+
+    if not fastq_field:
+        print(
+            f"ERROR: No FASTQ download links were found for accession {accession_value} "
+            f"on row {row_number}."
+        )
+        sys.exit(1)
+
+    fastq_urls = [_normalize_ena_fastq_url(item) for item in fastq_field.split(";")]
+    fastq_urls = [url for url in fastq_urls if url]
+    if not fastq_urls:
+        print(
+            f"ERROR: Accession {accession_value} on row {row_number} returned empty FASTQ links."
+        )
+        sys.exit(1)
+
+    forward_urls, reverse_urls = _split_paired_fastq_urls(fastq_urls, accession_value)
+    reads1 = [
+        download_to_cache(url, sample_name, "rawreads1", output)
+        for url in forward_urls
+    ]
+    reads2 = [
+        download_to_cache(url, sample_name, "rawreads2", output)
+        for url in reverse_urls
+    ]
+    return reads1, reads2
+
+def resolve_sample_read_lists(row, row_number, output):
+    sample = row.get("sample")
+    rawreads1 = row.get("rawreads1")
+    rawreads2 = row.get("rawreads2")
+    accession = row.get("accession")
+
+    if not _has_value(sample):
+        print(f"ERROR: Missing value in column 'sample' on row {row_number} of the sample info file.")
+        sys.exit(1)
+
+    sample_name = _normalized_value(sample)
+    accession_value = _normalized_value(accession)
+    rawreads1_value = _normalized_value(rawreads1)
+    rawreads2_value = _normalized_value(rawreads2)
+
+    if accession_value:
+        if rawreads1_value or rawreads2_value:
+            print(
+                f"ERROR: Row {row_number} of the sample info file mixes 'accession' with "
+                "'rawreads1'/'rawreads2'. Use either accession or explicit read files."
+            )
+            sys.exit(1)
+        reads1, reads2 = resolve_accession_to_reads(accession_value, sample_name, output, row_number)
+        return sample_name, reads1, reads2
+
+    for column, value in (("rawreads1", rawreads1), ("rawreads2", rawreads2)):
+        if not _has_value(value):
+            print(f"ERROR: Missing value in column '{column}' on row {row_number} of the sample info file.")
+            sys.exit(1)
+
+    reads1 = [_resolve_reads_path(rawreads1_value, sample_name, "rawreads1", output, row_number)]
+    reads2 = [_resolve_reads_path(rawreads2_value, sample_name, "rawreads2", output, row_number)]
+    return sample_name, reads1, reads2
 
 def _version_badge_lines(version):
     label = f"v{version}"
@@ -222,7 +384,12 @@ def check_screen_session():
     if "STY" not in os.environ:
         print("\n ⚠️   WARNING: You are not running this script inside a 'screen' session.")
         print("     Running long processes outside of 'screen' may cause issues if your session is disconnected.")
-        print("     \n📌 To start a screen session, use:  screen -S mysession")
+        if RichText is None:
+            print("\n 📌   To start a screen session, use: `screen -S mysession`")
+        else:
+            screen_message = RichText("\n 📌   To start a screen session, use: ")
+            screen_message.append("`screen -S mysession`", style="drakkar.code")
+            print(screen_message)
         print("         Then run this script inside the screen session.\n")
 
         # Prompt user to continue
@@ -274,37 +441,9 @@ def file_samples_to_json(infofile, output):
 
     # Populate the dictionaries
     for idx, row in df.iterrows():
-        sample = row.get("sample")
-        rawreads1 = row.get("rawreads1")
-        rawreads2 = row.get("rawreads2")
-
-        for column, value in (("sample", sample), ("rawreads1", rawreads1), ("rawreads2", rawreads2)):
-            if pd.isna(value) or str(value).strip() == "":
-                print(f"ERROR: Missing value in column '{column}' on row {idx + 1} of the sample info file.")
-                sys.exit(1)
-
-        sample_name = str(sample)
-        rawreads1_value = str(rawreads1)
-        rawreads2_value = str(rawreads2)
-
-        if is_url(rawreads1_value):
-            rawreads1_path = download_to_cache(rawreads1_value, sample_name, "rawreads1", output)
-        else:
-            rawreads1_path = str(Path(rawreads1_value).resolve())
-            if not os.path.exists(rawreads1_path):
-                print(f"ERROR: rawreads1 file not found on row {idx + 1}: {rawreads1_path}")
-                sys.exit(1)
-
-        if is_url(rawreads2_value):
-            rawreads2_path = download_to_cache(rawreads2_value, sample_name, "rawreads2", output)
-        else:
-            rawreads2_path = str(Path(rawreads2_value).resolve())
-            if not os.path.exists(rawreads2_path):
-                print(f"ERROR: rawreads2 file not found on row {idx + 1}: {rawreads2_path}")
-                sys.exit(1)
-
-        SAMPLE_TO_READS1[sample_name].append(rawreads1_path)
-        SAMPLE_TO_READS2[sample_name].append(rawreads2_path)
+        sample_name, read1_paths, read2_paths = resolve_sample_read_lists(row, idx + 1, output)
+        SAMPLE_TO_READS1[sample_name].extend(read1_paths)
+        SAMPLE_TO_READS2[sample_name].extend(read2_paths)
 
     # Convert defaultdict to standard dict (optional)
     SAMPLE_TO_READS1 = dict(SAMPLE_TO_READS1)
@@ -421,37 +560,9 @@ def file_preprocessed_to_json(infofile, output):
 
     # Populate the dictionaries
     for idx, row in df.iterrows():
-        sample = row.get("sample")
-        rawreads1 = row.get("rawreads1")
-        rawreads2 = row.get("rawreads2")
-
-        for column, value in (("sample", sample), ("rawreads1", rawreads1), ("rawreads2", rawreads2)):
-            if pd.isna(value) or str(value).strip() == "":
-                print(f"ERROR: Missing value in column '{column}' on row {idx + 1} of the sample info file.")
-                sys.exit(1)
-
-        sample_name = str(sample)
-        rawreads1_value = str(rawreads1)
-        rawreads2_value = str(rawreads2)
-
-        if is_url(rawreads1_value):
-            rawreads1_path = download_to_cache(rawreads1_value, sample_name, "rawreads1", output)
-        else:
-            rawreads1_path = str(Path(rawreads1_value).resolve())
-            if not os.path.exists(rawreads1_path):
-                print(f"ERROR: rawreads1 file not found on row {idx + 1}: {rawreads1_path}")
-                sys.exit(1)
-
-        if is_url(rawreads2_value):
-            rawreads2_path = download_to_cache(rawreads2_value, sample_name, "rawreads2", output)
-        else:
-            rawreads2_path = str(Path(rawreads2_value).resolve())
-            if not os.path.exists(rawreads2_path):
-                print(f"ERROR: rawreads2 file not found on row {idx + 1}: {rawreads2_path}")
-                sys.exit(1)
-
-        SAMPLE_TO_READS1[sample_name].append(rawreads1_path)
-        SAMPLE_TO_READS2[sample_name].append(rawreads2_path)
+        sample_name, read1_paths, read2_paths = resolve_sample_read_lists(row, idx + 1, output)
+        SAMPLE_TO_READS1[sample_name].extend(read1_paths)
+        SAMPLE_TO_READS2[sample_name].extend(read2_paths)
 
     # Convert defaultdict to standard dict (optional)
     SAMPLE_TO_READS1 = dict(SAMPLE_TO_READS1)
@@ -746,9 +857,10 @@ def file_transcriptome_to_json(infofile, output):
     SAMPLE_TO_READS2 = defaultdict(list)
 
     # Populate the dictionaries
-    for _, row in df.iterrows():
-        SAMPLE_TO_READS1[row["sample"]].append(str(Path(row["rawreads1"]).resolve()))
-        SAMPLE_TO_READS2[row["sample"]].append(str(Path(row["rawreads2"]).resolve()))
+    for idx, row in df.iterrows():
+        sample_name, read1_paths, read2_paths = resolve_sample_read_lists(row, idx + 1, output)
+        SAMPLE_TO_READS1[sample_name].extend(read1_paths)
+        SAMPLE_TO_READS2[sample_name].extend(read2_paths)
 
     # Convert defaultdict to standard dict (optional)
     SAMPLE_TO_READS1 = dict(SAMPLE_TO_READS1)

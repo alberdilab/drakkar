@@ -8,6 +8,15 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.6.1] - 2026-05-04
+
+### Changed
+
+- Made SLURM resource benchmarking explicitly default-on across workflow commands, added a shared ``--skip-benchmark`` opt-out flag, and ensured empty benchmark tables are still written when no submitted jobs are detected so the benchmark output is visible by default.
+- Broadened Snakemake SLURM submission parsing to recognize additional submission log styles such as ``Submitted batch job ...`` when building run benchmarks.
+- Allowed sample tables for preprocessing, complete, profiling, and expressing to use an ``accession`` column with paired-end ENA/SRA run accessions, which DRAKKAR now resolves and downloads into the existing forward/reverse read caches automatically.
+- Styled the screen-session startup hint so the inline ``screen -S mysession`` command is visually marked as code in Rich output and still remains clear in plain-text output.
+
 ## [1.6.0] - 2026-05-04
 
 ### Added

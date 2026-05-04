@@ -197,6 +197,14 @@ def add_resource_multiplier_arguments(parser):
     )
 
 
+def add_benchmark_argument(parser):
+    parser.add_argument(
+        "--skip-benchmark",
+        action="store_true",
+        help="Skip generating post-run SLURM resource benchmark outputs",
+    )
+
+
 def resource_config(memory_multiplier=1, time_multiplier=1):
     return f"memory_multiplier={memory_multiplier} time_multiplier={time_multiplier} "
 
@@ -725,6 +733,13 @@ def should_benchmark_run(metadata):
     return get_run_profile(metadata) == "slurm"
 
 
+def should_skip_benchmark(metadata):
+    arguments = {}
+    if isinstance(metadata, dict):
+        arguments = metadata.get("arguments") or {}
+    return bool(arguments.get("skip_benchmark"))
+
+
 def parse_int_or_none(value):
     if value in (None, ""):
         return None
@@ -837,6 +852,39 @@ def parse_snakemake_submitted_launches(log_path):
     current_block = None
     launches = []
     launch_order = 0
+    launched_internal_jobids = set()
+
+    def register_launch(block, internal_jobid, external_jobid):
+        nonlocal launch_order
+        if not block or block.get("local") or not internal_jobid or not external_jobid:
+            return
+        if internal_jobid in launched_internal_jobids:
+            return
+
+        launch_order += 1
+        resources = block.get("resources") or {}
+        requested_mem_mb = parse_float_or_none(resources.get("mem_mb"))
+        if requested_mem_mb is None:
+            requested_mem_mb = parse_float_or_none(resources.get("mem_mib"))
+        requested_runtime_min = parse_float_or_none(resources.get("runtime"))
+        launch = {
+            "launch_index": launch_order,
+            "rule": block.get("rule"),
+            "rule_type": block.get("rule_type"),
+            "internal_jobid": internal_jobid,
+            "external_jobid": str(external_jobid).rstrip("."),
+            "threads": block.get("threads"),
+            "requested_cpus": block.get("threads"),
+            "requested_mem_mb": requested_mem_mb,
+            "requested_runtime_min": requested_runtime_min,
+            "wildcards": block.get("wildcards", ""),
+            "input": block.get("input", ""),
+            "output": block.get("output", ""),
+            "resources": resources,
+        }
+        launch["logical_job_key"] = build_logical_job_key(launch)
+        launches.append(launch)
+        launched_internal_jobids.add(internal_jobid)
 
     with open(path, "r", encoding="utf-8", errors="replace") as handle:
         for raw_line in handle:
@@ -884,40 +932,40 @@ def parse_snakemake_submitted_launches(log_path):
                     continue
 
             submission_match = re.search(
-                r"Submitted job(?:id)?\s+(\d+)\s+with external jobid ['\"]?([^'\"\s]+)['\"]?",
+                r"Submitted (?:group )?job(?:id)?\s+(\d+).*?external jobid ['\"]?([^'\"\s]+)['\"]?",
                 stripped,
             )
-            if not submission_match:
+            if submission_match:
+                internal_jobid = submission_match.group(1)
+                register_launch(
+                    block_by_jobid.get(internal_jobid),
+                    internal_jobid,
+                    submission_match.group(2),
+                )
                 continue
 
-            internal_jobid = submission_match.group(1)
-            block = block_by_jobid.get(internal_jobid)
-            if not block or block.get("local"):
+            batch_submission_match = re.search(
+                r"Submitted batch job\s+['\"]?([^'\"\s]+)['\"]?\.?$",
+                stripped,
+            )
+            if batch_submission_match and current_block is not None:
+                register_launch(
+                    current_block,
+                    current_block.get("internal_jobid"),
+                    batch_submission_match.group(1),
+                )
                 continue
 
-            launch_order += 1
-            resources = block.get("resources") or {}
-            requested_mem_mb = parse_float_or_none(resources.get("mem_mb"))
-            if requested_mem_mb is None:
-                requested_mem_mb = parse_float_or_none(resources.get("mem_mib"))
-            requested_runtime_min = parse_float_or_none(resources.get("runtime"))
-            launch = {
-                "launch_index": launch_order,
-                "rule": block.get("rule"),
-                "rule_type": block.get("rule_type"),
-                "internal_jobid": internal_jobid,
-                "external_jobid": submission_match.group(2),
-                "threads": block.get("threads"),
-                "requested_cpus": block.get("threads"),
-                "requested_mem_mb": requested_mem_mb,
-                "requested_runtime_min": requested_runtime_min,
-                "wildcards": block.get("wildcards", ""),
-                "input": block.get("input", ""),
-                "output": block.get("output", ""),
-                "resources": resources,
-            }
-            launch["logical_job_key"] = build_logical_job_key(launch)
-            launches.append(launch)
+            external_only_match = re.search(
+                r"Submitted .*?external jobid ['\"]?([^'\"\s]+)['\"]?",
+                stripped,
+            )
+            if external_only_match and current_block is not None:
+                register_launch(
+                    current_block,
+                    current_block.get("internal_jobid"),
+                    external_only_match.group(1),
+                )
 
     attempt_counter = Counter()
     for launch in launches:
@@ -1024,6 +1072,52 @@ def benchmark_job_row(launch, accounting_row):
     return row
 
 
+BENCHMARK_JOB_FIELDS = [
+    "launch_index",
+    "rule",
+    "attempt",
+    "logical_job_key",
+    "internal_jobid",
+    "external_jobid",
+    "wildcards",
+    "requested_cpus",
+    "requested_mem_mb",
+    "requested_runtime_min",
+    "state",
+    "exit_code",
+    "alloc_cpus",
+    "elapsed_sec",
+    "cpu_time_sec",
+    "max_rss_mb",
+    "cpu_efficiency",
+    "memory_efficiency",
+    "runtime_efficiency",
+    "oom",
+    "timeout",
+]
+
+BENCHMARK_RULE_FIELDS = [
+    "rule",
+    "launches",
+    "logical_jobs",
+    "retries",
+    "failed_launches",
+    "oom_launches",
+    "timeout_launches",
+    "median_requested_cpus",
+    "median_alloc_cpus",
+    "median_requested_mem_mb",
+    "median_max_rss_mb",
+    "median_memory_efficiency",
+    "median_requested_runtime_min",
+    "median_elapsed_sec",
+    "median_runtime_efficiency",
+    "allocated_cpu_sec",
+    "used_cpu_sec",
+    "weighted_cpu_efficiency",
+]
+
+
 def write_tsv(path, fieldnames, rows):
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="") as handle:
@@ -1119,62 +1213,17 @@ def summarize_benchmark_rules(job_rows):
     return summaries
 
 
+def write_benchmark_tables(paths, job_rows, rule_rows):
+    write_tsv(paths["jobs"], BENCHMARK_JOB_FIELDS, job_rows)
+    write_tsv(paths["rules"], BENCHMARK_RULE_FIELDS, rule_rows)
+
+
 def generate_benchmark_reports(output_dir, run_id, job_rows):
     paths = build_benchmark_paths(output_dir, run_id)
     summary = summarize_benchmark_rows(job_rows)
     rule_rows = summarize_benchmark_rules(job_rows)
 
-    write_tsv(
-        paths["jobs"],
-        [
-            "launch_index",
-            "rule",
-            "attempt",
-            "logical_job_key",
-            "internal_jobid",
-            "external_jobid",
-            "wildcards",
-            "requested_cpus",
-            "requested_mem_mb",
-            "requested_runtime_min",
-            "state",
-            "exit_code",
-            "alloc_cpus",
-            "elapsed_sec",
-            "cpu_time_sec",
-            "max_rss_mb",
-            "cpu_efficiency",
-            "memory_efficiency",
-            "runtime_efficiency",
-            "oom",
-            "timeout",
-        ],
-        job_rows,
-    )
-    write_tsv(
-        paths["rules"],
-        [
-            "rule",
-            "launches",
-            "logical_jobs",
-            "retries",
-            "failed_launches",
-            "oom_launches",
-            "timeout_launches",
-            "median_requested_cpus",
-            "median_alloc_cpus",
-            "median_requested_mem_mb",
-            "median_max_rss_mb",
-            "median_memory_efficiency",
-            "median_requested_runtime_min",
-            "median_elapsed_sec",
-            "median_runtime_efficiency",
-            "allocated_cpu_sec",
-            "used_cpu_sec",
-            "weighted_cpu_efficiency",
-        ],
-        rule_rows,
-    )
+    write_benchmark_tables(paths, job_rows, rule_rows)
     write_benchmark_summary_file(
         paths["summary"],
         {
@@ -1209,6 +1258,27 @@ def generate_run_benchmark(output_dir, metadata_path=None, metadata=None, quiet=
         "profile": get_run_profile(metadata),
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
+
+    if should_skip_benchmark(metadata):
+        payload = {
+            **base_summary,
+            "status": "skipped",
+            "message": "Resource benchmarking was skipped because --skip-benchmark was used for this run.",
+        }
+        write_benchmark_summary_file(paths["summary"], payload)
+        update_launch_metadata(
+            metadata_path,
+            benchmark_status=payload["status"],
+            benchmark_summary=str(paths["summary"]),
+            benchmark_jobs=str(paths["jobs"]),
+            benchmark_rules=str(paths["rules"]),
+            benchmark_generated_at=payload["generated_at"],
+        )
+        return {
+            "status": payload["status"],
+            "paths": paths,
+            "summary": None,
+        }
 
     if not should_benchmark_run(metadata):
         payload = {
@@ -1259,6 +1329,7 @@ def generate_run_benchmark(output_dir, metadata_path=None, metadata=None, quiet=
 
     launches = parse_snakemake_submitted_launches(snakemake_log_path)
     if not launches:
+        write_benchmark_tables(paths, [], [])
         payload = {
             **base_summary,
             "status": "no_submitted_jobs",
@@ -1284,17 +1355,22 @@ def generate_run_benchmark(output_dir, metadata_path=None, metadata=None, quiet=
 
     sacct_rows = query_sacct_for_jobs([launch["external_jobid"] for launch in launches])
     if sacct_rows is None:
+        job_rows = [benchmark_job_row(launch, None) for launch in launches]
+        rule_rows = summarize_benchmark_rules(job_rows)
+        write_benchmark_tables(paths, job_rows, rule_rows)
+        summary = summarize_benchmark_rows(job_rows)
         payload = {
             **base_summary,
             "status": "accounting_unavailable",
-            "benchmarked_launches": len(launches),
+            **summary,
             "message": "SLURM sacct data could not be queried, so actual resource usage could not be summarized.",
+            "rules": rule_rows,
         }
         write_benchmark_summary_file(paths["summary"], payload)
         result = {
             "status": payload["status"],
             "paths": paths,
-            "summary": None,
+            "summary": summary,
         }
         update_launch_metadata(
             metadata_path,
@@ -1706,9 +1782,13 @@ def print_benchmark_summary(benchmark_result):
         return
 
     status = benchmark_result.get("status")
+    if status == "skipped":
+        section("RESOURCE BENCHMARK")
+        print("Resource benchmarking was skipped for this run because --skip-benchmark was used.")
+        return
     if status == "accounting_unavailable":
         section("RESOURCE BENCHMARK")
-        print("SLURM accounting data could not be queried, so no benchmark summary is available for this run.")
+        print("SLURM accounting data could not be queried, so actual usage metrics are unavailable for this run.")
         return
     if status == "unsupported_profile":
         section("RESOURCE BENCHMARK")
@@ -2548,6 +2628,7 @@ def main():
     subparser_complete.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_complete.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
     subparser_complete.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
+    add_benchmark_argument(subparser_complete)
     add_resource_multiplier_arguments(subparser_complete)
 
     subparser_preprocessing = subparsers.add_parser("preprocessing", help="Quality-filter reads, optionally remove host sequences, and prepare cleaned datasets for downstream analysis")
@@ -2562,6 +2643,7 @@ def main():
     subparser_preprocessing.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_preprocessing.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
     subparser_preprocessing.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
+    add_benchmark_argument(subparser_preprocessing)
     add_resource_multiplier_arguments(subparser_preprocessing)
 
     subparser_cataloging = subparsers.add_parser("cataloging", help="Assemble reads, bin genomes, and build the MAG catalog used by downstream workflows")
@@ -2573,6 +2655,7 @@ def main():
     subparser_cataloging.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_cataloging.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
     subparser_cataloging.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
+    add_benchmark_argument(subparser_cataloging)
     add_resource_multiplier_arguments(subparser_cataloging)
 
     subparser_profiling = subparsers.add_parser("profiling", help="Dereplicate MAGs and quantify genome or pangenome abundance across metagenomic samples")
@@ -2589,6 +2672,7 @@ def main():
     subparser_profiling.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_profiling.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
     subparser_profiling.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
+    add_benchmark_argument(subparser_profiling)
     add_resource_multiplier_arguments(subparser_profiling)
 
     subparser_dereplicating = subparsers.add_parser("dereplicating", help="Dereplicate genome collections and export representative MAG FASTA files without mapping reads")
@@ -2601,6 +2685,7 @@ def main():
     subparser_dereplicating.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_dereplicating.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
     subparser_dereplicating.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
+    add_benchmark_argument(subparser_dereplicating)
     add_resource_multiplier_arguments(subparser_dereplicating)
 
     subparser_annotating = subparsers.add_parser("annotating", help="Assign taxonomy and functional annotations to MAGs, genes, and derived feature tables")
@@ -2627,6 +2712,7 @@ def main():
     subparser_annotating.add_argument("-e", "--env_path", type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_annotating.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
     subparser_annotating.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
+    add_benchmark_argument(subparser_annotating)
     add_resource_multiplier_arguments(subparser_annotating)
 
     subparser_inspecting = subparsers.add_parser("inspecting", help="Combine bins and coverage or mapping inputs into inspection-ready summaries for follow-up exploration")
@@ -2638,6 +2724,7 @@ def main():
     subparser_inspecting.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_inspecting.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
     subparser_inspecting.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
+    add_benchmark_argument(subparser_inspecting)
     add_resource_multiplier_arguments(subparser_inspecting)
 
     subparser_expressing = subparsers.add_parser("expressing", help="Quantify microbial gene expression from reads against MAG-derived gene predictions")
@@ -2649,6 +2736,7 @@ def main():
     subparser_expressing.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_expressing.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
     subparser_expressing.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
+    add_benchmark_argument(subparser_expressing)
     add_resource_multiplier_arguments(subparser_expressing)
 
     database_parent = RichArgumentParser(add_help=False)
@@ -2659,6 +2747,7 @@ def main():
     database_parent.add_argument("--set-default", action="store_true", help="Update config.yaml to use this installed database release by default")
     database_parent.add_argument("-e", "--env_path", type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     database_parent.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
+    add_benchmark_argument(database_parent)
     add_resource_multiplier_arguments(database_parent)
 
     subparser_database = subparsers.add_parser("database", help="Install or update managed annotation database releases used by Drakkar workflows")
@@ -2674,6 +2763,7 @@ def main():
     subparser_environments = subparsers.add_parser("environments", help="Pre-build Drakkar conda environments before launching workflow jobs")
     subparser_environments.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_environments.add_argument("--profile", default="local", choices=["local", "slurm"])
+    add_benchmark_argument(subparser_environments)
     add_resource_multiplier_arguments(subparser_environments)
 
     subparser_unlock = subparsers.add_parser("unlock", help="Remove a stale Snakemake lock from a Drakkar output directory")
@@ -2748,7 +2838,7 @@ def main():
         sections=[
             ("Input Sources", ["input", "file", "reference", "reference_index"]),
             ("Workflow Scope", ["mode", "type", "annotation_type", "gtdb_version", "multicoverage", "fraction", "nonpareil", "ani"]),
-            ("Run Configuration", ["output", "env_path", "profile", "overwrite"]),
+            ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
         ],
     )
@@ -2764,7 +2854,7 @@ def main():
         sections=[
             ("Input Sources", ["input", "file", "reference", "reference_index"]),
             ("Optional Analyses", ["fraction", "nonpareil"]),
-            ("Run Configuration", ["output", "env_path", "profile", "overwrite"]),
+            ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
         ],
     )
@@ -2780,7 +2870,7 @@ def main():
         sections=[
             ("Input Sources", ["input", "file"]),
             ("Assembly Strategy", ["mode", "multicoverage"]),
-            ("Run Configuration", ["output", "env_path", "profile", "overwrite"]),
+            ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
         ],
     )
@@ -2797,7 +2887,7 @@ def main():
         sections=[
             ("Input Sources", ["bins_dir", "bins_file", "reads_dir", "reads_file"]),
             ("Analysis Settings", ["type", "fraction", "ani", "ignore_quality", "quality"]),
-            ("Run Configuration", ["output", "env_path", "profile", "overwrite"]),
+            ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
         ],
     )
@@ -2813,7 +2903,7 @@ def main():
         sections=[
             ("Input Genomes", ["bins_dir", "bins_file"]),
             ("Dereplication Settings", ["ani", "ignore_quality", "quality"]),
-            ("Run Configuration", ["output", "env_path", "profile", "overwrite"]),
+            ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
         ],
     )
@@ -2829,7 +2919,7 @@ def main():
         sections=[
             ("Input Genomes", ["bins_dir", "bins_file"]),
             ("Annotation Scope", ["annotation_type", "gtdb_version"]),
-            ("Run Configuration", ["output", "env_path", "profile", "overwrite"]),
+            ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
         ],
     )
@@ -2844,7 +2934,7 @@ def main():
         ],
         sections=[
             ("Input Sources", ["bins_dir", "bins_file", "mapping_dir", "cov_file"]),
-            ("Run Configuration", ["output", "env_path", "profile", "overwrite"]),
+            ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
         ],
     )
@@ -2859,7 +2949,7 @@ def main():
         ],
         sections=[
             ("Input Sources", ["bins_dir", "bins_file", "reads_dir", "reads_file"]),
-            ("Run Configuration", ["output", "env_path", "profile", "overwrite"]),
+            ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
         ],
     )
@@ -2923,7 +3013,7 @@ def main():
             examples=examples,
             sections=[
                 ("Release Settings", ["directory", "version", "download_runtime", "set_default"]),
-                ("Run Configuration", ["env_path", "profile", "overwrite"]),
+                ("Run Configuration", ["env_path", "profile", "overwrite", "skip_benchmark"]),
                 ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
             ],
         )
@@ -2937,7 +3027,7 @@ def main():
             "drakkar environments -e /shared/drakkar_envs --profile slurm",
         ],
         sections=[
-            ("Environment Setup", ["env_path", "profile"]),
+            ("Environment Setup", ["env_path", "profile", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
         ],
     )

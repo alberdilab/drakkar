@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from drakkar import output
+from drakkar import utils
 
 
 class OutputTests(unittest.TestCase):
@@ -37,6 +38,19 @@ class OutputTests(unittest.TestCase):
 
         with patch.dict(output.os.environ, {"DRAKKAR_NO_COLOR": "1"}, clear=True):
             self.assertFalse(output._should_force_terminal(sys.__stdout__))
+
+    def test_screen_session_warning_formats_command_as_code(self) -> None:
+        buffer = io.StringIO()
+        with (
+            contextlib.redirect_stdout(buffer),
+            patch.dict(utils.os.environ, {}, clear=True),
+            patch("drakkar.utils.prompt", return_value="1"),
+        ):
+            utils.check_screen_session()
+
+        rendered = buffer.getvalue()
+        self.assertIn("To start a screen session, use:", rendered)
+        self.assertIn("`screen -S mysession`", rendered)
 
 
 if __name__ == "__main__":

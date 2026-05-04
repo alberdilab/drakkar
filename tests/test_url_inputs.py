@@ -13,6 +13,8 @@ from drakkar.utils import (
     file_bins_to_json,
     file_mags_to_json,
     file_references_to_json,
+    file_samples_to_json,
+    file_transcriptome_to_json,
 )
 
 
@@ -26,6 +28,80 @@ class FakeResponse(io.BytesIO):
 
 
 class UrlGenomeInputTests(unittest.TestCase):
+    def test_file_samples_to_json_downloads_reads_from_accession(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            infofile = Path(tmpdir) / "info.tsv"
+            infofile.write_text(
+                "sample\taccession\n"
+                "sample1\tERR4303216\n",
+                encoding="utf-8",
+            )
+
+            with patch(
+                "drakkar.utils.urlopen",
+                side_effect=[
+                    FakeResponse(
+                        (
+                            "run_accession\tlibrary_layout\tfastq_ftp\n"
+                            "ERR4303216\tPAIRED\tftp.sra.ebi.ac.uk/vol1/fastq/ERR430/006/ERR4303216/ERR4303216_1.fastq.gz;"
+                            "ftp.sra.ebi.ac.uk/vol1/fastq/ERR430/006/ERR4303216/ERR4303216_2.fastq.gz\n"
+                        ).encode("utf-8")
+                    ),
+                    FakeResponse(b"read1"),
+                    FakeResponse(b"read2"),
+                ],
+            ):
+                file_samples_to_json(str(infofile), tmpdir)
+
+            reads1_json = Path(tmpdir) / "data" / "sample_to_reads1.json"
+            reads2_json = Path(tmpdir) / "data" / "sample_to_reads2.json"
+            sample_to_reads1 = json.loads(reads1_json.read_text(encoding="utf-8"))
+            sample_to_reads2 = json.loads(reads2_json.read_text(encoding="utf-8"))
+            expected_read1 = Path(tmpdir) / "data" / "reads_cache" / "sample1_ERR4303216_1.fastq.gz"
+            expected_read2 = Path(tmpdir) / "data" / "reads_cache" / "sample1_ERR4303216_2.fastq.gz"
+
+            self.assertEqual(sample_to_reads1["sample1"], [str(expected_read1)])
+            self.assertEqual(sample_to_reads2["sample1"], [str(expected_read2)])
+            self.assertTrue(expected_read1.exists())
+            self.assertTrue(expected_read2.exists())
+
+    def test_file_transcriptome_to_json_downloads_reads_from_accession(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            infofile = Path(tmpdir) / "transcriptome.tsv"
+            infofile.write_text(
+                "sample\taccession\n"
+                "sample_tx\tSRR12345678\n",
+                encoding="utf-8",
+            )
+
+            with patch(
+                "drakkar.utils.urlopen",
+                side_effect=[
+                    FakeResponse(
+                        (
+                            "run_accession\tlibrary_layout\tfastq_ftp\n"
+                            "SRR12345678\tPAIRED\tftp.sra.ebi.ac.uk/vol1/fastq/SRR123/078/SRR12345678/SRR12345678_1.fastq.gz;"
+                            "ftp.sra.ebi.ac.uk/vol1/fastq/SRR123/078/SRR12345678/SRR12345678_2.fastq.gz\n"
+                        ).encode("utf-8")
+                    ),
+                    FakeResponse(b"tx1"),
+                    FakeResponse(b"tx2"),
+                ],
+            ):
+                file_transcriptome_to_json(str(infofile), tmpdir)
+
+            reads1_json = Path(tmpdir) / "data" / "transcriptome_to_reads1.json"
+            reads2_json = Path(tmpdir) / "data" / "transcriptome_to_reads2.json"
+            transcriptome_to_reads1 = json.loads(reads1_json.read_text(encoding="utf-8"))
+            transcriptome_to_reads2 = json.loads(reads2_json.read_text(encoding="utf-8"))
+            expected_read1 = Path(tmpdir) / "data" / "reads_cache" / "sample_tx_SRR12345678_1.fastq.gz"
+            expected_read2 = Path(tmpdir) / "data" / "reads_cache" / "sample_tx_SRR12345678_2.fastq.gz"
+
+            self.assertEqual(transcriptome_to_reads1["sample_tx"], [str(expected_read1)])
+            self.assertEqual(transcriptome_to_reads2["sample_tx"], [str(expected_read2)])
+            self.assertTrue(expected_read1.exists())
+            self.assertTrue(expected_read2.exists())
+
     def test_file_references_to_json_downloads_reference_url(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             infofile = Path(tmpdir) / "info.tsv"

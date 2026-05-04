@@ -34,6 +34,9 @@ Run the full workflow from a sample table:
 drakkar complete -f input_info.tsv -o drakkar_output
 ```
 
+Sample tables can point to local read files, remote read URLs, or a paired-end
+ENA/SRA run accession in an `accession` column such as `ERR4303216`.
+
 On clusters that provide a module build, load the module first:
 
 ```bash

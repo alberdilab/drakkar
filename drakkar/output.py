@@ -30,6 +30,7 @@ DRAKKAR_THEME = (
             "drakkar.prompt": "bold #5f9ea0",
             "drakkar.help": "#b7c7d3",
             "drakkar.text": "#e6edf3",
+            "drakkar.code": "bold #10161c on #b7c7d3",
         }
     )
     if Theme

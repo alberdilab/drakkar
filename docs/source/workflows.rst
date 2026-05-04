@@ -53,7 +53,8 @@ Run the full pipeline in sequence:
 Options:
 
 - ``-i/--input``: input directory for reads.
-- ``-f/--file``: sample info table (TSV).
+- ``-f/--file``: sample info table (TSV), with read pairs provided either as
+  ``rawreads1``/``rawreads2`` or as an ENA/SRA ``accession``.
 - ``-o/--output``: output directory.
 - ``-r/--reference``: local path or URL to a host reference genome for preprocessing.
 - ``-x/--reference-index``: local path or URL to a tarball containing a host
@@ -85,7 +86,8 @@ and preprocessing summaries.
 Options:
 
 - ``-i/--input``: input directory for raw reads.
-- ``-f/--file``: sample info table.
+- ``-f/--file``: sample info table, with read pairs provided either as
+  ``rawreads1``/``rawreads2`` or as an ENA/SRA ``accession``.
 - ``-o/--output``: output directory.
 - ``-r/--reference``: local path or URL to a host reference genome file.
 - ``-x/--reference-index``: local path or URL to a tarball containing a host
@@ -108,7 +110,8 @@ Assembles reads, bins contigs into MAGs, generates bin metadata, and writes
 Options:
 
 - ``-i/--input``: directory with preprocessed reads or compatible workflow input.
-- ``-f/--file``: sample info table.
+- ``-f/--file``: sample info table, with read pairs provided either as
+  ``rawreads1``/``rawreads2`` or as an ENA/SRA ``accession``.
 - ``-o/--output``: output directory.
 - ``-m/--mode``: assembly modes such as ``individual`` and ``all``.
 - ``-c/--multicoverage``: enable multicoverage mapping.
@@ -130,7 +133,8 @@ Options:
 - ``-b/--bins_dir``: directory with MAG/bin FASTA files.
 - ``-B/--bins_file``: file listing MAG/bin paths.
 - ``-r/--reads_dir``: directory with reads.
-- ``-R/--reads_file``: sample info table with reads.
+- ``-R/--reads_file``: sample info table with reads, using either
+  ``rawreads1``/``rawreads2`` or an ENA/SRA ``accession``.
 - ``-o/--output``: output directory.
 - ``-t/--type``: profiling type (``genomes`` or ``pangenomes``).
 - ``-f/--fraction``: compute microbial fraction with SingleM.
@@ -205,7 +209,8 @@ Options:
 - ``-b/--bins_dir``: directory with MAG/bin FASTA files.
 - ``-B/--bins_file``: file listing MAG/bin paths.
 - ``-r/--reads_dir``: directory with transcriptome reads.
-- ``-R/--reads_file``: transcriptome sample table.
+- ``-R/--reads_file``: transcriptome sample table, using either
+  ``rawreads1``/``rawreads2`` or an ENA/SRA ``accession``.
 - ``-o/--output``: output directory.
 - ``-e/--env_path``: shared Conda environment directory.
 - ``-p/--profile``: Snakemake profile.

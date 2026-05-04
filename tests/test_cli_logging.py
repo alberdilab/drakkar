@@ -231,6 +231,30 @@ class LoggingCommandTests(unittest.TestCase):
             self.assertEqual(launches[0]["requested_mem_mb"], 16000.0)
             self.assertEqual(launches[1]["requested_runtime_min"], 60.0)
 
+    def test_parse_snakemake_submitted_launches_accepts_sbatch_style_submission_lines(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = Path(tmpdir) / "drakkar_test.snakemake.log"
+            log_path.write_text(
+                "\n".join(
+                    [
+                        "rule map_reads:",
+                        "    jobid: 1",
+                        "    wildcards: sample=A",
+                        "    threads: 8",
+                        "    resources: mem_mb=16000, runtime=30, tmpdir=/tmp",
+                        "Submitted batch job 501234",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            launches = cli_module.parse_snakemake_submitted_launches(log_path)
+
+            self.assertEqual(len(launches), 1)
+            self.assertEqual(launches[0]["internal_jobid"], "1")
+            self.assertEqual(launches[0]["external_jobid"], "501234")
+
     def test_generate_run_benchmark_writes_reports_and_summary(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             args = argparse.Namespace(command="cataloging", output=tmpdir, profile="slurm")
@@ -332,6 +356,30 @@ class LoggingCommandTests(unittest.TestCase):
             self.assertEqual(summary["retries"], 1)
             self.assertIn("rules", summary)
 
+    def test_generate_run_benchmark_writes_empty_tables_when_no_submitted_jobs_are_found(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            args = argparse.Namespace(command="profiling", output=tmpdir, profile="slurm")
+            run_info = cli_module.write_launch_metadata(args, tmpdir)
+            Path(run_info["snakemake_log_path"]).write_text(
+                "\n".join(
+                    [
+                        "rule dereplicate:",
+                        "    jobid: 1",
+                        "Finished jobid: 1 (Rule: dereplicate)",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = cli_module.generate_run_benchmark(tmpdir, metadata_path=run_info["metadata_path"], quiet=True)
+
+            self.assertEqual(result["status"], "no_submitted_jobs")
+            self.assertTrue(Path(result["paths"]["jobs"]).exists())
+            self.assertTrue(Path(result["paths"]["rules"]).exists())
+            self.assertEqual(Path(result["paths"]["jobs"]).read_text(encoding="utf-8").strip(), "\t".join(cli_module.BENCHMARK_JOB_FIELDS))
+            self.assertEqual(Path(result["paths"]["rules"]).read_text(encoding="utf-8").strip(), "\t".join(cli_module.BENCHMARK_RULE_FIELDS))
+
     def test_generate_run_benchmark_writes_root_status_file_for_non_slurm_runs(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             args = argparse.Namespace(command="cataloging", output=tmpdir, profile="local")
@@ -348,6 +396,19 @@ class LoggingCommandTests(unittest.TestCase):
             summary = yaml.safe_load(summary_path.read_text(encoding="utf-8"))
             self.assertEqual(summary["status"], "unsupported_profile")
             self.assertEqual(summary["profile"], "local")
+
+    def test_generate_run_benchmark_honors_skip_benchmark_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            args = argparse.Namespace(command="cataloging", output=tmpdir, profile="slurm", skip_benchmark=True)
+            run_info = cli_module.write_launch_metadata(args, tmpdir)
+            Path(run_info["snakemake_log_path"]).write_text("rule assemble:\n    jobid: 1\nSubmitted batch job 12345\n", encoding="utf-8")
+
+            result = cli_module.generate_run_benchmark(tmpdir, metadata_path=run_info["metadata_path"], quiet=True)
+
+            self.assertEqual(result["status"], "skipped")
+            summary = yaml.safe_load(Path(result["paths"]["summary"]).read_text(encoding="utf-8"))
+            self.assertEqual(summary["status"], "skipped")
+            self.assertIn("--skip-benchmark", summary["message"])
 
     def test_run_logging_summary_prints_benchmark_section_for_slurm_runs(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
