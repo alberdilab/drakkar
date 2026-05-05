@@ -23,6 +23,9 @@ from drakkar.ascii import (
 )
 from drakkar.output import Text as RichText, print, prompt
 
+class DownloadError(Exception):
+    pass
+
 DRAKKAR_SHIP_STYLE = "bold #5f9ea0"
 DRAKKAR_LOGO_STYLE = "bold #d6a642"
 DRAKKAR_INTRO_STYLE = "bold #b7c7d3"
@@ -44,7 +47,7 @@ def _normalized_value(value):
         return ""
     return str(value).strip()
 
-def download_to_cache(url, sample_name, column_name, output, cache_subdir="reads_cache", preserve_basename=False):
+def download_to_cache(url, sample_name, column_name, output, cache_subdir="reads_cache", preserve_basename=False, max_retries=3):
     cache_dir = os.path.join(output, "data", cache_subdir)
     os.makedirs(cache_dir, exist_ok=True)
     parsed = urlparse(url)
@@ -60,17 +63,22 @@ def download_to_cache(url, sample_name, column_name, output, cache_subdir="reads
 
     print(f"Downloading {column_name} for {sample_name} from {url}", flush=True)
     tmp_path = f"{dest_path}.tmp"
-    try:
-        with urlopen(url) as response, open(tmp_path, "wb") as handle:
-            shutil.copyfileobj(response, handle)
-    except Exception as exc:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
-        print(f"ERROR: Failed to download {url}: {exc}")
-        sys.exit(1)
-    os.replace(tmp_path, dest_path)
-    print(f"Saved {column_name} for {sample_name} to {dest_path}", flush=True)
-    return dest_path
+    for attempt in range(1, max_retries + 1):
+        try:
+            with urlopen(url) as response, open(tmp_path, "wb") as handle:
+                shutil.copyfileobj(response, handle)
+            os.replace(tmp_path, dest_path)
+            print(f"Saved {column_name} for {sample_name} to {dest_path}", flush=True)
+            return dest_path
+        except Exception as exc:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            if attempt < max_retries:
+                delay = 5 * (3 ** (attempt - 1))
+                print(f"WARNING: Download attempt {attempt}/{max_retries} failed for {url}: {exc}. Retrying in {delay}s...", flush=True)
+                time.sleep(delay)
+            else:
+                raise DownloadError(f"Failed to download {url} after {max_retries} attempts: {exc}")
 
 def resolve_input_manifest(manifest_path, output, cache_subdir="manifests_cache", label="manifest"):
     if is_url(manifest_path):
@@ -121,18 +129,16 @@ def _split_paired_fastq_urls(urls, accession):
     if unclassified:
         if len(urls) == 2 and not read1_urls and not read2_urls:
             return [urls[0]], [urls[1]]
-        print(
-            "ERROR: Could not determine forward and reverse FASTQ files "
+        raise DownloadError(
+            "Could not determine forward and reverse FASTQ files "
             f"for accession {accession}. Use explicit rawreads1/rawreads2 paths instead."
         )
-        sys.exit(1)
 
     if not read1_urls or not read2_urls or len(read1_urls) != len(read2_urls):
-        print(
-            f"ERROR: Accession {accession} did not resolve to a balanced paired-end FASTQ set. "
+        raise DownloadError(
+            f"Accession {accession} did not resolve to a balanced paired-end FASTQ set. "
             "Use explicit rawreads1/rawreads2 paths instead."
         )
-        sys.exit(1)
 
     return sorted(read1_urls), sorted(read2_urls)
 
@@ -149,21 +155,27 @@ def resolve_accession_to_reads(accession, sample_name, output, row_number):
             }
         )
     )
-    try:
-        with urlopen(query_url) as response:
-            payload = response.read().decode("utf-8")
-    except Exception as exc:
-        print(f"ERROR: Failed to resolve accession {accession_value} on row {row_number}: {exc}")
-        sys.exit(1)
+    payload = None
+    for attempt in range(1, 4):
+        try:
+            with urlopen(query_url) as response:
+                payload = response.read().decode("utf-8")
+            break
+        except Exception as exc:
+            if attempt < 3:
+                delay = 5 * (3 ** (attempt - 1))
+                print(f"WARNING: ENA API query attempt {attempt}/3 failed for accession {accession_value}: {exc}. Retrying in {delay}s...", flush=True)
+                time.sleep(delay)
+            else:
+                raise DownloadError(f"Failed to query ENA API for accession {accession_value} on row {row_number}: {exc}")
 
     reader = csv.DictReader(payload.splitlines(), delimiter="\t")
     rows = [row for row in reader if any(_normalized_value(value) for value in row.values())]
     if not rows:
-        print(
-            f"ERROR: No ENA/SRA FASTQ metadata were found for accession {accession_value} "
+        raise DownloadError(
+            f"No ENA/SRA FASTQ metadata were found for accession {accession_value} "
             f"on row {row_number}."
         )
-        sys.exit(1)
 
     matching_rows = [row for row in rows if _normalized_value(row.get("run_accession")) == accession_value]
     selected_row = matching_rows[0] if matching_rows else rows[0]
@@ -171,26 +183,23 @@ def resolve_accession_to_reads(accession, sample_name, output, row_number):
     fastq_field = _normalized_value(selected_row.get("fastq_ftp"))
 
     if library_layout and library_layout != "PAIRED":
-        print(
-            f"ERROR: Accession {accession_value} on row {row_number} is reported as "
+        raise DownloadError(
+            f"Accession {accession_value} on row {row_number} is reported as "
             f"{library_layout.lower()}, but DRAKKAR expects paired-end reads here."
         )
-        sys.exit(1)
 
     if not fastq_field:
-        print(
-            f"ERROR: No FASTQ download links were found for accession {accession_value} "
+        raise DownloadError(
+            f"No FASTQ download links were found for accession {accession_value} "
             f"on row {row_number}."
         )
-        sys.exit(1)
 
     fastq_urls = [_normalize_ena_fastq_url(item) for item in fastq_field.split(";")]
     fastq_urls = [url for url in fastq_urls if url]
     if not fastq_urls:
-        print(
-            f"ERROR: Accession {accession_value} on row {row_number} returned empty FASTQ links."
+        raise DownloadError(
+            f"Accession {accession_value} on row {row_number} returned empty FASTQ links."
         )
-        sys.exit(1)
 
     forward_urls, reverse_urls = _split_paired_fastq_urls(fastq_urls, accession_value)
     reads1 = [
@@ -432,24 +441,29 @@ def check_assembly_column(file_path):
     return True
 
 def file_samples_to_json(infofile, output):
-    # Load sample info file
     df = pd.read_csv(infofile, sep="\t")
 
-    # Initialize dictionaries with lists
     SAMPLE_TO_READS1 = defaultdict(list)
     SAMPLE_TO_READS2 = defaultdict(list)
+    errors = []
 
-    # Populate the dictionaries
     for idx, row in df.iterrows():
-        sample_name, read1_paths, read2_paths = resolve_sample_read_lists(row, idx + 1, output)
-        SAMPLE_TO_READS1[sample_name].extend(read1_paths)
-        SAMPLE_TO_READS2[sample_name].extend(read2_paths)
+        try:
+            sample_name, read1_paths, read2_paths = resolve_sample_read_lists(row, idx + 1, output)
+            SAMPLE_TO_READS1[sample_name].extend(read1_paths)
+            SAMPLE_TO_READS2[sample_name].extend(read2_paths)
+        except DownloadError as exc:
+            errors.append(str(exc))
 
-    # Convert defaultdict to standard dict (optional)
+    if errors:
+        print(f"ERROR: {len(errors)} file(s) could not be downloaded:")
+        for error in errors:
+            print(f"  - {error}")
+        sys.exit(1)
+
     SAMPLE_TO_READS1 = dict(SAMPLE_TO_READS1)
     SAMPLE_TO_READS2 = dict(SAMPLE_TO_READS2)
 
-    # Save dictionaries to JSON files
     os.makedirs(f"{output}/data", exist_ok=True)
     with open(f"{output}/data/sample_to_reads1.json", "w") as f:
         json.dump(SAMPLE_TO_READS1, f)
@@ -459,24 +473,34 @@ def file_samples_to_json(infofile, output):
 
 
 def file_references_to_json(infofile, output):
-    # Load sample info file
     df = pd.read_csv(infofile, sep="\t")
 
     REFERENCE_TO_FILE = {}
+    errors = []
     for ref_name, ref_path in zip(df["reference_name"], df["reference_path"]):
         ref_name_value = str(ref_name)
         ref_path_value = str(ref_path)
         if is_url(ref_path_value):
-            resolved_ref_path = download_to_cache(
-                ref_path_value,
-                ref_name_value,
-                "reference_path",
-                output,
-                cache_subdir="references_cache",
-            )
+            try:
+                resolved_ref_path = download_to_cache(
+                    ref_path_value,
+                    ref_name_value,
+                    "reference_path",
+                    output,
+                    cache_subdir="references_cache",
+                )
+            except DownloadError as exc:
+                errors.append(str(exc))
+                continue
         else:
             resolved_ref_path = str(Path(ref_path_value).resolve())
         REFERENCE_TO_FILE[ref_name_value] = resolved_ref_path
+
+    if errors:
+        print(f"ERROR: {len(errors)} file(s) could not be downloaded:")
+        for error in errors:
+            print(f"  - {error}")
+        sys.exit(1)
 
     os.makedirs(f"{output}/data", exist_ok=True)
     with open(f"{output}/data/reference_to_file.json", "w") as f:
@@ -551,24 +575,29 @@ def argument_references_to_json(argument, sample_to_reads, output):
         json.dump(SAMPLE_TO_REFERENCE, f, indent=4)
 
 def file_preprocessed_to_json(infofile, output):
-    # Load sample info file
     df = pd.read_csv(infofile, sep="\t")
 
-    # Initialize dictionaries with lists
     SAMPLE_TO_READS1 = defaultdict(list)
     SAMPLE_TO_READS2 = defaultdict(list)
+    errors = []
 
-    # Populate the dictionaries
     for idx, row in df.iterrows():
-        sample_name, read1_paths, read2_paths = resolve_sample_read_lists(row, idx + 1, output)
-        SAMPLE_TO_READS1[sample_name].extend(read1_paths)
-        SAMPLE_TO_READS2[sample_name].extend(read2_paths)
+        try:
+            sample_name, read1_paths, read2_paths = resolve_sample_read_lists(row, idx + 1, output)
+            SAMPLE_TO_READS1[sample_name].extend(read1_paths)
+            SAMPLE_TO_READS2[sample_name].extend(read2_paths)
+        except DownloadError as exc:
+            errors.append(str(exc))
 
-    # Convert defaultdict to standard dict (optional)
+    if errors:
+        print(f"ERROR: {len(errors)} file(s) could not be downloaded:")
+        for error in errors:
+            print(f"  - {error}")
+        sys.exit(1)
+
     SAMPLE_TO_READS1 = dict(SAMPLE_TO_READS1)
     SAMPLE_TO_READS2 = dict(SAMPLE_TO_READS2)
 
-    # Save dictionaries to JSON files
     os.makedirs(f"{output}/data", exist_ok=True)
     with open(f"{output}/data/preprocessed_to_reads1.json", "w") as f:
         json.dump(SAMPLE_TO_READS1, f)
@@ -689,28 +718,35 @@ def file_bins_to_json(paths_file=None, output=False):
             raise FileNotFoundError(f"Bin file not found: {paths_file}")
 
     fasta_re = re.compile(r"\.(?:fa|fna|fasta)(?:\.gz)?$", re.IGNORECASE)
+    errors = []
 
-    # Read the paths file
     with open(paths_file, "r") as f:
         for line in f:
             full_path = line.strip()
             if not full_path:
                 continue
             if is_url(full_path):
-                full_path = download_to_cache(
-                    full_path,
-                    "",
-                    "genome",
-                    output,
-                    cache_subdir="genomes_cache",
-                    preserve_basename=True,
-                )
+                try:
+                    full_path = download_to_cache(
+                        full_path,
+                        "",
+                        "genome",
+                        output,
+                        cache_subdir="genomes_cache",
+                        preserve_basename=True,
+                    )
+                except DownloadError as exc:
+                    errors.append(str(exc))
+                    continue
 
-            # Extract filename without path and extension (supports .gz)
             filename = fasta_re.sub("", os.path.basename(full_path))
-
-            # Store in dictionary
             fasta_dict[filename] = full_path
+
+    if errors:
+        print(f"ERROR: {len(errors)} file(s) could not be downloaded:")
+        for error in errors:
+            print(f"  - {error}")
+        sys.exit(1)
 
     os.makedirs(f"{output}/data", exist_ok=True)
     with open(f"{output}/data/bins_to_files.json", "w") as f:
@@ -746,27 +782,35 @@ def file_mags_to_json(paths_file=None, output=False):
     if not os.path.isfile(paths_file):
         raise FileNotFoundError(f"MAG file not found: {paths_file}")
 
-    # Read the paths file
+    errors = []
+
     with open(paths_file, "r") as f:
         for line in f:
             full_path = line.strip()
             if not full_path:
                 continue
             if is_url(full_path):
-                full_path = download_to_cache(
-                    full_path,
-                    "",
-                    "genome",
-                    output,
-                    cache_subdir="genomes_cache",
-                    preserve_basename=True,
-                )
+                try:
+                    full_path = download_to_cache(
+                        full_path,
+                        "",
+                        "genome",
+                        output,
+                        cache_subdir="genomes_cache",
+                        preserve_basename=True,
+                    )
+                except DownloadError as exc:
+                    errors.append(str(exc))
+                    continue
 
-            # Extract filename without path and extension (supports .gz)
             filename = fasta_re.sub("", os.path.basename(full_path))
-
-            # Store in dictionary
             fasta_dict[filename] = full_path
+
+    if errors:
+        print(f"ERROR: {len(errors)} file(s) could not be downloaded:")
+        for error in errors:
+            print(f"  - {error}")
+        sys.exit(1)
 
     os.makedirs(f"{output}/data", exist_ok=True)
     with open(f"{output}/data/mags_to_files.json", "w") as f:
@@ -849,24 +893,29 @@ def preprocessing_summary(summary_table, bar_width=50):
 
 
 def file_transcriptome_to_json(infofile, output):
-    # Load sample info file
     df = pd.read_csv(infofile, sep="\t")
 
-    # Initialize dictionaries with lists
     SAMPLE_TO_READS1 = defaultdict(list)
     SAMPLE_TO_READS2 = defaultdict(list)
+    errors = []
 
-    # Populate the dictionaries
     for idx, row in df.iterrows():
-        sample_name, read1_paths, read2_paths = resolve_sample_read_lists(row, idx + 1, output)
-        SAMPLE_TO_READS1[sample_name].extend(read1_paths)
-        SAMPLE_TO_READS2[sample_name].extend(read2_paths)
+        try:
+            sample_name, read1_paths, read2_paths = resolve_sample_read_lists(row, idx + 1, output)
+            SAMPLE_TO_READS1[sample_name].extend(read1_paths)
+            SAMPLE_TO_READS2[sample_name].extend(read2_paths)
+        except DownloadError as exc:
+            errors.append(str(exc))
 
-    # Convert defaultdict to standard dict (optional)
+    if errors:
+        print(f"ERROR: {len(errors)} file(s) could not be downloaded:")
+        for error in errors:
+            print(f"  - {error}")
+        sys.exit(1)
+
     SAMPLE_TO_READS1 = dict(SAMPLE_TO_READS1)
     SAMPLE_TO_READS2 = dict(SAMPLE_TO_READS2)
 
-    # Save dictionaries to JSON files
     os.makedirs(f"{output}/data", exist_ok=True)
     with open(f"{output}/data/transcriptome_to_reads1.json", "w") as f:
         json.dump(SAMPLE_TO_READS1, f)

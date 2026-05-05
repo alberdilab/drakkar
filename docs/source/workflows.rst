@@ -149,6 +149,10 @@ Annotating
 ^^^^^^^^^^
 
 Annotates dereplicated MAGs taxonomically and/or functionally.
+When taxonomy annotation is enabled, DRAKKAR also writes
+``annotating/bacteria.tree`` and, when archaeal MAGs are present,
+``annotating/archaea.tree`` by pruning GTDB-Tk classify trees down to the
+input genomes only.
 
 .. code-block:: console
 

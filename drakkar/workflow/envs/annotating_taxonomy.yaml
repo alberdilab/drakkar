@@ -5,3 +5,4 @@ channels:
 dependencies:
   - numpy=1.9
   - gtdbtk==2.4.0
+  - biopython

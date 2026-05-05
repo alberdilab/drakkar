@@ -4,9 +4,16 @@ This project tracks release notes here from this point forward.
 
 ## [Unreleased]
 
+## [1.6.2] - 2026-05-05
+
 ### Added
 
-- No unreleased changes yet.
+- Added pruned GTDB-Tk output trees for taxonomy annotation so ``annotating/bacteria.tree`` and optional ``annotating/archaea.tree`` keep only the input MAG genomes and exclude GTDB reference tips.
+
+### Changed
+
+- ENA/SRA and URL file downloads now retry up to three times with exponential backoff (5 s, 15 s, 45 s) before giving up on a single file.
+- All file-downloading loops (samples, references, bins, MAGs, preprocessed reads, transcriptomes) now continue past individual download failures and report the full list of failed files at the end instead of stopping on the first error.
 
 ## [1.6.1] - 2026-05-04
 

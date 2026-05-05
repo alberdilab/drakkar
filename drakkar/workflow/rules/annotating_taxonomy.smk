@@ -105,3 +105,65 @@ rule gtdbtk_table:
         cat {input} > {output}
         fi
         """
+
+rule gtdbtk_pruned_trees:
+    input:
+        batchfile=f"{OUTPUT_DIR}/annotating/gtdbtk/mag_input.tsv",
+        bacteria_summary=f"{OUTPUT_DIR}/annotating/gtdbtk/classify/gtdbtk.bac120.summary.tsv"
+    output:
+        bacteria=f"{OUTPUT_DIR}/annotating/bacteria.tree",
+        ready=touch(f"{OUTPUT_DIR}/annotating/gtdbtk_pruned_trees.done")
+    params:
+        package_dir={PACKAGE_DIR},
+        classify_dir=f"{OUTPUT_DIR}/annotating/gtdbtk/classify",
+        archaea_summary=f"{OUTPUT_DIR}/annotating/gtdbtk/classify/gtdbtk.ar53.summary.tsv",
+        archaea_output=f"{OUTPUT_DIR}/annotating/archaea.tree"
+    localrule: True
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, attempt: cap_mem_mb(1*1024 * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, attempt: cap_runtime(5 * 2 ** (attempt - 1))
+    message: "Pruning GTDB-Tk trees to keep only input genomes..."
+    shell:
+        """
+        bacteria_tree=""
+        for candidate in \
+            {params.classify_dir}/gtdbtk.backbone.bac120.classify.tree \
+            {params.classify_dir}/gtdbtk.bac120.classify.tree
+        do
+            if [ -s "$candidate" ]; then
+                bacteria_tree="$candidate"
+                break
+            fi
+        done
+
+        if [ -n "$bacteria_tree" ]; then
+            python {params.package_dir}/workflow/scripts/prune_gtdbtk_tree.py \
+                --input-tree "$bacteria_tree" \
+                --batchfile {input.batchfile} \
+                --output-tree {output.bacteria}
+        else
+            : > {output.bacteria}
+        fi
+
+        rm -f {params.archaea_output}
+        archaea_tree=""
+        for candidate in \
+            {params.classify_dir}/gtdbtk.backbone.ar53.classify.tree \
+            {params.classify_dir}/gtdbtk.ar53.classify.tree
+        do
+            if [ -s "$candidate" ]; then
+                archaea_tree="$candidate"
+                break
+            fi
+        done
+
+        if [ -s {params.archaea_summary} ] && [ -n "$archaea_tree" ]; then
+            python {params.package_dir}/workflow/scripts/prune_gtdbtk_tree.py \
+                --input-tree "$archaea_tree" \
+                --batchfile {input.batchfile} \
+                --output-tree {params.archaea_output}
+        fi
+
+        touch {output.ready}
+        """
