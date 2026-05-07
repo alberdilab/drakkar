@@ -3397,6 +3397,15 @@ def main():
 
         file_assemblies_to_json(args.file,samples,INDIVIDUAL_MODE,ALL_MODE,args.output)
 
+        with open(f"{args.output}/data/assembly_to_samples.json", "r") as f:
+            _assembly_check = json.load(f)
+        if not _assembly_check and not args.mode:
+            print(f"")
+            print(f"No assembly information found in the sample info file and no assembly mode (-m) was provided.")
+            print(f"    In consequence, DRAKKAR will run individual assemblies.")
+            INDIVIDUAL_MODE=True
+            file_assemblies_to_json(args.file,samples,INDIVIDUAL_MODE,ALL_MODE,args.output)
+
         if args.multicoverage:
             with open(f"{args.output}/data/assembly_to_samples.json", "r") as f:
                 assembly_to_samples = json.load(f)

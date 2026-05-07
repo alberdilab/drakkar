@@ -4,6 +4,16 @@ This project tracks release notes here from this point forward.
 
 ## [Unreleased]
 
+### Added
+
+- No unreleased changes yet.
+
+## [1.6.4] - 2026-05-07
+
+### Fixed
+
+- When no assembly column is present in the sample info file (or all assembly values are empty) and no `--mode` flag is given, DRAKKAR now defaults to individual assemblies instead of failing with an empty `assembly_to_samples.json`.
+
 ## [1.6.3] - 2026-05-07
 
 ### Changed
