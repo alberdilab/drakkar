@@ -4,6 +4,12 @@ This project tracks release notes here from this point forward.
 
 ## [Unreleased]
 
+## [1.6.3] - 2026-05-07
+
+### Changed
+
+- Cataloging now prioritises preprocessed reads when resolving input paths from a sample info file: explicit `preprocessedreads1`/`preprocessedreads2` columns are used first, then reads found in `preprocessing/final/` from a prior preprocessing run, and raw `rawreads1`/`rawreads2` or `accession` paths are only used as a last resort. This allows the same input file to carry coverage/assembly grouping metadata while still assembling and mapping against quality-filtered reads.
+
 ## [1.6.2] - 2026-05-05
 
 ### Added

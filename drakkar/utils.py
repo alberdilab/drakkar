@@ -246,6 +246,40 @@ def resolve_sample_read_lists(row, row_number, output):
     reads2 = [_resolve_reads_path(rawreads2_value, sample_name, "rawreads2", output, row_number)]
     return sample_name, reads1, reads2
 
+def resolve_preprocessed_read_lists(row, row_number, output):
+    """Like resolve_sample_read_lists but honours preprocessedreads1/2 columns first.
+
+    Priority order:
+      1. preprocessedreads1 / preprocessedreads2 columns (explicit preprocessed paths)
+      2. preprocessing/final/<sample>_1.fq.gz (auto-detected from a prior preprocessing run)
+      3. rawreads1 / rawreads2 or accession (raw inputs — same as resolve_sample_read_lists)
+    """
+    sample = row.get("sample")
+    if not _has_value(sample):
+        print(f"ERROR: Missing value in column 'sample' on row {row_number} of the sample info file.")
+        sys.exit(1)
+
+    sample_name = _normalized_value(sample)
+
+    preprocessedreads1_value = _normalized_value(row.get("preprocessedreads1"))
+    preprocessedreads2_value = _normalized_value(row.get("preprocessedreads2"))
+
+    if preprocessedreads1_value or preprocessedreads2_value:
+        for col, val in (("preprocessedreads1", preprocessedreads1_value), ("preprocessedreads2", preprocessedreads2_value)):
+            if not val:
+                print(f"ERROR: Column '{col}' is missing on row {row_number} while the paired column is present.")
+                sys.exit(1)
+        reads1 = [_resolve_reads_path(preprocessedreads1_value, sample_name, "preprocessedreads1", output, row_number)]
+        reads2 = [_resolve_reads_path(preprocessedreads2_value, sample_name, "preprocessedreads2", output, row_number)]
+        return sample_name, reads1, reads2
+
+    final_r1 = os.path.join(output, "preprocessing", "final", f"{sample_name}_1.fq.gz")
+    final_r2 = os.path.join(output, "preprocessing", "final", f"{sample_name}_2.fq.gz")
+    if os.path.isfile(final_r1) and os.path.isfile(final_r2):
+        return sample_name, [final_r1], [final_r2]
+
+    return resolve_sample_read_lists(row, row_number, output)
+
 def _version_badge_lines(version):
     label = f"v{version}"
     width = len(label) + 2
@@ -583,7 +617,7 @@ def file_preprocessed_to_json(infofile, output):
 
     for idx, row in df.iterrows():
         try:
-            sample_name, read1_paths, read2_paths = resolve_sample_read_lists(row, idx + 1, output)
+            sample_name, read1_paths, read2_paths = resolve_preprocessed_read_lists(row, idx + 1, output)
             SAMPLE_TO_READS1[sample_name].extend(read1_paths)
             SAMPLE_TO_READS2[sample_name].extend(read2_paths)
         except DownloadError as exc:
