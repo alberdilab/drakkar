@@ -60,11 +60,16 @@ A tab-separated table can include any of these columns. Only the columns needed
 for the chosen workflow are required.
 
 - ``sample``: sample name.
-- ``rawreads1``: path or URL to R1 reads.
-- ``rawreads2``: path or URL to R2 reads.
+- ``rawreads1``: path or URL to R1 reads (raw, before preprocessing).
+- ``rawreads2``: path or URL to R2 reads (raw, before preprocessing).
 - ``accession``: ENA/SRA paired-end run accession such as ``ERR4303216`` or
   ``SRR12345678``. Use this instead of ``rawreads1`` and ``rawreads2`` when
   you want DRAKKAR to download the read pair automatically.
+- ``preprocessedreads1``: explicit path to quality-filtered R1 reads for use
+  in cataloging. Takes priority over all other read columns. See
+  *Cataloging read resolution* below.
+- ``preprocessedreads2``: explicit path to quality-filtered R2 reads for use
+  in cataloging. Must be provided together with ``preprocessedreads1``.
 - ``reference_name``: host reference label for host-removal workflows.
 - ``reference_path``: local path or URL to a host FASTA, or to a tarball
   containing the FASTA plus Bowtie2 index files.
@@ -103,6 +108,35 @@ Input notes
 - ``-m individual`` adds per-sample assemblies alongside grouped assemblies.
 - ``--multicoverage`` maps samples sharing the same coverage label to each
   other's individual assemblies.
+
+Cataloging read resolution
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When ``drakkar cataloging`` (or ``drakkar complete``) loads a sample info table
+with ``-f/--file``, it resolves the reads to use for assembly and mapping in the
+following priority order for each sample:
+
+1. **``preprocessedreads1`` / ``preprocessedreads2`` columns** — if both are
+   present the cataloging workflow uses these paths directly. This is the
+   explicit override for cases where preprocessed reads live outside the
+   default output tree.
+
+2. **``preprocessing/final/<sample>_1.fq.gz``** — if neither
+   ``preprocessedreads1`` nor ``preprocessedreads2`` is supplied but a prior
+   ``drakkar preprocessing`` run has already written quality-filtered reads into
+   the output directory, cataloging detects and uses them automatically. This
+   is the typical case when running cataloging as a follow-up step after
+   preprocessing in the same output directory.
+
+3. **``rawreads1`` / ``rawreads2`` or ``accession``** — fallback to raw input
+   paths. This path is taken when neither preprocessed column is present and no
+   ``preprocessing/final/`` files are found. The assembly will run directly on
+   unfiltered reads.
+
+This means you can keep a single input table that contains raw read paths (or
+accessions) together with ``assembly`` and ``coverage`` grouping columns, and
+cataloging will automatically pick up the quality-filtered reads from a
+completed preprocessing run without any changes to the file.
 
 Guide map
 ---------

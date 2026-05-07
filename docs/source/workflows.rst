@@ -110,13 +110,39 @@ Assembles reads, bins contigs into MAGs, generates bin metadata, and writes
 Options:
 
 - ``-i/--input``: directory with preprocessed reads or compatible workflow input.
-- ``-f/--file``: sample info table, with read pairs provided either as
-  ``rawreads1``/``rawreads2`` or as an ENA/SRA ``accession``.
+- ``-f/--file``: sample info table. See *Read resolution* below for how the
+  workflow decides which reads to use for assembly and mapping.
 - ``-o/--output``: output directory.
 - ``-m/--mode``: assembly modes such as ``individual`` and ``all``.
 - ``-c/--multicoverage``: enable multicoverage mapping.
 - ``-e/--env_path``: shared Conda environment directory.
 - ``-p/--profile``: Snakemake profile.
+
+Read resolution when using ``-f/--file``
+"""""""""""""""""""""""""""""""""""""""""
+
+When a sample info table is provided, cataloging resolves the reads to assemble
+and map in the following priority order per sample:
+
+1. **Explicit preprocessed columns** — if the table contains
+   ``preprocessedreads1`` and ``preprocessedreads2`` columns for a sample,
+   those paths are used directly. Both columns must be present together.
+
+2. **Auto-detected preprocessed reads** — if no ``preprocessedreads1``/
+   ``preprocessedreads2`` columns are supplied, DRAKKAR checks whether
+   ``preprocessing/final/<sample>_1.fq.gz`` and the matching R2 file exist
+   inside the output directory. If they do, those quality-filtered reads are
+   used. This covers the standard case of running cataloging after
+   preprocessing in the same output directory without changing the input file.
+
+3. **Raw reads or accession** — if neither of the above is available,
+   cataloging falls back to ``rawreads1``/``rawreads2`` paths or an ENA/SRA
+   ``accession`` from the table.
+
+This allows a single input file to carry assembly grouping (``assembly``) and
+coverage grouping (``coverage``) metadata alongside raw read paths, while
+cataloging automatically upgrades to quality-filtered reads whenever they are
+available.
 
 Profiling
 ^^^^^^^^^
