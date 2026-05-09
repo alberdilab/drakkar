@@ -82,6 +82,17 @@ WORKFLOW_RUN_COMMANDS = {
 }
 
 READ_ONLY_COMMANDS = {"config", "logging"}
+CATALOGING_BINNER_ORDER = ("metabat", "maxbin", "semibin", "comebin")
+DEFAULT_CATALOGING_BINNERS = ",".join(CATALOGING_BINNER_ORDER)
+CATALOGING_BINNER_ALIASES = {
+    "metabat": "metabat",
+    "metabat2": "metabat",
+    "maxbin": "maxbin",
+    "maxbin2": "maxbin",
+    "semibin": "semibin",
+    "semibin2": "semibin",
+    "comebin": "comebin",
+}
 
 ###
 # Define helper functions
@@ -164,6 +175,29 @@ def validate_download_runtime(value):
         print(f"{ERROR}ERROR:{RESET} --download-runtime must be a positive integer number of minutes.")
         return None
     return runtime
+
+
+def normalize_cataloging_binners(binners):
+    if not binners:
+        return DEFAULT_CATALOGING_BINNERS
+
+    raw_items = [item.strip().lower() for item in str(binners).split(",") if item.strip()]
+    if not raw_items:
+        print(f"{ERROR}ERROR:{RESET} --binners must include at least one of: {', '.join(CATALOGING_BINNER_ORDER)}.")
+        return None
+    if "all" in raw_items:
+        return DEFAULT_CATALOGING_BINNERS
+
+    invalid = [item for item in raw_items if item not in CATALOGING_BINNER_ALIASES]
+    if invalid:
+        print(
+            f"{ERROR}ERROR:{RESET} --binners contains unsupported value(s): {', '.join(invalid)}. "
+            f"Options are: {', '.join(CATALOGING_BINNER_ORDER)}."
+        )
+        return None
+
+    selected = {CATALOGING_BINNER_ALIASES[item] for item in raw_items}
+    return ",".join(binner for binner in CATALOGING_BINNER_ORDER if binner in selected)
 
 
 def positive_int(value):
@@ -2313,7 +2347,17 @@ def run_snakemake_preprocessing(
     run_subprocess_with_logging(snakemake_command, run_info=run_info, workflow_name=workflow)
 
 
-def run_snakemake_cataloging(workflow, project_name, output_dir, env_path, profile, memory_multiplier=1, time_multiplier=1, run_info=None):
+def run_snakemake_cataloging(
+    workflow,
+    project_name,
+    output_dir,
+    env_path,
+    profile,
+    memory_multiplier=1,
+    time_multiplier=1,
+    run_info=None,
+    binners=DEFAULT_CATALOGING_BINNERS,
+):
 
     """ Run the cataloging workflow """
 
@@ -2327,7 +2371,7 @@ def run_snakemake_cataloging(workflow, project_name, output_dir, env_path, profi
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} {resource_overrides}"
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} binners={binners} {resource_overrides}"
         f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--conda-frontend mamba "
@@ -2337,7 +2381,16 @@ def run_snakemake_cataloging(workflow, project_name, output_dir, env_path, profi
     run_subprocess_with_logging(snakemake_command, run_info=run_info, workflow_name=workflow)
 
 #Screen output control
-def run_snakemake_cataloging2(workflow, project_name, output_dir, env_path, profile, memory_multiplier=1, time_multiplier=1):
+def run_snakemake_cataloging2(
+    workflow,
+    project_name,
+    output_dir,
+    env_path,
+    profile,
+    memory_multiplier=1,
+    time_multiplier=1,
+    binners=DEFAULT_CATALOGING_BINNERS,
+):
 
     """ Run the cataloging workflow """
 
@@ -2351,7 +2404,7 @@ def run_snakemake_cataloging2(workflow, project_name, output_dir, env_path, prof
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} {resource_overrides}"
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} binners={binners} {resource_overrides}"
         f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--conda-frontend mamba "
@@ -2603,6 +2656,16 @@ def main():
     complete_reference_group.add_argument("-r", "--reference", required=False, help="Reference host genome FASTA")
     complete_reference_group.add_argument("-x", "--reference-index", required=False, help="Tarball containing a reference FASTA and Bowtie2 index files")
     subparser_complete.add_argument("-m", "--mode", required=False, help="Comma-separated list of cataloging modes (e.g. individual,all)")
+    subparser_complete.add_argument(
+        "-b",
+        "--binners",
+        required=False,
+        default=DEFAULT_CATALOGING_BINNERS,
+        help=(
+            "Comma-separated list of binners to use for binning. "
+            "Options: metabat, maxbin, semibin, comebin. Default: all"
+        ),
+    )
     subparser_complete.add_argument("-t", "--type", required=False, default="genomes", help="Either genomes or pangenomes profiling type. Default: genomes")
     subparser_complete.add_argument(
         "--annotation-type",
@@ -2651,6 +2714,16 @@ def main():
     subparser_cataloging.add_argument("-f", "--file", required=False, help="Sample detail file (required if no input directory is provided)")
     subparser_cataloging.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_cataloging.add_argument("-m", "--mode", required=False, help="Comma-separated list of cataloging modes (e.g. individual,all)")
+    subparser_cataloging.add_argument(
+        "-b",
+        "--binners",
+        required=False,
+        default=DEFAULT_CATALOGING_BINNERS,
+        help=(
+            "Comma-separated list of binners to use for binning. "
+            "Options: metabat, maxbin, semibin, comebin. Default: all"
+        ),
+    )
     subparser_cataloging.add_argument("-c", "--multicoverage", action="store_true", help="Map samples sharing the same coverage group to each other's individual assemblies")
     subparser_cataloging.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_cataloging.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
@@ -2837,7 +2910,7 @@ def main():
         ],
         sections=[
             ("Input Sources", ["input", "file", "reference", "reference_index"]),
-            ("Workflow Scope", ["mode", "type", "annotation_type", "gtdb_version", "multicoverage", "fraction", "nonpareil", "ani"]),
+            ("Workflow Scope", ["mode", "binners", "type", "annotation_type", "gtdb_version", "multicoverage", "fraction", "nonpareil", "ani"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
         ],
@@ -2869,7 +2942,7 @@ def main():
         ],
         sections=[
             ("Input Sources", ["input", "file"]),
-            ("Assembly Strategy", ["mode", "multicoverage"]),
+            ("Assembly Strategy", ["mode", "binners", "multicoverage"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
         ],
@@ -3150,6 +3223,12 @@ def main():
             return
         args.gtdb_version = normalized_gtdb_version
 
+    if args.command in ("cataloging", "complete"):
+        normalized_binners = normalize_cataloging_binners(getattr(args, "binners", None))
+        if not normalized_binners:
+            return
+        args.binners = normalized_binners
+
     if args.command == "database":
         normalized_database_name = normalize_managed_database_name(getattr(args, "database_name", None))
         if not normalized_database_name:
@@ -3428,6 +3507,7 @@ def main():
             args.memory_multiplier,
             args.time_multiplier,
             run_info,
+            binners=args.binners,
         )
 
     ###

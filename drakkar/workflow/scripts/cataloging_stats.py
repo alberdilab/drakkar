@@ -25,6 +25,7 @@ COLUMNS = [
     "metabat2_bins",
     "maxbin2_bins",
     "semibin2_bins",
+    "comebin_bins",
     "final_bins",
     "high_quality_bins",
     "medium_quality_bins",
@@ -47,12 +48,14 @@ BINNER_METHODS = [
     ("metabat2_bins", "metabat2"),
     ("maxbin2_bins", "maxbin2"),
     ("semibin2_bins", "semibin2"),
+    ("comebin_bins", "comebin"),
 ]
 
 BINNER_ALIASES = {
     "metabat2_bins": ("metabat2", "metabat"),
     "maxbin2_bins": ("maxbin2", "maxbin"),
     "semibin2_bins": ("semibin2", "semibin"),
+    "comebin_bins": ("comebin",),
 }
 
 
@@ -352,6 +355,7 @@ def build_summary(args):
         ("metabat2_bins", args.metabat2),
         ("maxbin2_bins", args.maxbin2),
         ("semibin2_bins", args.semibin2),
+        ("comebin_bins", args.comebin),
     ]:
         for path in paths:
             assembly = assembly_from_final_tsv(path)
@@ -416,6 +420,7 @@ def main():
     parser.add_argument("--metabat2", nargs="*", default=[], help="MetaBAT2 contig-to-bin TSV files")
     parser.add_argument("--maxbin2", nargs="*", default=[], help="MaxBin2 contig-to-bin TSV files")
     parser.add_argument("--semibin2", nargs="*", default=[], help="SemiBin2 contig-to-bin TSV files")
+    parser.add_argument("--comebin", nargs="*", default=[], help="COMEBIN contig-to-bin TSV files")
     parser.add_argument(
         "--binette-report-root",
         help="Root cataloging/binette directory containing per-assembly input_bins_quality_reports directories",

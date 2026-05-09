@@ -14,6 +14,7 @@ MAXBIN2_MODULE = config["MAXBIN2_MODULE"]
 FRAGGENESCAN_MODULE = config["FRAGGENESCAN_MODULE"]
 BEDTOOLS_MODULE = config["BEDTOOLS_MODULE"]
 HMMER_MODULE = config["HMMER_MODULE"]
+COMEBIN_MODULE = config["COMEBIN_MODULE"]
 SEMIBIN2_MODULE = config["SEMIBIN2_MODULE"]
 DIAMOND_MODULE = config["DIAMOND_MODULE"]
 CHECKM2_MODULE = config["CHECKM2_MODULE"]
@@ -21,6 +22,62 @@ BINETTE_MODULE = config["BINETTE_MODULE"]
 
 # Databases
 CHECKM2_DB = config["CHECKM2_DB"]
+
+BINNER_ORDER = ("metabat", "maxbin", "semibin", "comebin")
+BINNER_ALIASES = {
+    "metabat": "metabat",
+    "metabat2": "metabat",
+    "maxbin": "maxbin",
+    "maxbin2": "maxbin",
+    "semibin": "semibin",
+    "semibin2": "semibin",
+    "comebin": "comebin",
+}
+BINNER_RULE_NAMES = {
+    "metabat": "metabat2",
+    "maxbin": "maxbin2",
+    "semibin": "semibin2",
+    "comebin": "comebin",
+}
+
+
+def normalize_binner_config(raw_binners):
+    if raw_binners is None:
+        return list(BINNER_ORDER)
+    if isinstance(raw_binners, str):
+        items = [item.strip().lower() for item in raw_binners.split(",") if item.strip()]
+    else:
+        items = [str(item).strip().lower() for item in raw_binners if str(item).strip()]
+    if not items or "all" in items:
+        return list(BINNER_ORDER)
+
+    invalid = [item for item in items if item not in BINNER_ALIASES]
+    if invalid:
+        raise ValueError(
+            f"Unsupported binner(s): {', '.join(invalid)}. "
+            f"Options are: {', '.join(BINNER_ORDER)}."
+        )
+
+    selected = {BINNER_ALIASES[item] for item in items}
+    return [binner for binner in BINNER_ORDER if binner in selected]
+
+
+SELECTED_BINNERS = normalize_binner_config(config.get("binners"))
+
+
+def binner_table_path(assembly, binner):
+    rule_name = BINNER_RULE_NAMES[binner]
+    return f"{OUTPUT_DIR}/cataloging/{rule_name}/{assembly}/{assembly}.tsv"
+
+
+def selected_binner_tables(wildcards):
+    return [binner_table_path(wildcards.assembly, binner) for binner in SELECTED_BINNERS]
+
+
+def selected_binner_expand(binner):
+    if binner not in SELECTED_BINNERS:
+        return []
+    return expand(binner_table_path("{assembly}", binner), assembly=assemblies)
 
 ####
 # Workflow rules
@@ -326,6 +383,66 @@ rule semibin2_table:
         fi
         """
 
+rule comebin:
+    input:
+        assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}.fna",
+        bam=lambda wildcards: [
+            f"{OUTPUT_DIR}/cataloging/bowtie2/{wildcards.assembly}/{sample}.bam"
+            for sample in ASSEMBLY_TO_COVERAGE_SAMPLES[wildcards.assembly]
+            ]
+    output:
+        f"{OUTPUT_DIR}/cataloging/comebin/{{assembly}}/comebin_res/comebin_res.tsv"
+    params:
+        comebin_module={COMEBIN_MODULE},
+        bamdir=f"{OUTPUT_DIR}/cataloging/comebin/{{assembly}}_bams",
+        outdir=f"{OUTPUT_DIR}/cataloging/comebin/{{assembly}}"
+    threads: 8
+    resources:
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(min(1000*1024,max(8*1024, int(input.size_mb * 30) * 2 ** (attempt - 1)))),
+        runtime=lambda wildcards, input, attempt: cap_runtime(min(20000,max(15, int(input.size_mb / 2) * 2 ** (attempt - 1))))
+    message: "Binning contigs from assembly {wildcards.assembly} using comebin..."
+    shell:
+        """
+        if [ ! -s {input.assembly} ]; then
+            echo "Assembly is empty, skipping comebin..."
+            mkdir -p $(dirname {output})
+            touch {output}
+        else
+            module load {params.comebin_module}
+            rm -rf {params.outdir} {params.bamdir}
+            mkdir -p {params.bamdir}
+            for bam in {input.bam}; do
+                ln -s "$(realpath "$bam")" "{params.bamdir}/$(basename "$bam")"
+            done
+            run_comebin.sh \
+                -a {input.assembly} \
+                -p {params.bamdir} \
+                -t {threads} \
+                -o {params.outdir}
+        fi
+        """
+
+rule comebin_table:
+    input:
+        f"{OUTPUT_DIR}/cataloging/comebin/{{assembly}}/comebin_res/comebin_res.tsv"
+    output:
+        f"{OUTPUT_DIR}/cataloging/comebin/{{assembly}}/{{assembly}}.tsv"
+    params:
+        package_dir={PACKAGE_DIR},
+        fastadir=f"{OUTPUT_DIR}/cataloging/comebin/{{assembly}}/comebin_res/comebin_res_bins"
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(1*1024, int(input.size_mb * 10) * 2 ** (attempt - 1))),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(5, int(input.size_mb / 5) * 2 ** (attempt - 1)))
+    shell:
+        """
+        if [ ! -s {input} ]; then
+            touch {output}
+        else
+            python {params.package_dir}/workflow/scripts/fastas_to_bintable.py -d {params.fastadir} -e fa -o {output}
+        fi
+        """
+
 # Script to calculate resources based on the number of bins
 _row_count_cache = {}
 def row_count(path):
@@ -335,11 +452,14 @@ def row_count(path):
             _row_count_cache[path] = max(0, sum(1 for _ in f))
     return _row_count_cache[path]
 
+
+def row_count_sum(paths):
+    return sum(row_count(path) for path in paths)
+
+
 checkpoint binette:
     input:
-        metabat2=f"{OUTPUT_DIR}/cataloging/metabat2/{{assembly}}/{{assembly}}.tsv",
-        maxbin2=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}.tsv",
-        semibin2=f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/{{assembly}}.tsv",
+        binner_tables=selected_binner_tables,
         fasta=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}.fna"
     output:
         f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}/final_bins_quality_reports.tsv"
@@ -353,32 +473,23 @@ checkpoint binette:
     conda:
         f"{PACKAGE_DIR}/workflow/envs/cataloging.yaml"
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(min(1000*1024,max(32*1024, (row_count(input.metabat2) + row_count(input.maxbin2) + row_count(input.semibin2)) * 2 ** (attempt - 1)))),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(min(1000*1024,max(32*1024, row_count_sum(input.binner_tables) * 2 ** (attempt - 1)))),
         runtime=lambda wildcards, input, attempt: cap_runtime(min(20000,max(15, int(input.size_mb) * 2 ** (attempt - 1))))
     message: "Refining bins from assembly {wildcards.assembly} using binette..."
     shell:
         """
-        # Define input files
-        METABAT2="{input.metabat2}"
-        MAXBIN2="{input.maxbin2}"
-        SEMIBIN2="{input.semibin2}"
-
         # Remove empty input files from the list
-        VALID_TSV_FILES=""
-        if [ -s "$METABAT2" ]; then
-            VALID_TSV_FILES="$VALID_TSV_FILES $METABAT2"
-        fi
-        if [ -s "$MAXBIN2" ]; then
-            VALID_TSV_FILES="$VALID_TSV_FILES $MAXBIN2"
-        fi
-        if [ -s "$SEMIBIN2" ]; then
-            VALID_TSV_FILES="$VALID_TSV_FILES $SEMIBIN2"
-        fi
+        VALID_TSV_FILES=()
+        for table in {input.binner_tables:q}; do
+            if [ -s "$table" ]; then
+                VALID_TSV_FILES+=("$table")
+            fi
+        done
 
         mkdir -p {params.outdir}
 
         # Ensure at least one valid TSV file exists
-        if [ -z "$VALID_TSV_FILES" ]; then
+        if [ "${{#VALID_TSV_FILES[@]}}" -eq 0 ]; then
             echo "No valid TSV input files for binette, skipping..."
             printf "bin_id\tcompleteness\tcontamination\tscore\tsize\tN50\tcontig_count\n" > {output}
             exit 0
@@ -390,7 +501,7 @@ checkpoint binette:
         EMPTY_OUTPUT_HEADER='bin_id\tcompleteness\tcontamination\tscore\tsize\tN50\tcontig_count\n'
 
         set +e
-        binette --contig2bin_tables $VALID_TSV_FILES \
+        binette --contig2bin_tables "${{VALID_TSV_FILES[@]}}" \
                 --contigs {input.fasta} \
                 --outdir {params.outdir} \
                 --checkm2_db {params.checkm_db} \
@@ -482,9 +593,10 @@ rule cataloging_stats:
             for assembly, samples in ASSEMBLY_TO_COVERAGE_SAMPLES.items()
             for sample in samples
         ],
-        metabat2=expand(f"{OUTPUT_DIR}/cataloging/metabat2/{{assembly}}/{{assembly}}.tsv", assembly=assemblies),
-        maxbin2=expand(f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}.tsv", assembly=assemblies),
-        semibin2=expand(f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/{{assembly}}.tsv", assembly=assemblies),
+        metabat2=selected_binner_expand("metabat"),
+        maxbin2=selected_binner_expand("maxbin"),
+        semibin2=selected_binner_expand("semibin"),
+        comebin=selected_binner_expand("comebin"),
         bins=expand(f"{OUTPUT_DIR}/cataloging/final/{{assembly}}.tsv", assembly=assemblies)
     output:
         f"{OUTPUT_DIR}/cataloging.tsv"
@@ -506,6 +618,7 @@ rule cataloging_stats:
             --metabat2 {input.metabat2} \
             --maxbin2 {input.maxbin2} \
             --semibin2 {input.semibin2} \
+            --comebin {input.comebin} \
             --binette-report-root {params.binette_report_root:q} \
             --bins {input.bins} \
             -o {output:q}

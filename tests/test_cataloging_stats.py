@@ -33,6 +33,12 @@ class CatalogingStatsTests(unittest.TestCase):
         self.assertIn("rule cataloging_stats:", rules)
         self.assertIn("cataloging_stats.py", rules)
         self.assertIn("--binette-report-root {params.binette_report_root:q}", rules)
+        self.assertIn("rule comebin:", rules)
+        self.assertIn("run_comebin.sh", rules)
+        self.assertIn("rule comebin_table:", rules)
+        self.assertIn("SELECTED_BINNERS = normalize_binner_config(config.get(\"binners\"))", rules)
+        self.assertIn("binner_tables=selected_binner_tables", rules)
+        self.assertIn('comebin=selected_binner_expand("comebin")', rules)
 
     def test_semibin2_table_uses_reclustered_output_bins(self) -> None:
         rules = CATALOGING_RULES.read_text(encoding="utf-8")
@@ -99,7 +105,8 @@ class CatalogingStatsTests(unittest.TestCase):
             metabat2 = tmp_path / "cataloging" / "metabat2" / "assembly1" / "assembly1.tsv"
             maxbin2 = tmp_path / "cataloging" / "maxbin2" / "assembly1" / "assembly1.tsv"
             semibin2 = tmp_path / "cataloging" / "semibin2" / "assembly1" / "assembly1.tsv"
-            for path, rows in [(metabat2, 5), (maxbin2, 4), (semibin2, 7)]:
+            comebin = tmp_path / "cataloging" / "comebin" / "assembly1" / "assembly1.tsv"
+            for path, rows in [(metabat2, 5), (maxbin2, 4), (semibin2, 7), (comebin, 6)]:
                 path.parent.mkdir(parents=True)
                 path.write_text("\n".join(f"c{i}\tb{i}" for i in range(rows)) + "\n", encoding="utf-8")
 
@@ -107,6 +114,7 @@ class CatalogingStatsTests(unittest.TestCase):
                 ("input_bins_1.maxbin2_all_all.tsv", "maxbin2/all/all", 1),
                 ("input_bins_2.metabat2_all_all.tsv", "metabat2/all/all", 2),
                 ("input_bins_3.semibin2_all_all.tsv", "semibin2/all/all", 3),
+                ("input_bins_4.comebin_all_all.tsv", "comebin/all/all", 4),
             ]:
                 rows = "\n".join(
                     f"{idx}\t{origin}\tbin_{idx}\t95\t2\t90\t10000\t4000\t10"
@@ -145,6 +153,8 @@ class CatalogingStatsTests(unittest.TestCase):
                     str(maxbin2),
                     "--semibin2",
                     str(semibin2),
+                    "--comebin",
+                    str(comebin),
                     "--binette-report-root",
                     str(tmp_path / "cataloging" / "binette"),
                     "--bins",
@@ -169,6 +179,7 @@ class CatalogingStatsTests(unittest.TestCase):
             self.assertEqual(row["metabat2_bins"], 2)
             self.assertEqual(row["maxbin2_bins"], 1)
             self.assertEqual(row["semibin2_bins"], 3)
+            self.assertEqual(row["comebin_bins"], 4)
             self.assertEqual(row["final_bins"], 3)
             self.assertEqual(row["high_quality_bins"], 1)
             self.assertEqual(row["medium_quality_bins"], 1)

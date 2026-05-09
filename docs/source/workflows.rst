@@ -60,6 +60,8 @@ Options:
 - ``-x/--reference-index``: local path or URL to a tarball containing a host
   reference FASTA and Bowtie2 index files; incompatible with ``-r/--reference``.
 - ``-m/--mode``: assembly modes such as ``individual`` and ``all``.
+- ``-b/--binners``: comma-separated binners for cataloging
+  (``metabat``, ``maxbin``, ``semibin``, ``comebin``; default: all).
 - ``-t/--type``: profiling type (``genomes`` or ``pangenomes``).
 - ``--annotation-type``: comma-separated annotation targets. See *Annotating*
   below for the full set.
@@ -114,6 +116,8 @@ Options:
   workflow decides which reads to use for assembly and mapping.
 - ``-o/--output``: output directory.
 - ``-m/--mode``: assembly modes such as ``individual`` and ``all``.
+- ``-b/--binners``: comma-separated binners to run
+  (``metabat``, ``maxbin``, ``semibin``, ``comebin``; default: all).
 - ``-c/--multicoverage``: enable multicoverage mapping.
 - ``-e/--env_path``: shared Conda environment directory.
 - ``-p/--profile``: Snakemake profile.

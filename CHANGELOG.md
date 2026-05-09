@@ -8,6 +8,12 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.6.5] - 2026-05-09
+
+### Added
+
+- Added `comebin` as a cataloging binner and added `-b/--binners` to `drakkar cataloging` and `drakkar complete` to select comma-separated binners from `metabat`, `maxbin`, `semibin`, and `comebin`; the default remains all binners.
+
 ## [1.6.4] - 2026-05-07
 
 ### Fixed

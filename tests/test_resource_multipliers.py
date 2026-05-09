@@ -53,6 +53,32 @@ class ResourceMultiplierTests(unittest.TestCase):
                 "--default-resources mem_mb=1024 runtime=14 ",
             )
 
+    def test_run_snakemake_cataloging_passes_binner_config(self) -> None:
+        command = self.command_from_run(
+            lambda: cli_module.run_snakemake_cataloging(
+                "cataloging",
+                "project",
+                "/tmp/output",
+                "/tmp/envs",
+                "local",
+                binners="metabat,comebin",
+            )
+        )
+
+        self.assertIn("binners=metabat,comebin", command)
+
+    def test_normalize_cataloging_binners(self) -> None:
+        self.assertEqual(
+            cli_module.normalize_cataloging_binners("semibin2,metabat,maxbin2"),
+            "metabat,maxbin,semibin",
+        )
+        self.assertEqual(
+            cli_module.normalize_cataloging_binners("all"),
+            cli_module.DEFAULT_CATALOGING_BINNERS,
+        )
+        with patch.object(cli_module, "print"):
+            self.assertIsNone(cli_module.normalize_cataloging_binners("metabat,unknown"))
+
 
 if __name__ == "__main__":
     unittest.main()

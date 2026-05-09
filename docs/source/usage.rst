@@ -106,6 +106,9 @@ Input notes
 - Assembly labels can be any identifiers you choose; they do not need to match
   sample names.
 - ``-m individual`` adds per-sample assemblies alongside grouped assemblies.
+- ``-b/--binners`` selects the binners used in cataloging. Use a comma-separated
+  list of ``metabat``, ``maxbin``, ``semibin``, and ``comebin``; the default is
+  all four.
 - ``--multicoverage`` maps samples sharing the same coverage label to each
   other's individual assemblies.
 

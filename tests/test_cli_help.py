@@ -65,6 +65,12 @@ class CliHelpTests(unittest.TestCase):
         self.assertIn("--memory-multiplier", plain)
         self.assertIn("Examples", plain)
 
+    def test_cataloging_help_includes_binners(self) -> None:
+        plain = self.run_help("cataloging")
+        self.assertIn("Assembly Strategy", plain)
+        self.assertIn("-b, --binners", plain)
+        self.assertRegex(plain, r"metabat,\s+maxbin,\s+semibin,\s+comebin")
+
     def test_help_fallback_explains_missing_rich_dependency(self) -> None:
         parser = cli_module.RichArgumentParser(prog="drakkar-test", description="test parser")
         buffer = io.StringIO()
