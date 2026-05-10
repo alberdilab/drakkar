@@ -348,7 +348,7 @@ rule semibin2:
     threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(min(1000*1024,max(8*1024, int(input.size_mb * 30) * 2 ** (attempt - 1)))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(min(20000,max(15, int(input.size_mb / 2) * 2 ** (attempt - 1))))
+        runtime=lambda wildcards, input, attempt: cap_runtime(min(20000,max(15, int(input.size_mb) * 2 ** (attempt - 1))))
     message: "Binning contigs from assembly {wildcards.assembly} using semibin2..."
     shell:
         """
@@ -399,7 +399,7 @@ rule comebin:
     threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(min(1000*1024,max(8*1024, int(input.size_mb * 30) * 2 ** (attempt - 1)))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(min(20000,max(15, int(input.size_mb / 2) * 2 ** (attempt - 1))))
+        runtime=lambda wildcards, input, attempt: cap_runtime(min(20000,max(15, int(input.size_mb) * 2 ** (attempt - 1))))
     message: "Binning contigs from assembly {wildcards.assembly} using comebin..."
     shell:
         """

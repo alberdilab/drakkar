@@ -255,6 +255,57 @@ class LoggingCommandTests(unittest.TestCase):
             self.assertEqual(launches[0]["internal_jobid"], "1")
             self.assertEqual(launches[0]["external_jobid"], "501234")
 
+    def test_parse_snakemake_submitted_launches_accepts_slurm_executor_submission_lines(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = Path(tmpdir) / "drakkar_test.snakemake.log"
+            log_path.write_text(
+                "\n".join(
+                    [
+                        "[Sun May 10 03:27:11 2026]",
+                        "rule map_reads:",
+                        "    input: reads/A_R1.fastq.gz, reads/A_R2.fastq.gz",
+                        "    output: mapped/A.bam",
+                        "    jobid: 17",
+                        "    wildcards: sample=A",
+                        "    threads: 8",
+                        "    resources: mem_mb=16000, runtime=30, tmpdir=<TBD>",
+                        "Job 17 has been submitted with SLURM jobid 8281752 (log: .snakemake/slurm_logs/rule_map_reads/A/8281752.log).",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            launches = cli_module.parse_snakemake_submitted_launches(log_path)
+
+            self.assertEqual(len(launches), 1)
+            self.assertEqual(launches[0]["internal_jobid"], "17")
+            self.assertEqual(launches[0]["external_jobid"], "8281752")
+            self.assertEqual(launches[0]["rule"], "map_reads")
+
+    def test_parse_snakemake_submitted_launches_normalizes_embedded_sbatch_output(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = Path(tmpdir) / "drakkar_test.snakemake.log"
+            log_path.write_text(
+                "\n".join(
+                    [
+                        "rule map_reads:",
+                        "    jobid: 1",
+                        "    wildcards: sample=A",
+                        "    threads: 8",
+                        "    resources: mem_mb=16000, runtime=30, tmpdir=/tmp",
+                        "Submitted job 1 with external jobid 'Submitted batch job 6018753'.",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            launches = cli_module.parse_snakemake_submitted_launches(log_path)
+
+            self.assertEqual(len(launches), 1)
+            self.assertEqual(launches[0]["external_jobid"], "6018753")
+
     def test_generate_run_benchmark_writes_reports_and_summary(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             args = argparse.Namespace(command="cataloging", output=tmpdir, profile="slurm")

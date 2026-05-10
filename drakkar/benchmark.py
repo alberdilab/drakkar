@@ -52,6 +52,20 @@ def parse_resource_assignments(text):
         resources[key.strip()] = value.strip()
     return resources
 
+def parse_slurm_job_id(value):
+    text = str(value or "").strip().strip("'\"").rstrip(".")
+    if not text:
+        return None
+
+    simple_match = re.fullmatch(r"\d+(?:_\d+)?(?:\.\d+)?(?:;[A-Za-z0-9_.-]+)?", text)
+    if simple_match:
+        return text.split(";", 1)[0]
+
+    matches = re.findall(r"(?<![\w.])\d+(?:_\d+)?(?:\.\d+)?(?:;[A-Za-z0-9_.-]+)?(?![\w.])", text)
+    if matches:
+        return matches[-1].split(";", 1)[0]
+    return text
+
 def parse_slurm_memory_to_mb(value):
     text = str(value or "").strip()
     if not text or text in {"Unknown", "None", "N/A"}:
@@ -131,6 +145,7 @@ def parse_snakemake_submitted_launches(log_path):
 
     def register_launch(block, internal_jobid, external_jobid):
         nonlocal launch_order
+        external_jobid = parse_slurm_job_id(external_jobid)
         if not block or block.get("local") or not internal_jobid or not external_jobid:
             return
         if internal_jobid in launched_internal_jobids:
@@ -207,15 +222,36 @@ def parse_snakemake_submitted_launches(log_path):
                     continue
 
             submission_match = re.search(
-                r"Submitted (?:group )?job(?:id)?\s+(\d+).*?external jobid ['\"]?([^'\"\s]+)['\"]?",
+                r"Submitted (?:group )?job(?:id)?\s+(\d+).*?external jobid\s+(.+?)\.?$",
                 stripped,
             )
             if submission_match:
                 internal_jobid = submission_match.group(1)
+                external_jobid = submission_match.group(2).strip().strip("'\"")
                 register_launch(
                     block_by_jobid.get(internal_jobid),
                     internal_jobid,
-                    submission_match.group(2),
+                    external_jobid,
+                )
+                continue
+
+            slurm_executor_submission_match = re.search(
+                r"^Job\s+(\S+)\s+has been submitted with SLURM jobid\s+(.+?)(?:\s+\(log:|$)",
+                stripped,
+            )
+            if slurm_executor_submission_match:
+                internal_jobid = slurm_executor_submission_match.group(1)
+                block = block_by_jobid.get(internal_jobid)
+                if (
+                    block is None
+                    and current_block is not None
+                    and current_block.get("internal_jobid") == internal_jobid
+                ):
+                    block = current_block
+                register_launch(
+                    block,
+                    internal_jobid,
+                    slurm_executor_submission_match.group(2),
                 )
                 continue
 
@@ -232,14 +268,15 @@ def parse_snakemake_submitted_launches(log_path):
                 continue
 
             external_only_match = re.search(
-                r"Submitted .*?external jobid ['\"]?([^'\"\s]+)['\"]?",
+                r"Submitted .*?external jobid\s+(.+?)\.?$",
                 stripped,
             )
             if external_only_match and current_block is not None:
+                external_jobid = external_only_match.group(1).strip().strip("'\"")
                 register_launch(
                     current_block,
                     current_block.get("internal_jobid"),
-                    external_only_match.group(1),
+                    external_jobid,
                 )
 
     attempt_counter = Counter()

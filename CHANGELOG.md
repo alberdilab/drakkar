@@ -8,6 +8,16 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.6.7] - 2026-05-10
+
+### Changed
+
+- Increased cataloging runtime scaling for SemiBin2 and ComeBin so their requested time is based on full assembly size instead of half assembly size.
+
+### Fixed
+
+- Fixed SLURM benchmark capture for current Snakemake executor logs such as `Job <id> has been submitted with SLURM jobid <id>`, and normalized embedded `sbatch` responses before querying `sacct`.
+
 ## [1.6.6] - 2026-05-10
 
 ### Added
