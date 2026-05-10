@@ -50,7 +50,7 @@ Start here on Read the Docs:
 - Installation: https://drakkar.readthedocs.io/en/latest/installation.html
 - User guide and input formats: https://drakkar.readthedocs.io/en/latest/usage.html
 - Workflow modules: https://drakkar.readthedocs.io/en/latest/workflows.html
-- Operations, logging, transfer, and troubleshooting: https://drakkar.readthedocs.io/en/latest/operations.html
+- Operations, status, logging, transfer, and troubleshooting: https://drakkar.readthedocs.io/en/latest/operations.html
 - CLI reference: https://drakkar.readthedocs.io/en/latest/api.html
 
 ## Main commands
@@ -63,6 +63,7 @@ Start here on Read the Docs:
 - `drakkar expressing`: quantify microbial gene expression.
 - `drakkar dereplicating`: run dereplication without read mapping.
 - `drakkar database`: install or update supported annotation databases.
+- `drakkar status`: show rule and sample progress for a workflow run.
 - `drakkar logging`: inspect run metadata and Snakemake logs.
 - `drakkar config`: view or edit the installed workflow configuration.
 - `drakkar transfer`: transfer selected outputs via SFTP.

@@ -2,8 +2,8 @@ Operations and troubleshooting
 ==============================
 
 This page covers the operational commands in DRAKKAR: database preparation,
-configuration, logging, result transfer, output layout, and common recovery
-tasks.
+configuration, status inspection, logging, result transfer, output layout, and
+common recovery tasks.
 
 Operations overview
 -------------------
@@ -24,6 +24,9 @@ Operations overview
    * - ``drakkar logging``
      - Inspect workflow metadata and Snakemake logs.
      - Diagnose failed runs, locked directories, and progress state.
+   * - ``drakkar status``
+     - Show rule and sample progress for a workflow run.
+     - Monitor the latest run, a selected output directory, or one metadata YAML.
    * - ``drakkar transfer``
      - Transfer selected outputs by SFTP while preserving structure.
      - Move results from cluster storage to long-term or collaborator storage.
@@ -166,6 +169,43 @@ Behavior:
   ``vim``, or ``vi``.
 - The command edits the installed package config directly, so changes affect
   later workflow runs from that installation.
+
+Status
+------
+
+Shows progress for the latest or selected Drakkar workflow run without
+restarting Snakemake.
+
+.. code-block:: console
+
+   $ drakkar status
+
+.. code-block:: console
+
+   $ drakkar status -d drakkar_output --rules
+
+.. code-block:: console
+
+   $ drakkar status drakkar_20260510-032711.yaml --samples
+
+Options:
+
+- ``target``: optional output directory or ``drakkar_<run_id>.yaml`` metadata
+  file. If omitted, DRAKKAR inspects the current directory.
+- ``-d/--directory`` or ``-o/--output``: output directory to inspect.
+- ``--run``: specific run ID or ``drakkar_<run_id>.yaml`` file name.
+- ``--rules``: show rule-focused progress only.
+- ``--samples``: show sample-focused progress only.
+- ``--complete``: include helper rules that are hidden by default.
+
+Behavior:
+
+- The default view shows overall progress, rule progress for main rules, and
+  sample-stage progress.
+- Rule totals are parsed from the captured Snakemake job stats and completion
+  lines in ``log/drakkar_<run_id>.snakemake.log``.
+- Sample stages are inferred from observed sample or assembly wildcards and the
+  workflow sample dictionaries under ``data/``.
 
 Logging
 -------

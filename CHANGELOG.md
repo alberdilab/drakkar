@@ -2,11 +2,11 @@
 
 This project tracks release notes here from this point forward.
 
-## [Unreleased]
+## [1.6.8] - 2026-05-10
 
 ### Added
 
-- No unreleased changes yet.
+- Added `drakkar status` to show latest or selected run progress by rule and sample, with optional run-directory/YAML selection, rule-only/sample-only views, and `--complete` helper-rule detail.
 
 ## [1.6.7] - 2026-05-10
 

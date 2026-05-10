@@ -24,7 +24,7 @@ Core concepts
 
 - **Modules**: DRAKKAR can be run end-to-end with ``drakkar complete`` or as
   independent modules such as preprocessing, cataloging, profiling,
-  annotating, expressing, dereplicating, inspecting, database, logging,
+  annotating, expressing, dereplicating, inspecting, database, status, logging,
   config, and transfer.
 - **Output directory**: all outputs are written under ``-o/--output`` and
   organized into predictable module-specific folders.

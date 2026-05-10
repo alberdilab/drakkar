@@ -254,6 +254,15 @@ def build_parser():
     subparser_logging.add_argument("--full", action="store_true", help="Print the full Snakemake log")
     subparser_logging.add_argument("--paths", action="store_true", help="List relevant metadata and log paths")
     subparser_logging.add_argument("--list", action="store_true", help="List available workflow runs in the output directory")
+
+    subparser_status = subparsers.add_parser("status", help="Show progress for a Drakkar workflow run")
+    subparser_status.add_argument("target", nargs="?", help="Output directory or drakkar_<run_id>.yaml metadata file. Default is the current directory.")
+    subparser_status.add_argument("-d", "--directory", "-o", "--output", dest="output", required=False, default=None, help="Output directory to inspect. Default is the directory from which drakkar is called.")
+    subparser_status.add_argument("--run", required=False, help="Specific run ID (YYYYMMDD-HHMMSS) or drakkar_<run_id>.yaml file name")
+    subparser_status.add_argument("--complete", action="store_true", help="Show all Snakemake rules, including helper rules hidden by default")
+    status_view_group = subparser_status.add_mutually_exclusive_group()
+    status_view_group.add_argument("--samples", action="store_true", help="Show sample-focused progress only")
+    status_view_group.add_argument("--rules", action="store_true", help="Show rule-focused progress only")
     
     parser.description = "Genome-resolved metagenomics workflows, database setup, and run management."
     _set_help_metadata(
@@ -262,11 +271,12 @@ def build_parser():
         examples=[
             "drakkar complete -f input_info.tsv -o drakkar_output",
             "drakkar preprocessing -i reads/ -o drakkar_output",
+            "drakkar status -d drakkar_output",
             "drakkar logging -o drakkar_output --summary",
         ],
         command_groups=[
             ("Data Generation and Analysis", ["complete", "preprocessing", "cataloging", "profiling", "dereplicating", "annotating", "inspecting", "expressing"]),
-            ("Operations and Management", ["database", "environments", "logging", "transfer", "config", "unlock", "update"]),
+            ("Operations and Management", ["database", "environments", "status", "logging", "transfer", "config", "unlock", "update"]),
         ],
         sections=[
             ("General", ["help", "--version"]),
@@ -547,6 +557,21 @@ def build_parser():
         sections=[
             ("Target Run", ["output", "run"]),
             ("Display Options", ["summary", "excerpt", "tail", "full", "paths", "list"]),
+        ],
+    )
+
+    subparser_status.description = "Show rule and sample progress for the latest or selected Drakkar workflow run."
+    _set_help_metadata(
+        subparser_status,
+        category="Operations and management",
+        examples=[
+            "drakkar status",
+            "drakkar status -d drakkar_output --rules",
+            "drakkar status drakkar_20260510-032711.yaml --samples",
+        ],
+        sections=[
+            ("Target Run", ["target", "output", "run"]),
+            ("Display", ["complete", "samples", "rules"]),
         ],
     )
     

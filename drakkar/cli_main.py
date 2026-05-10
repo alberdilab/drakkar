@@ -25,6 +25,7 @@ from drakkar.output_paths import prepare_output_directory, validate_path
 from drakkar.quality import validate_and_write_quality_file
 from drakkar.run_logs import run_logging
 from drakkar.run_metadata import write_launch_metadata
+from drakkar.status import run_status
 from drakkar.system_checks import check_screen_session
 from drakkar.transfer import run_sftp_transfer
 from drakkar.update_command import run_update
@@ -181,6 +182,16 @@ def main():
             full=args.full,
             paths=args.paths,
             list_runs=args.list,
+        )
+
+    elif args.command == "status":
+        view = "samples" if args.samples else "rules" if args.rules else "both"
+        return run_status(
+            target=args.target,
+            output_dir=args.output,
+            run_id=args.run,
+            show_complete=args.complete,
+            view=view,
         )
 
     elif args.command == "transfer":

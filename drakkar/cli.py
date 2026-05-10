@@ -34,6 +34,7 @@ from drakkar import config_commands as _config_commands
 from drakkar import output_paths as _output_paths
 from drakkar import run_logs as _run_logs
 from drakkar import run_metadata as _run_metadata
+from drakkar import status as _status
 from drakkar import update_command as _update_command
 from drakkar import workflow_launcher as _workflow_launcher
 from drakkar.cli_context import (
@@ -120,6 +121,11 @@ print_snakemake_summary = _run_logs.print_snakemake_summary
 print_benchmark_summary = _run_logs.print_benchmark_summary
 print_logging_usage_guide = _run_logs.print_logging_usage_guide
 
+parse_snakemake_status = _status.parse_snakemake_status
+resolve_status_target = _status.resolve_status_target
+resolve_status_metadata = _status.resolve_status_metadata
+build_sample_rows = _status.build_sample_rows
+
 from drakkar.quality import load_bins_map, normalize_genome_name, validate_and_write_quality_file
 from drakkar.transfer import build_sftp_batch_commands, collect_transfer_files, list_files_recursive, run_sftp_transfer
 
@@ -203,6 +209,13 @@ def _sync_run_log_dependencies():
     _run_logs.section = section
     _run_logs.is_snakemake_locked = globals()["is_snakemake_locked"]
     _run_logs.generate_run_benchmark = globals()["generate_run_benchmark"]
+
+
+def _sync_status_dependencies():
+    _status.print = print
+    _status.section = section
+    _status.resolve_run_metadata = globals()["resolve_run_metadata"]
+    _status.discover_snakemake_fallback_logs = globals()["discover_snakemake_fallback_logs"]
 
 
 def _sync_update_dependencies():
@@ -400,6 +413,11 @@ def run_logging(*args, **kwargs):
     return _run_logs.run_logging(*args, **kwargs)
 
 
+def run_status(*args, **kwargs):
+    _sync_status_dependencies()
+    return _status.run_status(*args, **kwargs)
+
+
 def run_unlock(*args, **kwargs):
     _sync_workflow_dependencies()
     return _workflow_launcher.run_unlock(*args, **kwargs)
@@ -473,6 +491,7 @@ def _sync_main_dependencies():
     _cli_main.prepare_output_directory = prepare_output_directory
     _cli_main.write_launch_metadata = write_launch_metadata
     _cli_main.run_logging = run_logging
+    _cli_main.run_status = run_status
     _cli_main.run_update = run_update
     _cli_main.run_sftp_transfer = run_sftp_transfer
     _cli_main.run_unlock = run_unlock
