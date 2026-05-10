@@ -89,7 +89,7 @@ Example:
 Input notes
 ^^^^^^^^^^^
 
-- Read files can be local paths or remote URLs (http/https/ftp).
+- Read files can be local paths or remote URLs (http/https/ftp/sftp).
 - Sample tables can also use an ``accession`` column with ENA/SRA paired-end
   run accessions; DRAKKAR resolves and downloads the matching R1 and R2 FASTQ
   files automatically.
@@ -101,6 +101,9 @@ Input notes
   remote URLs; DRAKKAR caches them locally before execution.
 - Directory-style inputs such as ``-i/--input`` and ``-b/--bins_dir`` must be
   local filesystem paths.
+- Before Snakemake starts, DRAKKAR checks downloaded and local input files for
+  existence and non-zero size. Remote downloads retry up to five times with
+  exponential backoff; ``sftp://`` URLs require ``curl`` with SFTP support.
 - The preferred sample-table column name is ``assembly``. The legacy column
   name ``coassembly`` is still accepted.
 - Assembly labels can be any identifiers you choose; they do not need to match

@@ -9,6 +9,8 @@ from unittest.mock import patch
 
 from drakkar import cli as cli_module
 from drakkar.utils import (
+    DEFAULT_DOWNLOAD_RETRIES,
+    argument_preprocessed_to_json,
     argument_references_to_json,
     file_bins_to_json,
     file_mags_to_json,
@@ -64,6 +66,25 @@ class UrlGenomeInputTests(unittest.TestCase):
             self.assertEqual(sample_to_reads2["sample1"], [str(expected_read2)])
             self.assertTrue(expected_read1.exists())
             self.assertTrue(expected_read2.exists())
+
+    def test_file_samples_to_json_stops_on_empty_remote_download(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            infofile = Path(tmpdir) / "info.tsv"
+            infofile.write_text(
+                "sample\trawreads1\trawreads2\n"
+                "sample1\thttps://example.org/sample1_1.fq.gz\thttps://example.org/sample1_2.fq.gz\n",
+                encoding="utf-8",
+            )
+
+            with patch(
+                "drakkar.utils.urlopen",
+                side_effect=[FakeResponse(b"") for _ in range(DEFAULT_DOWNLOAD_RETRIES)],
+            ) as urlopen_mock, patch("drakkar.utils.time.sleep"):
+                with self.assertRaises(SystemExit):
+                    file_samples_to_json(str(infofile), tmpdir)
+
+            self.assertEqual(urlopen_mock.call_count, DEFAULT_DOWNLOAD_RETRIES)
+            self.assertFalse((Path(tmpdir) / "data" / "sample_to_reads1.json").exists())
 
     def test_file_transcriptome_to_json_downloads_reads_from_accession(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -175,6 +196,28 @@ class UrlGenomeInputTests(unittest.TestCase):
 
             self.assertEqual(bins_to_files["bin_001"], str(expected_path))
             self.assertTrue(expected_path.exists())
+
+    def test_file_bins_to_json_stops_on_missing_local_genome(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bins_file = Path(tmpdir) / "bins.txt"
+            bins_file.write_text(f"{Path(tmpdir) / 'missing.fna'}\n", encoding="utf-8")
+
+            with self.assertRaises(SystemExit):
+                file_bins_to_json(str(bins_file), tmpdir)
+
+            self.assertFalse((Path(tmpdir) / "data" / "bins_to_files.json").exists())
+
+    def test_argument_preprocessed_to_json_stops_on_empty_directory_read(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            reads_dir = Path(tmpdir) / "reads"
+            reads_dir.mkdir()
+            (reads_dir / "sample1_1.fq.gz").write_bytes(b"")
+            (reads_dir / "sample1_2.fq.gz").write_bytes(b"read2")
+
+            with self.assertRaises(SystemExit):
+                argument_preprocessed_to_json(str(reads_dir), tmpdir)
+
+            self.assertFalse((Path(tmpdir) / "data" / "preprocessed_to_reads1.json").exists())
 
     def test_file_bins_to_json_downloads_remote_manifest_and_genome_urls(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -8,6 +8,16 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.6.6] - 2026-05-10
+
+### Added
+
+- Added stricter input-transfer preflight checks before Snakemake starts: URL downloads now retry up to five times, empty cached/downloaded files are rejected, SFTP URLs are supported via `curl`, and missing or empty input files/directories are reported together with a clear stop message.
+
+### Changed
+
+- Split the large CLI and utility modules into focused implementation modules while keeping the existing `drakkar.cli` and `drakkar.utils` import surfaces compatible.
+
 ## [1.6.5] - 2026-05-09
 
 ### Added
