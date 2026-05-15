@@ -18,10 +18,22 @@ def workflow_run_sort_key(metadata_path):
         return match.group(1)
     return path.name
 
+def is_launch_metadata_path(metadata_path):
+    return re.fullmatch(r"drakkar_\d{8}-\d{6}\.ya?ml", Path(metadata_path).name) is not None
+
+def run_id_from_metadata_name(value):
+    name = Path(str(value)).name
+    match = re.fullmatch(r"drakkar_(\d{8}-\d{6})(?:_resources)?\.ya?ml", name)
+    if match:
+        return match.group(1)
+    return str(value).strip().removeprefix("drakkar_").removesuffix(".yaml").removesuffix(".yml")
+
 def discover_run_metadata(output_dir):
     output_path = Path(output_dir)
     runs = []
     for metadata_path in sorted(output_path.glob("drakkar_*.yaml"), key=workflow_run_sort_key, reverse=True):
+        if not is_launch_metadata_path(metadata_path):
+            continue
         try:
             with open(metadata_path, "r", encoding="utf-8") as handle:
                 metadata = yaml.safe_load(handle) or {}
@@ -41,7 +53,7 @@ def resolve_run_metadata(output_dir, run_id=None):
         return runs[0]
 
     selector = str(run_id).strip()
-    normalized_selector = selector.removeprefix("drakkar_").removesuffix(".yaml")
+    normalized_selector = run_id_from_metadata_name(selector)
     for metadata_path, metadata in runs:
         run_value = str(metadata.get("run_id", "")).strip()
         if selector == metadata_path.name or normalized_selector == run_value:
@@ -141,7 +153,7 @@ def summarize_snakemake_log(path, metadata=None):
             if match:
                 started_job_ids.add(match.group(1))
 
-            match = re.search(r"Finished jobid:\s*(\d+)", stripped)
+            match = re.search(r"Finished\s+job(?:id:|\s+)\s*(\d+)", stripped)
             if match:
                 finished_job_ids.add(match.group(1))
 

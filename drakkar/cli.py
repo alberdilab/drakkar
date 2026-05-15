@@ -213,7 +213,9 @@ def _sync_run_log_dependencies():
 
 def _sync_status_dependencies():
     _status.print = print
+    _status.prompt = prompt
     _status.section = section
+    _status.discover_run_metadata = globals()["discover_run_metadata"]
     _status.resolve_run_metadata = globals()["resolve_run_metadata"]
     _status.discover_snakemake_fallback_logs = globals()["discover_snakemake_fallback_logs"]
 

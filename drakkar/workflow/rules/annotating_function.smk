@@ -595,7 +595,7 @@ rule final_gene_annotation_table:
     message: "Generating final gene annotation file..."
     shell:
         """
-        cat {input} | xz -c > {output}
+        awk 'FNR==1 && NR!=1 {{ next }} {{ print }}' {input} | xz -c > {output}
         """
 
 rule final_cluster_annotation_table:
@@ -611,5 +611,5 @@ rule final_cluster_annotation_table:
     message: "Generating final cluster annotation file..."
     shell:
         """
-        cat {input} | xz -c > {output}
+        awk 'FNR==1 && NR!=1 {{ next }} {{ print }}' {input} | xz -c > {output}
         """

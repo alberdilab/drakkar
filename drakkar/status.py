@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
 from drakkar.cli_context import ERROR, INFO, PACKAGE_DIR, RESET
-from drakkar.output import print, section
+from drakkar.output import print, prompt, section
 from drakkar.run_logs import (
+    discover_run_metadata,
     discover_snakemake_fallback_logs,
+    is_launch_metadata_path,
     resolve_run_metadata,
+    run_id_from_metadata_name,
 )
 from drakkar.run_metadata import build_snakemake_log_path, load_metadata_file
 
@@ -72,6 +76,9 @@ WORKFLOW_RULE_FILES = {
     "environments": ["rules/environments.smk"],
 }
 
+ANSI_ESCAPE_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+RUN_SELECTION_CANCELLED = object()
+
 
 def _looks_like_metadata_file(value):
     text = str(value or "").strip()
@@ -120,11 +127,64 @@ def resolve_status_metadata(output_path, run_selector=None):
             cwd_candidate = Path.cwd() / metadata_path
             output_candidate = Path(output_path) / metadata_path
             metadata_path = cwd_candidate if cwd_candidate.exists() else output_candidate
-        metadata = load_metadata_file(metadata_path)
-        if metadata is not None:
-            return metadata_path.resolve(), metadata
+        if is_launch_metadata_path(metadata_path):
+            metadata = load_metadata_file(metadata_path)
+            if metadata is not None:
+                return metadata_path.resolve(), metadata
+        else:
+            metadata_path_run_id = run_id_from_metadata_name(metadata_path.name)
+            resolved_path, resolved_metadata = resolve_run_metadata(output_path, metadata_path_run_id)
+            if resolved_metadata is not None:
+                return resolved_path, resolved_metadata
+            metadata = load_metadata_file(metadata_path)
+            if metadata is not None:
+                return metadata_path.resolve(), metadata
 
     return resolve_run_metadata(output_path, run_selector)
+
+
+def format_status_run_choice(metadata_path, metadata):
+    run_value = metadata.get("run_id", metadata_path.stem.removeprefix("drakkar_"))
+    command = metadata.get("command", "unknown")
+    status = metadata.get("status", "unknown")
+    started = metadata.get("started_at", metadata.get("timestamp", "unknown"))
+    return f"{run_value}: command={command}, status={status}, started={started}"
+
+
+def prompt_for_status_run(output_path):
+    runs = discover_run_metadata(output_path)
+    if len(runs) <= 1:
+        return resolve_run_metadata(output_path)
+    if not sys.stdin.isatty():
+        return resolve_run_metadata(output_path)
+
+    section("AVAILABLE RUNS")
+    print("Multiple Drakkar workflow runs were found. Select one to inspect:")
+    for index, (metadata_path, metadata) in enumerate(runs, start=1):
+        print(f"  {index}. {format_status_run_choice(metadata_path, metadata)}")
+
+    while True:
+        try:
+            selected = prompt("Select run index: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            print(f"{ERROR}ERROR:{RESET} Run selection cancelled.")
+            return RUN_SELECTION_CANCELLED, None
+
+        if not selected:
+            print(f"{ERROR}ERROR:{RESET} Please type a run index from 1 to {len(runs)}.")
+            continue
+
+        try:
+            selected_index = int(selected)
+        except ValueError:
+            print(f"{ERROR}ERROR:{RESET} Invalid run index: {selected}")
+            continue
+
+        if 1 <= selected_index <= len(runs):
+            return runs[selected_index - 1]
+
+        print(f"{ERROR}ERROR:{RESET} Run index must be between 1 and {len(runs)}.")
 
 
 def resolve_status_log(output_path, metadata):
@@ -151,6 +211,22 @@ def parse_wildcards(text):
         key, value = item.split("=", 1)
         wildcards[key.strip()] = value.strip()
     return wildcards
+
+
+def clean_log_line(line):
+    return ANSI_ESCAPE_RE.sub("", str(line or "")).replace("\r", "").strip()
+
+
+def parse_job_stats_row(line):
+    parts = str(line or "").split()
+    if len(parts) < 2:
+        return None
+    if not re.match(r"^[A-Za-z_][A-Za-z0-9_.-]*$", parts[0]):
+        return None
+    try:
+        return parts[0], int(parts[1])
+    except ValueError:
+        return None
 
 
 def parse_rule_order(modules):
@@ -220,7 +296,7 @@ def parse_snakemake_status(log_path, metadata=None):
 
     with open(log_path, "r", encoding="utf-8", errors="replace") as handle:
         for raw_line in handle:
-            stripped = raw_line.strip()
+            stripped = clean_log_line(raw_line)
             if not stripped:
                 if in_job_stats and seen_job_stat_rows:
                     in_job_stats = False
@@ -244,10 +320,9 @@ def parse_snakemake_status(log_path, metadata=None):
             if in_job_stats:
                 if stripped.lower().startswith("job ") or set(stripped) <= {"-", " "}:
                     continue
-                match = re.match(r"^([A-Za-z_][A-Za-z0-9_.-]*)\s+(\d+)\s*$", stripped)
-                if match:
-                    rule_name = match.group(1)
-                    count = int(match.group(2))
+                job_stats_row = parse_job_stats_row(stripped)
+                if job_stats_row:
+                    rule_name, count = job_stats_row
                     if rule_name != "total":
                         segment_planned[segment][rule_name] = max(
                             segment_planned[segment][rule_name],
@@ -285,7 +360,10 @@ def parse_snakemake_status(log_path, metadata=None):
                             current_block[field] = value
                         break
 
-            finish_match = re.search(r"Finished jobid:\s*(\d+)(?:\s+\(Rule:\s*([^)]+)\))?", stripped)
+            finish_match = re.search(
+                r"Finished\s+job(?:id:|\s+)\s*(\d+)(?:\s+\(Rule:\s*([^)]+)\))?\.?",
+                stripped,
+            )
             if finish_match:
                 jobid = finish_match.group(1)
                 rule_name = finish_match.group(2)
@@ -367,7 +445,7 @@ def parse_snakemake_status(log_path, metadata=None):
         "total": overall_total,
         "started": overall_started,
         "failed": overall_failed,
-        "pending": max(0, overall_total - overall_completed),
+        "pending": max(0, overall_total - max(overall_started, overall_completed)),
         "percent": percent,
     }
     summary["rules"] = rules
@@ -405,6 +483,11 @@ def load_sample_context(output_path):
     return sorted(sample_names), clean_assembly_map
 
 
+def load_mag_context(output_path):
+    mags_to_files = read_json(Path(output_path) / "data" / "mags_to_files.json")
+    return sorted(str(mag) for mag in mags_to_files)
+
+
 def job_samples(job, sample_names, assembly_to_samples):
     wildcards = job.get("wildcards") or {}
     sample = wildcards.get("sample")
@@ -421,10 +504,60 @@ def job_samples(job, sample_names, assembly_to_samples):
     return []
 
 
+def rows_from_rule_stats(rule_stats_by_entity, entity_names, rule_order):
+    rows = []
+    all_entities = sorted(set(entity_names) | set(rule_stats_by_entity))
+    for entity in all_entities:
+        rule_stats = rule_stats_by_entity.get(entity, {})
+        ordered_rules = sorted(
+            rule_stats,
+            key=lambda name: (rule_order.get(name, 10_000), name),
+        )
+        total = len(ordered_rules)
+        completed = 0
+        failed = False
+        started = False
+        current = None
+        for rule in ordered_rules:
+            stats = rule_stats[rule]
+            rule_done = stats["total"] > 0 and stats["completed"] >= stats["total"]
+            if rule_done:
+                completed += 1
+                continue
+            if stats["failed"]:
+                failed = True
+            if stats["started"] > stats["completed"]:
+                started = True
+            if current is None:
+                current = rule
+        if current is None and total:
+            current = "complete"
+        if failed:
+            status = "failed"
+        elif total and completed >= total:
+            status = "done"
+        elif started or completed:
+            status = "running"
+        else:
+            status = "pending"
+        rows.append(
+            {
+                "sample": entity,
+                "status": status,
+                "completed": completed,
+                "total": total,
+                "current": current or "not observed",
+            }
+        )
+    return rows
+
+
 def build_sample_rows(status_summary, sample_names, assembly_to_samples, rule_order, show_complete=False):
     jobs_by_rule = status_summary.get("jobs_by_rule") or {}
     completed_keys = status_summary.get("completed_keys") or set()
-    sample_rule_stats = defaultdict(lambda: defaultdict(lambda: {"total": 0, "completed": 0, "failed": 0}))
+    sample_rule_stats = defaultdict(
+        lambda: defaultdict(lambda: {"total": 0, "completed": 0, "failed": 0, "started": 0})
+    )
     sample_rules_seen = defaultdict(set)
 
     failed_by_rule = {rule["rule"]: rule["failed"] for rule in status_summary.get("rules", [])}
@@ -441,6 +574,7 @@ def build_sample_rows(status_summary, sample_names, assembly_to_samples, rule_or
             for sample in job_samples(job, sample_names, assembly_to_samples):
                 stats = sample_rule_stats[sample][rule]
                 stats["total"] += 1
+                stats["started"] += 1
                 if key in completed_keys:
                     stats["completed"] += 1
                 if failed_by_rule.get(rule):
@@ -455,40 +589,50 @@ def build_sample_rows(status_summary, sample_names, assembly_to_samples, rule_or
             for sample in sample_names:
                 sample_rule_stats[sample][rule]
 
-    rows = []
-    all_samples = sorted(set(sample_names) | set(sample_rule_stats))
-    for sample in all_samples:
-        rule_stats = sample_rule_stats.get(sample, {})
-        ordered_rules = sorted(
-            rule_stats,
-            key=lambda name: (rule_order.get(name, 10_000), name),
-        )
-        total = len(ordered_rules)
-        completed = 0
-        failed = False
-        current = None
-        for rule in ordered_rules:
-            stats = rule_stats[rule]
-            rule_done = stats["total"] > 0 and stats["completed"] >= stats["total"]
-            if rule_done:
-                completed += 1
+    return rows_from_rule_stats(sample_rule_stats, sample_names, rule_order)
+
+
+def build_mag_rows(status_summary, mag_names, rule_order, show_complete=False):
+    jobs_by_rule = status_summary.get("jobs_by_rule") or {}
+    completed_keys = status_summary.get("completed_keys") or set()
+    mag_rule_stats = defaultdict(
+        lambda: defaultdict(lambda: {"total": 0, "completed": 0, "failed": 0, "started": 0})
+    )
+    wildcard_rules = set()
+
+    failed_by_rule = {rule["rule"]: rule["failed"] for rule in status_summary.get("rules", [])}
+    display_rules = {
+        rule["rule"]
+        for rule in status_summary.get("rules", [])
+        if show_complete or not is_helper_rule(rule["rule"])
+    }
+
+    for rule, jobs in jobs_by_rule.items():
+        if rule not in display_rules:
+            continue
+        for key, job in jobs:
+            mag = (job.get("wildcards") or {}).get("mag")
+            if not mag:
                 continue
-            if stats["failed"]:
-                failed = True
-            if current is None:
-                current = rule
-        if current is None and total:
-            current = "complete"
-        rows.append(
-            {
-                "sample": sample,
-                "status": "failed" if failed else ("done" if total and completed >= total else "running" if completed else "pending"),
-                "completed": completed,
-                "total": total,
-                "current": current or "not observed",
-            }
-        )
-    return rows
+            wildcard_rules.add(rule)
+            stats = mag_rule_stats[mag][rule]
+            stats["total"] += 1
+            stats["started"] += 1
+            if key in completed_keys:
+                stats["completed"] += 1
+            if failed_by_rule.get(rule):
+                stats["failed"] += 1
+
+    if mag_names:
+        for rule in status_summary.get("rules", []):
+            rule_name = rule["rule"]
+            if rule_name not in display_rules:
+                continue
+            if rule["total"] >= len(mag_names) and (rule_name in wildcard_rules or rule["total"] == len(mag_names)):
+                for mag in mag_names:
+                    mag_rule_stats[mag][rule_name]["total"] = max(mag_rule_stats[mag][rule_name]["total"], 1)
+
+    return rows_from_rule_stats(mag_rule_stats, mag_names, rule_order)
 
 
 def is_helper_rule(rule_name):
@@ -569,18 +713,26 @@ def print_rule_rows(rules, rule_order, show_complete=False):
         print(f"{rule['rule']:<34} {rule['status']:<9} {done:>9}  {format_rule_detail(rule)}")
 
 
-def print_sample_rows(samples):
-    section("SAMPLE STATUS")
-    if not samples:
-        print("No sample-specific rule progress found in the Snakemake log.")
+def print_entity_rows(rows, section_title="SAMPLE STATUS", entity_label="Sample"):
+    section(section_title)
+    if not rows:
+        print(f"No {entity_label.lower()}-specific rule progress found in the Snakemake log.")
         return
-    print(f"{'Sample':<28} {'Status':<9} {'Stage':>9}  Current")
-    for sample in samples:
-        done = f"{sample['completed']}/{sample['total'] or '?'}"
+    print(f"{entity_label:<28} {'Status':<9} {'Stage':>9}  Current")
+    for row in rows:
+        done = f"{row['completed']}/{row['total'] or '?'}"
         print(
-            f"{sample['sample']:<28} {sample['status']:<9} "
-            f"{done:>9}  {sample['current']}"
+            f"{row['sample']:<28} {row['status']:<9} "
+            f"{done:>9}  {row['current']}"
         )
+
+
+def print_sample_rows(samples):
+    print_entity_rows(samples, section_title="SAMPLE STATUS", entity_label="Sample")
+
+
+def print_mag_rows(mags):
+    print_entity_rows(mags, section_title="MAG STATUS", entity_label="MAG")
 
 
 def run_status(
@@ -598,7 +750,12 @@ def run_status(
         print(f"{ERROR}ERROR:{RESET} Output path is not a directory: {output_path}")
         return 1
 
-    metadata_path, metadata = resolve_status_metadata(output_path, run_selector)
+    if run_selector:
+        metadata_path, metadata = resolve_status_metadata(output_path, run_selector)
+    else:
+        metadata_path, metadata = prompt_for_status_run(output_path)
+    if metadata_path is RUN_SELECTION_CANCELLED:
+        return 1
     if metadata is None:
         selector_text = f" matching {run_selector}" if run_selector else ""
         print(f"{ERROR}ERROR:{RESET} No Drakkar workflow run metadata{selector_text} found in {output_path}.")
@@ -608,14 +765,25 @@ def run_status(
     modules = metadata.get("modules") or ([metadata.get("command")] if metadata.get("command") else [])
     rule_order = parse_rule_order(modules)
     status_summary = parse_snakemake_status(log_path, metadata=metadata)
-    sample_names, assembly_to_samples = load_sample_context(output_path)
-    sample_rows = build_sample_rows(
-        status_summary,
-        sample_names,
-        assembly_to_samples,
-        rule_order,
-        show_complete=show_complete,
-    )
+    current_workflow = metadata.get("current_workflow") or metadata.get("command")
+    if current_workflow == "annotating":
+        mag_rows = build_mag_rows(
+            status_summary,
+            load_mag_context(output_path),
+            rule_order,
+            show_complete=show_complete,
+        )
+        sample_rows = []
+    else:
+        sample_names, assembly_to_samples = load_sample_context(output_path)
+        sample_rows = build_sample_rows(
+            status_summary,
+            sample_names,
+            assembly_to_samples,
+            rule_order,
+            show_complete=show_complete,
+        )
+        mag_rows = []
 
     print_run_header(output_path, metadata_path, metadata, log_path)
     if not status_summary["has_log"]:
@@ -626,5 +794,8 @@ def run_status(
     if view in {"both", "rules"}:
         print_rule_rows(status_summary["rules"], rule_order, show_complete=show_complete)
     if view in {"both", "samples"}:
-        print_sample_rows(sample_rows)
+        if current_workflow == "annotating":
+            print_mag_rows(mag_rows)
+        else:
+            print_sample_rows(sample_rows)
     return 0

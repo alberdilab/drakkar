@@ -8,6 +8,16 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.6.10] - 2026-05-15
+
+### Added
+
+- `drakkar status` now prompts for a run index when multiple runs are available and no run is specified.
+
+### Fixed
+
+- Final gene and cluster annotation tables now keep only the first per-genome TSV header when merging genome-specific annotation files.
+
 ## [1.6.9] - 2026-05-15
 
 ### Changed
