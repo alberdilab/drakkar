@@ -2,6 +2,22 @@
 
 This project tracks release notes here from this point forward.
 
+## [Unreleased]
+
+### Added
+
+- No unreleased changes yet.
+
+## [1.6.9] - 2026-05-15
+
+### Changed
+
+- GTDB-Tk taxonomy annotation now resolves the configured GTDB database at rule execution time, reports the selected config key and path, and uses the configured GTDB-Tk module for classification.
+
+### Fixed
+
+- ENA/SRA accession FASTQ downloads now validate cached and downloaded files against ENA byte counts when available, retry truncated files, and reject clearly imbalanced paired FASTQ sizes before Snakemake starts when ENA byte counts are unavailable.
+
 ## [1.6.8] - 2026-05-10
 
 ### Added

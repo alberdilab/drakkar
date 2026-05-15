@@ -22,6 +22,7 @@ from drakkar.output import print
 REMOTE_URL_SCHEMES = {"http", "https", "ftp", "sftp"}
 
 DEFAULT_DOWNLOAD_RETRIES = 5
+DEFAULT_PAIRED_FASTQ_SIZE_TOLERANCE = 0.10
 
 READ1_BASENAME_PATTERN = re.compile(r"(?:^|[._-])(?:R?1)(?:[._-]|$)", re.IGNORECASE)
 
@@ -68,6 +69,79 @@ def _download_once(url, tmp_path):
         _download_urlopen(url, tmp_path)
 
 
+def _normalize_expected_size(expected_size):
+    if expected_size is None:
+        return None
+    try:
+        normalized = int(expected_size)
+    except (TypeError, ValueError):
+        raise DownloadError(f"Invalid expected download size: {expected_size!r}")
+    if normalized <= 0:
+        raise DownloadError(f"Invalid expected download size: {expected_size!r}")
+    return normalized
+
+
+def _parse_ena_fastq_sizes(fastq_bytes_field, expected_count, accession):
+    value = _normalized_value(fastq_bytes_field)
+    if not value:
+        return [None] * expected_count
+
+    sizes = []
+    for item in value.split(";"):
+        item = item.strip()
+        if not item:
+            sizes.append(None)
+            continue
+        try:
+            size = int(item)
+        except ValueError:
+            raise DownloadError(
+                f"ENA returned a non-integer FASTQ byte count for accession {accession}: {item!r}."
+            )
+        if size <= 0:
+            raise DownloadError(
+                f"ENA returned a non-positive FASTQ byte count for accession {accession}: {item!r}."
+            )
+        sizes.append(size)
+
+    if len(sizes) != expected_count:
+        raise DownloadError(
+            f"ENA returned {len(sizes)} FASTQ byte count(s) but {expected_count} FASTQ URL(s) "
+            f"for accession {accession}."
+        )
+
+    return sizes
+
+
+def _remove_files(paths):
+    for path in paths:
+        try:
+            if path and os.path.isfile(path):
+                os.remove(path)
+        except OSError:
+            pass
+
+
+def _validate_paired_fastq_size_balance(read_pairs, accession, tolerance=DEFAULT_PAIRED_FASTQ_SIZE_TOLERANCE):
+    for read1_path, read2_path in read_pairs:
+        read1_size = os.path.getsize(read1_path)
+        read2_size = os.path.getsize(read2_path)
+        larger = max(read1_size, read2_size)
+        smaller = min(read1_size, read2_size)
+        if larger == 0:
+            raise DownloadError(
+                f"Downloaded FASTQ files for accession {accession} are empty: "
+                f"{read1_path}, {read2_path}."
+            )
+        difference = (larger - smaller) / larger
+        if difference > tolerance:
+            raise DownloadError(
+                f"Downloaded paired FASTQ files for accession {accession} differ in size by "
+                f"{difference:.1%}, which exceeds the {tolerance:.0%} guardrail: "
+                f"{read1_path} ({read1_size} bytes), {read2_path} ({read2_size} bytes)."
+            )
+
+
 def _validate_paired_read_maps(reads1, reads2, input_dir, label):
     errors = []
     read1_samples = set(reads1)
@@ -97,7 +171,8 @@ def _validate_paired_read_maps(reads1, reads2, input_dir, label):
         report_input_resolution_errors(errors)
 
 
-def download_to_cache(url, sample_name, column_name, output, cache_subdir="reads_cache", preserve_basename=False, max_retries=DEFAULT_DOWNLOAD_RETRIES):
+def download_to_cache(url, sample_name, column_name, output, cache_subdir="reads_cache", preserve_basename=False, max_retries=DEFAULT_DOWNLOAD_RETRIES, expected_size=None):
+    expected_size = _normalize_expected_size(expected_size)
     cache_dir = os.path.join(output, "data", cache_subdir)
     os.makedirs(cache_dir, exist_ok=True)
     parsed = urlparse(url)
@@ -108,11 +183,20 @@ def download_to_cache(url, sample_name, column_name, output, cache_subdir="reads
         filename = f"{sample_name}_{basename}"
     dest_path = os.path.join(cache_dir, filename)
     if os.path.exists(dest_path):
-        if os.path.getsize(dest_path) > 0:
+        cached_size = os.path.getsize(dest_path)
+        if cached_size > 0 and expected_size is not None and cached_size != expected_size:
+            print(
+                f"WARNING: Cached {column_name} for {sample_name} has size {cached_size} bytes, "
+                f"but ENA reports {expected_size} bytes. Downloading again: {dest_path}",
+                flush=True,
+            )
+            os.remove(dest_path)
+        elif cached_size > 0:
             print(f"Using cached {column_name} for {sample_name}: {dest_path}", flush=True)
             return dest_path
-        print(f"WARNING: Cached {column_name} for {sample_name} is empty and will be downloaded again: {dest_path}", flush=True)
-        os.remove(dest_path)
+        else:
+            print(f"WARNING: Cached {column_name} for {sample_name} is empty and will be downloaded again: {dest_path}", flush=True)
+            os.remove(dest_path)
 
     print(f"Downloading {column_name} for {sample_name} from {url}", flush=True)
     tmp_path = f"{dest_path}.tmp"
@@ -121,6 +205,12 @@ def download_to_cache(url, sample_name, column_name, output, cache_subdir="reads
             _download_once(url, tmp_path)
             if not os.path.isfile(tmp_path) or os.path.getsize(tmp_path) == 0:
                 raise DownloadError("downloaded file is empty")
+            downloaded_size = os.path.getsize(tmp_path)
+            if expected_size is not None and downloaded_size != expected_size:
+                raise DownloadError(
+                    f"downloaded file size is {downloaded_size} bytes, "
+                    f"but ENA reports {expected_size} bytes"
+                )
             os.replace(tmp_path, dest_path)
             print(f"Saved {column_name} for {sample_name} to {dest_path}", flush=True)
             return dest_path
@@ -202,7 +292,7 @@ def resolve_accession_to_reads(accession, sample_name, output, row_number):
             {
                 "accession": accession_value,
                 "result": "read_run",
-                "fields": "run_accession,library_layout,fastq_ftp",
+                "fields": "run_accession,library_layout,fastq_ftp,fastq_bytes",
                 "format": "tsv",
             }
         )
@@ -255,15 +345,47 @@ def resolve_accession_to_reads(accession, sample_name, output, row_number):
             f"Accession {accession_value} on row {row_number} returned empty FASTQ links."
         )
 
+    fastq_sizes = _parse_ena_fastq_sizes(
+        selected_row.get("fastq_bytes"),
+        len(fastq_urls),
+        accession_value,
+    )
+    expected_size_by_url = {
+        url: size for url, size in zip(fastq_urls, fastq_sizes) if size is not None
+    }
+
     forward_urls, reverse_urls = _split_paired_fastq_urls(fastq_urls, accession_value)
     reads1 = [
-        download_to_cache(url, sample_name, "rawreads1", output)
+        download_to_cache(
+            url,
+            sample_name,
+            "rawreads1",
+            output,
+            expected_size=expected_size_by_url.get(url),
+        )
         for url in forward_urls
     ]
     reads2 = [
-        download_to_cache(url, sample_name, "rawreads2", output)
+        download_to_cache(
+            url,
+            sample_name,
+            "rawreads2",
+            output,
+            expected_size=expected_size_by_url.get(url),
+        )
         for url in reverse_urls
     ]
+
+    read_pairs_without_complete_ena_sizes = []
+    for forward_url, reverse_url, read1_path, read2_path in zip(forward_urls, reverse_urls, reads1, reads2):
+        if expected_size_by_url.get(forward_url) is None or expected_size_by_url.get(reverse_url) is None:
+            read_pairs_without_complete_ena_sizes.append((read1_path, read2_path))
+    try:
+        _validate_paired_fastq_size_balance(read_pairs_without_complete_ena_sizes, accession_value)
+    except DownloadError:
+        _remove_files(reads1 + reads2)
+        raise
+
     return reads1, reads2
 
 def resolve_sample_read_lists(row, row_number, output):

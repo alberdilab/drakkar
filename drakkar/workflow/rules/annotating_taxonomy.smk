@@ -10,22 +10,27 @@ PRODIGAL_MODULE = config["PRODIGAL_MODULE"]
 HMMER_MODULE = config["HMMER_MODULE"]
 
 # Annotation databases
-GTDB_VERSION = str(config.get("gtdb_version", "") or "").strip()
-if GTDB_VERSION:
-    GTDB_DB_KEY = f"GTDB_DB_{GTDB_VERSION}"
-    if GTDB_DB_KEY not in config:
+def gtdb_db_key(wildcards):
+    gtdb_version = str(config.get("gtdb_version", "") or "").strip()
+    if not gtdb_version:
+        return "GTDB_DB"
+
+    key = f"GTDB_DB_{gtdb_version}"
+    if key not in config:
         available = sorted(
             key.replace("GTDB_DB_", "")
             for key in config
             if key.startswith("GTDB_DB_")
         )
         raise ValueError(
-            f"GTDB version {GTDB_VERSION} is not configured. "
-            f"Add {GTDB_DB_KEY} to config.yaml or choose one of: {', '.join(available)}"
+            f"GTDB version {gtdb_version} is not configured. "
+            f"Add {key} to config.yaml or choose one of: {', '.join(available)}"
         )
-    GTDB_DB = config[GTDB_DB_KEY]
-else:
-    GTDB_DB = config["GTDB_DB"]
+    return key
+
+
+def gtdb_db(wildcards):
+    return config[gtdb_db_key(wildcards)]
 
 ####
 # Workflow rules
@@ -58,19 +63,22 @@ rule gtdbtk:
         hmmer_module={HMMER_MODULE},
         prodigal_module={PRODIGAL_MODULE},
         gtdbtk_module={GTDBTK_MODULE},
-        db={GTDB_DB},
+        db_key=gtdb_db_key,
+        db=gtdb_db,
         outdir=f"{OUTPUT_DIR}/annotating/gtdbtk/",
         tmpdir=f"{OUTPUT_DIR}/annotating/tmp/"
     threads: 8
-    conda:
-        f"{PACKAGE_DIR}/workflow/envs/annotating_taxonomy.yaml"
+    # conda:
+    #     f"{PACKAGE_DIR}/workflow/envs/annotating_taxonomy.yaml"
     resources:
         mem_mb=lambda wildcards, attempt: cap_mem_mb(128*1024 * 2 ** (attempt - 1)),
         runtime=lambda wildcards, attempt: cap_runtime(120 * 2 ** (attempt - 1))
     message: "Annotating taxonomy using GTDBTK..."
     shell:
         """
-        export GTDBTK_DATA_PATH={params.db}
+        module load {params.gtdbtk_module}
+        echo "INFO Using {params.db_key}: {params.db}"
+        export GTDBTK_DATA_PATH="{params.db}"
         mkdir -p {params.tmpdir}
         gtdbtk classify_wf \
             --batchfile {input} \

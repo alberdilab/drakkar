@@ -67,6 +67,106 @@ class UrlGenomeInputTests(unittest.TestCase):
             self.assertTrue(expected_read1.exists())
             self.assertTrue(expected_read2.exists())
 
+    def test_file_samples_to_json_retries_accession_download_when_size_mismatches_ena_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            infofile = Path(tmpdir) / "info.tsv"
+            infofile.write_text(
+                "sample\taccession\n"
+                "sample1\tERR4303216\n",
+                encoding="utf-8",
+            )
+
+            with patch(
+                "drakkar.utils.urlopen",
+                side_effect=[
+                    FakeResponse(
+                        (
+                            "run_accession\tlibrary_layout\tfastq_ftp\tfastq_bytes\n"
+                            "ERR4303216\tPAIRED\tftp.sra.ebi.ac.uk/vol1/fastq/ERR430/006/ERR4303216/ERR4303216_1.fastq.gz;"
+                            "ftp.sra.ebi.ac.uk/vol1/fastq/ERR430/006/ERR4303216/ERR4303216_2.fastq.gz\t4;4\n"
+                        ).encode("utf-8")
+                    ),
+                    FakeResponse(b"bad"),
+                    FakeResponse(b"good"),
+                    FakeResponse(b"mate"),
+                ],
+            ) as urlopen_mock, patch("drakkar.utils.time.sleep"):
+                file_samples_to_json(str(infofile), tmpdir)
+
+            expected_read1 = Path(tmpdir) / "data" / "reads_cache" / "sample1_ERR4303216_1.fastq.gz"
+            expected_read2 = Path(tmpdir) / "data" / "reads_cache" / "sample1_ERR4303216_2.fastq.gz"
+
+            self.assertEqual(urlopen_mock.call_count, 4)
+            self.assertEqual(expected_read1.read_bytes(), b"good")
+            self.assertEqual(expected_read2.read_bytes(), b"mate")
+
+    def test_file_samples_to_json_redownloads_cached_accession_file_when_size_mismatches_ena_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            infofile = Path(tmpdir) / "info.tsv"
+            infofile.write_text(
+                "sample\taccession\n"
+                "sample1\tERR4303216\n",
+                encoding="utf-8",
+            )
+            cache_dir = Path(tmpdir) / "data" / "reads_cache"
+            cache_dir.mkdir(parents=True)
+            cached_read1 = cache_dir / "sample1_ERR4303216_1.fastq.gz"
+            cached_read2 = cache_dir / "sample1_ERR4303216_2.fastq.gz"
+            cached_read1.write_bytes(b"bad")
+            cached_read2.write_bytes(b"87654321")
+
+            with patch(
+                "drakkar.utils.urlopen",
+                side_effect=[
+                    FakeResponse(
+                        (
+                            "run_accession\tlibrary_layout\tfastq_ftp\tfastq_bytes\n"
+                            "ERR4303216\tPAIRED\tftp.sra.ebi.ac.uk/vol1/fastq/ERR430/006/ERR4303216/ERR4303216_1.fastq.gz;"
+                            "ftp.sra.ebi.ac.uk/vol1/fastq/ERR430/006/ERR4303216/ERR4303216_2.fastq.gz\t8;8\n"
+                        ).encode("utf-8")
+                    ),
+                    FakeResponse(b"12345678"),
+                ],
+            ) as urlopen_mock:
+                file_samples_to_json(str(infofile), tmpdir)
+
+            self.assertEqual(urlopen_mock.call_count, 2)
+            self.assertEqual(cached_read1.read_bytes(), b"12345678")
+            self.assertEqual(cached_read2.read_bytes(), b"87654321")
+
+    def test_file_samples_to_json_stops_on_imbalanced_accession_fastq_sizes_without_ena_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            infofile = Path(tmpdir) / "info.tsv"
+            infofile.write_text(
+                "sample\taccession\n"
+                "sample1\tERR4303216\n",
+                encoding="utf-8",
+            )
+
+            with patch(
+                "drakkar.utils.urlopen",
+                side_effect=[
+                    FakeResponse(
+                        (
+                            "run_accession\tlibrary_layout\tfastq_ftp\n"
+                            "ERR4303216\tPAIRED\tftp.sra.ebi.ac.uk/vol1/fastq/ERR430/006/ERR4303216/ERR4303216_1.fastq.gz;"
+                            "ftp.sra.ebi.ac.uk/vol1/fastq/ERR430/006/ERR4303216/ERR4303216_2.fastq.gz\n"
+                        ).encode("utf-8")
+                    ),
+                    FakeResponse(b"1" * 100),
+                    FakeResponse(b"2" * 80),
+                ],
+            ):
+                with self.assertRaises(SystemExit):
+                    file_samples_to_json(str(infofile), tmpdir)
+
+            expected_read1 = Path(tmpdir) / "data" / "reads_cache" / "sample1_ERR4303216_1.fastq.gz"
+            expected_read2 = Path(tmpdir) / "data" / "reads_cache" / "sample1_ERR4303216_2.fastq.gz"
+
+            self.assertFalse(expected_read1.exists())
+            self.assertFalse(expected_read2.exists())
+            self.assertFalse((Path(tmpdir) / "data" / "sample_to_reads1.json").exists())
+
     def test_file_samples_to_json_stops_on_empty_remote_download(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             infofile = Path(tmpdir) / "info.tsv"

@@ -49,6 +49,7 @@ from drakkar.display import (
 )
 from drakkar.downloads import (
     DEFAULT_DOWNLOAD_RETRIES,
+    DEFAULT_PAIRED_FASTQ_SIZE_TOLERANCE,
     READ1_BASENAME_PATTERN,
     READ2_BASENAME_PATTERN,
     REMOTE_URL_SCHEMES,
@@ -57,10 +58,14 @@ from drakkar.downloads import (
     _download_urlopen,
     _has_value,
     _normalize_ena_fastq_url,
+    _normalize_expected_size,
     _normalized_value,
+    _parse_ena_fastq_sizes,
+    _remove_files,
     _resolve_reads_path,
     _retry_delay,
     _split_paired_fastq_urls,
+    _validate_paired_fastq_size_balance,
     _validate_paired_read_maps,
 )
 from drakkar.input_errors import DownloadError, InputFileError, require_non_empty_file
