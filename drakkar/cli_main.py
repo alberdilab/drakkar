@@ -12,6 +12,8 @@ from drakkar.cli_context import (
 )
 from drakkar.cli_parser import build_parser
 from drakkar.cli_validation import (
+    build_slurm_resource_overrides,
+    build_snakemake_flags,
     normalize_annotation_type,
     normalize_cataloging_binners,
     validate_download_runtime,
@@ -157,6 +159,9 @@ def main():
         if not run_info:
             return
 
+    snakemake_flags = build_snakemake_flags(args) if hasattr(args, "snakemake_latency_wait") else ""
+    slurm_resources = build_slurm_resource_overrides(args) if hasattr(args, "slurm_partition") else ""
+
     ###
     # Unlock, update or create environments
     ###
@@ -212,6 +217,8 @@ def main():
             args.memory_multiplier,
             args.time_multiplier,
             run_info,
+            snakemake_flags=snakemake_flags,
+            slurm_resources=slurm_resources,
         )
 
     elif args.command == "database":
@@ -231,6 +238,8 @@ def main():
             args.memory_multiplier,
             args.time_multiplier,
             run_info,
+            snakemake_flags=snakemake_flags,
+            slurm_resources=slurm_resources,
         )
         if args.set_default:
             default_path = set_default_database_path(args.database_name, Path(args.directory).resolve(), args.version)
@@ -318,6 +327,8 @@ def main():
             args.memory_multiplier,
             args.time_multiplier,
             run_info,
+            snakemake_flags=snakemake_flags,
+            slurm_resources=slurm_resources,
         )
 
     ###
@@ -404,6 +415,8 @@ def main():
             args.time_multiplier,
             run_info,
             binners=args.binners,
+            snakemake_flags=snakemake_flags,
+            slurm_resources=slurm_resources,
         )
 
     ###
@@ -499,6 +512,8 @@ def main():
             args.memory_multiplier,
             args.time_multiplier,
             run_info,
+            snakemake_flags=snakemake_flags,
+            slurm_resources=slurm_resources,
         )
 
     ###
@@ -549,6 +564,8 @@ def main():
             args.memory_multiplier,
             args.time_multiplier,
             run_info,
+            snakemake_flags=snakemake_flags,
+            slurm_resources=slurm_resources,
         )
 
     ###
@@ -599,6 +616,8 @@ def main():
             args.memory_multiplier,
             args.time_multiplier,
             run_info,
+            snakemake_flags=snakemake_flags,
+            slurm_resources=slurm_resources,
         )
 
     ###
@@ -639,6 +658,8 @@ def main():
             args.memory_multiplier,
             args.time_multiplier,
             run_info,
+            snakemake_flags=snakemake_flags,
+            slurm_resources=slurm_resources,
         )
 
 
@@ -710,4 +731,6 @@ def main():
             args.memory_multiplier,
             args.time_multiplier,
             run_info,
+            snakemake_flags=snakemake_flags,
+            slurm_resources=slurm_resources,
         )

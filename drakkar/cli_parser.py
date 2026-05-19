@@ -7,6 +7,7 @@ from drakkar.cli_help import RichArgumentParser, _set_help_metadata
 from drakkar.cli_validation import (
     add_benchmark_argument,
     add_resource_multiplier_arguments,
+    add_snakemake_override_arguments,
     positive_int,
 )
 from drakkar.database_registry import MANAGED_DATABASES
@@ -67,6 +68,7 @@ def build_parser():
     subparser_complete.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
     add_benchmark_argument(subparser_complete)
     add_resource_multiplier_arguments(subparser_complete)
+    add_snakemake_override_arguments(subparser_complete)
     
     subparser_preprocessing = subparsers.add_parser("preprocessing", help="Quality-filter reads, optionally remove host sequences, and prepare cleaned datasets for downstream analysis")
     subparser_preprocessing.add_argument("-i", "--input", required=False, help="Input directory (required if no sample detail file is provided)")
@@ -82,6 +84,7 @@ def build_parser():
     subparser_preprocessing.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
     add_benchmark_argument(subparser_preprocessing)
     add_resource_multiplier_arguments(subparser_preprocessing)
+    add_snakemake_override_arguments(subparser_preprocessing)
     
     subparser_cataloging = subparsers.add_parser("cataloging", help="Assemble reads, bin genomes, and build the MAG catalog used by downstream workflows")
     subparser_cataloging.add_argument("-i", "--input", required=False, help="Input directory (required if no sample detail file is provided)")
@@ -104,6 +107,7 @@ def build_parser():
     subparser_cataloging.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
     add_benchmark_argument(subparser_cataloging)
     add_resource_multiplier_arguments(subparser_cataloging)
+    add_snakemake_override_arguments(subparser_cataloging)
     
     subparser_profiling = subparsers.add_parser("profiling", help="Dereplicate MAGs and quantify genome or pangenome abundance across metagenomic samples")
     subparser_profiling.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
@@ -121,6 +125,7 @@ def build_parser():
     subparser_profiling.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
     add_benchmark_argument(subparser_profiling)
     add_resource_multiplier_arguments(subparser_profiling)
+    add_snakemake_override_arguments(subparser_profiling)
     
     subparser_dereplicating = subparsers.add_parser("dereplicating", help="Dereplicate genome collections and export representative MAG FASTA files without mapping reads")
     subparser_dereplicating.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
@@ -134,6 +139,7 @@ def build_parser():
     subparser_dereplicating.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
     add_benchmark_argument(subparser_dereplicating)
     add_resource_multiplier_arguments(subparser_dereplicating)
+    add_snakemake_override_arguments(subparser_dereplicating)
     
     subparser_annotating = subparsers.add_parser("annotating", help="Assign taxonomy and functional annotations to MAGs, genes, and derived feature tables")
     subparser_annotating.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa, .fna or .fasta, optionally including .gz) are stored")
@@ -161,6 +167,7 @@ def build_parser():
     subparser_annotating.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
     add_benchmark_argument(subparser_annotating)
     add_resource_multiplier_arguments(subparser_annotating)
+    add_snakemake_override_arguments(subparser_annotating)
     
     subparser_inspecting = subparsers.add_parser("inspecting", help="Combine bins and coverage or mapping inputs into inspection-ready summaries for follow-up exploration")
     subparser_inspecting.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
@@ -173,6 +180,7 @@ def build_parser():
     subparser_inspecting.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
     add_benchmark_argument(subparser_inspecting)
     add_resource_multiplier_arguments(subparser_inspecting)
+    add_snakemake_override_arguments(subparser_inspecting)
     
     subparser_expressing = subparsers.add_parser("expressing", help="Quantify microbial gene expression from reads against MAG-derived gene predictions")
     subparser_expressing.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
@@ -185,6 +193,7 @@ def build_parser():
     subparser_expressing.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
     add_benchmark_argument(subparser_expressing)
     add_resource_multiplier_arguments(subparser_expressing)
+    add_snakemake_override_arguments(subparser_expressing)
     
     database_parent = RichArgumentParser(add_help=False)
     database_parent.add_argument("--directory", required=True, help="Base directory where the database release directory will be created")
@@ -196,6 +205,7 @@ def build_parser():
     database_parent.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
     add_benchmark_argument(database_parent)
     add_resource_multiplier_arguments(database_parent)
+    add_snakemake_override_arguments(database_parent)
     
     subparser_database = subparsers.add_parser("database", help="Install or update managed annotation database releases used by Drakkar workflows")
     database_subparsers = subparser_database.add_subparsers(dest="database_name", help="Managed databases")
@@ -212,6 +222,7 @@ def build_parser():
     subparser_environments.add_argument("--profile", default="local", choices=["local", "slurm"])
     add_benchmark_argument(subparser_environments)
     add_resource_multiplier_arguments(subparser_environments)
+    add_snakemake_override_arguments(subparser_environments)
     
     subparser_unlock = subparsers.add_parser("unlock", help="Remove a stale Snakemake lock from a Drakkar output directory")
     subparser_unlock.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
@@ -297,6 +308,8 @@ def build_parser():
             ("Workflow Scope", ["mode", "binners", "type", "annotation_type", "gtdb_version", "multicoverage", "fraction", "nonpareil", "ani"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
+            ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
+            ("SLURM Overrides", ["slurm_partition", "slurm_account", "slurm_constraint", "slurm_nodes", "slurm_nodelist", "slurm_extra"]),
         ],
     )
     
@@ -313,6 +326,8 @@ def build_parser():
             ("Optional Analyses", ["fraction", "nonpareil"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
+            ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
+            ("SLURM Overrides", ["slurm_partition", "slurm_account", "slurm_constraint", "slurm_nodes", "slurm_nodelist", "slurm_extra"]),
         ],
     )
     
@@ -329,6 +344,8 @@ def build_parser():
             ("Assembly Strategy", ["mode", "binners", "multicoverage"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
+            ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
+            ("SLURM Overrides", ["slurm_partition", "slurm_account", "slurm_constraint", "slurm_nodes", "slurm_nodelist", "slurm_extra"]),
         ],
     )
     
@@ -346,6 +363,8 @@ def build_parser():
             ("Analysis Settings", ["type", "fraction", "ani", "ignore_quality", "quality"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
+            ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
+            ("SLURM Overrides", ["slurm_partition", "slurm_account", "slurm_constraint", "slurm_nodes", "slurm_nodelist", "slurm_extra"]),
         ],
     )
     
@@ -362,6 +381,8 @@ def build_parser():
             ("Dereplication Settings", ["ani", "ignore_quality", "quality"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
+            ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
+            ("SLURM Overrides", ["slurm_partition", "slurm_account", "slurm_constraint", "slurm_nodes", "slurm_nodelist", "slurm_extra"]),
         ],
     )
     
@@ -378,6 +399,8 @@ def build_parser():
             ("Annotation Scope", ["annotation_type", "gtdb_version"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
+            ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
+            ("SLURM Overrides", ["slurm_partition", "slurm_account", "slurm_constraint", "slurm_nodes", "slurm_nodelist", "slurm_extra"]),
         ],
     )
     
@@ -393,6 +416,8 @@ def build_parser():
             ("Input Sources", ["bins_dir", "bins_file", "mapping_dir", "cov_file"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
+            ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
+            ("SLURM Overrides", ["slurm_partition", "slurm_account", "slurm_constraint", "slurm_nodes", "slurm_nodelist", "slurm_extra"]),
         ],
     )
     
@@ -408,6 +433,8 @@ def build_parser():
             ("Input Sources", ["bins_dir", "bins_file", "reads_dir", "reads_file"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
+            ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
+            ("SLURM Overrides", ["slurm_partition", "slurm_account", "slurm_constraint", "slurm_nodes", "slurm_nodelist", "slurm_extra"]),
         ],
     )
     
@@ -472,6 +499,8 @@ def build_parser():
                 ("Release Settings", ["directory", "version", "download_runtime", "set_default"]),
                 ("Run Configuration", ["env_path", "profile", "overwrite", "skip_benchmark"]),
                 ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
+                ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
+                ("SLURM Overrides", ["slurm_partition", "slurm_account", "slurm_constraint", "slurm_nodes", "slurm_nodelist", "slurm_extra"]),
             ],
         )
     
@@ -486,6 +515,8 @@ def build_parser():
         sections=[
             ("Environment Setup", ["env_path", "profile", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
+            ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
+            ("SLURM Overrides", ["slurm_partition", "slurm_account", "slurm_constraint", "slurm_nodes", "slurm_nodelist", "slurm_extra"]),
         ],
     )
     

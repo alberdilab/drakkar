@@ -138,6 +138,137 @@ def add_resource_multiplier_arguments(parser):
         ),
     )
 
+def add_snakemake_override_arguments(parser):
+    snakemake_group = parser.add_argument_group("Snakemake overrides")
+    snakemake_group.add_argument(
+        "--snakemake-latency-wait",
+        type=positive_int,
+        dest="snakemake_latency_wait",
+        metavar="N",
+        help="Seconds to wait for missing output files before failing. Overrides the profile value (slurm default: 300, local default: 60).",
+    )
+    snakemake_group.add_argument(
+        "--snakemake-jobs",
+        type=positive_int,
+        dest="snakemake_jobs",
+        metavar="N",
+        help="Maximum number of concurrent SLURM jobs. Overrides the profile value (default: 100).",
+    )
+    snakemake_group.add_argument(
+        "--snakemake-cores",
+        type=positive_int,
+        dest="snakemake_cores",
+        metavar="N",
+        help="Maximum local CPU cores (local executor only). Overrides the profile value.",
+    )
+    snakemake_group.add_argument(
+        "--snakemake-executor",
+        dest="snakemake_executor",
+        metavar="EXECUTOR",
+        help="Snakemake executor to use (e.g. slurm, local). Overrides the profile value.",
+    )
+    snakemake_group.add_argument(
+        "--snakemake-retries",
+        type=positive_int,
+        dest="snakemake_retries",
+        metavar="N",
+        help="Number of times to retry a failed job. Overrides the profile value (slurm default: 3).",
+    )
+    snakemake_group.add_argument(
+        "--snakemake-rerun-incomplete",
+        dest="snakemake_rerun_incomplete",
+        action="store_true",
+        default=None,
+        help="Force rerun of incomplete jobs from a previous interrupted run.",
+    )
+    snakemake_group.add_argument(
+        "--snakemake-keep-going",
+        dest="snakemake_keep_going",
+        action="store_true",
+        default=None,
+        help="Continue executing independent jobs after a failure instead of stopping immediately.",
+    )
+    slurm_group = parser.add_argument_group("SLURM overrides")
+    slurm_group.add_argument(
+        "--slurm-partition",
+        dest="slurm_partition",
+        metavar="NAME",
+        help="SLURM partition (queue) to submit jobs to.",
+    )
+    slurm_group.add_argument(
+        "--slurm-account",
+        dest="slurm_account",
+        metavar="NAME",
+        help="SLURM account for job billing.",
+    )
+    slurm_group.add_argument(
+        "--slurm-constraint",
+        dest="slurm_constraint",
+        metavar="EXPR",
+        help="SLURM node constraint expression (e.g. gpu or skylake).",
+    )
+    slurm_group.add_argument(
+        "--slurm-nodes",
+        type=positive_int,
+        dest="slurm_nodes",
+        metavar="N",
+        help="Number of nodes per SLURM job. Default: 1.",
+    )
+    slurm_group.add_argument(
+        "--slurm-nodelist",
+        dest="slurm_nodelist",
+        metavar="NODES",
+        help="Specific node or node list to run jobs on (e.g. node01 or node[01-03]).",
+    )
+    slurm_group.add_argument(
+        "--slurm-extra",
+        dest="slurm_extra",
+        metavar="ARGS",
+        help="Arbitrary extra sbatch arguments passed verbatim (e.g. '--mail-type=END --mail-user=you@example.com').",
+    )
+
+def build_snakemake_flags(args):
+    """Build extra top-level Snakemake CLI flags from override arguments."""
+    parts = []
+    if getattr(args, "snakemake_latency_wait", None) is not None:
+        parts.append(f"--latency-wait {args.snakemake_latency_wait}")
+    if getattr(args, "snakemake_jobs", None) is not None:
+        parts.append(f"--jobs {args.snakemake_jobs}")
+    if getattr(args, "snakemake_cores", None) is not None:
+        parts.append(f"--cores {args.snakemake_cores}")
+    if getattr(args, "snakemake_executor", None):
+        parts.append(f"--executor {args.snakemake_executor}")
+    if getattr(args, "snakemake_retries", None) is not None:
+        parts.append(f"--retries {args.snakemake_retries}")
+    if getattr(args, "snakemake_rerun_incomplete", None):
+        parts.append("--rerun-incomplete")
+    if getattr(args, "snakemake_keep_going", None):
+        parts.append("--keep-going")
+    return (" ".join(parts) + " ") if parts else ""
+
+def build_slurm_resource_overrides(args):
+    """Build SLURM resource override string to append into --default-resources."""
+    parts = []
+    if getattr(args, "slurm_partition", None):
+        parts.append(f"slurm_partition={args.slurm_partition}")
+    if getattr(args, "slurm_account", None):
+        parts.append(f"slurm_account={args.slurm_account}")
+    if getattr(args, "slurm_constraint", None):
+        parts.append(f"slurm_constraint={args.slurm_constraint}")
+    if getattr(args, "slurm_nodes", None) is not None:
+        parts.append(f"slurm_nodes={args.slurm_nodes}")
+    nodelist = getattr(args, "slurm_nodelist", None)
+    extra = getattr(args, "slurm_extra", None)
+    combined_extra_parts = []
+    if nodelist:
+        combined_extra_parts.append(f"--nodelist={nodelist}")
+    if extra:
+        combined_extra_parts.append(extra)
+    if combined_extra_parts:
+        combined = " ".join(combined_extra_parts)
+        parts.append(f"slurm_extra='{combined}'")
+    return " ".join(parts)
+
 def add_benchmark_argument(parser):
     parser.add_argument(
         "--skip-benchmark",
@@ -148,12 +279,13 @@ def add_benchmark_argument(parser):
 def resource_config(memory_multiplier=1, time_multiplier=1):
     return f"memory_multiplier={memory_multiplier} time_multiplier={time_multiplier} "
 
-def default_resource_args(memory_multiplier=1, time_multiplier=1):
+def default_resource_args(memory_multiplier=1, time_multiplier=1, slurm_resources=""):
     max_mem_mb = int(config_vars.get("SNAKEMAKE_MAX_GB", 1024)) * 1024
     max_runtime = int(config_vars.get("SNAKEMAKE_MAX_TIME", 14 * 24 * 60))
     default_mem_mb = min(max_mem_mb, 8 * 1024 * memory_multiplier)
     default_runtime = min(max_runtime, 10 * time_multiplier)
-    return f"--default-resources mem_mb={default_mem_mb} runtime={default_runtime} "
+    extra = f" {slurm_resources}" if slurm_resources else ""
+    return f"--default-resources mem_mb={default_mem_mb} runtime={default_runtime}{extra} "
 
 def default_database_version(database_name):
     if database_name == "vfdb":

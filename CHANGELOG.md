@@ -8,6 +8,14 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.7.0] - 2026-05-19
+
+### Added
+
+- Added `--snakemake-latency-wait`, `--snakemake-jobs`, `--snakemake-cores`, `--snakemake-executor`, `--snakemake-retries`, `--snakemake-rerun-incomplete`, and `--snakemake-keep-going` flags to all workflow subcommands for overriding Snakemake profile settings from the command line.
+- Added `--slurm-partition`, `--slurm-account`, `--slurm-constraint`, `--slurm-nodes`, `--slurm-nodelist`, and `--slurm-extra` flags to all workflow subcommands for overriding SLURM resource defaults without editing profile files.
+- Both override groups are surfaced as dedicated **Snakemake Overrides** and **SLURM Overrides** sections in `--help` for every workflow subcommand.
+
 ## [1.6.10] - 2026-05-15
 
 ### Added

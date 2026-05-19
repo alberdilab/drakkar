@@ -25,9 +25,9 @@ def run_unlock(workflow, output_dir, profile):
     print(f"The output directory {output_dir} has been succesfully unlocked")
     print(f"You can now rerun a new workflow using any drakkar command:")
 
-def run_snakemake_environments(workflow, env_path, profile, memory_multiplier=1, time_multiplier=1, run_info=None):
+def run_snakemake_environments(workflow, env_path, profile, memory_multiplier=1, time_multiplier=1, run_info=None, snakemake_flags="", slurm_resources=""):
     resource_overrides = resource_config(memory_multiplier, time_multiplier)
-    default_resources = default_resource_args(memory_multiplier, time_multiplier)
+    default_resources = default_resource_args(memory_multiplier, time_multiplier, slurm_resources)
     cmd = [
         "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
@@ -40,6 +40,7 @@ def run_snakemake_environments(workflow, env_path, profile, memory_multiplier=1,
         f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--use-conda "
+        f"{snakemake_flags}"
     ]
     run_subprocess_with_logging(cmd, run_info=run_info, workflow_name=workflow)
 
@@ -55,12 +56,14 @@ def run_snakemake_preprocessing(
     memory_multiplier=1,
     time_multiplier=1,
     run_info=None,
+    snakemake_flags="",
+    slurm_resources="",
 ):
 
     """ Run the preprocessing workflow """
 
     resource_overrides = resource_config(memory_multiplier, time_multiplier)
-    default_resources = default_resource_args(memory_multiplier, time_multiplier)
+    default_resources = default_resource_args(memory_multiplier, time_multiplier, slurm_resources)
     snakemake_command = [
         "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
@@ -74,7 +77,8 @@ def run_snakemake_preprocessing(
         f"--conda-prefix {env_path} "
         f"--conda-frontend mamba "
         f"--use-conda "
-        f"--slurm-delete-logfiles-older-than 0"
+        f"--slurm-delete-logfiles-older-than 0 "
+        f"{snakemake_flags}"
     ]
 
     run_subprocess_with_logging(snakemake_command, run_info=run_info, workflow_name=workflow)
@@ -89,12 +93,14 @@ def run_snakemake_cataloging(
     time_multiplier=1,
     run_info=None,
     binners=DEFAULT_CATALOGING_BINNERS,
+    snakemake_flags="",
+    slurm_resources="",
 ):
 
     """ Run the cataloging workflow """
 
     resource_overrides = resource_config(memory_multiplier, time_multiplier)
-    default_resources = default_resource_args(memory_multiplier, time_multiplier)
+    default_resources = default_resource_args(memory_multiplier, time_multiplier, slurm_resources)
     snakemake_command = [
         "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
@@ -108,6 +114,7 @@ def run_snakemake_cataloging(
         f"--conda-prefix {env_path} "
         f"--conda-frontend mamba "
         f"--use-conda "
+        f"{snakemake_flags}"
     ]
 
     run_subprocess_with_logging(snakemake_command, run_info=run_info, workflow_name=workflow)
@@ -175,11 +182,13 @@ def run_snakemake_profiling(
     memory_multiplier=1,
     time_multiplier=1,
     run_info=None,
+    snakemake_flags="",
+    slurm_resources="",
 ):
     """ Run the profiling workflow """
 
     resource_overrides = resource_config(memory_multiplier, time_multiplier)
-    default_resources = default_resource_args(memory_multiplier, time_multiplier)
+    default_resources = default_resource_args(memory_multiplier, time_multiplier, slurm_resources)
     snakemake_command = [
         "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
@@ -193,6 +202,7 @@ def run_snakemake_profiling(
         f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--use-conda "
+        f"{snakemake_flags}"
     ]
     run_subprocess_with_logging(snakemake_command, run_info=run_info, workflow_name=workflow)
 
@@ -208,11 +218,13 @@ def run_snakemake_dereplicating(
     memory_multiplier=1,
     time_multiplier=1,
     run_info=None,
+    snakemake_flags="",
+    slurm_resources="",
 ):
     """ Run the dereplicating workflow """
 
     resource_overrides = resource_config(memory_multiplier, time_multiplier)
-    default_resources = default_resource_args(memory_multiplier, time_multiplier)
+    default_resources = default_resource_args(memory_multiplier, time_multiplier, slurm_resources)
     snakemake_command = [
         "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
@@ -225,6 +237,7 @@ def run_snakemake_dereplicating(
         f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--use-conda "
+        f"{snakemake_flags}"
     ]
     run_subprocess_with_logging(snakemake_command, run_info=run_info, workflow_name=workflow)
 
@@ -239,12 +252,14 @@ def run_snakemake_annotating(
     memory_multiplier=1,
     time_multiplier=1,
     run_info=None,
+    snakemake_flags="",
+    slurm_resources="",
 ):
-    """ Run the profiling workflow """
+    """ Run the annotating workflow """
 
     gtdb_config = f"gtdb_version={gtdb_version} " if gtdb_version else ""
     resource_overrides = resource_config(memory_multiplier, time_multiplier)
-    default_resources = default_resource_args(memory_multiplier, time_multiplier)
+    default_resources = default_resource_args(memory_multiplier, time_multiplier, slurm_resources)
     snakemake_command = [
         "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
@@ -257,34 +272,15 @@ def run_snakemake_annotating(
         f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--use-conda "
+        f"{snakemake_flags}"
     ]
     run_subprocess_with_logging(snakemake_command, run_info=run_info, workflow_name=workflow)
 
-def run_snakemake_inspecting(workflow, project_name, output_dir, env_path, profile, memory_multiplier=1, time_multiplier=1, run_info=None):
-    """ Run the profiling workflow """
+def run_snakemake_inspecting(workflow, project_name, output_dir, env_path, profile, memory_multiplier=1, time_multiplier=1, run_info=None, snakemake_flags="", slurm_resources=""):
+    """ Run the inspecting workflow """
 
     resource_overrides = resource_config(memory_multiplier, time_multiplier)
-    default_resources = default_resource_args(memory_multiplier, time_multiplier)
-    snakemake_command = [
-        "/bin/bash", "-c", 
-        f"module load {config_vars['SNAKEMAKE_MODULE']} && "
-        "snakemake "
-        f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
-        f"--directory {output_dir} "
-        f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
-        f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} {resource_overrides}"
-        f"{default_resources}"
-        f"--conda-prefix {env_path} "
-        f"--use-conda "
-    ]
-    run_subprocess_with_logging(snakemake_command, run_info=run_info, workflow_name=workflow)
-
-def run_snakemake_expressing(workflow, project_name, output_dir, env_path, profile, memory_multiplier=1, time_multiplier=1, run_info=None):
-    """ Run the expressing workflow """
-
-    resource_overrides = resource_config(memory_multiplier, time_multiplier)
-    default_resources = default_resource_args(memory_multiplier, time_multiplier)
+    default_resources = default_resource_args(memory_multiplier, time_multiplier, slurm_resources)
     snakemake_command = [
         "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
@@ -297,6 +293,28 @@ def run_snakemake_expressing(workflow, project_name, output_dir, env_path, profi
         f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--use-conda "
+        f"{snakemake_flags}"
+    ]
+    run_subprocess_with_logging(snakemake_command, run_info=run_info, workflow_name=workflow)
+
+def run_snakemake_expressing(workflow, project_name, output_dir, env_path, profile, memory_multiplier=1, time_multiplier=1, run_info=None, snakemake_flags="", slurm_resources=""):
+    """ Run the expressing workflow """
+
+    resource_overrides = resource_config(memory_multiplier, time_multiplier)
+    default_resources = default_resource_args(memory_multiplier, time_multiplier, slurm_resources)
+    snakemake_command = [
+        "/bin/bash", "-c",
+        f"module load {config_vars['SNAKEMAKE_MODULE']} && "
+        "snakemake "
+        f"-s {PACKAGE_DIR / 'workflow' / 'Snakefile'} "
+        f"--directory {output_dir} "
+        f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
+        f"--configfile {CONFIG_PATH} "
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} {resource_overrides}"
+        f"{default_resources}"
+        f"--conda-prefix {env_path} "
+        f"--use-conda "
+        f"{snakemake_flags}"
     ]
     run_subprocess_with_logging(snakemake_command, run_info=run_info, workflow_name=workflow)
 
@@ -313,11 +331,13 @@ def run_snakemake_database(
     memory_multiplier=1,
     time_multiplier=1,
     run_info=None,
+    snakemake_flags="",
+    slurm_resources="",
 ):
     """Run a single database preparation workflow."""
 
     resource_overrides = resource_config(memory_multiplier, time_multiplier)
-    default_resources = default_resource_args(memory_multiplier, time_multiplier)
+    default_resources = default_resource_args(memory_multiplier, time_multiplier, slurm_resources)
     snakemake_command = [
         "/bin/bash", "-c",
         f"module load {config_vars['SNAKEMAKE_MODULE']} && "
@@ -332,5 +352,6 @@ def run_snakemake_database(
         f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--use-conda "
+        f"{snakemake_flags}"
     ]
     run_subprocess_with_logging(snakemake_command, run_info=run_info, workflow_name=workflow)
