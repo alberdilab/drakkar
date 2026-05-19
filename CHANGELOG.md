@@ -8,6 +8,12 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.7.2] - 2026-05-19
+
+### Fixed
+
+- `dbcan4` rule now passes `--input_raw_data` (the MAG FASTA file) and `--mode prok` to `run_dbcan substrate_prediction`, resolving a missing required input error.
+
 ## [1.7.1] - 2026-05-19
 
 ### Added

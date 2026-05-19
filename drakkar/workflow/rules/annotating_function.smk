@@ -381,7 +381,8 @@ rule dbcan3:
 
 rule dbcan4:
     input:
-        f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/cgc_standard_out.tsv"
+        fasta=lambda wildcards: MAGS_TO_FILES[wildcards.mag],
+        cgc=f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/cgc_standard_out.tsv"
     output:
         f"{OUTPUT_DIR}/annotating/dbcan/{{mag}}/substrate_prediction.tsv"
     threads:
@@ -398,6 +399,8 @@ rule dbcan4:
     shell:
         """
         run_dbcan substrate_prediction \
+            --input_raw_data {input.fasta} \
+            --mode prok \
             --output_dir {params.output_dir} \
             --db_dir {params.db}
         """
