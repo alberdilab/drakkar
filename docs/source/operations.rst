@@ -37,6 +37,9 @@ Operations overview
      - Reinstall DRAKKAR from the Git repository in the current environment.
      - Refresh the installed CLI and workflow package.
 
+See also :ref:`snakemake-slurm-management` for the Snakemake and SLURM override
+flags available on every workflow command.
+
 Database
 --------
 
@@ -170,6 +173,135 @@ Behavior:
 - The command edits the installed package config directly, so changes affect
   later workflow runs from that installation.
 
+.. _snakemake-slurm-management:
+
+Snakemake and SLURM management
+-------------------------------
+
+Every workflow subcommand (``complete``, ``preprocessing``, ``cataloging``,
+``profiling``, ``annotating``, ``expressing``, ``dereplicating``,
+``inspecting``, ``database``, and ``environments``) accepts the flags
+described in this section. They let you tune resource limits, override
+Snakemake profile settings, and pass SLURM directives without editing profile
+files.
+
+Resource caps (config.yaml)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``drakkar/workflow/config.yaml`` contains four resource-related keys that act
+as cluster-wide guardrails:
+
+- ``SNAKEMAKE_MAX_GB``: maximum memory any single rule may request, in
+  gigabytes. Default: ``1024``. Dynamic per-rule memory requests are capped at
+  this value.
+- ``SNAKEMAKE_MAX_TIME``: maximum runtime any single rule may request, in
+  minutes. Default: ``20160`` (14 days).
+- ``MEMORY_MULTIPLIER``: a global integer factor applied to every per-rule
+  memory request before the ``SNAKEMAKE_MAX_GB`` cap is enforced. Default:
+  ``1``. Increase this when a workflow consistently runs out of memory due to
+  unusually large samples.
+- ``TIME_MULTIPLIER``: equivalent factor for runtime requests before the
+  ``SNAKEMAKE_MAX_TIME`` cap. Default: ``1``. Increase when jobs time out on a
+  slow or heavily loaded cluster.
+
+Edit these values with ``drakkar config --edit`` or set them on the command
+line with the flags below.
+
+Resource multiplier flags
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``--memory-multiplier N`` and ``--time-multiplier N`` apply the same scaling
+as ``MEMORY_MULTIPLIER`` / ``TIME_MULTIPLIER`` in ``config.yaml`` but without
+permanently changing the installed config. The command-line value overrides the
+config value for that run only.
+
+.. code-block:: console
+
+   $ drakkar cataloging -f input.tsv -o drakkar_output --memory-multiplier 2
+
+   $ drakkar profiling -b /path/to/bins -o drakkar_output --time-multiplier 3
+
+Both flags accept any positive integer. They are most useful when a specific
+workflow run is expected to be unusually resource-intensive.
+
+Snakemake override flags
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+These flags override the corresponding settings in the active Snakemake
+profile without modifying profile files. All are optional; omitting a flag
+leaves the profile value in effect.
+
+- ``--snakemake-jobs N``: maximum number of concurrent SLURM jobs. Overrides
+  the profile value (typical default: ``100``).
+- ``--snakemake-cores N``: maximum local CPU cores when using the local
+  executor. Overrides the profile value.
+- ``--snakemake-executor EXECUTOR``: Snakemake executor plugin, e.g. ``slurm``
+  or ``local``. Overrides the profile value.
+- ``--snakemake-latency-wait N``: seconds to wait for output files before
+  failing a rule. Overrides the profile value (slurm default: ``300``, local
+  default: ``60``). Raise this on shared filesystems with high metadata
+  latency.
+- ``--snakemake-retries N``: number of times to retry a failed job. Overrides
+  the profile value (slurm default: ``3``).
+- ``--snakemake-rerun-incomplete``: force rerun of jobs whose output files were
+  left incomplete by a previous interrupted run.
+- ``--snakemake-keep-going``: continue running independent jobs after a failure
+  instead of stopping immediately.
+
+Examples:
+
+.. code-block:: console
+
+   $ drakkar complete -f input.tsv -o drakkar_output --snakemake-jobs 50 --snakemake-retries 5
+
+   $ drakkar cataloging -f input.tsv -o drakkar_output --snakemake-executor local --snakemake-cores 32
+
+   $ drakkar profiling -b bins/ -o drakkar_output --snakemake-rerun-incomplete --snakemake-keep-going
+
+SLURM override flags
+^^^^^^^^^^^^^^^^^^^^
+
+These flags inject SLURM directives into Snakemake's ``--default-resources``
+without requiring changes to the SLURM profile or cluster config.
+
+- ``--slurm-partition NAME``: SLURM partition (queue) to submit all jobs to.
+- ``--slurm-account NAME``: SLURM billing account.
+- ``--slurm-constraint EXPR``: node constraint expression, e.g. ``gpu`` or
+  ``skylake``.
+- ``--slurm-nodes N``: number of nodes per SLURM job (default: ``1``).
+- ``--slurm-nodelist NODES``: restrict jobs to a specific node or node list,
+  e.g. ``node01`` or ``node[01-03]``.
+- ``--slurm-extra ARGS``: arbitrary extra ``sbatch`` arguments passed verbatim,
+  e.g. ``'--mail-type=END --mail-user=you@example.com'``.
+
+Examples:
+
+.. code-block:: console
+
+   $ drakkar complete -f input.tsv -o drakkar_output --slurm-partition gpu --slurm-account myproject
+
+   $ drakkar annotating -b bins/ -o drakkar_output --slurm-extra '--mail-type=END --mail-user=you@example.com'
+
+SLURM benchmarking
+^^^^^^^^^^^^^^^^^^
+
+After each workflow run, DRAKKAR queries ``sacct`` for the jobs submitted
+during that run and writes a resource-efficiency summary. This produces:
+
+- ``benchmark/``: per-job resource tables under the output directory.
+- ``drakkar_<run_id>_resources.yaml``: root-level summary of CPU time, memory
+  peaks, and efficiency ratios for the run.
+
+The resource summary is also shown by ``drakkar logging`` alongside the
+workflow execution summary.
+
+To skip benchmark collection, pass ``--skip-benchmark`` to any workflow
+command:
+
+.. code-block:: console
+
+   $ drakkar preprocessing -i /path/to/reads -o drakkar_output --skip-benchmark
+
 Status
 ------
 
@@ -286,6 +418,13 @@ Update DRAKKAR in the current environment:
 
    $ drakkar update
 
+Pass ``--skip-deps`` to refresh the package without reinstalling Python
+dependencies (useful when only the workflow scripts have changed):
+
+.. code-block:: console
+
+   $ drakkar update --skip-deps
+
 Outputs
 -------
 
@@ -299,6 +438,10 @@ Key output locations:
 - ``annotating/``: annotation tables.
 - ``expressing/``: expression outputs.
 - ``dereplicating/``: dereplicated genomes in dereplication-only mode.
+- ``benchmark/``: per-SLURM-job resource tables written after each workflow run.
+- ``drakkar_<run_id>.yaml``: workflow run metadata.
+- ``drakkar_<run_id>_resources.yaml``: root-level SLURM resource-efficiency
+  summary for the run (CPU time, memory peaks, and efficiency ratios).
 - ``log/drakkar_<run_id>.snakemake.log``: persistent Snakemake stdout/stderr
   capture for a workflow run.
 - ``<directory>/<version>/database_versions.yaml``: installation log for a

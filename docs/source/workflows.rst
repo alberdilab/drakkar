@@ -71,6 +71,12 @@ Options:
 - ``-a/--ani``: dRep ANI threshold (default: ``0.98``).
 - ``-e/--env_path``: shared Conda environment directory.
 - ``-p/--profile``: Snakemake profile (default: ``slurm``).
+- ``--overwrite``: delete a locked output directory and rerun from scratch.
+- ``--skip-benchmark``: skip SLURM resource benchmark collection after the run.
+- ``--memory-multiplier N`` / ``--time-multiplier N``: scale per-rule resource
+  requests before the configured caps are applied.
+- ``--snakemake-*`` / ``--slurm-*``: Snakemake and SLURM override flags. See
+  :ref:`snakemake-slurm-management` in :doc:`operations`.
 
 Module reference
 ----------------
@@ -98,6 +104,9 @@ Options:
 - ``--nonpareil``: estimate metagenomic coverage and diversity with Nonpareil.
 - ``-e/--env_path``: shared Conda environment directory.
 - ``-p/--profile``: Snakemake profile.
+- ``--overwrite``: delete a locked output directory and rerun from scratch.
+- ``--skip-benchmark`` / ``--memory-multiplier`` / ``--time-multiplier`` /
+  ``--snakemake-*`` / ``--slurm-*``: see :ref:`snakemake-slurm-management`.
 
 Cataloging
 ^^^^^^^^^^
@@ -121,6 +130,9 @@ Options:
 - ``-c/--multicoverage``: enable multicoverage mapping.
 - ``-e/--env_path``: shared Conda environment directory.
 - ``-p/--profile``: Snakemake profile.
+- ``--overwrite``: delete a locked output directory and rerun from scratch.
+- ``--skip-benchmark`` / ``--memory-multiplier`` / ``--time-multiplier`` /
+  ``--snakemake-*`` / ``--slurm-*``: see :ref:`snakemake-slurm-management`.
 
 Read resolution when using ``-f/--file``
 """""""""""""""""""""""""""""""""""""""""
@@ -174,6 +186,9 @@ Options:
   this instead of CheckM2.
 - ``-e/--env_path``: shared Conda environment directory.
 - ``-p/--profile``: Snakemake profile.
+- ``--overwrite``: delete a locked output directory and rerun from scratch.
+- ``--skip-benchmark`` / ``--memory-multiplier`` / ``--time-multiplier`` /
+  ``--snakemake-*`` / ``--slurm-*``: see :ref:`snakemake-slurm-management`.
 
 Annotating
 ^^^^^^^^^^
@@ -218,6 +233,9 @@ Options:
   ``GTDB_DB_<version>`` from ``config.yaml``; if omitted, it uses ``GTDB_DB``.
 - ``-e/--env_path``: shared Conda environment directory.
 - ``-p/--profile``: Snakemake profile.
+- ``--overwrite``: delete a locked output directory and rerun from scratch.
+- ``--skip-benchmark`` / ``--memory-multiplier`` / ``--time-multiplier`` /
+  ``--snakemake-*`` / ``--slurm-*``: see :ref:`snakemake-slurm-management`.
 
 Output behavior for partial functional runs:
 
@@ -248,6 +266,9 @@ Options:
 - ``-o/--output``: output directory.
 - ``-e/--env_path``: shared Conda environment directory.
 - ``-p/--profile``: Snakemake profile.
+- ``--overwrite``: delete a locked output directory and rerun from scratch.
+- ``--skip-benchmark`` / ``--memory-multiplier`` / ``--time-multiplier`` /
+  ``--snakemake-*`` / ``--slurm-*``: see :ref:`snakemake-slurm-management`.
 
 Dereplicating
 ^^^^^^^^^^^^^
@@ -270,6 +291,9 @@ Options:
   this instead of CheckM2.
 - ``-e/--env_path``: shared Conda environment directory.
 - ``-p/--profile``: Snakemake profile.
+- ``--overwrite``: delete a locked output directory and rerun from scratch.
+- ``--skip-benchmark`` / ``--memory-multiplier`` / ``--time-multiplier`` /
+  ``--snakemake-*`` / ``--slurm-*``: see :ref:`snakemake-slurm-management`.
 
 Inspecting
 ^^^^^^^^^^
@@ -289,3 +313,6 @@ Options:
 - ``-o/--output``: output directory.
 - ``-e/--env_path``: shared Conda environment directory.
 - ``-p/--profile``: Snakemake profile.
+- ``--overwrite``: delete a locked output directory and rerun from scratch.
+- ``--skip-benchmark`` / ``--memory-multiplier`` / ``--time-multiplier`` /
+  ``--snakemake-*`` / ``--slurm-*``: see :ref:`snakemake-slurm-management`.

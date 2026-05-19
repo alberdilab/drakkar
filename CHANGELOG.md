@@ -8,6 +8,16 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.7.1] - 2026-05-19
+
+### Added
+
+- Added a dedicated **Snakemake and SLURM management** section to the documentation covering resource caps (`SNAKEMAKE_MAX_GB`, `SNAKEMAKE_MAX_TIME`, `MEMORY_MULTIPLIER`, `TIME_MULTIPLIER` in `config.yaml`), resource multiplier flags (`--memory-multiplier`, `--time-multiplier`), all `--snakemake-*` override flags, all `--slurm-*` override flags, and SLURM benchmarking outputs.
+- Documented `--overwrite` and `--skip-benchmark` in every workflow module's option list.
+- Documented `benchmark/` and `drakkar_<run_id>_resources.yaml` in the outputs reference.
+- Documented `drakkar update --skip-deps`.
+- Expanded the CLI reference (`api.rst`) with the full set of common, Snakemake override, and SLURM override options.
+
 ## [1.7.0] - 2026-05-19
 
 ### Added
