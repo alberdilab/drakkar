@@ -8,6 +8,12 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.7.4] - 2026-05-20
+
+### Changed
+
+- Replaced deprecated `--skip_ani_screen` flag with `--place_species` in the GTDB-Tk classify workflow, required by GTDB-Tk v2.7.0+.
+
 ## [1.7.3] - 2026-05-20
 
 ### Added

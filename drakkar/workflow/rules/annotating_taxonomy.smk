@@ -85,7 +85,7 @@ rule gtdbtk:
             --batchfile {input} \
             --out_dir {params.outdir} \
             --cpus {threads} \
-            --skip_ani_screen
+            --place_species
         """
 
 rule gtdbtk_table:
