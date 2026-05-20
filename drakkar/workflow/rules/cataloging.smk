@@ -99,6 +99,7 @@ rule assembly:
     message: "Assembling {wildcards.assembly}..."
     shell:
         """
+        module purge
         module load {params.megahit_module}
         rm -rf {params.outputdir}
 
@@ -136,6 +137,7 @@ rule assembly_index:
             echo "Assembly is empty, skipping bowtie2-build..."
             touch {output.index}
         else
+            module purge
             module load {params.bowtie2_module}
             bowtie2-build {input} {params.basename}
         fi
@@ -160,6 +162,7 @@ rule assembly_quast:
             mkdir -p {params.outdir:q}
             printf 'Assembly\t{wildcards.assembly}\n# contigs\t0\nLargest contig\t0\nTotal length\t0\nGC (%%)\tNA\nN50\t0\nN75\t0\nL50\t0\nL75\t0\n' > {output.report:q}
         else
+            module purge
             module load {params.quast_module}
             rm -rf {params.outdir:q}
             quast.py {input.assembly:q} \
@@ -195,6 +198,7 @@ rule assembly_map:
             mkdir -p $(dirname {output})
             touch {output}
         else
+            module purge
             module load {params.bowtie2_module} {params.samtools_module}
             R1_FILES=$(echo {input.r1} | tr ' ' ',')
             R2_FILES=$(echo {input.r2} | tr ' ' ',')
@@ -219,6 +223,7 @@ rule assembly_flagstat:
         if [ ! -s {input:q} ]; then
             printf '0 + 0 in total (QC-passed reads + QC-failed reads)\n0 + 0 mapped (0.00%% : N/A)\n' > {output:q}
         else
+            module purge
             module load {params.samtools_module}
             samtools flagstat -@ {threads} {input:q} > {output:q}
         fi
@@ -248,6 +253,7 @@ rule assembly_map_depth:
             mkdir -p $(dirname {output.metabat2})
             touch {output.metabat2} {output.maxbin2}
         else
+            module purge
             module load {params.metabat2_module}
             jgi_summarize_bam_contig_depths --outputDepth {output.metabat2} {input.bams}
             cut -f1,3 {output.metabat2} | tail -n+2 > {output.maxbin2}
@@ -274,6 +280,7 @@ rule metabat2:
             mkdir -p $(dirname {output})
             touch {output}
         else
+            module purge
             module load {params.metabat2_module}
             metabat2 -i {input.assembly} -a {input.depth} -o {output} -m 1500 --saveCls --noBinOut
         fi
@@ -303,6 +310,7 @@ rule maxbin2:
             touch {output}
         else
             MODULEPATH=/opt/shared_software/shared_envmodules/modules:$MODULEPATH \
+            module purge
             module load {params.maxbin2_module} {params.hmmer_module}
             rm -rf {params.basename}*
             run_MaxBin.pl -contig {input.assembly} -abund {input.depth} -max_iteration 10 -out {params.basename} -min_contig_length 1500
@@ -357,6 +365,7 @@ rule semibin2:
             mkdir -p {params.outdir}
             touch {output}
         else
+            module purge
             module load {params.semibin2_module} {params.bedtools_module} {params.hmmer_module}
             SemiBin2 single_easy_bin -i {input.assembly} -b {input.bam} -o {params.outdir} -m 1500 -t {threads} --compression none
         fi
@@ -408,6 +417,7 @@ rule comebin:
             mkdir -p $(dirname {output})
             touch {output}
         else
+            module purge
             module load {params.comebin_module}
             rm -rf {params.outdir} {params.bamdir}
             mkdir -p {params.bamdir}

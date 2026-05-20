@@ -37,6 +37,7 @@ rule fastp:
     message: "Quality-filtering sample {wildcards.sample}..."
     shell:
         """
+        module purge
         module load {params.fastp_module}
         fastp \
             --in1 {input.r1} --in2 {input.r2} \
@@ -78,6 +79,7 @@ rule reference_map:
     message: "Mapping {wildcards.sample} against reference genome..."
     shell:
         """
+        module purge
         module load {params.bowtie2_module} {params.samtools_module}
         bowtie2 -x {params.basename} -1 {input.r1} -2 {input.r2} -p {threads} | samtools view -bS - | samtools sort -o {output}
         """
@@ -102,6 +104,7 @@ rule samtools_stats:
     message: "Generating mapping stats for {wildcards.sample}..."
     shell:
         """
+        module purge
         module load {params.samtools_module}
         samtools index {input} {output.bai}
         samtools flagstat {input} > {output.flagstat}
@@ -133,6 +136,7 @@ rule split_reads:
     message: "Extracting metagenomic reads of {wildcards.sample}..."
     shell:
         """
+        module purge
         module load {params.bowtie2_module} {params.samtools_module}
         samtools view -b -f12 -@ {threads} {input} | samtools fastq -@ {threads} -1 {output.r1} -2 {output.r2} -
         samtools view -b -f12 -@ {threads} {input} | samtools view -c - > {output.metareads}
@@ -161,6 +165,7 @@ rule singlem:
         runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 100) * 2 ** (attempt - 1)))
     shell:
         """
+        module purge
         module load {params.singlem_module}
         singlem pipe \
             -1 {input.r1} \
@@ -190,6 +195,7 @@ rule singlem_mf:
         runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 100) * 2 ** (attempt - 1)))
     shell:
         """
+        module purge
         module load {params.singlem_module}
         singlem microbial_fraction \
             -1 {input.r1} \
@@ -274,6 +280,7 @@ rule preprocessing_multiqc:
     message: "Building MultiQC report..."
     shell:
         """
+        module purge
         module load {params.multiqc_module}
         multiqc --zip-data-dir --outdir {params.datadir} --title "{params.title}" --filename {output.html} {params.datadir}
         """

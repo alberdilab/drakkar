@@ -76,6 +76,7 @@ rule gtdbtk:
     message: "Annotating taxonomy using GTDBTK..."
     shell:
         """
+        module purge
         module load {params.gtdbtk_module}
         echo "INFO Using {params.db_key}: {params.db}"
         export GTDBTK_DATA_PATH="{params.db}"

@@ -78,11 +78,13 @@ rule prepare_reference:
                 ;;
             *.gz)
                 gunzip -c "$reference_input" > {output.fna:q}
+                module purge
                 module load {params.bowtie2_module}
                 bowtie2-build {output.fna:q} {params.basename:q}
                 ;;
             *)
                 cp "$reference_input" {output.fna:q}
+                module purge
                 module load {params.bowtie2_module}
                 bowtie2-build {output.fna:q} {params.basename:q}
                 ;;

@@ -221,6 +221,12 @@ def add_snakemake_override_arguments(parser):
         help="Specific node or node list to run jobs on (e.g. node01 or node[01-03]).",
     )
     slurm_group.add_argument(
+        "--slurm-qos",
+        dest="slurm_qos",
+        metavar="NAME",
+        help="SLURM Quality of Service (QOS) string passed to sbatch --qos.",
+    )
+    slurm_group.add_argument(
         "--slurm-extra",
         dest="slurm_extra",
         metavar="ARGS",
@@ -257,6 +263,8 @@ def build_slurm_resource_overrides(args):
         parts.append(f"slurm_constraint={args.slurm_constraint}")
     if getattr(args, "slurm_nodes", None) is not None:
         parts.append(f"slurm_nodes={args.slurm_nodes}")
+    if getattr(args, "slurm_qos", None):
+        parts.append(f"slurm_qos={args.slurm_qos}")
     nodelist = getattr(args, "slurm_nodelist", None)
     extra = getattr(args, "slurm_extra", None)
     combined_extra_parts = []

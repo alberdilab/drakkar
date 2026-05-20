@@ -80,6 +80,7 @@ if DATABASE_NAME == "kegg":
             find "{OUTPUT_DIR}/profiles" -type f -name "*.hmm" | sort | xargs cat > "{params.db}"
             rm -f "{params.archive}"
             rm -rf "{OUTPUT_DIR}/profiles"
+            module purge
             module load {params.hmmer_module}
             hmmpress -f "{params.db}"
             touch {output}
@@ -106,6 +107,7 @@ if DATABASE_NAME == "cazy":
                 exit 1
             fi
             mv "{params.db}.tmp" "{params.db}"
+            module purge
             module load {params.hmmer_module}
             hmmpress -f "{params.db}"
             touch {output}
@@ -135,6 +137,7 @@ if DATABASE_NAME == "pfam":
             fi
             gunzip -f "{params.db}.gz"
             curl -L --fail --output "{params.ec}" "{params.ec_url}"
+            module purge
             module load {params.hmmer_module}
             hmmpress -f "{params.db}"
             touch {output}
@@ -163,6 +166,7 @@ if DATABASE_NAME == "vfdb":
             wget -O "{params.fasta}.gz" "http://www.mgc.ac.cn/VFs/Down/VFDB_setB_pro.fas.gz"
             gunzip -f "{params.fasta}.gz"
             python "{params.package_dir}/workflow/scripts/get_fvid.py" "{params.fasta}" "{params.mapping}"
+            module purge
             module load {params.mmseqs2_module}
             mmseqs createdb "{params.fasta}" "{params.db}"
             mmseqs createindex "{params.db}" "{params.tmp}"
@@ -203,6 +207,7 @@ if DATABASE_NAME == "amr":
                 rm -f "{params.tsv}" "{params.archive}"
                 exit 1
             fi
+            module purge
             module load {params.hmmer_module}
             hmmpress -f "{params.db}"
             rm -f "{params.archive}"

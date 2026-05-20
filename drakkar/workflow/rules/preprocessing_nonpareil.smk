@@ -40,6 +40,7 @@ rule nonpareil:
         read_mb=$(python3 -c 'import os, sys; print(os.path.getsize(sys.argv[1]) // 1024 // 1024)' "$tmp_fastq")
 
         if [ "$read_mb" -gt 150 ]; then
+            module purge
             module load {params.nonpareil_module}
             nonpareil -s "$tmp_fastq" -f fastq -T kmer -t {threads} -b {params.prefix:q}
             Rscript {params.stats_script:q} --sample {wildcards.sample:q} --npo {output.npo:q} --output {output.stats:q}

@@ -36,6 +36,7 @@ if not IGNORE_QUALITY and not QUALITY_FILE:
         message: "Estimating MAG completeness/contamination with CheckM2..."
         shell:
             """
+            module purge
             module load {params.checkm2_module}
             rm -rf {params.outdir}
             rm -rf {params.genome_dir}
@@ -141,6 +142,7 @@ checkpoint dereplicate:
     message: "Dereplicating bins using dRep..."
     shell:
         """
+        module purge
         module load {params.mash_module} {params.drep_module}
         rm -rf {params.outdir}
         mkdir -p {params.uncompressed_dir}

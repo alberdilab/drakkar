@@ -8,6 +8,16 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.7.3] - 2026-05-20
+
+### Added
+
+- Added `--slurm-qos` flag to all workflow subcommands for passing a SLURM Quality of Service string to `sbatch --qos`.
+
+### Fixed
+
+- Added `module purge` before every `module load` in all workflow rules to prevent module conflicts when a module version is already loaded in the environment.
+
 ## [1.7.2] - 2026-05-19
 
 ### Fixed

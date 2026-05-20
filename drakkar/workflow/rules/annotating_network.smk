@@ -38,6 +38,7 @@ rule prodigal:
     threads: 1
     shell:
         """
+        module purge
         module load {params.prodigal_module}
         set -euo pipefail
         mkdir -p "$(dirname {output.gff})"

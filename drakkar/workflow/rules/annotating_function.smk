@@ -102,6 +102,7 @@ rule prodigal:
     message: "Predicting genes of MAG {wildcards.mag}..."
     shell:
         """
+        module purge
         module load {params.prodigal_module}
         if [[ "{input}" == *.gz ]]; then
             gzip -dc {input} | prodigal -d {output.nt} -a {output.aa} -o {output.gff} -f gff
@@ -126,6 +127,7 @@ rule kegg:
     message: "Annotating KEGG orthologs of MAG {wildcards.mag}..."
     shell:
         """
+        module purge
         module load {params.hmmer_module}
         hmmscan -o {output.txt} --tblout {output.tsv} -E 1e-10 --noali {params.db} {input}
         """
@@ -165,6 +167,7 @@ rule cazy:
     message: "Annotating CAZYs of MAG {wildcards.mag}..."
     shell:
         """
+        module purge
         module load {params.hmmer_module}
         hmmscan -o {output.txt} --tblout {output.tsv} --noali {params.db} {input}
         """
@@ -186,6 +189,7 @@ rule pfam:
     message: "Annotating PFAMs of MAG {wildcards.mag}..."
     shell:
         """
+        module purge
         module load {params.hmmer_module}
         hmmscan -o {output.txt} --tblout {output.tsv} --noali {params.db} {input}
         """
@@ -207,6 +211,7 @@ rule vfdb:
     message: "Annotating virulence factors of MAG {wildcards.mag}..."
     shell:
         """
+        module purge
         module load {params.mmseqs2_module}
         mmseqs easy-search {input} {params.db} {output} {params.tmp}
         """
@@ -228,6 +233,7 @@ rule amr:
     message: "Annotating AMRs of MAG {wildcards.mag}..."
     shell:
         """
+        module purge
         module load {params.hmmer_module}
         hmmscan -o {output.txt} --tblout {output.tsv} --noali {params.db} {input}
         """
@@ -247,6 +253,7 @@ rule signalp:
         runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 100) * 2 ** (attempt - 1)))
     shell:
         """
+        module purge
         module load {params.signalp_module}
         signalp6 --fastafile {input} --output_dir {params.tmp} --write_procs {threads}
         cat {params.tmp}/output.gff3 | cut -f1,3,6 | awk -F' # |[ \t]+' '!/^#/ {{print $1, $6, $7}}' OFS='\t' > {output}
@@ -520,6 +527,7 @@ rule genomad:
         runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 100) * 2 ** (attempt - 1)))
     shell:
         """
+        module purge
         module load {params.genomad_module}
         genomad end-to-end \
             -t {threads} \

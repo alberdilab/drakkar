@@ -34,6 +34,7 @@ rule fastp:
     message: "Quality-filtering sample {wildcards.sample}..."
     shell:
         """
+        module purge
         module load {params.fastp_module}
         fastp \
             --in1 {input.r1} --in2 {input.r2} \
@@ -70,6 +71,7 @@ rule singlem:
         runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 100) * 2 ** (attempt - 1)))
     shell:
         """
+        module purge
         module load {params.singlem_module}
         singlem pipe \
             -1 {input.r1} \
@@ -98,6 +100,7 @@ rule singlem_mf:
         runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 100) * 2 ** (attempt - 1)))
     shell:
         """
+        module purge
         module load {params.singlem_module}
         singlem microbial_fraction \
             -1 {input.r1} \

@@ -28,6 +28,7 @@ rule prodigal:
     threads: 1
     shell:
         """
+        module purge
         module load {params.prodigal_module}
         prodigal -i {input} -d {output.nt} -a {output.aa}
         """
@@ -61,6 +62,7 @@ checkpoint dereplicate:
     message: "Dereplicating bins using dRep..."
     shell:
         """
+        module purge
         module load {params.drep_module}
         rm -rf {params.outdir}
         dRep compare {params.outdir} -p {threads} -g {input.genomes} -sa 0.95 --genomeInfo {input.metadata}

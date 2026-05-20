@@ -43,6 +43,7 @@ if not IGNORE_QUALITY and not QUALITY_FILE:
         message: "Estimating MAG completeness/contamination with CheckM2..."
         shell:
             """
+            module purge
             module load {params.checkm2_module}
             rm -rf {params.outdir}
             rm -rf {params.genome_dir}
@@ -148,6 +149,7 @@ checkpoint dereplicate:
     message: "Dereplicating bins using dRep..."
     shell:
         """
+        module purge
         module load {params.mash_module} {params.drep_module}
         rm -rf {params.outdir}
         mkdir -p {params.uncompressed_dir}
@@ -226,6 +228,7 @@ rule index_catalogue:
         runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb / 1024 * 50) * 2 ** (attempt - 1)))
     shell:
         """
+        module purge
         module load {params.bowtie2_module}
         bowtie2-build {input} {params.basename}
         """
@@ -248,6 +251,7 @@ rule map_to_catalogue:
     message: "Mapping {wildcards.sample} against genome catalogue..."
     shell:
         """
+        module purge
         module load {params.bowtie2_module} {params.samtools_module}
         bowtie2 -x {params.basename} -1 {input.r1} -2 {input.r2} -p {threads} | samtools view -bS - | samtools sort -o {output}
         """
@@ -267,6 +271,7 @@ rule quantify_reads_catalogue:
         "Generating mapping statistics with..."
     shell:
         """
+        module purge
         module load {params.coverm_module}
         coverm genome \
             -b {input} \
@@ -293,6 +298,7 @@ rule profiling_stats:
     message: "Calculating mapping stats of {wildcards.sample}..."
     shell:
         """
+        module purge
         module load {params.bowtie2_module} {params.samtools_module}
         samtools view -b -F12 -@ {threads} {input} | samtools view -c - > {output.mappedreads}
         samtools view -F12 -@ {threads} {input} | awk '{{sum += length($10)}} END {{print sum}}' > {output.mappedbases}
@@ -404,6 +410,7 @@ rule singlem_profile:
     message: "Running singlem for {wildcards.sample}..."
     shell:
         """
+        module purge
         module load {params.singlem_module}
         singlem pipe --forward {input.r1} --reverse {input.r2} --threads {threads} -p {output} --metapackage {params.singlem_db}
         """
@@ -425,6 +432,7 @@ rule singlem_microbial_fraction:
     message: "Running singlem for {wildcards.sample}..."
     shell:
         """
+        module purge
         module load {params.singlem_module}
         singlem microbial_fraction --forward {input.r1} --reverse {input.r2} -p {input.profile} --metapackage {params.singlem_db} > {output}
         """

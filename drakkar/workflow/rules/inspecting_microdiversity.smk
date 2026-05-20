@@ -29,6 +29,7 @@ rule subset_catalogue:
         runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb / 1024 * 50) * 2 ** (attempt - 1)))
     shell:
         """
+        module purge
         module load {params.seqtk_module}
         printf "%s\n" "{wildcards.genome}" | seqtk subseq {input} - > {output}
         """
@@ -47,6 +48,7 @@ rule subset_bam:
         runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb / 1024 * 50) * 2 ** (attempt - 1)))
     shell:
         """
+        module purge
         module load {params.samtools_module}
         samtools view -h {input} {wildcards.genome} | samtools sort -o {output.bam}
         samtools index {output.bam}
@@ -69,6 +71,7 @@ rule remove_duplicates:
         runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb / 1024 * 50) * 2 ** (attempt - 1)))
     shell:
         """
+        module purge
         module load python/3.12.8 openjdk/17.0.8 {params.gatk_module}
         gatk MarkDuplicates INPUT={input} OUTPUT={output.dedup} REMOVE_DUPLICATES=True METRICS_FILE={output.metrics}
         gatk CleanSam INPUT={output.dedup} OUTPUT={output.clean} TMP_DIR={params.tempdir}
@@ -89,6 +92,7 @@ rule create_dict:
         runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb / 1024 * 50) * 2 ** (attempt - 1)))
     shell:
         """
+        module purge
         module load python/3.12.8 openjdk/17.0.8 {params.gatk_module} {params.samtools_module}
         samtools faidx {input} -o {output.fai}
         gatk CreateSequenceDictionary R={input} O={output.dict}
@@ -111,6 +115,7 @@ rule call_variants:
     message: "Calling SNVs in sample {wildcards.sample}..."
     shell:
         """
+        module purge
         module load python/3.12.8 openjdk/17.0.8 {params.gatk_module}
 		gatk HaplotypeCaller -ploidy=1 -R {input.catalogue} -I {input.bam} -O {output}
         """
@@ -130,6 +135,7 @@ rule merge_variants:
     message: "Merging haplotypes across samples..."
     shell:
         """
+        module purge
         module load python/3.12.8 openjdk/17.0.8 {params.gatk_module}
 		gatk combinegvcfs {input.gvcfs} -R {input.catalogue} -O {output}
         """

@@ -30,6 +30,7 @@ rule prodigal:
     message: "Predicting genes of MAG {wildcards.mag}..."
     shell:
         """
+        module purge
         module load {params.prodigal_module}
         if [[ "{input}" == *.gz ]]; then
             gzip -dc {input} | prodigal -d {output.nt} -a {output.aa} -o {output.gff} -f gff
@@ -100,6 +101,7 @@ rule index_metagenome:
         runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb / 1024 * 50) * 2 ** (attempt - 1)))
     shell:
         """
+        module purge
         module load {params.bowtie2_module}
         bowtie2-build {input} {params.basename}
         """
@@ -122,6 +124,7 @@ rule map_to_metagenome:
     message: "Mapping {wildcards.sample} against genome catalogue..."
     shell:
         """
+        module purge
         module load {params.bowtie2_module} {params.samtools_module}
         bowtie2 -x {params.basename} -1 {input.r1} -2 {input.r2} -p {threads} | samtools view -bS - | samtools sort -o {output}
         """
@@ -142,6 +145,7 @@ rule quantify:
         runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 200) * 2 ** (attempt - 1)))
     shell:
         """
+        module purge
         module load {params.subread_module}
         featureCounts {params.extra} -a {input.annotation} -o {output.counts} {input.bams}
         """
