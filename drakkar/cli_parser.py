@@ -62,6 +62,7 @@ def build_parser():
     subparser_complete.add_argument("-c", "--multicoverage", action="store_true", help="Map samples sharing the same coverage group to each other's individual assemblies")
     subparser_complete.add_argument("--fraction", required=False, action='store_true', help="Calculate microbial fraction using singlem")
     subparser_complete.add_argument("--nonpareil", required=False, action='store_true', help="Estimate metagenomic coverage and diversity using Nonpareil during preprocessing")
+    subparser_complete.add_argument("--sanitize", required=False, action='store_true', help="Sanitize paired FASTQ files using seqkit sana before quality filtering")
     subparser_complete.add_argument("-a", "--ani", required=False, type=float, default=0.98, help="ANI threshold for dRep dereplication (-sa). Default: 0.98")
     subparser_complete.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_complete.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
@@ -79,6 +80,7 @@ def build_parser():
     preprocessing_reference_group.add_argument("-x", "--reference-index", required=False, help="Tarball containing a reference FASTA and Bowtie2 index files")
     subparser_preprocessing.add_argument("--fraction", required=False, action='store_true', help="Calculate microbial fraction using singlem")
     subparser_preprocessing.add_argument("--nonpareil", required=False, action='store_true', help="Estimate metagenomic coverage and diversity using Nonpareil")
+    subparser_preprocessing.add_argument("--sanitize", required=False, action='store_true', help="Sanitize paired FASTQ files using seqkit sana before quality filtering")
     subparser_preprocessing.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_preprocessing.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
     subparser_preprocessing.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
@@ -305,7 +307,7 @@ def build_parser():
         ],
         sections=[
             ("Input Sources", ["input", "file", "reference", "reference_index"]),
-            ("Workflow Scope", ["mode", "binners", "type", "annotation_type", "gtdb_version", "multicoverage", "fraction", "nonpareil", "ani"]),
+            ("Workflow Scope", ["mode", "binners", "type", "annotation_type", "gtdb_version", "multicoverage", "fraction", "nonpareil", "sanitize", "ani"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
             ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
@@ -323,7 +325,7 @@ def build_parser():
         ],
         sections=[
             ("Input Sources", ["input", "file", "reference", "reference_index"]),
-            ("Optional Analyses", ["fraction", "nonpareil"]),
+            ("Optional Analyses", ["fraction", "nonpareil", "sanitize"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
             ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),

@@ -324,6 +324,7 @@ def main():
             args.profile,
             args.fraction,
             args.nonpareil,
+            args.sanitize,
             args.memory_multiplier,
             args.time_multiplier,
             run_info,

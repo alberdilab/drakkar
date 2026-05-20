@@ -9,6 +9,7 @@ import pandas as pd
 
 COLUMNS = [
     "sample",
+    "seqkit_sana_reads",
     "reads_pre_fastp",
     "bases_pre_fastp",
     "adapter_trimmed_reads",
@@ -83,6 +84,25 @@ def extract_fastp_data(json_files):
             }
         except (KeyError, json.JSONDecodeError, OSError) as error:
             print(f"Error processing {json_file}: {error}")
+
+    return data
+
+
+def extract_seqkit_sana_data(seqkit_files):
+    data = {}
+
+    for seqkit_file in seqkit_files:
+        fallback_sample = sample_from_path(seqkit_file, "_sana.tsv")
+        try:
+            table = pd.read_csv(seqkit_file, sep="\t")
+            if table.empty:
+                data[fallback_sample] = "NA"
+                continue
+            row = table.iloc[0]
+            sample = str(row["sample"]) if "sample" in table.columns else fallback_sample
+            data[sample] = row.get("seqkit_sana_reads", "NA")
+        except (OSError, pd.errors.ParserError, ValueError) as error:
+            print(f"Error processing {seqkit_file}: {error}")
 
     return data
 
@@ -192,6 +212,7 @@ def extract_nonpareil_data(nonpareil_files):
 
 def build_summary(args):
     fastp_data = extract_fastp_data(args.fastp)
+    seqkit_data = extract_seqkit_sana_data(args.seqkit_sana) if args.seqkit_sana else {}
     fastq_data = extract_fastq_data(args.fastq) if args.fastq else {}
     metagenomic_bases_data = (
         extract_text_data(args.metagenomic_bases, ".metabases")
@@ -221,6 +242,7 @@ def build_summary(args):
         | set(host_bases_data)
         | set(host_reads_data)
         | set(nonpareil_data)
+        | set(seqkit_data)
     )
     singlem_data = reconcile_singlem_samples(singlem_data, known_samples)
 
@@ -231,6 +253,8 @@ def build_summary(args):
         row = {column: "NA" for column in COLUMNS}
         row["sample"] = sample
         row.update(fastp_data.get(sample, {}))
+        if sample in seqkit_data:
+            row["seqkit_sana_reads"] = seqkit_data[sample]
         row.update(fastq_data.get(sample, {}))
 
         if sample in metagenomic_reads_data:
@@ -260,6 +284,7 @@ def main():
     parser.add_argument("-M", "--metagenomic_reads", required=False, nargs="+", help="metagenomic read count files")
     parser.add_argument("-g", "--host_bases", "--genomic_bases", dest="host_bases", required=False, nargs="+", help="host base count files")
     parser.add_argument("-G", "--host_reads", "--genomic_reads", dest="host_reads", required=False, nargs="+", help="host read count files")
+    parser.add_argument("-k", "--seqkit_sana", required=False, nargs="+", help="seqkit sana stats TSV files")
     parser.add_argument("-s", "--singlem_fraction", required=False, nargs="+", help="SingleM microbial fraction TSV files")
     parser.add_argument("-n", "--nonpareil", required=False, nargs="+", help="Nonpareil summary TSV files")
     parser.add_argument("-o", "--output", required=True, help="Output TSV file")

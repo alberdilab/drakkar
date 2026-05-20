@@ -8,6 +8,13 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.7.5] - 2026-05-20
+
+### Added
+
+- Added `--sanitize` flag to `drakkar preprocessing` and `drakkar complete` to run `seqkit sana` on each paired FASTQ file before quality filtering, followed by `seqkit pair` to re-synchronise the two mates. The sanitized reads feed directly into fastp, and a `seqkit_sana_reads` column (paired read count after sanitization) is appended to `preprocessing.tsv`; the column is `NA` when `--sanitize` is not used.
+- Added `SEQKIT_MODULE: "seqkit/2.10.0"` to `workflow/config.yaml`.
+
 ## [1.7.4] - 2026-05-20
 
 ### Changed

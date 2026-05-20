@@ -6,6 +6,7 @@ PACKAGE_DIR = config["package_dir"]
 
 # Software modules
 FASTP_MODULE = config["FASTP_MODULE"]
+SEQKIT_MODULE = config.get("SEQKIT_MODULE", None)
 BOWTIE2_MODULE = config["BOWTIE2_MODULE"]
 SAMTOOLS_MODULE = config["SAMTOOLS_MODULE"]
 SINGLEM_MODULE = config["SINGLEM_MODULE"]
@@ -21,8 +22,8 @@ MULTIQC_MODULE = config["MULTIQC_MODULE"]
 
 rule fastp:
     input:
-        r1=f"{OUTPUT_DIR}/data/reads/{{sample}}_1.fq.gz",
-        r2=f"{OUTPUT_DIR}/data/reads/{{sample}}_2.fq.gz"
+        r1=lambda wildcards: f"{OUTPUT_DIR}/preprocessing/seqkit/{wildcards.sample}_1.fq.gz" if SANITIZE else f"{OUTPUT_DIR}/data/reads/{wildcards.sample}_1.fq.gz",
+        r2=lambda wildcards: f"{OUTPUT_DIR}/preprocessing/seqkit/{wildcards.sample}_2.fq.gz" if SANITIZE else f"{OUTPUT_DIR}/data/reads/{wildcards.sample}_2.fq.gz"
     output:
         r1=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}_1.fq.gz",
         r2=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}_2.fq.gz",
@@ -217,14 +218,16 @@ rule preprocessing_stats:
         reads_host=expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostreads", sample=samples),
         bases_host=expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostbases", sample=samples),
         singlem=expand(f"{OUTPUT_DIR}/preprocessing/singlem/{{sample}}_smf.tsv", sample=samples) if FRACTION else [],
-        nonpareil=expand(f"{OUTPUT_DIR}/preprocessing/nonpareil/{{sample}}_np.tsv", sample=samples) if NONPAREIL else []
+        nonpareil=expand(f"{OUTPUT_DIR}/preprocessing/nonpareil/{{sample}}_np.tsv", sample=samples) if NONPAREIL else [],
+        seqkit=expand(f"{OUTPUT_DIR}/preprocessing/seqkit/{{sample}}_sana.tsv", sample=samples) if SANITIZE else []
     output:
         f"{OUTPUT_DIR}/preprocessing.tsv"
     localrule: True
     params:
         package_dir={PACKAGE_DIR},
         singlem_arg=lambda wildcards, input: "-s " + " ".join(input.singlem) if input.singlem else "",
-        nonpareil_arg=lambda wildcards, input: "-n " + " ".join(input.nonpareil) if input.nonpareil else ""
+        nonpareil_arg=lambda wildcards, input: "-n " + " ".join(input.nonpareil) if input.nonpareil else "",
+        seqkit_arg=lambda wildcards, input: "-k " + " ".join(input.seqkit) if input.seqkit else ""
     threads: 1
     resources:
         mem_mb=cap_mem_mb(1*1024),
@@ -232,7 +235,7 @@ rule preprocessing_stats:
     message: "Creating preprocessing stats..."
     shell:
         """
-        python {params.package_dir}/workflow/scripts/preprocessing_stats.py -p {input.fastp} -m {input.bases_metagenomic} -M {input.reads_metagenomic} -g {input.bases_host} -G {input.reads_host} {params.singlem_arg} {params.nonpareil_arg} -o {output}
+        python {params.package_dir}/workflow/scripts/preprocessing_stats.py -p {input.fastp} -m {input.bases_metagenomic} -M {input.reads_metagenomic} -g {input.bases_host} -G {input.reads_host} {params.singlem_arg} {params.nonpareil_arg} {params.seqkit_arg} -o {output}
         """
 
 # Generate an HTML report summarizing preprocessing statistics.  

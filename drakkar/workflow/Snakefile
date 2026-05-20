@@ -15,6 +15,7 @@ OUTPUT_DIR = config.get("output_dir", None)
 REFERENCE = config.get("reference", None)
 FRACTION = config.get("fraction", None)
 NONPAREIL = config.get("nonpareil", None)
+SANITIZE = config.get("sanitize", None)
 PROFILING_TYPE = config["profiling_type"].split(",") if "profiling_type" in config else []
 ANNOTATING_TYPE = config["annotating_type"].split(",") if "annotating_type" in config else []
 DATABASE_NAME = config.get("database_name", None)
@@ -161,6 +162,8 @@ if WORKFLOW == "preprocessing":
                 #f"{OUTPUT_DIR}/data/preprocessing_report.done"
 
         include: "rules/preparing.smk"
+        if SANITIZE:
+            include: "rules/preprocessing_sanitize.smk"
         include: "rules/preprocessing_ref.smk"
         include: "rules/preprocessing_nonpareil.smk"
 
@@ -176,6 +179,8 @@ if WORKFLOW == "preprocessing":
                 #f"{OUTPUT_DIR}/data/preprocessing_report.done"
 
         include: "rules/preparing.smk"
+        if SANITIZE:
+            include: "rules/preprocessing_sanitize.smk"
         include: "rules/preprocessing.smk"
         include: "rules/preprocessing_nonpareil.smk"
 

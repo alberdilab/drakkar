@@ -53,6 +53,7 @@ def run_snakemake_preprocessing(
     profile,
     fraction=False,
     nonpareil=False,
+    sanitize=False,
     memory_multiplier=1,
     time_multiplier=1,
     run_info=None,
@@ -72,7 +73,7 @@ def run_snakemake_preprocessing(
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} reference={reference} fraction={fraction} nonpareil={nonpareil} {resource_overrides}"
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} reference={reference} fraction={fraction} nonpareil={nonpareil} sanitize={sanitize} {resource_overrides}"
         f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--conda-frontend mamba "
