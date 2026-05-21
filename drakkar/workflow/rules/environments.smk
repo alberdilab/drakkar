@@ -3,7 +3,7 @@ PACKAGE_DIR = config["package_dir"]
 
 rule all:
     input:
-        f"drakkar_environments/env4.txt"
+        f"drakkar_environments/env5.txt"
 
 rule env1:
     output:
@@ -56,5 +56,19 @@ rule env4:
     shell:
         """
         echo "Created conda environment for annotating network"
+        touch {output}
+        """
+
+rule env5:
+    input:
+        f"drakkar_environments/env4.txt"
+    output:
+        f"drakkar_environments/env5.txt"
+    threads: 1
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/gtdbtk_tree_pruning.yaml"
+    shell:
+        """
+        echo "Created conda environment for GTDB-Tk tree pruning"
         touch {output}
         """

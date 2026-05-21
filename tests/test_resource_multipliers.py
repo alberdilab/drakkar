@@ -23,7 +23,7 @@ class ResourceMultiplierTests(unittest.TestCase):
         cases = [
             lambda: cli_module.run_snakemake_environments("environments", "/tmp/envs", "local", 3, 4),
             lambda: cli_module.run_snakemake_preprocessing(
-                "preprocessing", "project", "/tmp/output", False, "/tmp/envs", "local", False, False, 3, 4
+                "preprocessing", "project", "/tmp/output", False, "/tmp/envs", "local", False, False, False, 3, 4
             ),
             lambda: cli_module.run_snakemake_cataloging("cataloging", "project", "/tmp/output", "/tmp/envs", "local", 3, 4),
             lambda: cli_module.run_snakemake_profiling(

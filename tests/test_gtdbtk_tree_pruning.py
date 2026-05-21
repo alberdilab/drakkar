@@ -52,6 +52,17 @@ class GtdbtkTreePruningTests(unittest.TestCase):
         self.assertIn('f"{OUTPUT_DIR}/annotating/bacteria.tree"', snakefile)
         self.assertIn("rule gtdbtk_pruned_trees:", taxonomy_rules)
         self.assertIn('archaea_output=f"{OUTPUT_DIR}/annotating/archaea.tree"', taxonomy_rules)
+        self.assertIn("workflow/envs/gtdbtk_tree_pruning.yaml", taxonomy_rules)
+        self.assertIn('"$PYTHON_BIN" {params.package_dir}/workflow/scripts/prune_gtdbtk_tree.py', taxonomy_rules)
+
+        env_file = (
+            Path(__file__).resolve().parents[1]
+            / "drakkar"
+            / "workflow"
+            / "envs"
+            / "gtdbtk_tree_pruning.yaml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("biopython", env_file)
 
 
 if __name__ == "__main__":

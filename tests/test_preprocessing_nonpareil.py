@@ -125,6 +125,7 @@ class PreprocessingNonpareilTests(unittest.TestCase):
                 list(table.columns),
                 [
                     "sample",
+                    "seqkit_sana_reads",
                     "reads_pre_fastp",
                     "bases_pre_fastp",
                     "adapter_trimmed_reads",

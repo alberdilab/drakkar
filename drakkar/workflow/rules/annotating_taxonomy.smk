@@ -129,12 +129,17 @@ rule gtdbtk_pruned_trees:
         archaea_output=f"{OUTPUT_DIR}/annotating/archaea.tree"
     localrule: True
     threads: 1
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/gtdbtk_tree_pruning.yaml"
     resources:
         mem_mb=lambda wildcards, attempt: cap_mem_mb(1*1024 * 2 ** (attempt - 1)),
         runtime=lambda wildcards, attempt: cap_runtime(5 * 2 ** (attempt - 1))
     message: "Pruning GTDB-Tk trees to keep only input genomes..."
     shell:
         """
+        PYTHON_BIN="${{CONDA_PREFIX}}/bin/python"
+        echo "INFO Using python from $PYTHON_BIN"
+
         bacteria_tree=""
         for candidate in \
             {params.classify_dir}/gtdbtk.backbone.bac120.classify.tree \
@@ -147,7 +152,7 @@ rule gtdbtk_pruned_trees:
         done
 
         if [ -n "$bacteria_tree" ]; then
-            python {params.package_dir}/workflow/scripts/prune_gtdbtk_tree.py \
+            "$PYTHON_BIN" {params.package_dir}/workflow/scripts/prune_gtdbtk_tree.py \
                 --input-tree "$bacteria_tree" \
                 --batchfile {input.batchfile} \
                 --output-tree {output.bacteria}
@@ -168,7 +173,7 @@ rule gtdbtk_pruned_trees:
         done
 
         if [ -s {params.archaea_summary} ] && [ -n "$archaea_tree" ]; then
-            python {params.package_dir}/workflow/scripts/prune_gtdbtk_tree.py \
+            "$PYTHON_BIN" {params.package_dir}/workflow/scripts/prune_gtdbtk_tree.py \
                 --input-tree "$archaea_tree" \
                 --batchfile {input.batchfile} \
                 --output-tree {params.archaea_output}

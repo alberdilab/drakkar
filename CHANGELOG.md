@@ -8,6 +8,12 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.7.6] - 2026-05-21
+
+### Fixed
+
+- Ensured GTDB-Tk tree pruning runs in a dedicated Biopython conda environment and calls that environment's Python, preventing `ModuleNotFoundError: No module named 'Bio'` when the launcher environment lacks Biopython.
+
 ## [1.7.5] - 2026-05-20
 
 ### Added
