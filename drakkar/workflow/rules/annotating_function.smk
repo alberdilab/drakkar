@@ -36,6 +36,8 @@ GENOMAD_DB = config["GENOMAD_DB"]
 DBCAN_DB = config["DBCAN_DB"]
 ANTISMASH_DB = config["ANTISMASH_DB"]
 DEFENSEFINDER_DB = config["DEFENSEFINDER_DB"]
+ANNOTATION_EVALUE = float(config.get("annotation_evalue", config.get("ANNOTATION_EVALUE", 1e-10)))
+ANNOTATION_IDENTITY = float(config.get("annotation_identity", config.get("ANNOTATION_IDENTITY", 50.0)))
 
 ANNOTATING_TYPE_SET = set(ANNOTATING_TYPE)
 
@@ -271,6 +273,8 @@ rule merge_gene_annotations:
         ec_db={PFAM_DB_EC},
         vf_db={VFDB_DB_TSV},
         amr_db={AMR_DB_TSV},
+        evalue={ANNOTATION_EVALUE},
+        identity={ANNOTATION_IDENTITY},
         kegg=lambda wildcards: f"{OUTPUT_DIR}/annotating/kegg/{wildcards.mag}.tsv",
         pfam=lambda wildcards: f"{OUTPUT_DIR}/annotating/pfam/{wildcards.mag}.tsv",
         cazy=lambda wildcards: f"{OUTPUT_DIR}/annotating/cazy/{wildcards.mag}.tsv",
@@ -304,6 +308,8 @@ rule merge_gene_annotations:
             -amrdb {params.amr_db} \
             -signalp {params.signalp} \
             -defense {params.defense} \
+            --evalue {params.evalue} \
+            --identity {params.identity} \
             -o {output}
         """
 

@@ -58,6 +58,26 @@ class GtdbVersionTests(unittest.TestCase):
 
         command = run_mock.call_args.args[0][2]
         self.assertNotIn("gtdb_version=", command)
+        self.assertNotIn("annotation_evalue=", command)
+        self.assertNotIn("annotation_identity=", command)
+
+    def test_run_snakemake_annotating_passes_annotation_filters(self) -> None:
+        with patch.object(cli_module, "config_vars", {"SNAKEMAKE_MODULE": "snakemake"}):
+            with patch.object(cli_module, "run_subprocess_with_logging") as run_mock:
+                cli_module.run_snakemake_annotating(
+                    "annotating",
+                    "project",
+                    "genes",
+                    "/tmp/output",
+                    "/tmp/envs",
+                    "local",
+                    annotation_evalue=1e-20,
+                    annotation_identity=80,
+                )
+
+        command = run_mock.call_args.args[0][2]
+        self.assertIn("annotation_evalue=1e-20", command)
+        self.assertIn("annotation_identity=80", command)
 
 
 if __name__ == "__main__":

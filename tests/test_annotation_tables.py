@@ -10,6 +10,15 @@ ANNOTATION_RULES = ROOT / "drakkar" / "workflow" / "rules" / "annotating_functio
 
 
 class AnnotationTableWorkflowTests(unittest.TestCase):
+    def test_merge_gene_annotations_passes_filter_params(self) -> None:
+        rules = ANNOTATION_RULES.read_text(encoding="utf-8")
+
+        self.assertIn('ANNOTATION_EVALUE = float(config.get("annotation_evalue"', rules)
+        self.assertIn('ANNOTATION_IDENTITY = float(config.get("annotation_identity"', rules)
+        self.assertIn('config.get("ANNOTATION_IDENTITY", 50.0)', rules)
+        self.assertIn("--evalue {params.evalue}", rules)
+        self.assertIn("--identity {params.identity}", rules)
+
     def test_final_annotation_tables_strip_duplicate_per_genome_headers(self) -> None:
         rules = ANNOTATION_RULES.read_text(encoding="utf-8")
 

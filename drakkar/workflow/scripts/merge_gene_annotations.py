@@ -7,6 +7,10 @@ import pandas as pd
 from Bio import SearchIO
 
 
+DEFAULT_EVALUE_THRESHOLD = 1e-10
+DEFAULT_IDENTITY_THRESHOLD = 50.0
+
+
 def select_lowest_evalue(group):
     return group.sort_values(by="evalue").head(1)
 
@@ -80,7 +84,7 @@ def parse_kegg(kegg_file, keggdb_file, evalue_threshold):
 
     hierarchy = load_kegg_hierarchy(keggdb_file)
     hits["evalue"] = pd.to_numeric(hits["evalue"], errors="coerce")
-    hits = hits[hits["evalue"] < evalue_threshold]
+    hits = hits[hits["evalue"] <= evalue_threshold]
     if hits.empty:
         return kegg_df
 
@@ -104,7 +108,7 @@ def parse_pfam(pfam_file, ec_file, evalue_threshold):
         return pfam_df
 
     hits["evalue"] = pd.to_numeric(hits["evalue"], errors="coerce")
-    hits = hits[hits["evalue"] < evalue_threshold]
+    hits = hits[hits["evalue"] <= evalue_threshold]
     if hits.empty:
         return pfam_df
 
@@ -140,7 +144,7 @@ def parse_cazy(cazy_file, evalue_threshold):
         return cazy_df
 
     hits["evalue"] = pd.to_numeric(hits["evalue"], errors="coerce")
-    hits = hits[hits["evalue"] < evalue_threshold]
+    hits = hits[hits["evalue"] <= evalue_threshold]
     if hits.empty:
         return cazy_df
 
@@ -159,7 +163,7 @@ def parse_amr(amr_file, amrdb_file, evalue_threshold):
         return amr_df
 
     hits["evalue"] = pd.to_numeric(hits["evalue"], errors="coerce")
-    hits = hits[hits["evalue"] < evalue_threshold]
+    hits = hits[hits["evalue"] <= evalue_threshold]
     if hits.empty:
         return amr_df
 
@@ -180,7 +184,7 @@ def parse_amr(amr_file, amrdb_file, evalue_threshold):
     return hits[["gene", "resistance_type", "resistance_target"]]
 
 
-def parse_vfdb(vf_file, vfdb_file, evalue_threshold):
+def parse_vfdb(vf_file, vfdb_file, evalue_threshold, identity_threshold):
     vf_df = pd.DataFrame(columns=["gene", "vf", "vf_type"])
     if not has_content(vf_file):
         return vf_df
@@ -199,7 +203,8 @@ def parse_vfdb(vf_file, vfdb_file, evalue_threshold):
         return vf_df
 
     hits["evalue"] = pd.to_numeric(hits["evalue"], errors="coerce")
-    hits = hits[hits["evalue"] < evalue_threshold]
+    hits["identity"] = pd.to_numeric(hits["identity"], errors="coerce")
+    hits = hits[(hits["evalue"] <= evalue_threshold) & (hits["identity"] >= identity_threshold)]
     if hits.empty:
         return vf_df
 
@@ -274,6 +279,8 @@ def merge_annotations(
     signalp_file,
     output_file,
     defense_file=None,
+    evalue_threshold=DEFAULT_EVALUE_THRESHOLD,
+    identity_threshold=DEFAULT_IDENTITY_THRESHOLD,
 ):
     annotations = pd.read_csv(
         gff_file,
@@ -289,12 +296,11 @@ def merge_annotations(
         annotations = annotations.drop(columns=["attributes", "source", "score", "type", "phase"])
         annotations = annotations.rename(columns={"seqid": "gene"})
 
-    evalue_threshold = 0.00001
     kegg_df = parse_kegg(kegg_file, keggdb_file, evalue_threshold)
     pfam_df = parse_pfam(pfam_file, ec_file, evalue_threshold)
     cazy_df = parse_cazy(cazy_file, evalue_threshold)
     amr_df = parse_amr(amr_file, amrdb_file, evalue_threshold)
-    vf_df = parse_vfdb(vf_file, vfdb_file, evalue_threshold)
+    vf_df = parse_vfdb(vf_file, vfdb_file, evalue_threshold, identity_threshold)
     signalp_df = parse_signalp(signalp_file)
 
     annotations = pd.merge(annotations, kegg_df[["gene", "kegg", "ec"]], on="gene", how="left")
@@ -338,8 +344,29 @@ def main():
     parser.add_argument("-signalp", required=False, type=str, help="Path to the SignalP table")
     parser.add_argument("-o", required=True, type=str, help="Path to the output TSV file")
     parser.add_argument("-defense", required=False, type=str, help="Path to DefenseFinder gene-level TSV")
+    parser.add_argument(
+        "-evalue",
+        "--evalue",
+        required=False,
+        type=float,
+        default=DEFAULT_EVALUE_THRESHOLD,
+        help="Maximum e-value for annotation hits. Default: 1e-10.",
+    )
+    parser.add_argument(
+        "-identity",
+        "--identity",
+        required=False,
+        type=float,
+        default=DEFAULT_IDENTITY_THRESHOLD,
+        help="Minimum percent identity for annotation hits with identity values. Default: 50.",
+    )
 
     args = parser.parse_args()
+    if args.evalue < 0:
+        parser.error("--evalue must be non-negative")
+    if args.identity < 0 or args.identity > 100:
+        parser.error("--identity must be between 0 and 100")
+
     merge_annotations(
         args.gff,
         args.kegg,
@@ -354,6 +381,8 @@ def main():
         args.signalp,
         args.o,
         args.defense,
+        args.evalue,
+        args.identity,
     )
 
 

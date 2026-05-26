@@ -65,6 +65,11 @@ Options:
 - ``-t/--type``: profiling type (``genomes`` or ``pangenomes``).
 - ``--annotation-type``: comma-separated annotation targets. See *Annotating*
   below for the full set.
+- ``--annotation-evalue``: maximum e-value for merged gene annotation hits
+  (default: ``1e-10``).
+- ``--annotation-identity``: minimum percent identity for merged gene
+  annotation hits with identity values, currently VFDB/MMseqs hits
+  (default: ``50``).
 - ``-c/--multicoverage``: enable multicoverage mapping.
 - ``--fraction``: compute microbial fraction with SingleM.
 - ``--nonpareil``: estimate metagenomic coverage and diversity with Nonpareil.
@@ -231,6 +236,11 @@ Options:
   - ``network``: metabolic network reconstruction.
 - ``--gtdb-version``: GTDB release number for taxonomy annotation. DRAKKAR uses
   ``GTDB_DB_<version>`` from ``config.yaml``; if omitted, it uses ``GTDB_DB``.
+- ``--annotation-evalue``: maximum e-value for merged gene annotation hits
+  (default: ``1e-10``).
+- ``--annotation-identity``: minimum percent identity for merged gene
+  annotation hits with identity values, currently VFDB/MMseqs hits
+  (default: ``50``).
 - ``-e/--env_path``: shared Conda environment directory.
 - ``-p/--profile``: Snakemake profile.
 - ``--overwrite``: delete a locked output directory and rerun from scratch.

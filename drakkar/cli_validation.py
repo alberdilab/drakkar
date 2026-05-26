@@ -118,6 +118,21 @@ def positive_int(value):
         raise argparse.ArgumentTypeError("must be a positive integer")
     return parsed
 
+def nonnegative_float(value):
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError) as exc:
+        raise argparse.ArgumentTypeError("must be a non-negative number") from exc
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("must be a non-negative number")
+    return parsed
+
+def percent_float(value):
+    parsed = nonnegative_float(value)
+    if parsed > 100:
+        raise argparse.ArgumentTypeError("must be between 0 and 100")
+    return parsed
+
 def add_resource_multiplier_arguments(parser):
     parser.add_argument(
         "--memory-multiplier",

@@ -8,6 +8,12 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.7.7] - 2026-05-26
+
+### Added
+
+- Added `--annotation-evalue` and `--annotation-identity` to `drakkar annotating` and `drakkar complete`, forwarding the thresholds to `merge_gene_annotations.py` for configurable merged annotation filtering. The default e-value threshold is `1e-10`, and the default identity threshold is `50`.
+
 ## [1.7.6] - 2026-05-21
 
 ### Fixed

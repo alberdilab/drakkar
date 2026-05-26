@@ -8,9 +8,30 @@ from drakkar.cli_validation import (
     add_benchmark_argument,
     add_resource_multiplier_arguments,
     add_snakemake_override_arguments,
+    nonnegative_float,
+    percent_float,
     positive_int,
 )
 from drakkar.database_registry import MANAGED_DATABASES
+
+
+def add_annotation_filter_arguments(parser):
+    parser.add_argument(
+        "--annotation-evalue",
+        dest="annotation_evalue",
+        required=False,
+        type=nonnegative_float,
+        default=None,
+        help="Maximum e-value for merged gene annotation hits. Default: config value, initially 1e-10.",
+    )
+    parser.add_argument(
+        "--annotation-identity",
+        dest="annotation_identity",
+        required=False,
+        type=percent_float,
+        default=None,
+        help="Minimum percent identity for merged gene annotation hits with identity values. Default: config value, initially 50.",
+    )
 
 
 def build_parser():
@@ -59,6 +80,7 @@ def build_parser():
         required=False,
         help="GTDB release number for taxonomy annotation, using GTDB_DB_<version> from config.yaml. Default: GTDB_DB.",
     )
+    add_annotation_filter_arguments(subparser_complete)
     subparser_complete.add_argument("-c", "--multicoverage", action="store_true", help="Map samples sharing the same coverage group to each other's individual assemblies")
     subparser_complete.add_argument("--fraction", required=False, action='store_true', help="Calculate microbial fraction using singlem")
     subparser_complete.add_argument("--nonpareil", required=False, action='store_true', help="Estimate metagenomic coverage and diversity using Nonpareil during preprocessing")
@@ -164,6 +186,7 @@ def build_parser():
         required=False,
         help="GTDB release number for taxonomy annotation, using GTDB_DB_<version> from config.yaml. Default: GTDB_DB.",
     )
+    add_annotation_filter_arguments(subparser_annotating)
     subparser_annotating.add_argument("-e", "--env_path", type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_annotating.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
     subparser_annotating.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
@@ -307,7 +330,7 @@ def build_parser():
         ],
         sections=[
             ("Input Sources", ["input", "file", "reference", "reference_index"]),
-            ("Workflow Scope", ["mode", "binners", "type", "annotation_type", "gtdb_version", "multicoverage", "fraction", "nonpareil", "sanitize", "ani"]),
+            ("Workflow Scope", ["mode", "binners", "type", "annotation_type", "gtdb_version", "annotation_evalue", "annotation_identity", "multicoverage", "fraction", "nonpareil", "sanitize", "ani"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
             ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
@@ -398,7 +421,7 @@ def build_parser():
         ],
         sections=[
             ("Input Genomes", ["bins_dir", "bins_file"]),
-            ("Annotation Scope", ["annotation_type", "gtdb_version"]),
+            ("Annotation Scope", ["annotation_type", "gtdb_version", "annotation_evalue", "annotation_identity"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
             ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),

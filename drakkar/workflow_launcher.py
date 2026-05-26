@@ -255,10 +255,17 @@ def run_snakemake_annotating(
     run_info=None,
     snakemake_flags="",
     slurm_resources="",
+    annotation_evalue=None,
+    annotation_identity=None,
 ):
     """ Run the annotating workflow """
 
     gtdb_config = f"gtdb_version={gtdb_version} " if gtdb_version else ""
+    annotation_filter_config = ""
+    if annotation_evalue is not None:
+        annotation_filter_config += f"annotation_evalue={annotation_evalue} "
+    if annotation_identity is not None:
+        annotation_filter_config += f"annotation_identity={annotation_identity} "
     resource_overrides = resource_config(memory_multiplier, time_multiplier)
     default_resources = default_resource_args(memory_multiplier, time_multiplier, slurm_resources)
     snakemake_command = [
@@ -269,7 +276,7 @@ def run_snakemake_annotating(
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} annotating_type={annotating_type} output_dir={output_dir} {gtdb_config}{resource_overrides}"
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} annotating_type={annotating_type} output_dir={output_dir} {gtdb_config}{annotation_filter_config}{resource_overrides}"
         f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--use-conda "

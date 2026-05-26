@@ -619,6 +619,8 @@ def main():
             run_info,
             snakemake_flags=snakemake_flags,
             slurm_resources=slurm_resources,
+            annotation_evalue=args.annotation_evalue,
+            annotation_identity=args.annotation_identity,
         )
 
     ###
