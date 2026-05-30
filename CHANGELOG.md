@@ -8,6 +8,12 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.7.8] - 2026-05-30
+
+### Added
+
+- Added `MIN_COMPLETENESS` (default 70) and `MAX_CONTAMINATION` (default 10) parameters to `workflow/config.yaml`. These are forwarded as `--min_completeness` to Binette in the cataloging workflow, and as `--completeness` / `--contamination` to dRep in the dereplicating and profiling-genomes workflows. Both values can be overridden in the project config file.
+
 ## [1.7.7] - 2026-05-26
 
 ### Added

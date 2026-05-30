@@ -13,6 +13,8 @@ MASH_MODULE = config["MASH_MODULE"]
 SINGLEM_MODULE = config["SINGLEM_MODULE"]
 CHECKM2_MODULE = config["CHECKM2_MODULE"]
 DREP_ANI = float(config.get("DREP_ANI", 0.98))
+MIN_COMPLETENESS = float(config.get("MIN_COMPLETENESS", 70))
+MAX_CONTAMINATION = float(config.get("MAX_CONTAMINATION", 10))
 CHECKM2_DB = config["CHECKM2_DB"]
 IGNORE_QUALITY = config.get("IGNORE_QUALITY", False)
 QUALITY_FILE = config.get("QUALITY_FILE", False)
@@ -137,6 +139,8 @@ checkpoint dereplicate:
         mash_module={MASH_MODULE},
         outdir=f"{OUTPUT_DIR}/profiling_genomes/drep/",
         ani={DREP_ANI},
+        min_completeness={MIN_COMPLETENESS},
+        max_contamination={MAX_CONTAMINATION},
         uncompressed_dir=f"{OUTPUT_DIR}/profiling_genomes/drep/uncompressed_genomes",
         ignore_quality=IGNORE_QUALITY,
         ignore_quality_flag="true" if IGNORE_QUALITY else "false",
@@ -167,7 +171,7 @@ checkpoint dereplicate:
         if [ "{params.use_genomeinfo_flag}" = "true" ]; then
             genomeinfo_arg="--genomeInfo {input.metadata}"
         fi
-        dRep dereplicate {params.outdir} -p {threads} -g "${{files[@]}}" -sa {params.ani} $genomeinfo_arg {params.ignore_quality_arg}
+        dRep dereplicate {params.outdir} -p {threads} -g "${{files[@]}}" -sa {params.ani} --completeness {params.min_completeness} --contamination {params.max_contamination} $genomeinfo_arg {params.ignore_quality_arg}
         """
 
 # Normalize headers in dereplicated genomes with .fa/.fna/.fasta

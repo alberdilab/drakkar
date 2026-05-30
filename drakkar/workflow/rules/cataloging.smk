@@ -19,6 +19,8 @@ SEMIBIN2_MODULE = config["SEMIBIN2_MODULE"]
 DIAMOND_MODULE = config["DIAMOND_MODULE"]
 CHECKM2_MODULE = config["CHECKM2_MODULE"]
 BINETTE_MODULE = config["BINETTE_MODULE"]
+MIN_COMPLETENESS = float(config.get("MIN_COMPLETENESS", 70))
+MAX_CONTAMINATION = float(config.get("MAX_CONTAMINATION", 10))
 
 # Databases
 CHECKM2_DB = config["CHECKM2_DB"]
@@ -478,6 +480,7 @@ checkpoint binette:
         diamond_module = {DIAMOND_MODULE},
         checkm2_module = {CHECKM2_MODULE},
         binette_module = {BINETTE_MODULE},
+        min_completeness={MIN_COMPLETENESS},
         outdir=f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}"
     threads: 8
     conda:
@@ -515,6 +518,7 @@ checkpoint binette:
                 --contigs {input.fasta} \
                 --outdir {params.outdir} \
                 --checkm2_db {params.checkm_db} \
+                --min_completeness {params.min_completeness} \
                 --threads {threads}
         BINETTE_STATUS=$?
         set -e
