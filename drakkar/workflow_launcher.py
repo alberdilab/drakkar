@@ -257,10 +257,12 @@ def run_snakemake_annotating(
     slurm_resources="",
     annotation_evalue=None,
     annotation_identity=None,
+    gtdb_scratch=False,
 ):
     """ Run the annotating workflow """
 
     gtdb_config = f"gtdb_version={gtdb_version} " if gtdb_version else ""
+    gtdb_scratch_config = f"gtdb_scratch=True " if gtdb_scratch else ""
     annotation_filter_config = ""
     if annotation_evalue is not None:
         annotation_filter_config += f"annotation_evalue={annotation_evalue} "
@@ -276,7 +278,7 @@ def run_snakemake_annotating(
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} annotating_type={annotating_type} output_dir={output_dir} {gtdb_config}{annotation_filter_config}{resource_overrides}"
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} annotating_type={annotating_type} output_dir={output_dir} {gtdb_config}{gtdb_scratch_config}{annotation_filter_config}{resource_overrides}"
         f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--use-conda "

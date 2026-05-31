@@ -3,6 +3,7 @@
 ####
 
 PACKAGE_DIR = config["package_dir"]
+GTDB_SCRATCH = config.get("gtdb_scratch", False)
 
 # Software modules
 GTDBTK_MODULE = config["GTDBTK_MODULE"]
@@ -66,7 +67,8 @@ rule gtdbtk:
         db_key=gtdb_db_key,
         db=gtdb_db,
         outdir=f"{OUTPUT_DIR}/annotating/gtdbtk/",
-        tmpdir=f"{OUTPUT_DIR}/annotating/tmp/"
+        tmpdir=f"{OUTPUT_DIR}/annotating/tmp/",
+        scratch_arg=f"--scratch_dir {OUTPUT_DIR}/annotating/tmp/" if GTDB_SCRATCH else ""
     threads: 8
     resources:
         mem_mb=lambda wildcards, attempt: cap_mem_mb(512*1024 * 2 ** (attempt - 1)),
@@ -83,7 +85,7 @@ rule gtdbtk:
             --batchfile {input} \
             --out_dir {params.outdir} \
             --cpus {threads} \
-            --scratch_dir {params.tmpdir} \
+            {params.scratch_arg} \
             --place_species
         """
 

@@ -8,6 +8,12 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.7.10] - 2026-05-31
+
+### Changed
+
+- `--scratch_dir` in GTDB-Tk `classify_wf` is now opt-in via `--gtdb-scratch` on `drakkar annotating` and `drakkar complete`. By default pplacer loads the reference tree into memory (faster); pass `--gtdb-scratch` to write intermediates to disk and reduce peak RAM.
+
 ## [1.7.9] - 2026-05-31
 
 ### Changed

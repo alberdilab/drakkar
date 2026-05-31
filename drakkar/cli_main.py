@@ -621,6 +621,7 @@ def main():
             slurm_resources=slurm_resources,
             annotation_evalue=args.annotation_evalue,
             annotation_identity=args.annotation_identity,
+            gtdb_scratch=getattr(args, "gtdb_scratch", False),
         )
 
     ###

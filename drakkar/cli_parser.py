@@ -80,6 +80,13 @@ def build_parser():
         required=False,
         help="GTDB release number for taxonomy annotation, using GTDB_DB_<version> from config.yaml. Default: GTDB_DB.",
     )
+    subparser_complete.add_argument(
+        "--gtdb-scratch",
+        dest="gtdb_scratch",
+        required=False,
+        action="store_true",
+        help="Write pplacer intermediate files to disk instead of memory, reducing peak RAM at the cost of speed.",
+    )
     add_annotation_filter_arguments(subparser_complete)
     subparser_complete.add_argument("-c", "--multicoverage", action="store_true", help="Map samples sharing the same coverage group to each other's individual assemblies")
     subparser_complete.add_argument("--fraction", required=False, action='store_true', help="Calculate microbial fraction using singlem")
@@ -185,6 +192,13 @@ def build_parser():
         dest="gtdb_version",
         required=False,
         help="GTDB release number for taxonomy annotation, using GTDB_DB_<version> from config.yaml. Default: GTDB_DB.",
+    )
+    subparser_annotating.add_argument(
+        "--gtdb-scratch",
+        dest="gtdb_scratch",
+        required=False,
+        action="store_true",
+        help="Write pplacer intermediate files to disk instead of memory, reducing peak RAM at the cost of speed.",
     )
     add_annotation_filter_arguments(subparser_annotating)
     subparser_annotating.add_argument("-e", "--env_path", type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
@@ -330,7 +344,7 @@ def build_parser():
         ],
         sections=[
             ("Input Sources", ["input", "file", "reference", "reference_index"]),
-            ("Workflow Scope", ["mode", "binners", "type", "annotation_type", "gtdb_version", "annotation_evalue", "annotation_identity", "multicoverage", "fraction", "nonpareil", "sanitize", "ani"]),
+            ("Workflow Scope", ["mode", "binners", "type", "annotation_type", "gtdb_version", "gtdb_scratch", "annotation_evalue", "annotation_identity", "multicoverage", "fraction", "nonpareil", "sanitize", "ani"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
             ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
@@ -421,7 +435,7 @@ def build_parser():
         ],
         sections=[
             ("Input Genomes", ["bins_dir", "bins_file"]),
-            ("Annotation Scope", ["annotation_type", "gtdb_version", "annotation_evalue", "annotation_identity"]),
+            ("Annotation Scope", ["annotation_type", "gtdb_version", "gtdb_scratch", "annotation_evalue", "annotation_identity"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
             ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
