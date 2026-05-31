@@ -68,11 +68,9 @@ rule gtdbtk:
         outdir=f"{OUTPUT_DIR}/annotating/gtdbtk/",
         tmpdir=f"{OUTPUT_DIR}/annotating/tmp/"
     threads: 8
-    # conda:
-    #     f"{PACKAGE_DIR}/workflow/envs/annotating_taxonomy.yaml"
     resources:
-        mem_mb=lambda wildcards, attempt: cap_mem_mb(128*1024 * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: cap_runtime(120 * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, attempt: cap_mem_mb(512*1024 * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, attempt: cap_runtime(180 * 2 ** (attempt - 1))
     message: "Annotating taxonomy using GTDBTK..."
     shell:
         """
@@ -85,6 +83,7 @@ rule gtdbtk:
             --batchfile {input} \
             --out_dir {params.outdir} \
             --cpus {threads} \
+            --scratch_dir {params.tmpdir} \
             --place_species
         """
 

@@ -8,6 +8,12 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.7.9] - 2026-05-31
+
+### Changed
+
+- Added `--scratch_dir` to the GTDB-Tk `classify_wf` call to reduce pplacer memory usage by writing intermediate files to disk.
+
 ## [1.7.8] - 2026-05-30
 
 ### Added
