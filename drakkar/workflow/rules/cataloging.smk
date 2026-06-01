@@ -357,8 +357,10 @@ rule semibin2:
         assembly_size_mb=lambda wildcards, input: int(Path(input.assembly).stat().st_size / (1024*1024))
     threads: 8
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(min(1000*1024,max(8*1024, int(input.size_mb * 30) * 2 ** (attempt - 1)))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(min(20000,max(15, int(input.size_mb) * 2 ** (attempt - 1))))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(min(1000*1024, max(8*1024, int(Path(input.assembly).stat().st_size / (1024*1024) * 30) * 2 ** (attempt - 1)))),
+        runtime=lambda wildcards, input, attempt: cap_runtime(min(20000, max(30, int(Path(input.assembly).stat().st_size / (1024*1024) / 2) * 2 ** (attempt - 1)))),
+        slurm_partition="gpuqueue",
+        slurm_extra="--gres=gpu:1"
     message: "Binning contigs from assembly {wildcards.assembly} using semibin2..."
     shell:
         """
@@ -409,8 +411,10 @@ rule comebin:
         outdir=f"{OUTPUT_DIR}/cataloging/comebin/{{assembly}}"
     threads: 8
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(min(1000*1024,max(8*1024, int(input.size_mb * 30) * 2 ** (attempt - 1)))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(min(20000,max(15, int(input.size_mb) * 2 ** (attempt - 1))))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(min(1000*1024, max(8*1024, int(Path(input.assembly).stat().st_size / (1024*1024) * 30) * 2 ** (attempt - 1)))),
+        runtime=lambda wildcards, input, attempt: cap_runtime(min(20000, max(30, int(Path(input.assembly).stat().st_size / (1024*1024) / 2) * 2 ** (attempt - 1)))),
+        slurm_partition="gpuqueue",
+        slurm_extra="--gres=gpu:1"
     message: "Binning contigs from assembly {wildcards.assembly} using comebin..."
     shell:
         """

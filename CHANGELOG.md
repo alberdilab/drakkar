@@ -8,6 +8,13 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.8.0] - 2026-06-01
+
+### Changed
+
+- `semibin2` and `comebin` rules now submit to the `gpuqueue` SLURM partition and request one GPU via `--gres=gpu:1`, enabling GPU-accelerated binning for both tools.
+- Fixed memory and runtime scaling for `semibin2` and `comebin`: resources are now derived from assembly file size alone instead of total input size (assembly + BAM files), which previously caused grossly inflated RAM and walltime requests.
+
 ## [1.7.10] - 2026-05-31
 
 ### Changed
