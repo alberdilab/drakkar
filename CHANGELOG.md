@@ -8,6 +8,12 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.8.1] - 2026-06-03
+
+### Added
+
+- Added `--annotation-type clusters` shortcut that expands to `dbcan`, `antismash`, and `mobile`, producing only `cluster_annotations.tsv.xz` without triggering gene annotation. `defense` is intentionally excluded so that `RUN_GENE_ANNOTATIONS` remains false; users who want defense systems can combine `clusters,defense` explicitly.
+
 ## [1.8.0] - 2026-06-01
 
 ### Changed

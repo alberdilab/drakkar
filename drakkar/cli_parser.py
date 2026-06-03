@@ -69,7 +69,7 @@ def build_parser():
         required=False,
         default="taxonomy,function",
         help=(
-            "Comma-separated annotation targets. Options: taxonomy, function, genes, "
+            "Comma-separated annotation targets. Options: taxonomy, function, genes, clusters, "
             "kegg, cazy, pfam, virulence (vfdb), amr, signalp, dbcan, antismash, "
             "defense, mobile (genomad), network. Default: taxonomy,function"
         ),
@@ -182,7 +182,7 @@ def build_parser():
         required=False,
         default="taxonomy,function",
         help=(
-            "Comma-separated annotation targets. Options: taxonomy, function, genes, "
+            "Comma-separated annotation targets. Options: taxonomy, function, genes, clusters, "
             "kegg, cazy, pfam, virulence (vfdb), amr, signalp, dbcan, antismash, "
             "defense, mobile (genomad), network. Default: taxonomy,function"
         ),

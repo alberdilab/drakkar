@@ -28,6 +28,7 @@ FUNCTION_ANNOTATION_COMPONENTS = {
 }
 GENE_ANNOTATION_COMPONENTS = {"kegg", "cazy", "pfam", "virulence", "amr", "signalp"}
 CLUSTER_ANNOTATION_COMPONENTS = {"dbcan", "antismash", "defense", "mobile"}
+CLUSTERS_ONLY_COMPONENTS = {"dbcan", "antismash", "mobile"}
 
 annotation_aliases = {"vfdb": "virulence", "genomad": "mobile"}
 ANNOTATING_TYPE = [annotation_aliases.get(t.strip().lower(), t.strip().lower()) for t in ANNOTATING_TYPE if t.strip()]
@@ -38,6 +39,9 @@ if "function" in ANNOTATING_TYPE_SET:
 
 if "genes" in ANNOTATING_TYPE_SET:
     ANNOTATING_TYPE_SET.update(GENE_ANNOTATION_COMPONENTS)
+
+if "clusters" in ANNOTATING_TYPE_SET:
+    ANNOTATING_TYPE_SET.update(CLUSTERS_ONLY_COMPONENTS)
 
 ANNOTATING_TYPE = sorted(ANNOTATING_TYPE_SET)
 RUN_ANNOTATING_FUNCTION = bool(ANNOTATING_TYPE_SET.intersection(FUNCTION_ANNOTATION_COMPONENTS | {"function", "genes"}))

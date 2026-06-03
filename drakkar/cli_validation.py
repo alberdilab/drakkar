@@ -19,20 +19,21 @@ def normalize_annotation_type(annotation_type):
         "dbcan", "antismash", "defense", "mobile"
     }
     gene_components = {"kegg", "cazy", "pfam", "virulence", "amr", "signalp"}
+    clusters_only_components = {"dbcan", "antismash", "mobile"}
     aliases = {"vfdb": "virulence", "genomad": "mobile"}
     allowed = {
-        "taxonomy", "function", "genes", "network",
+        "taxonomy", "function", "genes", "clusters", "network",
         *functional_components
     }
     option_order = [
-        "taxonomy", "function", "genes", "network",
+        "taxonomy", "function", "genes", "clusters", "network",
         "kegg", "cazy", "pfam", "virulence", "amr", "signalp",
         "dbcan", "antismash", "defense", "mobile"
     ]
     items = [aliases.get(item.strip().lower(), item.strip().lower()) for item in annotation_type.split(",") if item.strip()]
     invalid = [item for item in items if item not in allowed]
     if not items or invalid:
-        print(f"{ERROR}ERROR:{RESET} --annotation-type must be a comma-separated list including taxonomy, function, genes, kegg, cazy, pfam, virulence, amr, signalp, dbcan, antismash, defense, mobile, and/or network.")
+        print(f"{ERROR}ERROR:{RESET} --annotation-type must be a comma-separated list including taxonomy, function, genes, clusters, kegg, cazy, pfam, virulence, amr, signalp, dbcan, antismash, defense, mobile, and/or network.")
         return None
 
     expanded = set(items)
@@ -40,6 +41,8 @@ def normalize_annotation_type(annotation_type):
         expanded.update(functional_components)
     if "genes" in expanded:
         expanded.update(gene_components)
+    if "clusters" in expanded:
+        expanded.update(clusters_only_components)
 
     normalized = [opt for opt in option_order if opt in expanded]
     return ",".join(normalized)
