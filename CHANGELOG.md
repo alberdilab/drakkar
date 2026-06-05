@@ -8,6 +8,12 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.8.2] - 2026-06-05
+
+### Fixed
+
+- `MIN_COMPLETENESS` and `MAX_CONTAMINATION` were cast to `float` but Binette expects integers; corrected to `int`.
+
 ## [1.8.1] - 2026-06-03
 
 ### Added
