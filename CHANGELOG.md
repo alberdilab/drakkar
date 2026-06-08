@@ -8,6 +8,14 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.8.3] - 2026-06-08
+
+### Changed
+
+- `semibin2` and `comebin` rules now load `CUDA_MODULE` (configurable in `config.yaml`, default `cuda/12.9.1`) so that GPU hardware is properly detected at runtime.
+- Minimum memory for `semibin2` and `comebin` raised from 8 GB to 16 GB.
+- Minimum runtime for `semibin2` and `comebin` raised from 30 to 120 minutes; per-MB scaling increased 4× (from `size/2` to `size*2` minutes).
+
 ## [1.8.2] - 2026-06-05
 
 ### Fixed
