@@ -8,6 +8,12 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.8.4] - 2026-06-09
+
+### Fixed
+
+- `nonpareil` rule now uses `shadow: "minimal"` so that the decompressed temporary FASTQ and nonpareil intermediate files (`.npl`, `.npa`, `.npc`) are written into Snakemake's per-job scratch directory and cleaned up automatically — even when the job is killed with SIGKILL, which bypasses shell `trap` handlers.
+
 ## [1.8.3] - 2026-06-08
 
 ### Changed
