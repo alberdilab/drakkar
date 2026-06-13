@@ -8,6 +8,16 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.8.6] - 2026-06-13
+
+### Fixed
+
+- `query_sacct_for_jobs` now batches job IDs into chunks of 500 before calling `sacct`, preventing an `OSError: [Errno 7] Argument list too long` crash on runs with a large number of jobs.
+
+### Changed
+
+- Launch metadata now records `drakkar_version` so the exact package version used for a run is captured in the metadata file.
+
 ## [1.8.5] - 2026-06-13
 
 ### Fixed

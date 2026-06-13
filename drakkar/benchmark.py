@@ -286,30 +286,9 @@ def parse_snakemake_submitted_launches(log_path):
 
     return launches
 
-def query_sacct_for_jobs(job_ids):
-    if not job_ids:
-        return {}
-
-    command = [
-        "sacct",
-        "-X",
-        "-P",
-        "-n",
-        "--units=M",
-        "-j",
-        ",".join(str(job_id) for job_id in job_ids),
-        "--format",
-        "JobIDRaw,State,ExitCode,ElapsedRaw,CPUTimeRAW,AllocCPUS,MaxRSS,TimelimitRaw",
-    ]
-    try:
-        result = subprocess.run(command, capture_output=True, text=True, check=False)
-    except FileNotFoundError:
-        return None
-    if result.returncode != 0:
-        return None
-
+def _parse_sacct_output(stdout):
     rows = {}
-    for raw_line in result.stdout.splitlines():
+    for raw_line in stdout.splitlines():
         if not raw_line.strip():
             continue
         parts = raw_line.split("|")
@@ -328,6 +307,34 @@ def query_sacct_for_jobs(job_ids):
             "max_rss_mb": parse_slurm_memory_to_mb(parts[6]),
             "timelimit_raw_min": parse_int_or_none(parts[7]),
         }
+    return rows
+
+def query_sacct_for_jobs(job_ids, chunk_size=500):
+    if not job_ids:
+        return {}
+
+    job_ids = list(job_ids)
+    rows = {}
+    for i in range(0, len(job_ids), chunk_size):
+        chunk = job_ids[i : i + chunk_size]
+        command = [
+            "sacct",
+            "-X",
+            "-P",
+            "-n",
+            "--units=M",
+            "-j",
+            ",".join(str(job_id) for job_id in chunk),
+            "--format",
+            "JobIDRaw,State,ExitCode,ElapsedRaw,CPUTimeRAW,AllocCPUS,MaxRSS,TimelimitRaw",
+        ]
+        try:
+            result = subprocess.run(command, capture_output=True, text=True, check=False)
+        except FileNotFoundError:
+            return None
+        if result.returncode != 0:
+            return None
+        rows.update(_parse_sacct_output(result.stdout))
     return rows
 
 def benchmark_job_row(launch, accounting_row):

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import yaml
 
+from drakkar import __version__
 from drakkar.cli_context import ERROR, RESET, WORKFLOW_RUN_COMMANDS
 from drakkar.output import print
 from drakkar.output_paths import validate_launch_metadata_directory
@@ -64,6 +65,7 @@ def write_launch_metadata(args, output_dir, env_path=None):
         benchmark_paths = None
     metadata = {
         "run_id": run_id,
+        "drakkar_version": __version__,
         "timestamp": timestamp.isoformat(),
         "started_at": timestamp.isoformat(),
         "command": args.command,
