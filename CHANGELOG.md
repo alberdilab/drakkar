@@ -8,6 +8,13 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.8.5] - 2026-06-13
+
+### Fixed
+
+- Virulence factor annotations were silently dropped because `mmseqs easy-search` outputs `fident` (fractional identity, 0–1) by default while `parse_vfdb` compared against a percentage threshold (`identity >= 50.0`). Every hit evaluated `0.99 >= 50.0 → False`, filtering the entire result set. Fixed by adding `--format-output query,target,pident,...` to the `vfdb` rule so the identity column is in percentage (0–100), consistent with the threshold. Added a regression test to catch any future reversion.
+- Doubled the default runtime for `gtdbtk` to 360 minutes to accommodate larger datasets.
+
 ## [1.8.4] - 2026-06-09
 
 ### Fixed

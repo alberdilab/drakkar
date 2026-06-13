@@ -72,7 +72,7 @@ rule gtdbtk:
     threads: 8
     resources:
         mem_mb=lambda wildcards, attempt: cap_mem_mb(512*1024 * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, attempt: cap_runtime(180 * 2 ** (attempt - 1))
+        runtime=lambda wildcards, attempt: cap_runtime(360 * 2 ** (attempt - 1))
     message: "Annotating taxonomy using GTDBTK..."
     shell:
         """

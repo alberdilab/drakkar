@@ -215,7 +215,8 @@ rule vfdb:
         """
         module purge
         module load {params.mmseqs2_module}
-        mmseqs easy-search {input} {params.db} {output} {params.tmp}
+        mmseqs easy-search {input} {params.db} {output} {params.tmp} \
+            --format-output query,target,pident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits
         """
 
 rule amr:
