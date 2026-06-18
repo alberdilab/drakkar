@@ -193,7 +193,7 @@ rule pfam:
         """
         module purge
         module load {params.hmmer_module}
-        hmmscan -o {output.txt} --tblout {output.tsv} --noali {params.db} {input}
+        hmmscan -o {output.txt} --tblout {output.tsv} --cut_ga --noali {params.db} {input}
         """
 
 rule vfdb:
@@ -536,6 +536,10 @@ rule genomad:
         """
         module purge
         module load {params.genomad_module}
+        # Prevent the drakkar conda env (and ~/.local) from shadowing the
+        # genomad module's own Python packages, e.g. its pinned numpy <= 2.2.
+        unset PYTHONPATH
+        export PYTHONNOUSERSITE=1
         genomad end-to-end \
             -t {threads} \
             {input} \

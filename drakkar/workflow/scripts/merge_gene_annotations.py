@@ -101,16 +101,16 @@ def parse_kegg(kegg_file, keggdb_file, evalue_threshold):
     return kegg_df
 
 
-def parse_pfam(pfam_file, ec_file, evalue_threshold):
+def parse_pfam(pfam_file, ec_file):
+    # Pfam hits are filtered upstream by hmmscan's per-family curated gathering
+    # thresholds (--cut_ga), so no flat e-value cutoff is applied here. The
+    # e-value is retained only to pick the single best hit per gene.
     pfam_df = pd.DataFrame(columns=["gene", "pfam", "ec"])
     hits = parse_hmmer3_tab(pfam_file)
     if hits.empty:
         return pfam_df
 
     hits["evalue"] = pd.to_numeric(hits["evalue"], errors="coerce")
-    hits = hits[hits["evalue"] <= evalue_threshold]
-    if hits.empty:
-        return pfam_df
 
     hits = hits.rename(columns={"accession": "pfam"})
     hits["pfam"] = hits["pfam"].astype("string").str.split(".").str[0]
@@ -297,7 +297,7 @@ def merge_annotations(
         annotations = annotations.rename(columns={"seqid": "gene"})
 
     kegg_df = parse_kegg(kegg_file, keggdb_file, evalue_threshold)
-    pfam_df = parse_pfam(pfam_file, ec_file, evalue_threshold)
+    pfam_df = parse_pfam(pfam_file, ec_file)
     cazy_df = parse_cazy(cazy_file, evalue_threshold)
     amr_df = parse_amr(amr_file, amrdb_file, evalue_threshold)
     vf_df = parse_vfdb(vf_file, vfdb_file, evalue_threshold, identity_threshold)

@@ -8,6 +8,16 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.8.7] - 2026-06-18
+
+### Changed
+
+- Pfam annotation now uses HMMER's per-family curated gathering thresholds (`hmmscan --cut_ga`) instead of a flat e-value cutoff, matching how Pfam/InterPro/UniProt assign annotations. The flat `ANNOTATION_EVALUE` filter is no longer applied to Pfam hits in `merge_gene_annotations.py` (it would otherwise discard GA-passing hits whose full-sequence e-value is weaker than the threshold); the e-value is retained only to select the single best hit per gene. This is more sensitive for short/divergent families and may change existing Pfam results. Other HMM databases (KEGG, CAZy, AMR) are unaffected.
+
+### Fixed
+
+- The `genomad` rule failed with a numpy version error (module ships numpy 2.2.6, but 2.4.6 was imported) because Snakemake injects `PYTHONPATH` pointing at the drakkar conda env, which shadowed the genomad module's own `site-packages`. The rule now runs `unset PYTHONPATH` and `export PYTHONNOUSERSITE=1` after `module load` so the module's pinned numpy is used.
+
 ## [1.8.6] - 2026-06-13
 
 ### Fixed
