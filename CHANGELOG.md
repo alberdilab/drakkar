@@ -8,6 +8,14 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.8.8] - 2026-06-18
+
+### Changed
+
+- Updated `SEMIBIN2_MODULE` from `semibin/2.1.0` to `semibin/2.3.0`, which includes a CUDA-enabled PyTorch build.
+- Updated `CUDA_MODULE` from `cuda/12.9.1` to `cuda/12.8` to satisfy `semibin/2.3.0`'s prerequisite.
+- Fixed module load order in `semibin2` and `comebin` rules: `CUDA_MODULE` is now loaded before the tool module, as required by the module system.
+
 ## [1.8.7] - 2026-06-18
 
 ### Changed

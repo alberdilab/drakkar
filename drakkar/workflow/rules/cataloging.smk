@@ -372,7 +372,7 @@ rule semibin2:
             touch {output}
         else
             module purge
-            module load {params.semibin2_module} {params.bedtools_module} {params.hmmer_module} {params.cuda_module}
+            module load {params.cuda_module} {params.semibin2_module} {params.bedtools_module} {params.hmmer_module}
             SemiBin2 single_easy_bin -i {input.assembly} -b {input.bam} -o {params.outdir} -m 1500 -t {threads} --compression none
         fi
         """
@@ -427,7 +427,7 @@ rule comebin:
             touch {output}
         else
             module purge
-            module load {params.comebin_module} {params.cuda_module}
+            module load {params.cuda_module} {params.comebin_module}
             rm -rf {params.outdir} {params.bamdir}
             mkdir -p {params.bamdir}
             for bam in {input.bam}; do
