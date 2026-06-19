@@ -37,6 +37,7 @@ SEQTK_MODULE: "seqtk/1.4"
 MULTIQC_MODULE: "multiqc/1.29"
 SUBREAD_MODULE: "subread/2.0.6"
 GENOMAD_MODULE: "genomad/1.11.0"
+FOLDSEEK_MODULE: "foldseek/9.427df8a"
 
 # Annotation databases
 CHECKM2_DB: "/maps/datasets/globe_databases/checkm2/20250215/CheckM2_database/uniref100.KO.1.dmnd"
@@ -60,6 +61,14 @@ DBCAN_DB: "/projects/alberdilab/data/databases/drakkar/dbcan"
 ANTISMASH_DB: "/projects/alberdilab/data/databases/drakkar/antismash"
 DEFENSEFINDER_DB: "/projects/alberdilab/data/databases/drakkar/defensefinder"
   # Small trick to change the versions of models from 2.1 to 2.0 was done to avoid errors in DefenseFinder
+# The three FOLDSEEK_* paths below are installed together by:
+#   drakkar database foldseek --directory <dir> [--version <name>] --set-default
+FOLDSEEK_DB: "/projects/alberdilab/data/databases/drakkar/foldseek/foldseek_db"
+  # Foldseek AlphaFold/Swiss-Prot target database
+PROSTT5_MODEL: "/projects/alberdilab/data/databases/drakkar/foldseek/prostt5"
+  # ProstT5 weights for sequence->3Di prediction inside Foldseek
+FOLDSEEK_MAP_DB: "/projects/alberdilab/data/databases/drakkar/foldseek/foldseek_map.tsv"
+  # TSV mapping UniProt accession -> function. Header: accession<TAB>kegg<TAB>ec<TAB>pfam
 
 # Environments
 

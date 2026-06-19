@@ -23,6 +23,7 @@ normalize_managed_database_name = database_registry.normalize_managed_database_n
 
 HMMER_MODULE = config["HMMER_MODULE"]
 MMSEQS2_MODULE = config["MMSEQS2_MODULE"]
+FOLDSEEK_MODULE = config["FOLDSEEK_MODULE"]
 
 DATABASE_NAME = normalize_managed_database_name(config.get("database_name", ""))
 DATABASE_DIRECTORY = config.get("database_directory", "")
@@ -57,8 +58,10 @@ if DATABASE_NAME == "kegg":
             db=str(TARGET_DB),
             archive=f"{OUTPUT_DIR}/profiles.tar.gz",
             json=f"{TARGET_DB}.json",
+            ko_list=f"{TARGET_DB}_ko_list.tsv",
             archive_url=DATABASE_SOURCES[0],
             json_url=DATABASE_SOURCES[1],
+            ko_list_url=DATABASE_SOURCES[2],
             hmmer_module=HMMER_MODULE
         threads: 1
         resources:
@@ -67,7 +70,7 @@ if DATABASE_NAME == "kegg":
             """
             set -euo pipefail
             mkdir -p "{OUTPUT_DIR}"
-            rm -f "{params.db}" "{params.db}.h3f" "{params.db}.h3i" "{params.db}.h3m" "{params.db}.h3p" "{params.json}" "{params.archive}"
+            rm -f "{params.db}" "{params.db}.h3f" "{params.db}.h3i" "{params.db}.h3m" "{params.db}.h3p" "{params.json}" "{params.ko_list}" "{params.archive}"
             rm -rf "{OUTPUT_DIR}/profiles"
             if ! curl -L --fail --output "{params.archive}" "{params.archive_url}"; then
                 echo "Unable to download KEGG KOfam archive: {params.archive_url}" >&2
@@ -76,6 +79,7 @@ if DATABASE_NAME == "kegg":
                 exit 1
             fi
             curl -L --fail --output "{params.json}" "{params.json_url}"
+            curl -L --fail --output "{params.ko_list}" "{params.ko_list_url}"
             tar -xzf "{params.archive}" -C "{OUTPUT_DIR}"
             find "{OUTPUT_DIR}/profiles" -type f -name "*.hmm" | sort | xargs cat > "{params.db}"
             rm -f "{params.archive}"
@@ -215,6 +219,47 @@ if DATABASE_NAME == "amr":
             touch {output}
             """
 
+if DATABASE_NAME == "foldseek":
+    rule prepare_database:
+        output:
+            touch(f"{OUTPUT_DIR}/foldseek.done")
+        params:
+            foldseek_db=str(TARGET_DB),
+            prostt5=f"{OUTPUT_DIR}/prostt5",
+            sprot=f"{OUTPUT_DIR}/uniprot_sprot.dat.gz",
+            mapping=f"{OUTPUT_DIR}/foldseek_map.tsv",
+            tmp=f"{OUTPUT_DIR}/tmp",
+            sprot_url=DATABASE_SOURCES[2],
+            foldseek_module=FOLDSEEK_MODULE,
+            package_dir=PACKAGE_DIR
+        threads: 1
+        conda:
+            f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
+        resources:
+            runtime=lambda wildcards, attempt: cap_runtime(DOWNLOAD_RUNTIME * 2 ** (attempt - 1))
+        shell:
+            """
+            set -euo pipefail
+            mkdir -p "{OUTPUT_DIR}"
+            rm -rf "{params.tmp}" "{params.prostt5}"*
+            find "{OUTPUT_DIR}" -maxdepth 1 -type f -name "foldseek_db*" -delete
+            rm -f "{params.mapping}" "{params.sprot}"
+            module load {params.foldseek_module}
+            # Pre-built AlphaFold/Swiss-Prot structure DB and the ProstT5 weights
+            # are fetched and formatted by foldseek itself from its mirror.
+            foldseek databases Alphafold/Swiss-Prot "{params.foldseek_db}" "{params.tmp}"
+            foldseek databases ProstT5 "{params.prostt5}" "{params.tmp}"
+            # UniProt accession -> KO/EC/Pfam map for interpreting structural hits.
+            curl -L --fail --output "{params.sprot}" "{params.sprot_url}"
+            PYTHON_BIN="${{CONDA_PREFIX}}/bin/python"
+            "$PYTHON_BIN" "{params.package_dir}/workflow/scripts/build_foldseek_function_map.py" \
+                -i "{params.sprot}" \
+                -o "{params.mapping}"
+            rm -f "{params.sprot}"
+            rm -rf "{params.tmp}"
+            touch {output}
+            """
+
 rule write_database_versions:
     input:
         f"{OUTPUT_DIR}/{DATABASE_NAME}.done"
@@ -242,6 +287,8 @@ rule write_database_versions:
             checksums = [Path(f"{TARGET_DB}.idx"), Path(f"{TARGET_DB}.tsv")]
         elif DATABASE_NAME == "amr":
             checksums = [Path(str(TARGET_DB)), Path(f"{TARGET_DB}.tsv")]
+        elif DATABASE_NAME == "foldseek":
+            checksums = [Path(str(TARGET_DB)), Path(f"{OUTPUT_DIR}/foldseek_map.tsv")]
 
         file_info = []
         for target in checksums:

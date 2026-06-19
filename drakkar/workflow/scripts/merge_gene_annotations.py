@@ -1,5 +1,6 @@
 import argparse
 import json
+import re
 from collections import defaultdict
 from pathlib import Path
 
@@ -9,6 +10,12 @@ from Bio import SearchIO
 
 DEFAULT_EVALUE_THRESHOLD = 1e-10
 DEFAULT_IDENTITY_THRESHOLD = 50.0
+
+# Function columns a Foldseek structural hit is allowed to fill when sequence
+# homology left them empty.
+STRUCTURE_FILL_COLUMNS = ["kegg", "ec", "pfam"]
+# Sequence columns that, if populated, mark a gene as sequence-annotated.
+SEQUENCE_EVIDENCE_COLUMNS = ["kegg", "ec", "pfam", "cazy"]
 
 
 def select_lowest_evalue(group):
@@ -34,8 +41,11 @@ def has_content(path):
 
 def parse_hmmer3_tab(path):
     fields = ["accession", "bitscore", "evalue", "id", "overlap_num", "region_num"]
+    # bitscore is the full-sequence score; bitscore_domain is the best single
+    # domain score, needed for KOfam KOs whose curated cutoff is domain-based.
+    columns = ["gene", *fields, "bitscore_domain"]
     if not has_content(path):
-        return pd.DataFrame(columns=["gene", *fields])
+        return pd.DataFrame(columns=columns)
 
     hits = defaultdict(list)
     query_ids = []
@@ -45,13 +55,29 @@ def parse_hmmer3_tab(path):
                 query_ids.append(queryresult.id)
                 for field in fields:
                     hits[field].append(getattr(hit, field, None))
+                domain_score = hit.hsps[0].bitscore if hit.hsps else None
+                hits["bitscore_domain"].append(domain_score)
 
     if not query_ids:
-        return pd.DataFrame(columns=["gene", *fields])
+        return pd.DataFrame(columns=columns)
 
     data = pd.DataFrame.from_dict(hits)
     data["gene"] = query_ids
     return data
+
+
+def load_kofam_thresholds(kolist_file):
+    # KOfam ships per-KO adaptive bit-score cutoffs in its ko_list file rather
+    # than embedding GA/TC lines in the HMMs, so they cannot be applied with
+    # hmmscan --cut_ga; they are applied here instead.
+    columns = ["kegg", "threshold", "score_type"]
+    if not has_content(kolist_file):
+        return pd.DataFrame(columns=columns)
+
+    kolist = pd.read_csv(kolist_file, sep="\t", header=0, usecols=["knum", "threshold", "score_type"])
+    kolist = kolist.rename(columns={"knum": "kegg"})
+    kolist["threshold"] = pd.to_numeric(kolist["threshold"], errors="coerce")
+    return kolist[columns]
 
 
 def load_kegg_hierarchy(keggdb_file):
@@ -76,19 +102,34 @@ def load_kegg_hierarchy(keggdb_file):
     return pd.DataFrame(kegg_rows, columns=["kegg", "ec"])
 
 
-def parse_kegg(kegg_file, keggdb_file, evalue_threshold):
+def parse_kegg(kegg_file, keggdb_file, kolist_file, evalue_threshold):
     kegg_df = pd.DataFrame(columns=["gene", "kegg", "ec"])
     hits = parse_hmmer3_tab(kegg_file)
     if hits.empty:
         return kegg_df
 
-    hierarchy = load_kegg_hierarchy(keggdb_file)
     hits["evalue"] = pd.to_numeric(hits["evalue"], errors="coerce")
-    hits = hits[hits["evalue"] <= evalue_threshold]
+    hits["bitscore"] = pd.to_numeric(hits["bitscore"], errors="coerce")
+    hits["bitscore_domain"] = pd.to_numeric(hits["bitscore_domain"], errors="coerce")
+    hits = hits.rename(columns={"id": "kegg"})
+
+    thresholds = load_kofam_thresholds(kolist_file)
+    if not thresholds.empty:
+        # Apply each KO's curated bit-score cutoff: full-sequence score unless
+        # the KO is scored on its best domain. KOs without a curated threshold
+        # fall back to the flat e-value cutoff.
+        hits = pd.merge(hits, thresholds, on="kegg", how="left")
+        score = hits["bitscore"].where(hits["score_type"] != "domain", hits["bitscore_domain"])
+        has_threshold = hits["threshold"].notna()
+        passes_native = has_threshold & (score >= hits["threshold"])
+        passes_fallback = ~has_threshold & (hits["evalue"] <= evalue_threshold)
+        hits = hits[passes_native | passes_fallback]
+    else:
+        hits = hits[hits["evalue"] <= evalue_threshold]
     if hits.empty:
         return kegg_df
 
-    hits = hits.rename(columns={"id": "kegg"})
+    hierarchy = load_kegg_hierarchy(keggdb_file)
     if not hierarchy.empty:
         hits = pd.merge(hits, hierarchy, on="kegg", how="left")
     else:
@@ -156,16 +197,16 @@ def parse_cazy(cazy_file, evalue_threshold):
     return cazy_df
 
 
-def parse_amr(amr_file, amrdb_file, evalue_threshold):
+def parse_amr(amr_file, amrdb_file):
+    # AMR hits are filtered upstream by hmmscan's per-model trusted cutoffs
+    # (--cut_tc), the same cutoffs AMRFinderPlus uses, so no flat e-value cutoff
+    # is applied here. The e-value is retained only to pick the best hit per gene.
     amr_df = pd.DataFrame(columns=["gene", "resistance_type", "resistance_target"])
     hits = parse_hmmer3_tab(amr_file)
     if hits.empty:
         return amr_df
 
     hits["evalue"] = pd.to_numeric(hits["evalue"], errors="coerce")
-    hits = hits[hits["evalue"] <= evalue_threshold]
-    if hits.empty:
-        return amr_df
 
     hits = hits.rename(columns={"id": "amr"})
     hits = hits.groupby("gene", group_keys=False)[["gene", "amr", "accession", "evalue"]].apply(
@@ -265,10 +306,59 @@ def parse_defensefinder(defense_file):
     return defense_hits, antidefense_hits
 
 
+def uniprot_accession_from_target(target):
+    # AlphaFold/Swiss-Prot Foldseek targets look like "AF-P12345-F1-model_v4.cif.gz".
+    match = re.match(r"AF-([^-]+)-F\d+", str(target))
+    if match:
+        return match.group(1)
+    return str(target)
+
+
+def parse_foldseek(foldseek_file, mapdb_file, evalue_threshold):
+    foldseek_df = pd.DataFrame(columns=["gene", "kegg", "ec", "pfam"])
+    if not has_content(foldseek_file):
+        return foldseek_df
+
+    hits = pd.read_csv(
+        foldseek_file,
+        sep="\t",
+        comment="#",
+        header=None,
+        names=[
+            "gene", "target", "fident", "alnlen", "mismatch", "gapopen",
+            "qstart", "qend", "tstart", "tend", "evalue", "bits",
+        ],
+    )
+    if hits.empty:
+        return foldseek_df
+
+    hits["evalue"] = pd.to_numeric(hits["evalue"], errors="coerce")
+    hits = hits[hits["evalue"] <= evalue_threshold]
+    if hits.empty:
+        return foldseek_df
+
+    hits = hits.groupby("gene", group_keys=False)[["gene", "target", "evalue"]].apply(
+        select_lowest_evalue, include_groups=False
+    ).reset_index(drop=True)
+    hits["accession"] = hits["target"].map(uniprot_accession_from_target)
+
+    if has_content(mapdb_file):
+        mapping = pd.read_csv(mapdb_file, sep="\t", comment="#", header=0)
+        keep = ["accession"] + [c for c in STRUCTURE_FILL_COLUMNS if c in mapping.columns]
+        hits = pd.merge(hits, mapping[keep], on="accession", how="left")
+
+    for column in STRUCTURE_FILL_COLUMNS:
+        if column not in hits.columns:
+            hits[column] = pd.NA
+
+    return hits[["gene", *STRUCTURE_FILL_COLUMNS]]
+
+
 def merge_annotations(
     gff_file,
     kegg_file,
     keggdb_file,
+    keggcutoffs_file,
     pfam_file,
     ec_file,
     cazy_file,
@@ -279,6 +369,8 @@ def merge_annotations(
     signalp_file,
     output_file,
     defense_file=None,
+    foldseek_file=None,
+    foldseekdb_file=None,
     evalue_threshold=DEFAULT_EVALUE_THRESHOLD,
     identity_threshold=DEFAULT_IDENTITY_THRESHOLD,
 ):
@@ -296,10 +388,10 @@ def merge_annotations(
         annotations = annotations.drop(columns=["attributes", "source", "score", "type", "phase"])
         annotations = annotations.rename(columns={"seqid": "gene"})
 
-    kegg_df = parse_kegg(kegg_file, keggdb_file, evalue_threshold)
+    kegg_df = parse_kegg(kegg_file, keggdb_file, keggcutoffs_file, evalue_threshold)
     pfam_df = parse_pfam(pfam_file, ec_file)
     cazy_df = parse_cazy(cazy_file, evalue_threshold)
-    amr_df = parse_amr(amr_file, amrdb_file, evalue_threshold)
+    amr_df = parse_amr(amr_file, amrdb_file)
     vf_df = parse_vfdb(vf_file, vfdb_file, evalue_threshold, identity_threshold)
     signalp_df = parse_signalp(signalp_file)
 
@@ -326,6 +418,40 @@ def merge_annotations(
         if column not in annotations.columns:
             annotations[column] = pd.NA
 
+    # Structural (Foldseek/ProstT5) fallback: fill kegg/ec/pfam only where
+    # sequence homology left them empty, and record provenance per gene.
+    def is_empty(series):
+        return series.isna() | (series.astype("string").fillna("") == "")
+
+    has_sequence = pd.Series(False, index=annotations.index)
+    for column in SEQUENCE_EVIDENCE_COLUMNS:
+        if column in annotations.columns:
+            has_sequence |= ~is_empty(annotations[column])
+
+    filled_by_structure = pd.Series(False, index=annotations.index)
+    foldseek_df = parse_foldseek(foldseek_file, foldseekdb_file, evalue_threshold)
+    if not foldseek_df.empty:
+        annotations = pd.merge(annotations, foldseek_df, on="gene", how="left", suffixes=("", "_struct"))
+        for column in STRUCTURE_FILL_COLUMNS:
+            struct_column = f"{column}_struct"
+            if struct_column not in annotations.columns:
+                continue
+            # Cast to object so filling an otherwise all-NaN (float) column with
+            # string labels doesn't trigger a pandas dtype-incompatibility warning.
+            annotations[column] = annotations[column].astype("object")
+            empty = is_empty(annotations[column]) & ~is_empty(annotations[struct_column])
+            annotations.loc[empty, column] = annotations.loc[empty, struct_column]
+            filled_by_structure |= empty
+            annotations.drop(columns=[struct_column], inplace=True)
+
+    # Sequence provenance wins: a gene with any sequence annotation is labelled
+    # "sequence" even if structure additionally filled a secondary column. In the
+    # gated pipeline structure only runs on orphans, so "structure" marks genes
+    # annotated purely by Foldseek.
+    annotations["evidence"] = pd.NA
+    annotations.loc[filled_by_structure, "evidence"] = "structure"
+    annotations.loc[has_sequence, "evidence"] = "sequence"
+
     annotations.to_csv(output_file, sep="\t", index=False)
 
 
@@ -334,6 +460,7 @@ def main():
     parser.add_argument("-gff", required=True, type=str, help="Path to the GFF file")
     parser.add_argument("-kegg", required=False, type=str, help="Path to the KEGG HMMER table")
     parser.add_argument("-keggdb", required=False, type=str, help="Path to the KEGG hierarchy JSON")
+    parser.add_argument("-keggcutoffs", required=False, type=str, help="Path to the KOfam ko_list with per-KO thresholds")
     parser.add_argument("-pfam", required=False, type=str, help="Path to the PFAM HMMER table")
     parser.add_argument("-ec", required=False, type=str, help="Path to the PFAM-to-EC mapping table")
     parser.add_argument("-cazy", required=False, type=str, help="Path to the CAZy HMMER table")
@@ -344,6 +471,8 @@ def main():
     parser.add_argument("-signalp", required=False, type=str, help="Path to the SignalP table")
     parser.add_argument("-o", required=True, type=str, help="Path to the output TSV file")
     parser.add_argument("-defense", required=False, type=str, help="Path to DefenseFinder gene-level TSV")
+    parser.add_argument("-foldseek", required=False, type=str, help="Path to the Foldseek/ProstT5 search output (m8)")
+    parser.add_argument("-foldseekdb", required=False, type=str, help="Path to the UniProt accession -> function TSV")
     parser.add_argument(
         "-evalue",
         "--evalue",
@@ -371,6 +500,7 @@ def main():
         args.gff,
         args.kegg,
         args.keggdb,
+        args.keggcutoffs,
         args.pfam,
         args.ec,
         args.cazy,
@@ -381,6 +511,8 @@ def main():
         args.signalp,
         args.o,
         args.defense,
+        args.foldseek,
+        args.foldseekdb,
         args.evalue,
         args.identity,
     )

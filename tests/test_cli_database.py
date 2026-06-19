@@ -89,6 +89,7 @@ class DatabaseCommandTests(unittest.TestCase):
             [
                 "https://www.genome.jp/ftp/db/kofam/archives/2026-02-01/profiles.tar.gz",
                 "https://www.kegg.jp/kegg-bin/download_htext?htext=ko00001.keg&format=json&filedir=",
+                "https://www.genome.jp/ftp/db/kofam/archives/2026-02-01/ko_list",
             ],
         )
 

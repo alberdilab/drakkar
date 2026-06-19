@@ -135,8 +135,8 @@ def main():
         args.database_name = normalized_database_name
         args.version = normalized_database_version
         args.download_runtime = normalized_download_runtime
-        if args.database_name == "vfdb" and not version_was_provided:
-            print(f"{INFO}INFO:{RESET} No --version provided for vfdb; using download date {args.version} (UTC).")
+        if args.database_name in ("vfdb", "foldseek") and not version_was_provided:
+            print(f"{INFO}INFO:{RESET} No --version provided for {args.database_name}; using download date {args.version} (UTC).")
 
     overwrite_capable_commands = {
         "complete", "preprocessing", "cataloging", "profiling", "dereplicating",
@@ -242,8 +242,9 @@ def main():
             slurm_resources=slurm_resources,
         )
         if args.set_default:
-            default_path = set_default_database_path(args.database_name, Path(args.directory).resolve(), args.version)
-            print(f"{INFO}INFO:{RESET} Updated {MANAGED_DATABASES[args.database_name]['config_key']} in config.yaml to {default_path}")
+            updated = set_default_database_path(args.database_name, Path(args.directory).resolve(), args.version)
+            for config_key, default_path in updated.items():
+                print(f"{INFO}INFO:{RESET} Updated {config_key} in config.yaml to {default_path}")
         return
 
     else:            

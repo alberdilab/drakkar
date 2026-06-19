@@ -12,6 +12,7 @@ MANAGED_DATABASES = {
         "sources": [
             "https://www.genome.jp/ftp/db/kofam/archives/{version}/profiles.tar.gz",
             "https://www.kegg.jp/kegg-bin/download_htext?htext=ko00001.keg&format=json&filedir=",
+            "https://www.genome.jp/ftp/db/kofam/archives/{version}/ko_list",
         ],
     },
     "cazy": {
@@ -50,6 +51,25 @@ MANAGED_DATABASES = {
         "sources": [
             "https://ftp.ncbi.nlm.nih.gov/hmm/NCBIfam-AMRFinder/{version}/NCBIfam-AMRFinder.HMM.tar.gz",
             "https://ftp.ncbi.nlm.nih.gov/hmm/NCBIfam-AMRFinder/{version}/NCBIfam-AMRFinder.tsv",
+        ],
+    },
+    "foldseek": {
+        "aliases": [],
+        # Bundled database: one release dir holds three artifacts, each wired to
+        # its own config key (see config_targets). basename/config_key point at
+        # the primary structure DB for the framework's single-target machinery.
+        "config_key": "FOLDSEEK_DB",
+        "config_targets": {
+            "FOLDSEEK_DB": "foldseek_db",
+            "PROSTT5_MODEL": "prostt5",
+            "FOLDSEEK_MAP_DB": "foldseek_map.tsv",
+        },
+        "basename": "foldseek_db",
+        "version_label": "Foldseek AlphaFold/Swiss-Prot + UniProt Swiss-Prot snapshot",
+        "sources": [
+            "Alphafold/Swiss-Prot",
+            "ProstT5",
+            "https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.dat.gz",
         ],
     },
 }
@@ -101,6 +121,21 @@ def database_sources(database_name: str, version: str | None = None) -> list[str
     return [source.format(version=version) for source in definition["sources"]]
 
 
+def database_config_targets(database_name: str, base_directory: str | Path, version: str) -> dict[str, str]:
+    """Map each config key this database sets to the path --set-default writes.
+
+    Single-target databases write their one config key to the release directory.
+    Bundled databases (config_targets) write each key to its own artifact path
+    inside that release directory.
+    """
+    definition = MANAGED_DATABASES[database_name]
+    release_dir = database_release_dir(database_name, base_directory, version)
+    targets = definition.get("config_targets")
+    if targets:
+        return {config_key: str(release_dir / relative) for config_key, relative in targets.items()}
+    return {definition["config_key"]: str(release_dir)}
+
+
 def database_source_version_label(database_name: str, version: str | None = None) -> str:
     if database_name == "kegg" and version:
         return f"kofam archive {version}"
@@ -112,4 +147,6 @@ def database_source_version_label(database_name: str, version: str | None = None
         return f"VFDB_setB downloaded {version}"
     if database_name == "amr" and version:
         return f"NCBIfam-AMRFinder {version}"
+    if database_name == "foldseek" and version:
+        return f"Foldseek AlphaFold/Swiss-Prot + UniProt Swiss-Prot downloaded {version}"
     return MANAGED_DATABASES[database_name]["version_label"]

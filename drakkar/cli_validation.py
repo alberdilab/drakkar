@@ -20,20 +20,22 @@ def normalize_annotation_type(annotation_type):
     }
     gene_components = {"kegg", "cazy", "pfam", "virulence", "amr", "signalp"}
     clusters_only_components = {"dbcan", "antismash", "mobile"}
-    aliases = {"vfdb": "virulence", "genomad": "mobile"}
+    aliases = {"vfdb": "virulence", "genomad": "mobile", "foldseek": "structure"}
+    # "structure" (Foldseek/ProstT5) is opt-in only: it needs extra staged
+    # databases, so it is never pulled in by the "function"/"genes" shortcuts.
     allowed = {
-        "taxonomy", "function", "genes", "clusters", "network",
+        "taxonomy", "function", "genes", "clusters", "network", "structure",
         *functional_components
     }
     option_order = [
         "taxonomy", "function", "genes", "clusters", "network",
         "kegg", "cazy", "pfam", "virulence", "amr", "signalp",
-        "dbcan", "antismash", "defense", "mobile"
+        "dbcan", "antismash", "defense", "mobile", "structure"
     ]
     items = [aliases.get(item.strip().lower(), item.strip().lower()) for item in annotation_type.split(",") if item.strip()]
     invalid = [item for item in items if item not in allowed]
     if not items or invalid:
-        print(f"{ERROR}ERROR:{RESET} --annotation-type must be a comma-separated list including taxonomy, function, genes, clusters, kegg, cazy, pfam, virulence, amr, signalp, dbcan, antismash, defense, mobile, and/or network.")
+        print(f"{ERROR}ERROR:{RESET} --annotation-type must be a comma-separated list including taxonomy, function, genes, clusters, kegg, cazy, pfam, virulence, amr, signalp, structure, dbcan, antismash, defense, mobile, and/or network.")
         return None
 
     expanded = set(items)
@@ -314,7 +316,7 @@ def default_resource_args(memory_multiplier=1, time_multiplier=1, slurm_resource
     return f"--default-resources mem_mb={default_mem_mb} runtime={default_runtime}{extra} "
 
 def default_database_version(database_name):
-    if database_name == "vfdb":
+    if database_name in ("vfdb", "foldseek"):
         return datetime.now(timezone.utc).strftime("%Y-%m-%d")
     return None
 

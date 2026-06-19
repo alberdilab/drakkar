@@ -70,7 +70,7 @@ def build_parser():
         default="taxonomy,function",
         help=(
             "Comma-separated annotation targets. Options: taxonomy, function, genes, clusters, "
-            "kegg, cazy, pfam, virulence (vfdb), amr, signalp, dbcan, antismash, "
+            "kegg, cazy, pfam, virulence (vfdb), amr, signalp, structure (foldseek), dbcan, antismash, "
             "defense, mobile (genomad), network. Default: taxonomy,function"
         ),
     )
@@ -183,7 +183,7 @@ def build_parser():
         default="taxonomy,function",
         help=(
             "Comma-separated annotation targets. Options: taxonomy, function, genes, clusters, "
-            "kegg, cazy, pfam, virulence (vfdb), amr, signalp, dbcan, antismash, "
+            "kegg, cazy, pfam, virulence (vfdb), amr, signalp, structure (foldseek), dbcan, antismash, "
             "defense, mobile (genomad), network. Default: taxonomy,function"
         ),
     )
@@ -255,6 +255,7 @@ def build_parser():
     database_pfam = database_subparsers.add_parser("pfam", parents=[database_parent], help="Install or update the PFAM database")
     database_vfdb = database_subparsers.add_parser("vfdb", parents=[database_parent], help="Install or update the VFDB database")
     database_amr = database_subparsers.add_parser("amr", parents=[database_parent], help="Install or update the AMR database")
+    database_foldseek = database_subparsers.add_parser("foldseek", parents=[database_parent], help="Install or update the Foldseek bundle (AlphaFold/Swiss-Prot DB, ProstT5 model, UniProt function map)")
     
     subparser_environments = subparsers.add_parser("environments", help="Pre-build Drakkar conda environments before launching workflow jobs")
     subparser_environments.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")

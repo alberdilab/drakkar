@@ -8,6 +8,39 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.8.9] - 2026-06-19
+
+### Added
+
+- New opt-in `structure` (alias `foldseek`) annotation type that structurally
+  annotates homology-orphan genes with Foldseek/ProstT5 against the
+  AlphaFold/Swiss-Prot database. ProstT5 runs inside the `foldseek` module
+  (CPU, no GPU), gated on genes that KEGG/Pfam/CAZy did not annotate. Structural
+  KO/EC/Pfam hits fill the existing columns only where sequence homology was
+  empty, and a new `evidence` column (`sequence`/`structure`) records provenance.
+- Added `FOLDSEEK_MODULE`, `FOLDSEEK_DB`, `PROSTT5_MODEL`, and `FOLDSEEK_MAP_DB`
+  configuration entries.
+- Added `build_foldseek_function_map.py` to generate `FOLDSEEK_MAP_DB` (UniProt
+  accession -> KO/EC/Pfam) from UniProt's `uniprot_sprot.dat.gz`.
+- New `drakkar database foldseek` command that installs the whole Foldseek bundle
+  in one step: the AlphaFold/Swiss-Prot structure DB and ProstT5 weights (via
+  `foldseek databases`) plus the UniProt function map. `--set-default` updates
+  `FOLDSEEK_DB`, `PROSTT5_MODEL`, and `FOLDSEEK_MAP_DB` together. Like `vfdb`, the
+  `--version` is optional and defaults to the UTC download date. Managed-database
+  entries can now declare multiple config keys via `config_targets`.
+
+### Changed
+
+- KEGG and AMR annotations now use their databases' native per-model cutoffs
+  instead of the flat `annotation_evalue`, mirroring the `--cut_ga` approach
+  already used for Pfam:
+  - KEGG: applies KOfam's per-KO adaptive bit-score thresholds from the `ko_list`
+    file (full- or domain-score per `score_type`), falling back to the e-value
+    cutoff only for KOs that have no curated threshold. The `ko_list` is now
+    downloaded alongside the KOfam profiles by `drakkar database kegg`.
+  - AMR: `hmmscan` now runs with `--cut_tc` (NCBIfam-AMRFinder trusted cutoffs,
+    as used by AMRFinderPlus); the flat e-value filter is removed.
+
 ## [1.8.8] - 2026-06-18
 
 ### Changed

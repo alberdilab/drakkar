@@ -6,7 +6,7 @@ import subprocess
 import sys
 
 from drakkar.cli_context import CONFIG_PATH, ERROR, RESET
-from drakkar.database_registry import MANAGED_DATABASES, database_release_dir
+from drakkar.database_registry import database_config_targets
 from drakkar.output import print
 
 def replace_config_value(config_key, new_value):
@@ -19,10 +19,12 @@ def replace_config_value(config_key, new_value):
     CONFIG_PATH.write_text(updated_text, encoding="utf-8")
 
 def set_default_database_path(database_name, directory, version):
-    definition = MANAGED_DATABASES[database_name]
-    default_path = str(database_release_dir(database_name, directory, version))
-    replace_config_value(definition["config_key"], default_path)
-    return default_path
+    # Returns {config_key: path} for every key this database sets. Single-target
+    # databases yield one entry; bundled ones (e.g. foldseek) yield several.
+    targets = database_config_targets(database_name, directory, version)
+    for config_key, path in targets.items():
+        replace_config_value(config_key, path)
+    return targets
 
 def resolve_editor_command():
     for env_var in ("VISUAL", "EDITOR"):

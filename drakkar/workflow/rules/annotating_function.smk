@@ -21,10 +21,12 @@ HMMER_MODULE = config["HMMER_MODULE"]
 MMSEQS2_MODULE = config["MMSEQS2_MODULE"]
 SIGNALP_MODULE = config["SIGNALP_MODULE"]
 GENOMAD_MODULE = config["GENOMAD_MODULE"]
+FOLDSEEK_MODULE = config["FOLDSEEK_MODULE"]
 
 # Annotation databases
 KEGG_DB = str(database_registry.database_artifact_path("kegg", config["KEGG_DB"]))
 KEGG_DB_JSON = str(database_registry.database_artifact_path("kegg", config["KEGG_DB"], ".json"))
+KEGG_DB_KOLIST = str(database_registry.database_artifact_path("kegg", config["KEGG_DB"], "_ko_list.tsv"))
 CAZY_DB = str(database_registry.database_artifact_path("cazy", config["CAZY_DB"]))
 AMR_DB = str(database_registry.database_artifact_path("amr", config["AMR_DB"]))
 AMR_DB_TSV = str(database_registry.database_artifact_path("amr", config["AMR_DB"], ".tsv"))
@@ -36,6 +38,9 @@ GENOMAD_DB = config["GENOMAD_DB"]
 DBCAN_DB = config["DBCAN_DB"]
 ANTISMASH_DB = config["ANTISMASH_DB"]
 DEFENSEFINDER_DB = config["DEFENSEFINDER_DB"]
+FOLDSEEK_DB = config["FOLDSEEK_DB"]
+PROSTT5_MODEL = config["PROSTT5_MODEL"]
+FOLDSEEK_MAP_DB = config["FOLDSEEK_MAP_DB"]
 ANNOTATION_EVALUE = float(config.get("annotation_evalue", config.get("ANNOTATION_EVALUE", 1e-10)))
 ANNOTATION_IDENTITY = float(config.get("annotation_identity", config.get("ANNOTATION_IDENTITY", 50.0)))
 
@@ -51,6 +56,7 @@ RUN_DBCAN = "dbcan" in ANNOTATING_TYPE_SET
 RUN_ANTISMASH = "antismash" in ANNOTATING_TYPE_SET
 RUN_DEFENSE = "defense" in ANNOTATING_TYPE_SET
 RUN_MOBILE = "mobile" in ANNOTATING_TYPE_SET
+RUN_STRUCTURE = "structure" in ANNOTATING_TYPE_SET
 
 
 def selected_gene_annotation_inputs(wildcards):
@@ -69,7 +75,22 @@ def selected_gene_annotation_inputs(wildcards):
         selected.append(f"{OUTPUT_DIR}/annotating/signalp/{wildcards.mag}.txt")
     if RUN_DEFENSE:
         selected.append(f"{OUTPUT_DIR}/annotating/defensefinder/{wildcards.mag}/{wildcards.mag}_defense_finder_genes.tsv")
+    if RUN_STRUCTURE:
+        selected.append(f"{OUTPUT_DIR}/annotating/foldseek/{wildcards.mag}.tsv")
     return selected
+
+
+def structure_gating_inputs(wildcards):
+    # Genes annotated by these sequence tools are excluded from the structural
+    # search. Only the enabled subset is used to define "unannotated".
+    gating = []
+    if RUN_KEGG:
+        gating.append(f"{OUTPUT_DIR}/annotating/kegg/{wildcards.mag}.tsv")
+    if RUN_PFAM:
+        gating.append(f"{OUTPUT_DIR}/annotating/pfam/{wildcards.mag}.tsv")
+    if RUN_CAZY:
+        gating.append(f"{OUTPUT_DIR}/annotating/cazy/{wildcards.mag}.tsv")
+    return gating
 
 
 def selected_cluster_annotation_inputs(wildcards):
@@ -238,7 +259,7 @@ rule amr:
         """
         module purge
         module load {params.hmmer_module}
-        hmmscan -o {output.txt} --tblout {output.tsv} --noali {params.db} {input}
+        hmmscan -o {output.txt} --tblout {output.tsv} --cut_tc --noali {params.db} {input}
         """
 
 rule signalp:
@@ -262,6 +283,66 @@ rule signalp:
         cat {params.tmp}/output.gff3 | cut -f1,3,6 | awk -F' # |[ \t]+' '!/^#/ {{print $1, $6, $7}}' OFS='\t' > {output}
         """
 
+rule foldseek_orphans:
+    input:
+        faa=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa",
+        gating=structure_gating_inputs
+    output:
+        f"{OUTPUT_DIR}/annotating/foldseek/{{mag}}_orphans.faa"
+    params:
+        package_dir={PACKAGE_DIR},
+        evalue={ANNOTATION_EVALUE}
+    threads:
+        1
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
+    resources:
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10) * 2 ** (attempt - 1)))
+    message: "Selecting genes of MAG {wildcards.mag} without a sequence-homology annotation..."
+    shell:
+        """
+        PYTHON_BIN="${{CONDA_PREFIX}}/bin/python"
+        $PYTHON_BIN {params.package_dir}/workflow/scripts/extract_unannotated_genes.py \
+            -faa {input.faa} \
+            -hmmer {input.gating} \
+            -evalue {params.evalue} \
+            -o {output}
+        """
+
+rule foldseek:
+    input:
+        f"{OUTPUT_DIR}/annotating/foldseek/{{mag}}_orphans.faa"
+    output:
+        f"{OUTPUT_DIR}/annotating/foldseek/{{mag}}.tsv"
+    params:
+        foldseek_module={FOLDSEEK_MODULE},
+        db={FOLDSEEK_DB},
+        prostt5={PROSTT5_MODEL},
+        tmp=f"{OUTPUT_DIR}/annotating/foldseek/{{mag}}_tmp"
+    threads:
+        8
+    resources:
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(16*1024, int(input.size_mb * 1024 * 8) * 2 ** (attempt - 1))),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(30, int(input.size_mb * 120) * 2 ** (attempt - 1)))
+    message: "Structurally annotating orphan genes of MAG {wildcards.mag} with Foldseek/ProstT5..."
+    shell:
+        """
+        if [ ! -s {input} ]; then
+            echo "No unannotated genes for {wildcards.mag}, skipping Foldseek..."
+            touch {output}
+        else
+            module purge
+            module load {params.foldseek_module}
+            foldseek easy-search {input} {params.db} {output} {params.tmp} \
+                --prostt5-model {params.prostt5} \
+                --gpu 0 \
+                --threads {threads} \
+                --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits
+            rm -rf {params.tmp}
+        fi
+        """
+
 rule merge_gene_annotations:
     input:
         gff=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.gff",
@@ -271,9 +352,11 @@ rule merge_gene_annotations:
     params:
         package_dir={PACKAGE_DIR},
         kegg_db={KEGG_DB_JSON},
+        kegg_cutoffs={KEGG_DB_KOLIST},
         ec_db={PFAM_DB_EC},
         vf_db={VFDB_DB_TSV},
         amr_db={AMR_DB_TSV},
+        foldseek_db={FOLDSEEK_MAP_DB},
         evalue={ANNOTATION_EVALUE},
         identity={ANNOTATION_IDENTITY},
         kegg=lambda wildcards: f"{OUTPUT_DIR}/annotating/kegg/{wildcards.mag}.tsv",
@@ -282,7 +365,8 @@ rule merge_gene_annotations:
         vf=lambda wildcards: f"{OUTPUT_DIR}/annotating/vfdb/{wildcards.mag}.txt",
         amr=lambda wildcards: f"{OUTPUT_DIR}/annotating/amr/{wildcards.mag}.tsv",
         signalp=lambda wildcards: f"{OUTPUT_DIR}/annotating/signalp/{wildcards.mag}.txt",
-        defense=lambda wildcards: f"{OUTPUT_DIR}/annotating/defensefinder/{wildcards.mag}/{wildcards.mag}_defense_finder_genes.tsv"
+        defense=lambda wildcards: f"{OUTPUT_DIR}/annotating/defensefinder/{wildcards.mag}/{wildcards.mag}_defense_finder_genes.tsv",
+        foldseek=lambda wildcards: f"{OUTPUT_DIR}/annotating/foldseek/{wildcards.mag}.tsv"
     threads:
         1
     conda:
@@ -300,6 +384,7 @@ rule merge_gene_annotations:
             -gff {input.gff} \
             -kegg {params.kegg} \
             -keggdb {params.kegg_db} \
+            -keggcutoffs {params.kegg_cutoffs} \
             -pfam {params.pfam} \
             -ec {params.ec_db} \
             -cazy {params.cazy} \
@@ -309,6 +394,8 @@ rule merge_gene_annotations:
             -amrdb {params.amr_db} \
             -signalp {params.signalp} \
             -defense {params.defense} \
+            -foldseek {params.foldseek} \
+            -foldseekdb {params.foldseek_db} \
             --evalue {params.evalue} \
             --identity {params.identity} \
             -o {output}
