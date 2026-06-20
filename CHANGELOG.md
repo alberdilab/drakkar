@@ -8,6 +8,14 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.8.10] - 2026-06-20
+
+### Fixed
+
+- KEGG KOfam database build now downloads the archived `ko_list.gz` (the
+  archive no longer serves an uncompressed `ko_list`, which caused a 404) and
+  decompresses it to `*_ko_list.tsv`.
+
 ## [1.8.9] - 2026-06-19
 
 ### Added

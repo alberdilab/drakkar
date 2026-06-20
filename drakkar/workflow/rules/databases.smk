@@ -70,7 +70,7 @@ if DATABASE_NAME == "kegg":
             """
             set -euo pipefail
             mkdir -p "{OUTPUT_DIR}"
-            rm -f "{params.db}" "{params.db}.h3f" "{params.db}.h3i" "{params.db}.h3m" "{params.db}.h3p" "{params.json}" "{params.ko_list}" "{params.archive}"
+            rm -f "{params.db}" "{params.db}.h3f" "{params.db}.h3i" "{params.db}.h3m" "{params.db}.h3p" "{params.json}" "{params.ko_list}" "{params.ko_list}.gz" "{params.archive}"
             rm -rf "{OUTPUT_DIR}/profiles"
             if ! curl -L --fail --output "{params.archive}" "{params.archive_url}"; then
                 echo "Unable to download KEGG KOfam archive: {params.archive_url}" >&2
@@ -79,7 +79,8 @@ if DATABASE_NAME == "kegg":
                 exit 1
             fi
             curl -L --fail --output "{params.json}" "{params.json_url}"
-            curl -L --fail --output "{params.ko_list}" "{params.ko_list_url}"
+            curl -L --fail --output "{params.ko_list}.gz" "{params.ko_list_url}"
+            gunzip -f "{params.ko_list}.gz"
             tar -xzf "{params.archive}" -C "{OUTPUT_DIR}"
             find "{OUTPUT_DIR}/profiles" -type f -name "*.hmm" | sort | xargs cat > "{params.db}"
             rm -f "{params.archive}"

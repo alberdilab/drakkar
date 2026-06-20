@@ -12,7 +12,7 @@ MANAGED_DATABASES = {
         "sources": [
             "https://www.genome.jp/ftp/db/kofam/archives/{version}/profiles.tar.gz",
             "https://www.kegg.jp/kegg-bin/download_htext?htext=ko00001.keg&format=json&filedir=",
-            "https://www.genome.jp/ftp/db/kofam/archives/{version}/ko_list",
+            "https://www.genome.jp/ftp/db/kofam/archives/{version}/ko_list.gz",
         ],
     },
     "cazy": {
