@@ -7,6 +7,7 @@ import yaml
 
 from drakkar.benchmark import format_hours, format_megabytes, format_percent, generate_run_benchmark
 from drakkar.cli_context import ERROR, INFO, RESET, WORKFLOW_RUN_COMMANDS
+from drakkar.failures import generate_failure_report, print_failure_report
 from drakkar.output import print, section
 from drakkar.run_metadata import build_snakemake_log_path, load_metadata_file
 from drakkar.system_checks import is_snakemake_locked
@@ -301,10 +302,12 @@ def print_logging_usage_guide(output_path, selected_run_id=None):
     summary_cmd = f"drakkar logging -o {output_arg} --summary"
     paths_cmd = f"drakkar logging -o {output_arg} --paths"
     excerpt_cmd = f"drakkar logging -o {output_arg} --excerpt"
+    failures_cmd = f"drakkar logging -o {output_arg} --failures"
     full_cmd = f"drakkar logging -o {output_arg} --full"
     list_cmd = f"drakkar logging -o {output_arg} --list"
     print("Use these commands to inspect more detail:")
     print(f"  Summary only: {summary_cmd}")
+    print(f"  Failure report: {failures_cmd}")
     if selected_run_id:
         run_cmd = f"drakkar logging -o {output_arg} --run {selected_run_id} --summary"
         print(f"  Specific run summary: {run_cmd}")
@@ -314,7 +317,7 @@ def print_logging_usage_guide(output_path, selected_run_id=None):
     print(f"  Available runs: {list_cmd}")
     print("  Benchmark tables: inspect benchmark/drakkar_<run_id>.jobs.tsv and .rules.tsv when present")
 
-def run_logging(output_dir, run_id=None, tail=50, full=False, paths=False, list_runs=False, summary=False, excerpt=False):
+def run_logging(output_dir, run_id=None, tail=50, full=False, paths=False, list_runs=False, summary=False, excerpt=False, failures=False):
     output_path = Path(output_dir).resolve()
     if not output_path.exists():
         print(f"{ERROR}ERROR:{RESET} Output directory not found: {output_path}")
@@ -385,6 +388,20 @@ def run_logging(output_dir, run_id=None, tail=50, full=False, paths=False, list_
         print_snakemake_summary(log_summary)
     if benchmark_result is not None:
         print_benchmark_summary(benchmark_result)
+
+    if metadata is not None and snakemake_log_path is not None and snakemake_log_path.exists():
+        failure_report = generate_failure_report(output_path, metadata_path=metadata_path, metadata=metadata)
+        if failure_report is not None and (failure_report["rows"] or failure_report["workflow_errors"]):
+            print_failure_report(failure_report, detailed=failures)
+        elif failures:
+            section("FAILURE REPORT")
+            print("No failed jobs were detected in the Snakemake log.")
+    elif failures:
+        section("FAILURE REPORT")
+        print("No Snakemake log was found, so no failure report could be built.")
+
+    if failures and not full and not excerpt and not paths:
+        return 0
 
     if paths:
         section("LOG PATHS")

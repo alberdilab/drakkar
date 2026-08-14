@@ -8,6 +8,30 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.8.11] - 2026-08-14
+
+### Added
+
+- Tabular failure report printed automatically when Snakemake stops after
+  failures. It lists one row per failed job (rule, target sample/assembly/MAG,
+  failed attempts, failure category, and a short detail line), followed by a
+  "what to do next" section with per-category recommendations and a verdict
+  stating whether relaunching as is, relaunching with larger
+  `--time-multiplier`/`--memory-multiplier`, or a manual fix is needed.
+  Failure categories are inferred from the SLURM job state, the Snakemake
+  error message, and the job logs of the failed rules.
+- The same report is written to `log/drakkar_<run_id>.failures.tsv`, recorded
+  in the run metadata, and can be reprinted with
+  `drakkar logging -o <output_dir> --failures`, which also shows per-job log
+  excerpts. Jobs that failed but succeeded on a retry are reported separately
+  from unresolved failures.
+
+### Changed
+
+- Workflow failures now exit with the Snakemake exit code and a short pointer
+  to the failure report instead of raising an uncaught `CalledProcessError`
+  traceback.
+
 ## [1.8.10] - 2026-06-20
 
 ### Fixed

@@ -302,6 +302,7 @@ def build_parser():
     subparser_logging.add_argument("--tail", required=False, type=positive_int, default=50, help="Number of log lines to show when --excerpt is used and no failure excerpt is found. Default: 50")
     subparser_logging.add_argument("--summary", action="store_true", help="Print the parsed workflow summary without showing log content")
     subparser_logging.add_argument("--excerpt", action="store_true", help="Print the most recent failure excerpt, or the last --tail lines if no excerpt is found")
+    subparser_logging.add_argument("--failures", action="store_true", help="Print the full tabular failure report, including per-job log excerpts")
     subparser_logging.add_argument("--full", action="store_true", help="Print the full Snakemake log")
     subparser_logging.add_argument("--paths", action="store_true", help="List relevant metadata and log paths")
     subparser_logging.add_argument("--list", action="store_true", help="List available workflow runs in the output directory")
@@ -622,12 +623,13 @@ def build_parser():
         examples=[
             "drakkar logging -o drakkar_output",
             "drakkar logging -o drakkar_output --summary",
+            "drakkar logging -o drakkar_output --failures",
             "drakkar logging -o drakkar_output --excerpt",
             "drakkar logging -o drakkar_output --run 20260503-101530 --paths",
         ],
         sections=[
             ("Target Run", ["output", "run"]),
-            ("Display Options", ["summary", "excerpt", "tail", "full", "paths", "list"]),
+            ("Display Options", ["summary", "failures", "excerpt", "tail", "full", "paths", "list"]),
         ],
     )
 

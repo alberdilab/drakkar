@@ -355,6 +355,10 @@ or interrupted runs.
 
 .. code-block:: console
 
+   $ drakkar logging -o drakkar_output --failures
+
+.. code-block:: console
+
    $ drakkar logging -o drakkar_output --run 20260503-101530 --paths
 
 Options:
@@ -363,6 +367,8 @@ Options:
 - ``--run``: specific run ID (``YYYYMMDD-HHMMSS``) or
   ``drakkar_<run_id>.yaml`` file name.
 - ``--summary``: print only the parsed workflow summary.
+- ``--failures``: print the full failure report, including per-job log
+  excerpts.
 - ``--tail``: number of trailing log lines to show if no failure excerpt is
   found and ``--summary`` is not used (default: ``50``).
 - ``--full``: print the full Snakemake log.
@@ -377,8 +383,69 @@ Behavior:
   ``log/drakkar_20260503-101530.snakemake.log``.
 - The default logging view includes a parsed execution summary with planned
   jobs, observed rule executions, workflow progress, and detected error types.
+- If failures are detected, the failure report described below is printed as
+  well.
 - If the output directory is locked, run ``drakkar logging -o <output_dir>``
   before using ``drakkar unlock`` or ``--overwrite``.
+
+.. _failure-report:
+
+Failure report
+--------------
+
+When Snakemake stops after failures, DRAKKAR prints a tabular failure report
+before exiting, and writes the same information to
+``log/drakkar_<run_id>.failures.tsv``. The report can be printed again at any
+time with ``drakkar logging -o <output_dir> --failures``.
+
+.. code-block:: text
+
+   ================================ FAILURE REPORT ================================
+   Failed jobs: 2 across 2 rule(s) (3 failed attempts in total)
+   Failed once but completed after a retry: 1
+
+   Rule                       Target             Att  Reason          Detail
+   samtools_stats             PR04534              1  command-error   samtools index: failed to open "PR04534.bam"
+   singlem                    PR04533              1  timeout         hit the SLURM time limit (72 min requested)
+
+   =============================== WHAT TO DO NEXT ================================
+   [command-error] 1 job(s) in samtools_stats: the tool called by the rule exited with a non-zero status.
+     -> Inspect the job log of the failed rule and fix the cause before relaunching.
+     -> Example job log: .snakemake/slurm_logs/rule_samtools_stats/PR04534/45360507.log
+   [timeout] 1 job(s) in singlem: the job hit its SLURM wall-time limit.
+     -> Relaunch the same drakkar command with a larger --time-multiplier (e.g. --time-multiplier 2).
+
+   Verdict: at least one failure needs to be inspected and fixed before relaunching.
+
+Report contents:
+
+- One row per failed job, identified by rule and target (the sample, assembly,
+  or MAG taken from the Snakemake wildcards), with the number of failed
+  attempts.
+- A failure category derived from the SLURM job state, the Snakemake error
+  message, and the job log of the failed rule: ``timeout``,
+  ``out-of-memory``, ``node-failure``, ``cancelled``, ``storage``,
+  ``missing-input``, ``missing-output``, ``incomplete``, ``locked``,
+  ``command-error``, or ``unknown``.
+- A short detail line: the requested runtime or memory for resource failures,
+  and the last error line of the job log for tool failures.
+- Jobs that failed but succeeded on a later attempt are counted separately and
+  marked as ``recovered`` in the TSV instead of being listed as failures.
+- Workflow-level errors that are not tied to a single job, such as
+  ``MissingInputException`` or a locked directory, are listed below the table.
+
+The verdict line summarizes whether relaunching is enough:
+
+- ``relaunching the same drakkar command should be enough``: only transient
+  failures (node failures, cancellations, missing outputs) were detected.
+- ``relaunch with the resource multipliers suggested above``: all failures were
+  timeouts or out-of-memory kills, so ``--time-multiplier`` or
+  ``--memory-multiplier`` should be raised.
+- ``at least one failure needs to be inspected and fixed before relaunching``:
+  a tool error, missing input, or storage problem needs attention first.
+
+Completed outputs are preserved, so a relaunch resumes where the workflow
+stopped.
 
 Transfer
 --------

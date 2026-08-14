@@ -133,6 +133,7 @@ def finalize_launch_metadata(run_info, status, exit_code=None, current_workflow=
 
 def run_subprocess_with_logging(command, run_info=None, workflow_name=None):
     from drakkar.benchmark import generate_run_benchmark
+    from drakkar.failures import report_run_failures
 
     metadata_path = run_info["metadata_path"] if run_info else None
     log_path = Path(run_info["snakemake_log_path"]) if run_info and run_info.get("snakemake_log_path") else None
@@ -183,6 +184,7 @@ def run_subprocess_with_logging(command, run_info=None, workflow_name=None):
         finalize_launch_metadata(run_info, "failed", return_code, current_workflow=workflow_name)
         if output_dir:
             generate_run_benchmark(output_dir, metadata_path=metadata_path, quiet=True)
+            report_run_failures(output_dir, metadata_path=metadata_path)
         raise subprocess.CalledProcessError(return_code, command)
 
     finalize_launch_metadata(run_info, "success", 0, current_workflow=workflow_name)

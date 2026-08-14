@@ -31,6 +31,7 @@ from drakkar import cli_main as _cli_main
 from drakkar import cli_parser as _cli_parser
 from drakkar import cli_validation as _cli_validation
 from drakkar import config_commands as _config_commands
+from drakkar import failures as _failures
 from drakkar import output_paths as _output_paths
 from drakkar import run_logs as _run_logs
 from drakkar import run_metadata as _run_metadata
@@ -108,6 +109,16 @@ load_metadata_file = _run_metadata.load_metadata_file
 update_launch_metadata = _run_metadata.update_launch_metadata
 finalize_launch_metadata = _run_metadata.finalize_launch_metadata
 run_subprocess_with_logging = _run_metadata.run_subprocess_with_logging
+
+FAILURE_CATEGORIES = _failures.FAILURE_CATEGORIES
+FAILURE_REPORT_FIELDS = _failures.FAILURE_REPORT_FIELDS
+build_failure_report_path = _failures.build_failure_report_path
+parse_snakemake_failures = _failures.parse_snakemake_failures
+classify_failure = _failures.classify_failure
+build_failure_groups = _failures.build_failure_groups
+build_failure_report = _failures.build_failure_report
+summarize_failure_rows = _failures.summarize_failure_rows
+print_failure_report = _failures.print_failure_report
 
 workflow_run_sort_key = _run_logs.workflow_run_sort_key
 discover_run_metadata = _run_logs.discover_run_metadata
@@ -189,6 +200,7 @@ def _sync_output_path_dependencies():
 
 
 def _sync_workflow_dependencies():
+    _sync_failure_dependencies()
     _workflow_launcher.config_vars = config_vars
     _workflow_launcher.print = print
     _workflow_launcher.resource_config = globals()["resource_config"]
@@ -203,8 +215,17 @@ def _sync_benchmark_dependencies():
     _benchmark.update_launch_metadata = globals()["update_launch_metadata"]
 
 
+def _sync_failure_dependencies():
+    _failures.print = print
+    _failures.section = section
+    _failures.update_launch_metadata = globals()["update_launch_metadata"]
+
+
 def _sync_run_log_dependencies():
     _sync_benchmark_dependencies()
+    _sync_failure_dependencies()
+    _run_logs.generate_failure_report = _failures.generate_failure_report
+    _run_logs.print_failure_report = _failures.print_failure_report
     _run_logs.print = print
     _run_logs.section = section
     _run_logs.is_snakemake_locked = globals()["is_snakemake_locked"]
@@ -410,6 +431,16 @@ def generate_run_benchmark(*args, **kwargs):
     return _benchmark.generate_run_benchmark(*args, **kwargs)
 
 
+def generate_failure_report(*args, **kwargs):
+    _sync_failure_dependencies()
+    return _failures.generate_failure_report(*args, **kwargs)
+
+
+def report_run_failures(*args, **kwargs):
+    _sync_failure_dependencies()
+    return _failures.report_run_failures(*args, **kwargs)
+
+
 def run_logging(*args, **kwargs):
     _sync_run_log_dependencies()
     return _run_logs.run_logging(*args, **kwargs)
@@ -521,7 +552,12 @@ def _sync_main_dependencies():
 
 def main():
     _sync_main_dependencies()
-    return _cli_main.main()
+    try:
+        return _cli_main.main()
+    except subprocess.CalledProcessError as exc:
+        print(f"{ERROR}ERROR:{RESET} Snakemake stopped after failures (exit code {exc.returncode}).")
+        print("See the failure report above, or rerun 'drakkar logging -o <output_dir> --failures'.")
+        return exc.returncode or 1
 
 
 if __name__ == "__main__":

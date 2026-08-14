@@ -184,6 +184,7 @@ def main():
             tail=args.tail,
             summary=args.summary,
             excerpt=args.excerpt,
+            failures=args.failures,
             full=args.full,
             paths=args.paths,
             list_runs=args.list,
