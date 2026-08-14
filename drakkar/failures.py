@@ -161,7 +161,7 @@ TIMEOUT_HINT_RE = re.compile(r"due to time limit|time limit exceeded", re.IGNORE
 STORAGE_HINT_RE = re.compile(r"no space left on device|disk quota exceeded", re.IGNORECASE)
 
 def build_failure_report_path(output_dir, run_id):
-    return Path(output_dir) / "log" / f"drakkar_{run_id}.failures.tsv"
+    return Path(output_dir) / f"drakkar_{run_id}_failures.tsv"
 
 def clean_line(line):
     return ANSI_ESCAPE_RE.sub("", str(line or "")).replace("\r", "").rstrip("\n")

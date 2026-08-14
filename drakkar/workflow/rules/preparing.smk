@@ -100,6 +100,30 @@ rule prepare_reference:
         touch {output.ready:q}
         """
 
+# Index the reference FASTA. Required to read and write CRAM, which is the format the
+# reference alignments are stored in. Kept as a separate rule rather than folded into
+# prepare_reference so that references prepared by earlier runs only need this cheap step
+# added, instead of triggering a full bowtie2-build again.
+
+rule reference_faidx:
+    input:
+        f"{OUTPUT_DIR}/data/references/{{reference}}.fna"
+    output:
+        f"{OUTPUT_DIR}/data/references/{{reference}}.fna.fai"
+    params:
+        samtools_module=config["SAMTOOLS_MODULE"]
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(4*1024, int(input.size_mb) * 2 ** (attempt - 1))),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb / 1024 * 10) * 2 ** (attempt - 1)))
+    message: "Indexing reference FASTA of {wildcards.reference}..."
+    shell:
+        """
+        module purge
+        module load {params.samtools_module}
+        samtools faidx {input}
+        """
+
 rule concatenate_or_link_preprocessed:
     input:
         r1=lambda wildcards: PREPROCESSED_TO_READS1[wildcards.sample],

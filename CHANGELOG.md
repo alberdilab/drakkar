@@ -8,6 +8,37 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.8.12] - 2026-08-14
+
+### Added
+
+- `rules/genomics.smk`, a host-genomics branch that runs GATK duplicate marking
+  and scattered joint germline variant calling on the host alignments produced
+  by preprocessing. GATK variant outputs are indexed with `bcftools index -c`
+  (CSI) rather than tabix, because `.tbi` shares BAI's ~512 Mbp ceiling. Not
+  yet wired into the CLI.
+- `reference_faidx` rule, producing `data/references/<reference>.fna.fai`.
+  Kept separate from `prepare_reference` so references prepared by earlier runs
+  gain the index without re-running `bowtie2-build`.
+- `BCFTOOLS_MODULE` config entry.
+
+### Changed
+
+- **Reference mapping in preprocessing now produces CRAM instead of BAM.**
+  `preprocessing/bowtie2/<sample>.bam` becomes `<sample>.cram`, and
+  `preprocessing/final/<sample>.bam` becomes `<sample>.cram` with a `.crai`
+  index alongside it. BAM's companion index, BAI, cannot address positions
+  beyond 2^29-1 (~512 Mbp), so references carrying chromosomes above that size
+  could not be indexed at all and `samtools_stats` failed with
+  `cannot be stored in a bai index. Try using a csi index` /
+  `Numerical result out of range`. The CRAM index has no such ceiling. CRAM is
+  also roughly half the size of the equivalent BAM.
+- `samtools_stats` now emits `<sample>.cram.crai` instead of `<sample>.bam.bai`.
+- The failure report table is now written to
+  `drakkar_<run_id>_failures.tsv` in the root of the output directory, next to
+  `drakkar_<run_id>.yaml` and `drakkar_<run_id>_resources.yaml`, instead of
+  `log/drakkar_<run_id>.failures.tsv`.
+
 ## [1.8.11] - 2026-08-14
 
 ### Added

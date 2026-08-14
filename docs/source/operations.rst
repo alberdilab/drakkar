@@ -395,8 +395,10 @@ Failure report
 
 When Snakemake stops after failures, DRAKKAR prints a tabular failure report
 before exiting, and writes the same information to
-``log/drakkar_<run_id>.failures.tsv``. The report can be printed again at any
-time with ``drakkar logging -o <output_dir> --failures``.
+``drakkar_<run_id>_failures.tsv`` in the root of the output directory, next to
+``drakkar_<run_id>.yaml`` and ``drakkar_<run_id>_resources.yaml``. The report
+can be printed again at any time with
+``drakkar logging -o <output_dir> --failures``.
 
 .. code-block:: text
 
@@ -509,6 +511,8 @@ Key output locations:
 - ``drakkar_<run_id>.yaml``: workflow run metadata.
 - ``drakkar_<run_id>_resources.yaml``: root-level SLURM resource-efficiency
   summary for the run (CPU time, memory peaks, and efficiency ratios).
+- ``drakkar_<run_id>_failures.tsv``: root-level table of failed jobs, written
+  only when a run fails (see :ref:`failure-report`).
 - ``log/drakkar_<run_id>.snakemake.log``: persistent Snakemake stdout/stderr
   capture for a workflow run.
 - ``<directory>/<version>/database_versions.yaml``: installation log for a

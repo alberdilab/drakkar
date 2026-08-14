@@ -228,7 +228,8 @@ class FailureReportTests(unittest.TestCase):
 
             report_path = Path(report["report_path"])
             self.assertTrue(report_path.exists())
-            self.assertEqual(report_path.name, "drakkar_20260814-011000.failures.tsv")
+            self.assertEqual(report_path.parent, Path(tmpdir))
+            self.assertEqual(report_path.name, "drakkar_20260814-011000_failures.tsv")
             with open(report_path, newline="", encoding="utf-8") as handle:
                 rows = list(csv.DictReader(handle, delimiter="\t"))
             self.assertEqual(len(rows), 3)
@@ -279,7 +280,7 @@ class FailureReportTests(unittest.TestCase):
             self.assertIn("FAILURE REPORT", output)
             self.assertIn("fastp", output)
             self.assertIn("Verdict:", output)
-            self.assertTrue((Path(tmpdir) / "log" / f"drakkar_{run_info['run_id']}.failures.tsv").exists())
+            self.assertTrue((Path(tmpdir) / f"drakkar_{run_info['run_id']}_failures.tsv").exists())
 
 
 if __name__ == "__main__":

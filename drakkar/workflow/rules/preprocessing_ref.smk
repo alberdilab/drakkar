@@ -56,8 +56,15 @@ rule fastp:
             --adapter_sequence_r2 AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
         """
 
-# Align quality-filtered paired-end reads to the corresponding reference genome using Bowtie2.  
-# The alignments are converted to BAM format and sorted with samtools for downstream analyses.
+# Align quality-filtered paired-end reads to the corresponding reference genome using Bowtie2.
+# The alignments are sorted and stored as CRAM.
+#
+# CRAM rather than BAM because BAM's companion index, BAI, cannot address positions beyond
+# 2^29-1 (~512 Mbp), so references carrying chromosomes above that size cannot be indexed at
+# all. The CRAM index stores absolute file offsets instead of a binning scheme and has no such
+# ceiling. CRAM is reference-based, so every rule reading these files must be handed the same
+# reference FASTA with -T/--reference: the M5 checksums recorded per @SQ line make decoding
+# fail loudly against a mismatched reference.
 
 rule reference_map:
     input:
@@ -65,10 +72,12 @@ rule reference_map:
             f"{OUTPUT_DIR}/data/references/{{reference}}.index.ready",
             reference=[SAMPLE_TO_REFERENCE[wildcards.sample]]
         ),
+        reference=lambda wildcards: f"{OUTPUT_DIR}/data/references/{SAMPLE_TO_REFERENCE[wildcards.sample]}.fna",
+        fai=lambda wildcards: f"{OUTPUT_DIR}/data/references/{SAMPLE_TO_REFERENCE[wildcards.sample]}.fna.fai",
         r1=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}_1.fq.gz",
         r2=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}_2.fq.gz"
     output:
-        f"{OUTPUT_DIR}/preprocessing/bowtie2/{{sample}}.bam"
+        f"{OUTPUT_DIR}/preprocessing/bowtie2/{{sample}}.cram"
     params:
         bowtie2_module={BOWTIE2_MODULE},
         samtools_module={SAMTOOLS_MODULE},
@@ -82,17 +91,21 @@ rule reference_map:
         """
         module purge
         module load {params.bowtie2_module} {params.samtools_module}
-        bowtie2 -x {params.basename} -1 {input.r1} -2 {input.r2} -p {threads} | samtools view -bS - | samtools sort -o {output}
+        bowtie2 -x {params.basename} -1 {input.r1} -2 {input.r2} -p {threads} \
+            | samtools sort -@ {threads} --output-fmt CRAM --reference {input.reference} -o {output}
         """
 
-# Generate alignment quality metrics for each BAM file using samtools.  
-# Produces an index (.bai), a flagstat summary, idxstats, and detailed stats file for MultiQC reporting.
+# Generate alignment quality metrics for each CRAM file using samtools.
+# Produces an index (.crai), a flagstat summary, idxstats, and detailed stats file for MultiQC
+# reporting. The CRAM index has no coordinate ceiling, so it works on references of any size.
 
 rule samtools_stats:
     input:
-        rules.reference_map.output
+        cram=rules.reference_map.output,
+        reference=lambda wildcards: f"{OUTPUT_DIR}/data/references/{SAMPLE_TO_REFERENCE[wildcards.sample]}.fna",
+        fai=lambda wildcards: f"{OUTPUT_DIR}/data/references/{SAMPLE_TO_REFERENCE[wildcards.sample]}.fna.fai"
     output:
-        bai      = f"{OUTPUT_DIR}/preprocessing/samtools/{{sample}}.bam.bai",
+        crai     = f"{OUTPUT_DIR}/preprocessing/samtools/{{sample}}.cram.crai",
         flagstat = f"{OUTPUT_DIR}/preprocessing/samtools/{{sample}}.flagstat.txt",
         idxstats = f"{OUTPUT_DIR}/preprocessing/samtools/{{sample}}.idxstats.txt",
         stats    = f"{OUTPUT_DIR}/preprocessing/samtools/{{sample}}.stats.txt"
@@ -101,30 +114,35 @@ rule samtools_stats:
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 2) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(10 * 2 ** (attempt - 1))
+        runtime=lambda wildcards, input, attempt: cap_runtime(20 * 2 ** (attempt - 1))
     message: "Generating mapping stats for {wildcards.sample}..."
     shell:
         """
         module purge
         module load {params.samtools_module}
-        samtools index {input} {output.bai}
-        samtools flagstat {input} > {output.flagstat}
-        samtools idxstats {input} > {output.idxstats}
-        samtools stats {input} > {output.stats}
+        samtools index {input.cram} {output.crai}
+        samtools flagstat {input.cram} > {output.flagstat}
+        samtools idxstats {input.cram} > {output.idxstats}
+        samtools stats --reference {input.reference} {input.cram} > {output.stats}
         """
 
-# Split mapped BAM files into metagenomic (unmapped) and host (mapped) read sets.
+# Split mapped CRAM files into metagenomic (unmapped) and host (mapped) read sets.
 # Count sidecars are temporary inputs for preprocessing.tsv and are removed after use.
+#
+# Every pass needs -T: reading CRAM requires the reference the alignments were written against.
 
 rule split_reads:
     input:
-        f"{OUTPUT_DIR}/preprocessing/bowtie2/{{sample}}.bam"
+        cram=f"{OUTPUT_DIR}/preprocessing/bowtie2/{{sample}}.cram",
+        reference=lambda wildcards: f"{OUTPUT_DIR}/data/references/{SAMPLE_TO_REFERENCE[wildcards.sample]}.fna",
+        fai=lambda wildcards: f"{OUTPUT_DIR}/data/references/{SAMPLE_TO_REFERENCE[wildcards.sample]}.fna.fai"
     output:
         r1=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz",
         r2=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz",
         metareads=temp(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metareads"),
         metabases=temp(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.metabases"),
-        bam=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam",
+        cram=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.cram",
+        crai=f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.cram.crai",
         hostreads=temp(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostreads"),
         hostbases=temp(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostbases")
     params:
@@ -133,18 +151,19 @@ rule split_reads:
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 100) * 2 ** (attempt - 1)))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(30, int(input.size_mb / 50) * 2 ** (attempt - 1)))
     message: "Extracting metagenomic reads of {wildcards.sample}..."
     shell:
         """
         module purge
         module load {params.bowtie2_module} {params.samtools_module}
-        samtools view -b -f12 -@ {threads} {input} | samtools fastq -@ {threads} -1 {output.r1} -2 {output.r2} -
-        samtools view -b -f12 -@ {threads} {input} | samtools view -c - > {output.metareads}
-        samtools view -f12 -@ {threads} {input} | awk '{{sum += length($10)}} END {{print sum}}' > {output.metabases}
-        samtools view -b -F12 -@ {threads} {input} | samtools sort -@ {threads} -o {output.bam} -
-        samtools view -b -F12 -@ {threads} {input} | samtools view -c - > {output.hostreads}
-        samtools view -F12 -@ {threads} {input} | awk '{{sum += length($10)}} END {{print sum}}' > {output.hostbases}
+        samtools view -u -f12 -@ {threads} -T {input.reference} {input.cram} | samtools fastq -@ {threads} -1 {output.r1} -2 {output.r2} -
+        samtools view -c -f12 -@ {threads} -T {input.reference} {input.cram} > {output.metareads}
+        samtools view -f12 -@ {threads} -T {input.reference} {input.cram} | awk '{{sum += length($10)}} END {{print sum}}' > {output.metabases}
+        samtools view -u -F12 -@ {threads} -T {input.reference} {input.cram} | samtools sort -@ {threads} --output-fmt CRAM --reference {input.reference} -o {output.cram} -
+        samtools index -@ {threads} {output.cram}
+        samtools view -c -F12 -@ {threads} -T {input.reference} {input.cram} > {output.hostreads}
+        samtools view -F12 -@ {threads} -T {input.reference} {input.cram} | awk '{{sum += length($10)}} END {{print sum}}' > {output.hostbases}
         """
 
 # Run SingleM on the filtered metagenomic read pairs to generate OTU tables  

@@ -157,7 +157,7 @@ if WORKFLOW == "preprocessing":
                 expand(f"{OUTPUT_DIR}/data/references/{{reference}}.index.ready", reference=references),
                 expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_1.fq.gz", sample=samples),
                 expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}_2.fq.gz", sample=samples),
-                expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.bam", sample=samples),
+                expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.cram", sample=samples),
                 *(expand(f"{OUTPUT_DIR}/preprocessing/singlem/{{sample}}_smf.tsv", sample=samples) if FRACTION else []),
                 *(expand(f"{OUTPUT_DIR}/preprocessing/nonpareil/{{sample}}_np.tsv", sample=samples) if NONPAREIL else []),
                 f"{OUTPUT_DIR}/preprocessing.tsv",
