@@ -22,6 +22,12 @@ CHECKM2_MODULE = config["CHECKM2_MODULE"]
 BINETTE_MODULE = config["BINETTE_MODULE"]
 MIN_COMPLETENESS = int(config.get("MIN_COMPLETENESS", 70))
 MAX_CONTAMINATION = int(config.get("MAX_CONTAMINATION", 10))
+MIN_BIN_LENGTH = int(config.get("MIN_BIN_LENGTH", 200000))
+MAX_BIN_LENGTH = int(config.get("MAX_BIN_LENGTH", 10000000))
+
+# Binette >=1.2 names the selected bins <prefix>_bin<n> and writes both the
+# quality report and the bin FASTA files using that name.
+BINETTE_REPORT_HEADER = "\\t".join(BINETTE_REPORT_COLUMNS) + "\\n"
 
 # Databases
 CHECKM2_DB = config["CHECKM2_DB"]
@@ -488,6 +494,11 @@ checkpoint binette:
         checkm2_module = {CHECKM2_MODULE},
         binette_module = {BINETTE_MODULE},
         min_completeness={MIN_COMPLETENESS},
+        max_contamination={MAX_CONTAMINATION},
+        min_bin_length={MIN_BIN_LENGTH},
+        max_bin_length={MAX_BIN_LENGTH},
+        bin_prefix={BINETTE_BIN_PREFIX},
+        report_header={BINETTE_REPORT_HEADER},
         outdir=f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}"
     threads: 8
     conda:
@@ -511,21 +522,25 @@ checkpoint binette:
         # Ensure at least one valid TSV file exists
         if [ "${{#VALID_TSV_FILES[@]}}" -eq 0 ]; then
             echo "No valid TSV input files for binette, skipping..."
-            printf "bin_id\tcompleteness\tcontamination\tscore\tsize\tN50\tcontig_count\n" > {output}
+            printf "{params.report_header}" > {output}
             exit 0
         fi
 
         # Run binette only with non-empty TSV files
         DIAMOND_RESULT_TSV="{params.outdir}/temporary_files/diamond_result.tsv"
         DIAMOND_RESULT_TSV_GZ="{params.outdir}/temporary_files/diamond_result.tsv.gz"
-        EMPTY_OUTPUT_HEADER='bin_id\tcompleteness\tcontamination\tscore\tsize\tN50\tcontig_count\n'
+        EMPTY_OUTPUT_HEADER='{params.report_header}'
 
         set +e
         binette --contig2bin_tables "${{VALID_TSV_FILES[@]}}" \
                 --contigs {input.fasta} \
                 --outdir {params.outdir} \
                 --checkm2_db {params.checkm_db} \
+                --prefix {params.bin_prefix} \
                 --min_completeness {params.min_completeness} \
+                --max_contamination {params.max_contamination} \
+                --min_length {params.min_bin_length} \
+                --max_length {params.max_bin_length} \
                 --threads {threads}
         BINETTE_STATUS=$?
         set -e
@@ -554,7 +569,7 @@ checkpoint binette:
 def get_bin_fna_sep(wildcards):
     checkpoint_output = checkpoints.binette.get(**wildcards).output[0]
     cluster_ids = get_bin_ids_from_tsv(checkpoint_output)
-    return f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}/final_bins/bin_{wildcards.bin_id}.fa"
+    return f"{OUTPUT_DIR}/cataloging/binette/{{assembly}}/final_bins/{BINETTE_BIN_PREFIX}_bin{wildcards.bin_id}.fa"
 
 rule rename_bins:
     input:

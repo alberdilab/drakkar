@@ -5,6 +5,8 @@ import re
 
 import pandas as pd
 
+from bin_report import bin_id_from_name
+
 
 COLUMNS = [
     "assembly",
@@ -247,6 +249,16 @@ def assembly_from_final_tsv(path):
     return os.path.splitext(os.path.basename(path))[0]
 
 
+def best_bin_name(row):
+    # Binette >=1.2 reports the bin under "name" (<prefix>_bin<n>); older
+    # reports used "bin_id". Either way the reported value is the drakkar bin id.
+    for column in ("name", "bin_id"):
+        value = row.get(column)
+        if value is not None and not pd.isna(value):
+            return bin_id_from_name(value)
+    return "NA"
+
+
 def read_bin_summary(path):
     assembly = assembly_from_final_tsv(path)
     empty = {
@@ -308,7 +320,7 @@ def read_bin_summary(path):
             "bin_total_contigs": int(table["contig_count"].sum()) if "contig_count" in table.columns else "NA",
             "bin_mean_completeness": numeric_or_na(completeness.mean()) if not completeness.empty else "NA",
             "bin_mean_contamination": numeric_or_na(contamination.mean()) if not contamination.empty else "NA",
-            "best_bin": str(best["bin_id"]) if "bin_id" in table.columns else "NA",
+            "best_bin": best_bin_name(best),
             "best_bin_score": numeric_or_na(best.get("score", "NA")),
             "best_bin_completeness": numeric_or_na(best.get("completeness", "NA")),
             "best_bin_contamination": numeric_or_na(best.get("contamination", "NA")),

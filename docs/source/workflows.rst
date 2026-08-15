@@ -70,6 +70,9 @@ Options:
 - ``--annotation-identity``: minimum percent identity for merged gene
   annotation hits with identity values, currently VFDB/MMseqs hits
   (default: ``50``).
+- ``--min-completeness`` / ``--max-contamination`` / ``--min-bin-length`` /
+  ``--max-bin-length``: bin filtering thresholds applied by Binette during
+  cataloging. See *Cataloging* below.
 - ``-c/--multicoverage``: enable multicoverage mapping.
 - ``--fraction``: compute microbial fraction with SingleM.
 - ``--nonpareil``: estimate metagenomic coverage and diversity with Nonpareil.
@@ -132,6 +135,14 @@ Options:
 - ``-m/--mode``: assembly modes such as ``individual`` and ``all``.
 - ``-b/--binners``: comma-separated binners to run
   (``metabat``, ``maxbin``, ``semibin``, ``comebin``; default: all).
+- ``--min-completeness``: minimum completeness (%) for a bin to be kept by
+  Binette (default: ``70``).
+- ``--max-contamination``: maximum contamination (%) for a bin to be kept by
+  Binette (default: ``10``).
+- ``--min-bin-length`` (``--min-length``): minimum bin length in bp
+  (default: ``200000``).
+- ``--max-bin-length`` (``--max-length``): maximum bin length in bp
+  (default: ``10000000``).
 - ``-c/--multicoverage``: enable multicoverage mapping.
 - ``-e/--env_path``: shared Conda environment directory.
 - ``-p/--profile``: Snakemake profile.

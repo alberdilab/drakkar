@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 from drakkar.cli_context import CONFIG_PATH, DEFAULT_CATALOGING_BINNERS, PACKAGE_DIR, config_vars
-from drakkar.cli_validation import default_resource_args, resource_config
+from drakkar.cli_validation import bin_filter_args, default_resource_args, resource_config
 from drakkar.display import display_end, display_unlock
 from drakkar.output import print
 from drakkar.run_metadata import run_subprocess_with_logging
@@ -96,10 +96,20 @@ def run_snakemake_cataloging(
     binners=DEFAULT_CATALOGING_BINNERS,
     snakemake_flags="",
     slurm_resources="",
+    min_completeness=None,
+    max_contamination=None,
+    min_bin_length=None,
+    max_bin_length=None,
 ):
 
     """ Run the cataloging workflow """
 
+    bin_filter_config = bin_filter_args(
+        min_completeness=min_completeness,
+        max_contamination=max_contamination,
+        min_bin_length=min_bin_length,
+        max_bin_length=max_bin_length,
+    )
     resource_overrides = resource_config(memory_multiplier, time_multiplier)
     default_resources = default_resource_args(memory_multiplier, time_multiplier, slurm_resources)
     snakemake_command = [
@@ -110,7 +120,7 @@ def run_snakemake_cataloging(
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} binners={binners} {resource_overrides}"
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} binners={binners} {bin_filter_config}{resource_overrides}"
         f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--conda-frontend mamba "

@@ -123,6 +123,15 @@ def positive_int(value):
         raise argparse.ArgumentTypeError("must be a positive integer")
     return parsed
 
+def percent_int(value):
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise argparse.ArgumentTypeError("must be an integer between 0 and 100") from exc
+    if parsed < 0 or parsed > 100:
+        raise argparse.ArgumentTypeError("must be an integer between 0 and 100")
+    return parsed
+
 def nonnegative_float(value):
     try:
         parsed = float(value)
@@ -303,6 +312,16 @@ def add_benchmark_argument(parser):
         action="store_true",
         help="Skip generating post-run SLURM resource benchmark outputs",
     )
+
+def bin_filter_args(min_completeness=None, max_contamination=None, min_bin_length=None, max_bin_length=None):
+    """Build the --config overrides for the Binette bin filtering thresholds."""
+    overrides = {
+        "MIN_COMPLETENESS": min_completeness,
+        "MAX_CONTAMINATION": max_contamination,
+        "MIN_BIN_LENGTH": min_bin_length,
+        "MAX_BIN_LENGTH": max_bin_length,
+    }
+    return "".join(f"{key}={value} " for key, value in overrides.items() if value is not None)
 
 def resource_config(memory_multiplier=1, time_multiplier=1):
     return f"memory_multiplier={memory_multiplier} time_multiplier={time_multiplier} "

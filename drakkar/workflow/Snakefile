@@ -2,8 +2,16 @@ import os
 import math
 import gzip
 import json
+import sys
 import pandas as pd
 from glob import glob
+
+sys.path.insert(0, os.path.join(workflow.basedir, "scripts"))
+from bin_report import (
+    BINETTE_BIN_PREFIX,
+    REPORT_COLUMNS as BINETTE_REPORT_COLUMNS,
+    bin_ids_from_table,
+)
 
 ####
 # Define config variables
@@ -238,9 +246,7 @@ if WORKFLOW == "cataloging":
         if not os.path.exists(tsv_path) or os.path.getsize(tsv_path) == 0:
             return []
         df = pd.read_csv(tsv_path, sep="\t")
-        if "bin_id" not in df.columns:
-            return []
-        return df["bin_id"].dropna().unique()
+        return bin_ids_from_table(df)
 
     def collect_bin_fastas(wildcards):
         fasta_list = []

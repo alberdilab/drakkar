@@ -3,6 +3,8 @@ import os
 
 import pandas as pd
 
+from bin_report import bin_id_column
+
 
 OUTPUT_COLUMNS = ["genome", "completeness", "contamination", "score", "size", "N50", "contig_count"]
 
@@ -15,11 +17,11 @@ def process_tsv_files(tsv_files, output_csv):
         try:
             df = pd.read_csv(tsv_file, sep="\t")
 
-            required_columns = {"bin_id", "completeness", "contamination"}
-            if not required_columns.issubset(df.columns):
+            required_columns = {"completeness", "contamination"}
+            if not required_columns.issubset(df.columns) or not {"bin_id", "name"}.intersection(df.columns):
                 raise ValueError(f"Missing required columns in {tsv_file}")
 
-            df["genome"] = df["bin_id"].astype(str).apply(lambda x: f"{assembly_id}_bin_{x}.fa")
+            df["genome"] = [f"{assembly_id}_bin_{bin_id}.fa" for bin_id in bin_id_column(df)]
 
             for column in OUTPUT_COLUMNS:
                 if column not in df.columns:

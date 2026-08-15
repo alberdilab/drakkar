@@ -2,6 +2,8 @@ import os
 import pandas as pd
 import argparse
 
+from bin_report import bin_ids_from_table
+
 def extract_fasta_paths(tsv_files, output_file):
     fasta_paths = []
 
@@ -12,10 +14,10 @@ def extract_fasta_paths(tsv_files, output_file):
         # Read the TSV file and extract bin IDs
         try:
             df = pd.read_csv(tsv_file, sep="\t")
-            if "bin_id" not in df.columns:
-                raise ValueError(f"Column 'bin_id' not found in {tsv_file}")
+            if not {"bin_id", "name"}.intersection(df.columns):
+                raise ValueError(f"Column 'name' not found in {tsv_file}")
 
-            bin_ids = df["bin_id"].unique()
+            bin_ids = bin_ids_from_table(df)
 
             # Generate paths
             for bin_id in bin_ids:

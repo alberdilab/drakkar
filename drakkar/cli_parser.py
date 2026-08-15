@@ -10,6 +10,7 @@ from drakkar.cli_validation import (
     add_snakemake_override_arguments,
     nonnegative_float,
     percent_float,
+    percent_int,
     positive_int,
 )
 from drakkar.database_registry import MANAGED_DATABASES
@@ -31,6 +32,43 @@ def add_annotation_filter_arguments(parser):
         type=percent_float,
         default=None,
         help="Minimum percent identity for merged gene annotation hits with identity values. Default: config value, initially 50.",
+    )
+
+
+def add_bin_filter_arguments(parser):
+    parser.add_argument(
+        "--min-completeness",
+        dest="min_completeness",
+        required=False,
+        type=percent_int,
+        default=None,
+        help="Minimum completeness (%%) required for a bin to be kept by Binette. Default: config value, initially 70.",
+    )
+    parser.add_argument(
+        "--max-contamination",
+        dest="max_contamination",
+        required=False,
+        type=percent_int,
+        default=None,
+        help="Maximum contamination (%%) allowed for a bin to be kept by Binette. Default: config value, initially 10.",
+    )
+    parser.add_argument(
+        "--min-bin-length",
+        "--min-length",
+        dest="min_bin_length",
+        required=False,
+        type=positive_int,
+        default=None,
+        help="Minimum bin length in bp required for a bin to be kept by Binette. Default: config value, initially 200000.",
+    )
+    parser.add_argument(
+        "--max-bin-length",
+        "--max-length",
+        dest="max_bin_length",
+        required=False,
+        type=positive_int,
+        default=None,
+        help="Maximum bin length in bp allowed for a bin to be kept by Binette. Default: config value, initially 10000000.",
     )
 
 
@@ -88,6 +126,7 @@ def build_parser():
         help="Write pplacer intermediate files to disk instead of memory, reducing peak RAM at the cost of speed.",
     )
     add_annotation_filter_arguments(subparser_complete)
+    add_bin_filter_arguments(subparser_complete)
     subparser_complete.add_argument("-c", "--multicoverage", action="store_true", help="Map samples sharing the same coverage group to each other's individual assemblies")
     subparser_complete.add_argument("--fraction", required=False, action='store_true', help="Calculate microbial fraction using singlem")
     subparser_complete.add_argument("--nonpareil", required=False, action='store_true', help="Estimate metagenomic coverage and diversity using Nonpareil during preprocessing")
@@ -132,6 +171,7 @@ def build_parser():
             "Options: metabat, maxbin, semibin, comebin. Default: all"
         ),
     )
+    add_bin_filter_arguments(subparser_cataloging)
     subparser_cataloging.add_argument("-c", "--multicoverage", action="store_true", help="Map samples sharing the same coverage group to each other's individual assemblies")
     subparser_cataloging.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_cataloging.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
@@ -346,7 +386,7 @@ def build_parser():
         ],
         sections=[
             ("Input Sources", ["input", "file", "reference", "reference_index"]),
-            ("Workflow Scope", ["mode", "binners", "type", "annotation_type", "gtdb_version", "gtdb_scratch", "annotation_evalue", "annotation_identity", "multicoverage", "fraction", "nonpareil", "sanitize", "ani"]),
+            ("Workflow Scope", ["mode", "binners", "type", "annotation_type", "gtdb_version", "gtdb_scratch", "annotation_evalue", "annotation_identity", "min_completeness", "max_contamination", "min_bin_length", "max_bin_length", "multicoverage", "fraction", "nonpareil", "sanitize", "ani"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
             ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
@@ -383,6 +423,7 @@ def build_parser():
         sections=[
             ("Input Sources", ["input", "file"]),
             ("Assembly Strategy", ["mode", "binners", "multicoverage"]),
+            ("Bin Filtering", ["min_completeness", "max_contamination", "min_bin_length", "max_bin_length"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
             ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),

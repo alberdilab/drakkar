@@ -420,6 +420,10 @@ def main():
             binners=args.binners,
             snakemake_flags=snakemake_flags,
             slurm_resources=slurm_resources,
+            min_completeness=args.min_completeness,
+            max_contamination=args.max_contamination,
+            min_bin_length=args.min_bin_length,
+            max_bin_length=args.max_bin_length,
         )
 
     ###

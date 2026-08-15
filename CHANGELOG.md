@@ -8,6 +8,31 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.8.13] - 2026-08-15
+
+### Added
+
+- Bin filtering thresholds for cataloging are now forwarded to Binette in full:
+  `MAX_CONTAMINATION` (default 10) is passed as `--max_contamination`, and the
+  new `MIN_BIN_LENGTH` (default 200000) and `MAX_BIN_LENGTH` (default 10000000)
+  config entries are passed as `--min_length` / `--max_length`. Previously only
+  `--min_completeness` was applied, so bin contamination was not filtered at all
+  during cataloging.
+- `--min-completeness`, `--max-contamination`, `--min-bin-length`
+  (`--min-length`) and `--max-bin-length` (`--max-length`) arguments for
+  `drakkar cataloging` and `drakkar complete`. When omitted, the values in
+  `workflow/config.yaml` are used.
+
+### Changed
+
+- Binette upgraded from 1.1.2 to 1.2.1 in `workflow/envs/cataloging.yaml`, which
+  is the first release exposing the contamination and bin length filters.
+  Binette 1.2 renames the `bin_id` column of `final_bins_quality_reports.tsv` to
+  `name` (`binette_bin<n>`) and names bin FASTA files after it; the workflow now
+  reads bin ids through `workflow/scripts/bin_report.py`, which accepts both the
+  new and the legacy report layouts. Exported bin names
+  (`<assembly>_bin_<n>.fa`) are unchanged.
+
 ## [1.8.12] - 2026-08-14
 
 ### Added
