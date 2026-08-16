@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from drakkar.cli_context import ERROR, RESET
+from drakkar.input_tables import detect_table_delimiter
 from drakkar.output import print
 
 def normalize_genome_name(name):
@@ -33,7 +34,11 @@ def validate_and_write_quality_file(quality_path, output_dir):
         print(f"{ERROR}ERROR:{RESET} Quality file not found: {quality_path}")
         return False
 
-    df = pd.read_csv(quality_path, sep=None, engine="python", encoding="utf-8-sig")
+    try:
+        df = pd.read_csv(quality_path, sep=detect_table_delimiter(quality_path), encoding="utf-8-sig")
+    except Exception as exc:
+        print(f"{ERROR}ERROR:{RESET} Could not read the quality file {quality_path}: {exc}")
+        return False
     col_map = {c: str(c).strip().lstrip("\ufeff").lower() for c in df.columns}
     df.rename(columns=col_map, inplace=True)
     required = {"genome", "completeness", "contamination"}

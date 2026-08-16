@@ -29,6 +29,7 @@ from drakkar import display as _display
 from drakkar import downloads as _downloads
 from drakkar import input_errors as _input_errors
 from drakkar import input_manifests as _input_manifests
+from drakkar import input_tables as _input_tables
 from drakkar import system_checks as _system_checks
 
 from drakkar.display import (
@@ -50,12 +51,15 @@ from drakkar.display import (
 from drakkar.downloads import (
     DEFAULT_DOWNLOAD_RETRIES,
     DEFAULT_PAIRED_FASTQ_SIZE_TOLERANCE,
+    NCBI_ASSEMBLY_ACCESSION_PATTERN,
+    NCBI_GENOMES_BASE_URL,
     READ1_BASENAME_PATTERN,
     READ2_BASENAME_PATTERN,
     REMOTE_URL_SCHEMES,
     _download_once,
     _download_sftp,
     _download_urlopen,
+    _fetch_url_text,
     _has_value,
     _normalize_ena_fastq_url,
     _normalize_expected_size,
@@ -70,6 +74,7 @@ from drakkar.downloads import (
 )
 from drakkar.input_errors import DownloadError, InputFileError, require_non_empty_file
 from drakkar.input_manifests import ASSEMBLY_COLUMN_CANDIDATES
+from drakkar.input_tables import DELIMITER_LABELS, INPUT_TABLE_DELIMITERS
 
 _ORIGINAL_BANNER_ANIMATION_ENABLED = _display._banner_animation_enabled
 
@@ -103,8 +108,27 @@ def report_input_resolution_errors(errors):
     return _input_errors.report_input_resolution_errors(errors)
 
 
+def detect_table_delimiter(*args, **kwargs):
+    return _input_tables.detect_table_delimiter(*args, **kwargs)
+
+
+def read_input_table(*args, **kwargs):
+    _input_errors.print = print
+    _input_tables.print = print
+    return _input_tables.read_input_table(*args, **kwargs)
+
+
 def is_url(value):
     return _downloads.is_url(value)
+
+
+def is_ncbi_assembly_accession(value):
+    return _downloads.is_ncbi_assembly_accession(value)
+
+
+def resolve_ncbi_assembly_accession(*args, **kwargs):
+    _sync_download_dependencies()
+    return _downloads.resolve_ncbi_assembly_accession(*args, **kwargs)
 
 
 def download_to_cache(*args, **kwargs):

@@ -8,6 +8,31 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.8.14] - 2026-08-16
+
+### Added
+
+- `-r/--reference` in `drakkar preprocessing` and `drakkar complete`, and the
+  `reference_path` column of the sample info file, now accept NCBI genome
+  assembly accessions (e.g. `GCF_000001405.40`, `GCA_000001635`) in addition to
+  local paths and URLs. The accession is resolved against the NCBI genomes FTP
+  site and the matching `*_genomic.fna.gz` file is downloaded into the run's
+  reference cache. Unversioned accessions resolve to the latest available
+  assembly version.
+- Sample info tables can now be comma-separated or semicolon-separated as well
+  as tab-separated. The delimiter is detected from the header line rather than
+  from the file extension, so a `.csv` sample table no longer fails with a
+  misleading `Missing value in column 'sample'` error.
+
+### Changed
+
+- All sample-table reads go through a single `read_input_table()` helper in the
+  new `drakkar/input_tables.py`, which also trims whitespace and byte-order
+  marks from column names and reports unreadable tables as input errors instead
+  of raising a pandas traceback. `drakkar dereplicating`/`profiling` quality
+  files (`-q/--quality`) now use the same delimiter detection, replacing their
+  separate `csv.Sniffer`-based handling.
+
 ## [1.8.13] - 2026-08-15
 
 ### Added

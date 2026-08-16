@@ -84,10 +84,10 @@ def build_parser():
     # Define subcommands for each workflow
     subparser_complete = subparsers.add_parser("complete", help="Run the end-to-end workflow from raw reads to catalog, profiling, and annotation outputs")
     subparser_complete.add_argument("-i", "--input", required=False, help="Input directory")
-    subparser_complete.add_argument("-f", "--file", required=False, help="Sample detail file (required if no input directory is provided)")
+    subparser_complete.add_argument("-f", "--file", required=False, help="Sample detail file, tab- or comma-separated (required if no input directory is provided)")
     subparser_complete.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     complete_reference_group = subparser_complete.add_mutually_exclusive_group()
-    complete_reference_group.add_argument("-r", "--reference", required=False, help="Reference host genome FASTA")
+    complete_reference_group.add_argument("-r", "--reference", required=False, help="Reference host genome FASTA (local path, URL, or NCBI assembly accession such as GCF_000001405.40)")
     complete_reference_group.add_argument("-x", "--reference-index", required=False, help="Tarball containing a reference FASTA and Bowtie2 index files")
     subparser_complete.add_argument("-m", "--mode", required=False, help="Comma-separated list of cataloging modes (e.g. individual,all)")
     subparser_complete.add_argument(
@@ -141,10 +141,10 @@ def build_parser():
     
     subparser_preprocessing = subparsers.add_parser("preprocessing", help="Quality-filter reads, optionally remove host sequences, and prepare cleaned datasets for downstream analysis")
     subparser_preprocessing.add_argument("-i", "--input", required=False, help="Input directory (required if no sample detail file is provided)")
-    subparser_preprocessing.add_argument("-f", "--file", required=False, help="Sample detail file (required if no input directory is provided)")
+    subparser_preprocessing.add_argument("-f", "--file", required=False, help="Sample detail file, tab- or comma-separated (required if no input directory is provided)")
     subparser_preprocessing.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     preprocessing_reference_group = subparser_preprocessing.add_mutually_exclusive_group()
-    preprocessing_reference_group.add_argument("-r", "--reference", required=False, help="Reference host genome FASTA")
+    preprocessing_reference_group.add_argument("-r", "--reference", required=False, help="Reference host genome FASTA (local path, URL, or NCBI assembly accession such as GCF_000001405.40)")
     preprocessing_reference_group.add_argument("-x", "--reference-index", required=False, help="Tarball containing a reference FASTA and Bowtie2 index files")
     subparser_preprocessing.add_argument("--fraction", required=False, action='store_true', help="Calculate microbial fraction using singlem")
     subparser_preprocessing.add_argument("--nonpareil", required=False, action='store_true', help="Estimate metagenomic coverage and diversity using Nonpareil")
@@ -158,7 +158,7 @@ def build_parser():
     
     subparser_cataloging = subparsers.add_parser("cataloging", help="Assemble reads, bin genomes, and build the MAG catalog used by downstream workflows")
     subparser_cataloging.add_argument("-i", "--input", required=False, help="Input directory (required if no sample detail file is provided)")
-    subparser_cataloging.add_argument("-f", "--file", required=False, help="Sample detail file (required if no input directory is provided)")
+    subparser_cataloging.add_argument("-f", "--file", required=False, help="Sample detail file, tab- or comma-separated (required if no input directory is provided)")
     subparser_cataloging.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_cataloging.add_argument("-m", "--mode", required=False, help="Comma-separated list of cataloging modes (e.g. individual,all)")
     subparser_cataloging.add_argument(
@@ -184,7 +184,7 @@ def build_parser():
     subparser_profiling.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
     subparser_profiling.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
     subparser_profiling.add_argument("-r", "--reads_dir", required=False, help="Directory in which metagenomic reads are stored")
-    subparser_profiling.add_argument("-R", "--reads_file", required=False, help="Sample detail file")
+    subparser_profiling.add_argument("-R", "--reads_file", required=False, help="Sample detail file, tab- or comma-separated")
     subparser_profiling.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_profiling.add_argument("-t", "--type", required=False, default="genomes", help="Either genomes or pangenomes profiling type. Default: genomes")
     subparser_profiling.add_argument("-f", "--fraction", required=False, action='store_true', help="Calculate microbial fraction using singlem")
@@ -265,7 +265,7 @@ def build_parser():
     subparser_expressing.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
     subparser_expressing.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
     subparser_expressing.add_argument("-r", "--reads_dir", required=False, help="Directory in which metagenomic reads are stored")
-    subparser_expressing.add_argument("-R", "--reads_file", required=False, help="Sample detail file")
+    subparser_expressing.add_argument("-R", "--reads_file", required=False, help="Sample detail file, tab- or comma-separated")
     subparser_expressing.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_expressing.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_expressing.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
@@ -401,6 +401,7 @@ def build_parser():
         examples=[
             "drakkar preprocessing -i reads/ -o drakkar_output",
             "drakkar preprocessing -f input_info.tsv -r host.fna -o drakkar_output",
+            "drakkar preprocessing -f input_info.tsv -r GCF_000001405.40 -o drakkar_output",
         ],
         sections=[
             ("Input Sources", ["input", "file", "reference", "reference_index"]),

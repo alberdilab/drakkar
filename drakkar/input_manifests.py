@@ -10,20 +10,22 @@ from drakkar.downloads import (
     _normalized_value,
     _validate_paired_read_maps,
     download_to_cache,
+    is_ncbi_assembly_accession,
     is_url,
     resolve_input_manifest,
+    resolve_ncbi_assembly_accession,
     resolve_preprocessed_read_lists,
     resolve_sample_read_lists,
 )
 from drakkar.input_errors import InputFileError, report_input_resolution_errors, require_non_empty_file
+from drakkar.input_tables import read_input_table
 from drakkar.output import print
 
 ASSEMBLY_COLUMN_CANDIDATES = ("assembly", "coassembly")
 
 def check_reference_columns(file_path):
     """Checks if a file contains 'reference_name' and 'reference_path' columns with non-NA values."""
-    # Read the file (assumed to be TSV, change sep="," for CSV)
-    df = pd.read_csv(file_path, sep="\t")
+    df = read_input_table(file_path, label="sample info file")
     # Check if required columns exist
     required_columns = {"reference_name", "reference_path"}
     if not required_columns.issubset(df.columns):
@@ -41,8 +43,7 @@ def get_assembly_column_name(df):
 
 def check_assembly_column(file_path):
     """Checks if a file contains the preferred 'assembly' column or legacy 'coassembly' values."""
-    # Read the file (assumed to be TSV, change sep="," for CSV)
-    df = pd.read_csv(file_path, sep="\t")
+    df = read_input_table(file_path, label="sample info file")
     assembly_column = get_assembly_column_name(df)
     if not assembly_column:
         return False
@@ -52,7 +53,7 @@ def check_assembly_column(file_path):
     return True
 
 def file_samples_to_json(infofile, output):
-    df = pd.read_csv(infofile, sep="\t")
+    df = read_input_table(infofile, label="sample info file")
 
     SAMPLE_TO_READS1 = defaultdict(list)
     SAMPLE_TO_READS2 = defaultdict(list)
@@ -82,7 +83,7 @@ def file_samples_to_json(infofile, output):
         json.dump(SAMPLE_TO_READS2, f)
 
 def file_references_to_json(infofile, output):
-    df = pd.read_csv(infofile, sep="\t")
+    df = read_input_table(infofile, label="sample info file")
 
     required_columns = {"reference_name", "reference_path"}
     missing_columns = sorted(required_columns - set(df.columns))
@@ -92,6 +93,9 @@ def file_references_to_json(infofile, output):
         ])
 
     REFERENCE_TO_FILE = {}
+    # Sample tables usually repeat the same reference on every row, so each
+    # accession is resolved against NCBI only once.
+    resolved_accessions = {}
     errors = []
     for idx, row in df.iterrows():
         row_number = idx + 1
@@ -103,10 +107,16 @@ def file_references_to_json(infofile, output):
         if not ref_path_value:
             errors.append(f"Missing reference_path on row {row_number} of {infofile}.")
             continue
-        if is_url(ref_path_value):
+        if is_ncbi_assembly_accession(ref_path_value) or is_url(ref_path_value):
             try:
+                if is_ncbi_assembly_accession(ref_path_value):
+                    if ref_path_value not in resolved_accessions:
+                        resolved_accessions[ref_path_value] = resolve_ncbi_assembly_accession(ref_path_value)
+                    ref_url_value = resolved_accessions[ref_path_value]
+                else:
+                    ref_url_value = ref_path_value
                 resolved_ref_path = download_to_cache(
-                    ref_path_value,
+                    ref_url_value,
                     ref_name_value,
                     "reference_path",
                     output,
@@ -179,7 +189,15 @@ def argument_samples_to_json(argument, output):
 
 def argument_references_to_json(argument, sample_to_reads, output):
     try:
-        if is_url(argument):
+        if is_ncbi_assembly_accession(argument):
+            reference_path = download_to_cache(
+                resolve_ncbi_assembly_accession(argument),
+                "reference",
+                "reference",
+                output,
+                cache_subdir="references_cache",
+            )
+        elif is_url(argument):
             reference_path = download_to_cache(
                 argument,
                 "reference",
@@ -206,7 +224,7 @@ def argument_references_to_json(argument, sample_to_reads, output):
         json.dump(SAMPLE_TO_REFERENCE, f, indent=4)
 
 def file_preprocessed_to_json(infofile, output):
-    df = pd.read_csv(infofile, sep="\t")
+    df = read_input_table(infofile, label="sample info file")
 
     SAMPLE_TO_READS1 = defaultdict(list)
     SAMPLE_TO_READS2 = defaultdict(list)
@@ -280,7 +298,7 @@ def file_assemblies_to_json(infofile=None, samples=None, individual=False, all=F
     assemblies = defaultdict(list)
 
     if infofile is not None:
-        df = pd.read_csv(infofile, sep="\t")
+        df = read_input_table(infofile, label="sample info file")
         assembly_column = get_assembly_column_name(df)
         if assembly_column:
             for _, row in df.iterrows():
@@ -315,7 +333,7 @@ def file_coverages_to_json(infofile=None, samples=None, output=False):
     has_coverage_column = False
 
     if infofile is not None:
-        df = pd.read_csv(infofile, sep="\t")
+        df = read_input_table(infofile, label="sample info file")
         if "coverage" in df.columns:
             has_coverage_column = True
             for _, row in df.iterrows():
@@ -563,7 +581,7 @@ def preprocessing_summary(summary_table, bar_width=50):
     print(f"│{bar}│")
 
 def file_transcriptome_to_json(infofile, output):
-    df = pd.read_csv(infofile, sep="\t")
+    df = read_input_table(infofile, label="sample info file")
 
     SAMPLE_TO_READS1 = defaultdict(list)
     SAMPLE_TO_READS2 = defaultdict(list)

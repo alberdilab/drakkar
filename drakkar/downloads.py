@@ -28,9 +28,17 @@ READ1_BASENAME_PATTERN = re.compile(r"(?:^|[._-])(?:R?1)(?:[._-]|$)", re.IGNOREC
 
 READ2_BASENAME_PATTERN = re.compile(r"(?:^|[._-])(?:R?2)(?:[._-]|$)", re.IGNORECASE)
 
+NCBI_GENOMES_BASE_URL = "https://ftp.ncbi.nlm.nih.gov/genomes/all"
+
+NCBI_ASSEMBLY_ACCESSION_PATTERN = re.compile(r"^(GC[AF])_(\d{9})(?:\.(\d+))?$", re.IGNORECASE)
+
 def is_url(value):
     parsed = urlparse(str(value))
     return parsed.scheme in REMOTE_URL_SCHEMES
+
+def is_ncbi_assembly_accession(value):
+    """True for NCBI genome assembly accessions such as GCF_000001405.40 or GCA_000001405."""
+    return NCBI_ASSEMBLY_ACCESSION_PATTERN.match(_normalized_value(value)) is not None
 
 def _has_value(value):
     return not (pd.isna(value) or str(value).strip() == "")
@@ -223,6 +231,67 @@ def download_to_cache(url, sample_name, column_name, output, cache_subdir="reads
                 time.sleep(delay)
             else:
                 raise DownloadError(f"Failed to download {url} after {max_retries} attempts: {exc}")
+
+def _fetch_url_text(url, description, max_retries=DEFAULT_DOWNLOAD_RETRIES):
+    for attempt in range(1, max_retries + 1):
+        try:
+            with urlopen(url) as response:
+                payload = response.read().decode("utf-8", errors="replace")
+            if not payload.strip():
+                raise DownloadError("the server returned an empty response")
+            return payload
+        except Exception as exc:
+            if attempt < max_retries:
+                delay = _retry_delay(attempt)
+                print(f"WARNING: Attempt {attempt}/{max_retries} to {description} failed: {exc}. Retrying in {delay}s...", flush=True)
+                time.sleep(delay)
+            else:
+                raise DownloadError(f"Failed to {description} after {max_retries} attempts: {exc}")
+
+def resolve_ncbi_assembly_accession(accession):
+    """Resolve an NCBI assembly accession to the URL of its genomic FASTA file.
+
+    Accessions may be versioned (GCF_000001405.40) or unversioned
+    (GCF_000001405), in which case the latest version available on the NCBI
+    genomes FTP site is used.
+    """
+    accession_value = _normalized_value(accession)
+    match = NCBI_ASSEMBLY_ACCESSION_PATTERN.match(accession_value)
+    if not match:
+        raise DownloadError(f"{accession_value} is not a valid NCBI assembly accession.")
+
+    prefix = match.group(1).upper()
+    digits = match.group(2)
+    version = match.group(3)
+
+    directory_url = f"{NCBI_GENOMES_BASE_URL}/{prefix}/{digits[0:3]}/{digits[3:6]}/{digits[6:9]}/"
+    print(f"Resolving NCBI assembly accession {accession_value}", flush=True)
+    listing = _fetch_url_text(directory_url, f"list NCBI assemblies for accession {accession_value}")
+
+    entry_pattern = re.compile(rf'href="({prefix}_{digits}\.(\d+)_[^"/]*)/"', re.IGNORECASE)
+    entries = {}
+    for assembly_dir, assembly_version in entry_pattern.findall(listing):
+        entries[int(assembly_version)] = assembly_dir
+
+    if not entries:
+        raise DownloadError(
+            f"No genome assembly was found on the NCBI genomes FTP site for accession {accession_value}."
+        )
+
+    if version is not None:
+        selected_version = int(version)
+        if selected_version not in entries:
+            available = ", ".join(f"{prefix}_{digits}.{item}" for item in sorted(entries))
+            raise DownloadError(
+                f"NCBI assembly accession {accession_value} was not found. Available versions: {available}."
+            )
+    else:
+        selected_version = max(entries)
+
+    assembly_dir = entries[selected_version]
+    fasta_url = f"{directory_url}{assembly_dir}/{assembly_dir}_genomic.fna.gz"
+    print(f"Resolved {accession_value} to {fasta_url}", flush=True)
+    return fasta_url
 
 def resolve_input_manifest(manifest_path, output, cache_subdir="manifests_cache", label="manifest"):
     if is_url(manifest_path):

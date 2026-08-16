@@ -46,6 +46,7 @@ from drakkar.utils import (
     file_references_to_json,
     file_samples_to_json,
     file_transcriptome_to_json,
+    is_ncbi_assembly_accession,
     path_bins_to_json,
     path_mags_to_json,
 )
@@ -80,14 +81,15 @@ def main():
         (getattr(args, "bins_file", None), "Bins file", False, True),
         (getattr(args, "reads_dir", None), "Reads directory", True),
         (getattr(args, "reads_file", None), "Reads file", False),
-        (getattr(args, "reference", None), "Reference", False, True),
+        (getattr(args, "reference", None), "Reference", False, True, True),
         (getattr(args, "reference_index", None), "Reference index tarball", False, True),
         (getattr(args, "cov_file", None), "Coverage file", False),
     ]
     for path_check in path_checks:
         path_value, label, expect_dir, *options = path_check
         allow_url = options[0] if options else False
-        if not validate_path(path_value, label, expect_dir, allow_url=allow_url):
+        allow_accession = options[1] if len(options) > 1 else False
+        if not validate_path(path_value, label, expect_dir, allow_url=allow_url, allow_accession=allow_accession):
             return
 
     ###
@@ -280,7 +282,12 @@ def main():
 
         # Generate reference genome dictionaries
         reference_argument = getattr(args, "reference", None) or getattr(args, "reference_index", None)
-        reference_source_label = "reference index tarball" if getattr(args, "reference_index", None) else "reference genome file"
+        if getattr(args, "reference_index", None):
+            reference_source_label = "reference index tarball"
+        elif is_ncbi_assembly_accession(getattr(args, "reference", None) or ""):
+            reference_source_label = "NCBI assembly accession"
+        else:
+            reference_source_label = "reference genome file"
 
         if args.file and reference_argument:
             if check_reference_columns(args.file):

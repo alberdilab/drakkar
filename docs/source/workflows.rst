@@ -53,10 +53,12 @@ Run the full pipeline in sequence:
 Options:
 
 - ``-i/--input``: input directory for reads.
-- ``-f/--file``: sample info table (TSV), with read pairs provided either as
-  ``rawreads1``/``rawreads2`` or as an ENA/SRA ``accession``.
+- ``-f/--file``: sample info table (TSV, CSV, or semicolon-separated), with
+  read pairs provided either as ``rawreads1``/``rawreads2`` or as an ENA/SRA
+  ``accession``.
 - ``-o/--output``: output directory.
-- ``-r/--reference``: local path or URL to a host reference genome for preprocessing.
+- ``-r/--reference``: local path, URL, or NCBI genome assembly accession such
+  as ``GCF_000001405.40`` for a host reference genome used in preprocessing.
 - ``-x/--reference-index``: local path or URL to a tarball containing a host
   reference FASTA and Bowtie2 index files; incompatible with ``-r/--reference``.
 - ``-m/--mode``: assembly modes such as ``individual`` and ``all``.
@@ -105,7 +107,8 @@ Options:
 - ``-f/--file``: sample info table, with read pairs provided either as
   ``rawreads1``/``rawreads2`` or as an ENA/SRA ``accession``.
 - ``-o/--output``: output directory.
-- ``-r/--reference``: local path or URL to a host reference genome file.
+- ``-r/--reference``: local path, URL, or NCBI genome assembly accession such
+  as ``GCF_000001405.40`` for a host reference genome file.
 - ``-x/--reference-index``: local path or URL to a tarball containing a host
   reference FASTA and Bowtie2 index files; incompatible with ``-r/--reference``.
 - ``--fraction``: compute microbial fraction with SingleM after preprocessing.

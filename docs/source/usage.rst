@@ -53,11 +53,13 @@ names such as ``*_1.fq.gz`` and ``*_2.fq.gz``.
 
    $ drakkar preprocessing -i /path/to/reads -o drakkar_output
 
-Sample info table (TSV)
-^^^^^^^^^^^^^^^^^^^^^^^
+Sample info table (TSV or CSV)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-A tab-separated table can include any of these columns. Only the columns needed
-for the chosen workflow are required.
+The table can be tab-separated, comma-separated, or semicolon-separated;
+DRAKKAR detects the delimiter from the header line, so the file extension does
+not matter. It can include any of these columns. Only the columns needed for
+the chosen workflow are required.
 
 - ``sample``: sample name.
 - ``rawreads1``: path or URL to R1 reads (raw, before preprocessing).
@@ -71,8 +73,9 @@ for the chosen workflow are required.
 - ``preprocessedreads2``: explicit path to quality-filtered R2 reads for use
   in cataloging. Must be provided together with ``preprocessedreads1``.
 - ``reference_name``: host reference label for host-removal workflows.
-- ``reference_path``: local path or URL to a host FASTA, or to a tarball
-  containing the FASTA plus Bowtie2 index files.
+- ``reference_path``: local path, URL, or NCBI genome assembly accession for a
+  host FASTA, or a local path or URL to a tarball containing the FASTA plus
+  Bowtie2 index files.
 - ``assembly``: labels defining assembly groups. Legacy ``coassembly`` is
   still accepted.
 - ``coverage``: labels defining coverage-sharing groups for multicoverage
@@ -86,15 +89,35 @@ Example:
    sample1\tpath/sample1_1.fq.gz\tpath/sample1_2.fq.gz\t\tref1\tpath/ref1.fna\tassembly1,all\tcoverage1
    sample2\t\t\tERR4303216\tref1\tpath/ref1.fna\tassembly2,all\tcoverage2
 
+The same table as CSV:
+
+.. code-block:: text
+
+   sample,rawreads1,rawreads2,accession,reference_name,reference_path,assembly,coverage
+   sample1,path/sample1_1.fq.gz,path/sample1_2.fq.gz,,ref1,GCF_000001405.40,"assembly1,all",coverage1
+   sample2,,,ERR4303216,ref1,GCF_000001405.40,"assembly2,all",coverage2
+
+Note that comma-containing values such as multiple assembly labels must be
+quoted in a comma-separated table. Tab-separated tables need no quoting.
+
 Input notes
 ^^^^^^^^^^^
 
+- Sample info tables can be tab-, comma-, or semicolon-separated. The delimiter
+  is detected from the header line: whichever of tab, comma, or semicolon
+  occurs most often there is used, and tab wins ties. The file extension is
+  never used to decide.
 - Read files can be local paths or remote URLs (http/https/ftp/sftp).
 - Sample tables can also use an ``accession`` column with ENA/SRA paired-end
   run accessions; DRAKKAR resolves and downloads the matching R1 and R2 FASTQ
   files automatically.
 - ``-r/--reference``, ``-x/--reference-index``, and ``reference_path`` values
   can be local files or remote URLs.
+- ``-r/--reference`` and ``reference_path`` also accept NCBI genome assembly
+  accessions such as ``GCF_000001405.40`` or ``GCA_000001635.9``. DRAKKAR
+  resolves the accession against the NCBI genomes FTP site and downloads the
+  corresponding ``*_genomic.fna.gz`` file. Unversioned accessions such as
+  ``GCF_000001405`` resolve to the latest available version.
 - Reference inputs may be FASTA files, compressed FASTA files, or tarballs
   containing a FASTA plus Bowtie2 index files.
 - Genome lists passed through options such as ``-B/--bins_file`` can also use

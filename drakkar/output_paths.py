@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 from drakkar.cli_context import ERROR, INFO, RESET
-from drakkar.downloads import is_url
+from drakkar.downloads import is_ncbi_assembly_accession, is_url
 from drakkar.output import print, prompt
 from drakkar.system_checks import is_snakemake_locked
 
@@ -47,10 +47,12 @@ def prepare_output_directory(output_dir, overwrite=False):
     print(f"{INFO}Use 'drakkar logging -o {output_path}' to inspect the latest Snakemake log, --overwrite to delete it automatically, or 'drakkar unlock -o {output_path}' if you only want to clear the Snakemake lock.{RESET}")
     return False
 
-def validate_path(path_value, label, expect_dir=False, allow_url=False):
+def validate_path(path_value, label, expect_dir=False, allow_url=False, allow_accession=False):
     if not path_value:
         return True
     if allow_url and not expect_dir and is_url(path_value):
+        return True
+    if allow_accession and not expect_dir and is_ncbi_assembly_accession(path_value):
         return True
     if expect_dir:
         exists = os.path.isdir(path_value)
