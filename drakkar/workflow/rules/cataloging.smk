@@ -14,7 +14,6 @@ MAXBIN2_MODULE = config["MAXBIN2_MODULE"]
 FRAGGENESCAN_MODULE = config["FRAGGENESCAN_MODULE"]
 BEDTOOLS_MODULE = config["BEDTOOLS_MODULE"]
 HMMER_MODULE = config["HMMER_MODULE"]
-COMEBIN_MODULE = config["COMEBIN_MODULE"]
 SEMIBIN2_MODULE = config["SEMIBIN2_MODULE"]
 CUDA_MODULE = config["CUDA_MODULE"]
 DIAMOND_MODULE = config["DIAMOND_MODULE"]
@@ -414,11 +413,11 @@ rule comebin:
     output:
         f"{OUTPUT_DIR}/cataloging/comebin/{{assembly}}/comebin_res/comebin_res.tsv"
     params:
-        comebin_module={COMEBIN_MODULE},
-        cuda_module={CUDA_MODULE},
         bamdir=f"{OUTPUT_DIR}/cataloging/comebin/{{assembly}}_bams",
         outdir=f"{OUTPUT_DIR}/cataloging/comebin/{{assembly}}"
     threads: 8
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/comebin.yaml"
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(min(1000*1024, max(16*1024, int(Path(input.assembly).stat().st_size / (1024*1024) * 30) * 2 ** (attempt - 1)))),
         runtime=lambda wildcards, input, attempt: cap_runtime(min(20000, max(120, int(Path(input.assembly).stat().st_size / (1024*1024) * 2) * 2 ** (attempt - 1)))),
@@ -432,8 +431,6 @@ rule comebin:
             mkdir -p $(dirname {output})
             touch {output}
         else
-            module purge
-            module load {params.cuda_module} {params.comebin_module}
             rm -rf {params.outdir} {params.bamdir}
             mkdir -p {params.bamdir}
             for bam in {input.bam}; do

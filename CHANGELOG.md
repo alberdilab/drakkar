@@ -8,6 +8,17 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.8.15] - 2026-08-17
+
+### Changed
+
+- Bumped the Binette module from `binette/1.0.5` to `binette/1.2.1`.
+- `comebin` now runs in its own Conda environment
+  (`drakkar/workflow/envs/comebin.yaml`, COMEBin 1.0.4 on Python 3.7.12)
+  instead of loading the `comebin` and `cuda` system modules. The
+  `COMEBIN_MODULE` config key has been removed, and the environment is
+  pre-created by `drakkar environments`.
+
 ## [1.8.14] - 2026-08-16
 
 ### Added
