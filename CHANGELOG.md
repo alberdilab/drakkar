@@ -8,6 +8,35 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.8.18] - 2026-08-17
+
+### Added
+
+- `drakkar environments --list` reports every conda environment deployed in the
+  environment directory (`-e/--env_path`, or `ENVIRONMENTS_DIR`) with its size
+  and creation date, and classifies it as `in use`, `orphan` (built from a
+  superseded definition), `incomplete` (a failed deployment) or `unknown` (a
+  directory that is not a Snakemake environment). Environments are matched by
+  comparing the `<hash>.yaml` copy Snakemake stores next to each environment
+  against the definitions shipped in `workflow/envs/`, so the check does not
+  depend on Snakemake's internal hashing.
+- `drakkar environments --prune` removes orphaned and incomplete environments,
+  along with definition files left without an environment. It is a dry run
+  unless `--yes` is given, and never touches directories that are not named
+  like a Snakemake environment. `--no-size` skips size computation on slow
+  shared filesystems.
+
+### Changed
+
+- The `comebin` environment now carries a post-deployment script
+  (`drakkar/workflow/envs/comebin.post-deploy.sh`) that replaces the
+  conda-resolved PyTorch with the CUDA 11.3 build (`torch==1.10.2+cu113`, the
+  last CUDA wheel published for Python 3.7) and verifies it, so COMEBin detects
+  the GPU on the `gpuqueue` nodes. This mirrors what was already done for
+  `semibin`. Because Snakemake hashes the post-deploy script together with the
+  environment definition, the `comebin` environment is redeployed under a new
+  hash the next time `drakkar environments` runs.
+
 ## [1.8.17] - 2026-08-17
 
 ### Fixed

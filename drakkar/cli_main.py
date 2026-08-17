@@ -22,6 +22,7 @@ from drakkar.cli_validation import (
 )
 from drakkar.config_commands import edit_config, set_default_database_path, view_config
 from drakkar.database_registry import MANAGED_DATABASES, database_release_dir, normalize_managed_database_name
+from drakkar.environments import run_environments_list, run_environments_prune
 from drakkar.output import print, section
 from drakkar.output_paths import prepare_output_directory, validate_path
 from drakkar.quality import validate_and_write_quality_file
@@ -70,8 +71,14 @@ def main():
     # Display ASCII logo before running any command or showing help
     display_drakkar()
 
+    # Listing or pruning the environment directory neither launches Snakemake
+    # nor writes to an output directory, so it is treated as a read-only command.
+    environments_maintenance = args.command == "environments" and (
+        getattr(args, "list_environments", False) or getattr(args, "prune_environments", False)
+    )
+
     # Check screen session
-    if args.command not in READ_ONLY_COMMANDS:
+    if args.command not in READ_ONLY_COMMANDS and not environments_maintenance:
         check_screen_session()
 
     path_checks = [
@@ -156,7 +163,7 @@ def main():
         if not prepare_output_directory(output_dir, overwrite=getattr(args, "overwrite", False)):
             return
     run_info = None
-    if args.command in WORKFLOW_RUN_COMMANDS:
+    if args.command in WORKFLOW_RUN_COMMANDS and not environments_maintenance:
         run_info = write_launch_metadata(args, output_dir, env_path=locals().get("env_path"))
         if not run_info:
             return
@@ -212,6 +219,18 @@ def main():
         return run_update(skip_deps=args.skip_deps)
 
     elif args.command == "environments":
+        if args.list_environments:
+            section("LISTING CONDA ENVIRONMENTS")
+            return run_environments_list(env_path, compute_size=not args.no_size)
+
+        if args.prune_environments:
+            section("PRUNING CONDA ENVIRONMENTS")
+            return run_environments_prune(
+                env_path,
+                assume_yes=args.assume_yes,
+                compute_size=not args.no_size,
+            )
+
         section("CREATING CONDA ENVIRONMENTS")
         run_snakemake_environments(
             args.command,

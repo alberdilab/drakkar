@@ -297,9 +297,14 @@ def build_parser():
     database_amr = database_subparsers.add_parser("amr", parents=[database_parent], help="Install or update the AMR database")
     database_foldseek = database_subparsers.add_parser("foldseek", parents=[database_parent], help="Install or update the Foldseek bundle (AlphaFold/Swiss-Prot DB, ProstT5 model, UniProt function map)")
     
-    subparser_environments = subparsers.add_parser("environments", help="Pre-build Drakkar conda environments before launching workflow jobs")
+    subparser_environments = subparsers.add_parser("environments", help="Pre-build Drakkar conda environments, or list and prune the ones no longer in use")
     subparser_environments.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_environments.add_argument("--profile", default="local", choices=["local", "slurm"])
+    environments_actions = subparser_environments.add_mutually_exclusive_group()
+    environments_actions.add_argument("--list", dest="list_environments", action="store_true", help="List the environments deployed in the environment directory and flag the ones no longer used by this Drakkar version")
+    environments_actions.add_argument("--prune", dest="prune_environments", action="store_true", help="Delete environments no longer used by this Drakkar version. Dry run unless --yes is given")
+    subparser_environments.add_argument("--yes", dest="assume_yes", action="store_true", help="Confirm deletion when running --prune")
+    subparser_environments.add_argument("--no-size", dest="no_size", action="store_true", help="Skip directory size computation, which can be slow on shared filesystems")
     add_benchmark_argument(subparser_environments)
     add_resource_multiplier_arguments(subparser_environments)
     add_snakemake_override_arguments(subparser_environments)
@@ -587,16 +592,19 @@ def build_parser():
             ],
         )
     
-    subparser_environments.description = "Pre-build workflow conda environments before launching production runs."
+    subparser_environments.description = "Pre-build workflow conda environments before launching production runs, or inspect the environment directory and remove environments left behind by earlier Drakkar versions."
     _set_help_metadata(
         subparser_environments,
         category="Operations and management",
         examples=[
             "drakkar environments --profile local",
             "drakkar environments -e /shared/drakkar_envs --profile slurm",
+            "drakkar environments -e /shared/drakkar_envs --list",
+            "drakkar environments -e /shared/drakkar_envs --prune --yes",
         ],
         sections=[
             ("Environment Setup", ["env_path", "profile", "skip_benchmark"]),
+            ("Maintenance", ["list_environments", "prune_environments", "assume_yes", "no_size"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
             ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
             ("SLURM Overrides", ["slurm_partition", "slurm_account", "slurm_constraint", "slurm_nodes", "slurm_nodelist", "slurm_qos", "slurm_extra"]),

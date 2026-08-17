@@ -31,6 +31,7 @@ from drakkar import cli_main as _cli_main
 from drakkar import cli_parser as _cli_parser
 from drakkar import cli_validation as _cli_validation
 from drakkar import config_commands as _config_commands
+from drakkar import environments as _environments
 from drakkar import failures as _failures
 from drakkar import output_paths as _output_paths
 from drakkar import run_logs as _run_logs
@@ -239,6 +240,10 @@ def _sync_status_dependencies():
     _status.discover_run_metadata = globals()["discover_run_metadata"]
     _status.resolve_run_metadata = globals()["resolve_run_metadata"]
     _status.discover_snakemake_fallback_logs = globals()["discover_snakemake_fallback_logs"]
+
+
+def _sync_environments_dependencies():
+    _environments.print = print
 
 
 def _sync_update_dependencies():
@@ -461,6 +466,16 @@ def run_snakemake_environments(*args, **kwargs):
     return _workflow_launcher.run_snakemake_environments(*args, **kwargs)
 
 
+def run_environments_list(*args, **kwargs):
+    _sync_environments_dependencies()
+    return _environments.run_environments_list(*args, **kwargs)
+
+
+def run_environments_prune(*args, **kwargs):
+    _sync_environments_dependencies()
+    return _environments.run_environments_prune(*args, **kwargs)
+
+
 def run_snakemake_preprocessing(*args, **kwargs):
     _sync_workflow_dependencies()
     return _workflow_launcher.run_snakemake_preprocessing(*args, **kwargs)
@@ -529,6 +544,8 @@ def _sync_main_dependencies():
     _cli_main.run_sftp_transfer = run_sftp_transfer
     _cli_main.run_unlock = run_unlock
     _cli_main.run_snakemake_environments = run_snakemake_environments
+    _cli_main.run_environments_list = run_environments_list
+    _cli_main.run_environments_prune = run_environments_prune
     _cli_main.run_snakemake_preprocessing = run_snakemake_preprocessing
     _cli_main.run_snakemake_cataloging = run_snakemake_cataloging
     _cli_main.run_snakemake_profiling = run_snakemake_profiling

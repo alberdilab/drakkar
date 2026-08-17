@@ -49,3 +49,40 @@ where environment creation during a run is slow):
 
 If you want to use a shared environment directory, pass ``-e/--env_path`` to
 commands or set it in your workflow config.
+
+Housekeeping: retiring old environments
+---------------------------------------
+
+Snakemake names every deployed environment after a hash of its definition, so
+each time a ``workflow/envs/*.yaml`` file changes a new environment is created
+and the previous one stays behind. Over several DRAKKAR versions a shared
+environment directory therefore keeps growing.
+
+List what the directory contains, and which environments the installed DRAKKAR
+version no longer uses:
+
+.. code-block:: console
+
+   $ drakkar environments -e /shared/drakkar_envs --list
+
+Each environment is reported as ``in use`` (its definition matches one shipped
+by the installed version), ``orphan`` (built from a superseded definition),
+``incomplete`` (a failed deployment), or ``unknown`` (a directory that does not
+look like a Snakemake environment, which is only reported and never removed).
+
+Delete the reclaimable ones. Without ``--yes`` this is a dry run that only
+prints what would be removed:
+
+.. code-block:: console
+
+   $ drakkar environments -e /shared/drakkar_envs --prune
+   $ drakkar environments -e /shared/drakkar_envs --prune --yes
+
+Add ``--no-size`` to skip the directory size computation, which can be slow on
+shared parallel filesystems.
+
+.. warning::
+
+   Pruning is relative to the DRAKKAR version you run it with. If two DRAKKAR
+   versions share one environment directory, pruning from the older one deletes
+   the environments the newer one needs.

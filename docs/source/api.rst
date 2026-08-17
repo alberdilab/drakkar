@@ -48,7 +48,10 @@ Microdiversity inspection workflows.
 
 environments
 ^^^^^^^^^^^^
-Pre-create Conda environments for modules.
+Pre-create Conda environments for modules. With ``--list`` it reports the
+environments deployed in the environment directory and flags the ones no
+longer used by the installed DRAKKAR version; with ``--prune`` it removes
+them (dry run unless ``--yes`` is given).
 
 unlock
 ^^^^^^
