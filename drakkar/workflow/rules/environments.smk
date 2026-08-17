@@ -3,7 +3,7 @@ PACKAGE_DIR = config["package_dir"]
 
 rule all:
     input:
-        f"drakkar_environments/env6.txt"
+        f"drakkar_environments/env7.txt"
 
 rule env1:
     output:
@@ -84,5 +84,19 @@ rule env6:
     shell:
         """
         echo "Created conda environment for comebin"
+        touch {output}
+        """
+
+rule env7:
+    input:
+        f"drakkar_environments/env6.txt"
+    output:
+        f"drakkar_environments/env7.txt"
+    threads: 1
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/semibin.yaml"
+    shell:
+        """
+        echo "Created conda environment for semibin"
         touch {output}
         """

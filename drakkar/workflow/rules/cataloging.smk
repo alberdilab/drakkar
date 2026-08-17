@@ -12,10 +12,7 @@ QUAST_MODULE = config["QUAST_MODULE"]
 METABAT2_MODULE = config["METABAT2_MODULE"]
 MAXBIN2_MODULE = config["MAXBIN2_MODULE"]
 FRAGGENESCAN_MODULE = config["FRAGGENESCAN_MODULE"]
-BEDTOOLS_MODULE = config["BEDTOOLS_MODULE"]
 HMMER_MODULE = config["HMMER_MODULE"]
-SEMIBIN2_MODULE = config["SEMIBIN2_MODULE"]
-CUDA_MODULE = config["CUDA_MODULE"]
 DIAMOND_MODULE = config["DIAMOND_MODULE"]
 CHECKM2_MODULE = config["CHECKM2_MODULE"]
 BINETTE_MODULE = config["BINETTE_MODULE"]
@@ -356,13 +353,11 @@ rule semibin2:
     output:
         f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/contig_bins.tsv"
     params:
-        semibin2_module={SEMIBIN2_MODULE},
-        hmmer_module={HMMER_MODULE},
-        bedtools_module={BEDTOOLS_MODULE},
-        cuda_module={CUDA_MODULE},
         outdir=f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}",
         assembly_size_mb=lambda wildcards, input: int(Path(input.assembly).stat().st_size / (1024*1024))
     threads: 8
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/semibin.yaml"
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(min(1000*1024, max(16*1024, int(Path(input.assembly).stat().st_size / (1024*1024) * 30) * 2 ** (attempt - 1)))),
         runtime=lambda wildcards, input, attempt: cap_runtime(min(20000, max(120, int(Path(input.assembly).stat().st_size / (1024*1024) * 2) * 2 ** (attempt - 1)))),
@@ -376,8 +371,6 @@ rule semibin2:
             mkdir -p {params.outdir}
             touch {output}
         else
-            module purge
-            module load {params.cuda_module} {params.semibin2_module} {params.bedtools_module} {params.hmmer_module}
             SemiBin2 single_easy_bin -i {input.assembly} -b {input.bam} -o {params.outdir} -m 1500 -t {threads} --compression none
         fi
         """

@@ -8,6 +8,20 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.8.16] - 2026-08-17
+
+### Changed
+
+- `semibin2` now runs in its own Conda environment
+  (`drakkar/workflow/envs/semibin.yaml`, SemiBin 2.3.0 on Python 3.11) instead
+  of loading the `semibin`, `cuda`, `bedtools` and `hmmer` system modules. A
+  post-deployment script (`drakkar/workflow/envs/semibin.post-deploy.sh`)
+  replaces the conda-resolved PyTorch with the CUDA 12.4 build
+  (`torch==2.5.1+cu124`) and verifies it, so the environment matches the setup
+  validated on the A100 nodes. The `SEMIBIN2_MODULE`, `CUDA_MODULE` and
+  `BEDTOOLS_MODULE` config keys have been removed, and the environment is
+  pre-created by `drakkar environments`.
+
 ## [1.8.15] - 2026-08-17
 
 ### Changed

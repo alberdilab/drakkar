@@ -1,0 +1,11 @@
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+
+dependencies:
+  - python=3.11
+  - semibin=2.3.0=pyhdfd78af_0
+  - pip
+# The conda-resolved PyTorch is replaced by the CUDA 12.4 wheel in
+# semibin.post-deploy.sh, which runs automatically after env creation.
