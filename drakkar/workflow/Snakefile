@@ -124,6 +124,12 @@ def calculate_file_sizes(file_dict):
 if WORKFLOW == "environments":
     include: "rules/environments.smk"
 
+    # Must be declared here, after the include: a target rule defined inside an
+    # included file never becomes Snakemake's default target.
+    rule all:
+        input:
+            ENVIRONMENTS_TARGET
+
 if WORKFLOW == "database":
     rule all:
         input:

@@ -8,6 +8,21 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.8.17] - 2026-08-17
+
+### Fixed
+
+- `drakkar environments` did nothing and exited with "Nothing to be done (all
+  requested files are present and up to date)" without creating any
+  environment. The `rule all` of the environments workflow lived in
+  `rules/environments.smk`, and Snakemake's `Workflow.include()` restores the
+  default target after parsing an included file, so the run had no target at
+  all. The target rule is now declared in `workflow/Snakefile` after the
+  include, using the `ENVIRONMENTS_TARGET` marker exported by the rules file.
+  The command has been a silent no-op since the environments workflow was split
+  into its own rules file; environments were only ever created on demand by
+  actual workflow runs.
+
 ## [1.8.16] - 2026-08-17
 
 ### Changed

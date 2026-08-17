@@ -1,9 +1,14 @@
-# Toy pipeline that only declares environments
+# Toy pipeline that only declares environments.
+#
+# The env rules are chained (env1 -> env2 -> ... ) so that conda solves run one
+# at a time. The last marker below is the workflow target, but `rule all` must
+# be defined in the Snakefile rather than here: Snakemake's Workflow.include()
+# restores the default target after parsing an included file, so a `rule all`
+# (or a `default_target: True` directive) placed in this file is ignored and the
+# run ends with "Nothing to be done".
 PACKAGE_DIR = config["package_dir"]
 
-rule all:
-    input:
-        f"drakkar_environments/env7.txt"
+ENVIRONMENTS_TARGET = "drakkar_environments/env7.txt"
 
 rule env1:
     output:
