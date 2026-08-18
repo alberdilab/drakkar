@@ -8,6 +8,18 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.8.20] - 2026-08-18
+
+### Fixed
+
+- `semibin2` and `comebin` now clear `PYTHONPATH` and set `PYTHONNOUSERSITE=1`
+  before running, so the snakemake module's Python packages and `~/.local` can no
+  longer shadow the packages inside their conda environments. SemiBin2 was
+  crashing with `ModuleNotFoundError: No module named 'narwhals.stable.v2'`
+  because an older `narwhals` from outside the environment was imported by the
+  environment's `scikit-learn`, which resolves `narwhals >= 2.0.1` correctly
+  inside the environment itself.
+
 ## [1.8.19] - 2026-08-18
 
 ### Fixed

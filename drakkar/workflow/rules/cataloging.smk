@@ -393,6 +393,11 @@ rule semibin2:
     message: "Binning contigs from assembly {wildcards.assembly} using semibin2..."
     shell:
         """
+        # Prevent the snakemake module's PYTHONPATH (and ~/.local) from shadowing
+        # the conda env's own Python packages, e.g. an older narwhals that
+        # scikit-learn >= 1.9 cannot import.
+        unset PYTHONPATH
+        export PYTHONNOUSERSITE=1
         if (( {params.assembly_size_mb} < 10 )); then
             echo "Assembly is smaller than 10 MB, skipping semibin2..."
             mkdir -p {params.outdir}
@@ -446,6 +451,10 @@ rule comebin:
     message: "Binning contigs from assembly {wildcards.assembly} using comebin..."
     shell:
         """
+        # Prevent the snakemake module's PYTHONPATH (and ~/.local) from shadowing
+        # the conda env's own Python packages.
+        unset PYTHONPATH
+        export PYTHONNOUSERSITE=1
         if [ ! -s {input.assembly} ]; then
             echo "Assembly is empty, skipping comebin..."
             mkdir -p $(dirname {output})
