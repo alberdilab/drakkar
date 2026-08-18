@@ -8,6 +8,20 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.8.21] - 2026-08-18
+
+### Fixed
+
+- `comebin` now puts its conda environment's `bin` first in `PATH` (and clears
+  `PYTHONHOME`) before calling `run_comebin.sh`. COMEBin's launcher invokes a
+  bare `python`, and when a conda environment is already active in the
+  submitting shell, `conda activate` swaps the rule's environment into the
+  *position* of the previously active one instead of prepending it, leaving the
+  snakemake module's Python ahead of the environment's Python 3.7. COMEBin then
+  ran under the wrong interpreter and failed with
+  `ModuleNotFoundError: No module named 'torch'`, even though importing `torch`
+  worked when the same environment was activated by hand.
+
 ## [1.8.20] - 2026-08-18
 
 ### Fixed

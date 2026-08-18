@@ -454,7 +454,16 @@ rule comebin:
         # Prevent the snakemake module's PYTHONPATH (and ~/.local) from shadowing
         # the conda env's own Python packages.
         unset PYTHONPATH
+        unset PYTHONHOME
         export PYTHONNOUSERSITE=1
+        # run_comebin.sh calls a bare `python`. When a conda env is already
+        # active in the submitting shell, `conda activate` swaps the new env's
+        # bin into the *position* of the old one instead of prepending it, so
+        # the snakemake module's Python (3.11, no torch) stays ahead of this
+        # env's Python 3.7 in PATH. Put the env's bin first explicitly.
+        if [ -n "${{CONDA_PREFIX:-}}" ]; then
+            export PATH="$CONDA_PREFIX/bin:$PATH"
+        fi
         if [ ! -s {input.assembly} ]; then
             echo "Assembly is empty, skipping comebin..."
             mkdir -p $(dirname {output})
