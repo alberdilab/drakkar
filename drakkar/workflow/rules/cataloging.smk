@@ -343,6 +343,33 @@ rule maxbin2_table:
         fi
         """
 
+# SemiBin2 and COMEBin keep contig features in memory and read every coverage
+# BAM to build the depth profiles used for training, so their footprint is
+# driven by the mapping data as much as by the assembly. Sizing on the assembly
+# alone under-requests badly for deeply sequenced samples (a 186 MB assembly
+# with a 1.8 GB BAM was OOM-killed while training at the previous 16 GB floor).
+def _file_size_mb(path):
+    try:
+        return Path(path).stat().st_size / (1024*1024)
+    except OSError:
+        return 0
+
+
+def deep_binner_mem_mb(assembly, bams, attempt):
+    """Memory estimate (MB) for the deep-learning binners, scaled by assembly and BAM sizes."""
+    bam_mb = [_file_size_mb(bam) for bam in bams] or [0]
+    estimate = _file_size_mb(assembly) * 60 + max(bam_mb) * 12 + len(bam_mb) * 1024
+    # Scale after the floor so a job that was OOM-killed at the floor actually
+    # grows on retry instead of asking for the same memory again.
+    return min(1000*1024, max(32*1024, int(estimate)) * 2 ** (attempt - 1))
+
+
+def deep_binner_runtime(assembly, bams, attempt):
+    """Runtime estimate (min) for the deep-learning binners, scaled by assembly and BAM sizes."""
+    estimate = _file_size_mb(assembly) * 2 + sum(_file_size_mb(bam) for bam in bams) / 10
+    return min(20000, max(120, int(estimate)) * 2 ** (attempt - 1))
+
+
 rule semibin2:
     input:
         assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}.fna",
@@ -359,8 +386,8 @@ rule semibin2:
     conda:
         f"{PACKAGE_DIR}/workflow/envs/semibin.yaml"
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(min(1000*1024, max(16*1024, int(Path(input.assembly).stat().st_size / (1024*1024) * 30) * 2 ** (attempt - 1)))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(min(20000, max(120, int(Path(input.assembly).stat().st_size / (1024*1024) * 2) * 2 ** (attempt - 1)))),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(deep_binner_mem_mb(input.assembly, input.bam, attempt)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(deep_binner_runtime(input.assembly, input.bam, attempt)),
         slurm_partition="gpuqueue",
         slurm_extra="--gres=gpu:1"
     message: "Binning contigs from assembly {wildcards.assembly} using semibin2..."
@@ -412,8 +439,8 @@ rule comebin:
     conda:
         f"{PACKAGE_DIR}/workflow/envs/comebin.yaml"
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(min(1000*1024, max(16*1024, int(Path(input.assembly).stat().st_size / (1024*1024) * 30) * 2 ** (attempt - 1)))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(min(20000, max(120, int(Path(input.assembly).stat().st_size / (1024*1024) * 2) * 2 ** (attempt - 1)))),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(deep_binner_mem_mb(input.assembly, input.bam, attempt)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(deep_binner_runtime(input.assembly, input.bam, attempt)),
         slurm_partition="gpuqueue",
         slurm_extra="--gres=gpu:1"
     message: "Binning contigs from assembly {wildcards.assembly} using comebin..."

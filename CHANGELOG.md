@@ -8,6 +8,19 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.8.19] - 2026-08-18
+
+### Fixed
+
+- `semibin2` and `comebin` no longer size their memory and runtime requests from
+  the assembly alone. Both binners read every coverage BAM to build the depth
+  profiles used for training, so the requests now scale with the assembly size,
+  the largest BAM and the number of BAMs, and the floor was raised from 16 GB to
+  32 GB. A 186 MB assembly with a 1.8 GB BAM previously requested 16 GB and was
+  killed by the SLURM out-of-memory handler while training. Retry scaling is now
+  applied after the floor, so a job that was OOM-killed at the floor asks for
+  more memory on the next attempt instead of repeating the same request.
+
 ## [1.8.18] - 2026-08-17
 
 ### Added
