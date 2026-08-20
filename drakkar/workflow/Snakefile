@@ -301,6 +301,7 @@ if WORKFLOW == "profiling":
         input:
             *([f"{OUTPUT_DIR}/profiling_genomes/final/counts.tsv"] if "genomes" in PROFILING_TYPE else []),
             *([f"{OUTPUT_DIR}/profiling_genomes/final/bases.tsv"] if "genomes" in PROFILING_TYPE else []),
+            *([f"{OUTPUT_DIR}/profiling_genomes/final/mags.tsv"] if "genomes" in PROFILING_TYPE else []),
             *([f"{OUTPUT_DIR}/profiling_genomes.tsv"] if "genomes" in PROFILING_TYPE else []),
             *([f"{OUTPUT_DIR}/dereplicating.tsv"] if "genomes" in PROFILING_TYPE else []),
             *([f"{OUTPUT_DIR}/profiling_genomes/singlem/microbial_fraction.tsv"] if ("genomes" in PROFILING_TYPE and FRACTION) else []),

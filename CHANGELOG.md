@@ -8,6 +8,20 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [1.8.22] - 2026-08-20
+
+### Added
+
+- The `profiling_genomes` workflow now writes a third table to
+  `profiling_genomes/final/`: `mags.tsv`, with one row per dereplicated genome
+  and the columns `magid`, `completeness`, `contamination`, `size`, `contigs`,
+  `longest_contig`, `n50`, `gc`, `cluster`, `cluster_members`, and `score`.
+  The `magid` values match the genome identifiers used in `counts.tsv` and
+  `bases.tsv`. Completeness and contamination come from CheckM2 (or from the
+  file passed with `-q/--quality`), the contig statistics are computed from the
+  dereplicated genome FASTA files, and the cluster columns come from dRep.
+  `mags.tsv` is also included in `drakkar transfer --profile`.
+
 ## [1.8.21] - 2026-08-18
 
 ### Fixed

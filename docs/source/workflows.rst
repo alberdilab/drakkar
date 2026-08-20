@@ -209,6 +209,19 @@ Options:
 - ``--skip-benchmark`` / ``--memory-multiplier`` / ``--time-multiplier`` /
   ``--snakemake-*`` / ``--slurm-*``: see :ref:`snakemake-slurm-management`.
 
+Genome profiling writes three tables to ``profiling_genomes/final/``:
+
+- ``counts.tsv``: reads mapped to each dereplicated genome per sample.
+- ``bases.tsv``: genome bases covered in each sample.
+- ``mags.tsv``: metadata of the dereplicated genomes listed in the two tables
+  above, with one row per genome and the columns ``magid``, ``completeness``,
+  ``contamination``, ``size``, ``contigs``, ``longest_contig``, ``n50``,
+  ``gc``, ``cluster``, ``cluster_members``, and ``score``. Completeness and
+  contamination come from CheckM2 or from the file passed with ``-q/--quality``
+  and are ``NA`` when ``-n/--ignore_quality`` is used without a quality file;
+  ``cluster``, ``cluster_members`` (number of input bins collapsed into the
+  cluster), and ``score`` come from dRep.
+
 Annotating
 ^^^^^^^^^^
 

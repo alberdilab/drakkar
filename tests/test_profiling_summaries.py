@@ -15,6 +15,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 COUNT_SCRIPT = REPO_ROOT / "drakkar" / "workflow" / "scripts" / "count_total_reads.py"
 PROFILING_SCRIPT = REPO_ROOT / "drakkar" / "workflow" / "scripts" / "profiling_genomes_stats.py"
 DEREP_SCRIPT = REPO_ROOT / "drakkar" / "workflow" / "scripts" / "dereplicating_stats.py"
+MAG_METADATA_SCRIPT = REPO_ROOT / "drakkar" / "workflow" / "scripts" / "mag_metadata.py"
 SNAKEFILE = REPO_ROOT / "drakkar" / "workflow" / "Snakefile"
 
 
@@ -138,10 +139,116 @@ class ProfilingSummaryTests(unittest.TestCase):
             self.assertEqual(df.loc[0, "output_bin_completeness"], 90.00)
             self.assertEqual(df.loc[0, "output_bin_contamination"], 2.00)
 
+    def test_mag_metadata_summarizes_dereplicated_genomes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+            genome_a = tmpdir_path / "asm1_bin_1.fa"
+            genome_b = tmpdir_path / "asm2_bin_3.fa"
+            genome_a.write_text(
+                ">asm1_bin_1^0\n" + "GC" * 250 + "\n"
+                ">asm1_bin_1^1\n" + "AT" * 100 + "\n"
+                ">asm1_bin_1^2\n" + "AC" * 50 + "\n",
+                encoding="utf-8",
+            )
+            genome_b.write_text(">asm2_bin_3^0\n" + "ACGT" * 250 + "\n", encoding="utf-8")
+
+            metadata = tmpdir_path / "all_bin_metadata.csv"
+            metadata.write_text(
+                "genome,completeness,contamination\n"
+                "asm1_bin_1.fa,95.5,1.2\n"
+                "asm2_bin_3.fa,80.0,4.4\n"
+                "asm3_bin_9.fa,70.1,2.0\n",
+                encoding="utf-8",
+            )
+
+            wdb = tmpdir_path / "Wdb.csv"
+            wdb.write_text(
+                "genome,cluster,score\n"
+                "asm1_bin_1.fa,1_1,92.1\n"
+                "asm2_bin_3.fa,2_1,74.5\n",
+                encoding="utf-8",
+            )
+
+            cdb = tmpdir_path / "Cdb.csv"
+            cdb.write_text(
+                "genome,secondary_cluster,primary_cluster\n"
+                "asm1_bin_1.fa,1_1,1\n"
+                "asm3_bin_9.fa,1_1,1\n"
+                "asm2_bin_3.fa,2_1,2\n",
+                encoding="utf-8",
+            )
+
+            output = tmpdir_path / "mags.tsv"
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(MAG_METADATA_SCRIPT),
+                    "--genomes",
+                    str(genome_a),
+                    str(genome_b),
+                    "--metadata",
+                    str(metadata),
+                    "--wdb",
+                    str(wdb),
+                    "--cdb",
+                    str(cdb),
+                    "-o",
+                    str(output),
+                ],
+                check=True,
+            )
+
+            df = pd.read_csv(output, sep="\t").set_index("magid")
+            self.assertEqual(list(df.index), ["asm1_bin_1", "asm2_bin_3"])
+
+            first = df.loc["asm1_bin_1"]
+            self.assertEqual(first["completeness"], 95.5)
+            self.assertEqual(first["contamination"], 1.2)
+            self.assertEqual(first["size"], 800)
+            self.assertEqual(first["contigs"], 3)
+            self.assertEqual(first["longest_contig"], 500)
+            self.assertEqual(first["n50"], 500)
+            self.assertEqual(first["gc"], 68.75)
+            self.assertEqual(first["cluster"], "1_1")
+            self.assertEqual(first["cluster_members"], 2)
+            self.assertEqual(first["score"], 92.1)
+
+            second = df.loc["asm2_bin_3"]
+            self.assertEqual(second["size"], 1000)
+            self.assertEqual(second["contigs"], 1)
+            self.assertEqual(second["gc"], 50.0)
+            self.assertEqual(second["cluster_members"], 1)
+
+    def test_mag_metadata_without_quality_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+            genome = tmpdir_path / "asm1_bin_1.fa"
+            genome.write_text(">asm1_bin_1^0\n" + "ACGT" * 100 + "\n", encoding="utf-8")
+
+            output = tmpdir_path / "mags.tsv"
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(MAG_METADATA_SCRIPT),
+                    "--genomes",
+                    str(genome),
+                    "-o",
+                    str(output),
+                ],
+                check=True,
+            )
+
+            df = pd.read_csv(output, sep="\t")
+            self.assertEqual(df.loc[0, "magid"], "asm1_bin_1")
+            self.assertEqual(df.loc[0, "size"], 400)
+            self.assertTrue(pd.isna(df.loc[0, "completeness"]))
+            self.assertTrue(pd.isna(df.loc[0, "cluster"]))
+
     def test_snakefile_targets_root_summary_tables(self) -> None:
         text = SNAKEFILE.read_text(encoding="utf-8")
         self.assertIn('f"{OUTPUT_DIR}/profiling_genomes.tsv"', text)
         self.assertIn('f"{OUTPUT_DIR}/dereplicating.tsv"', text)
+        self.assertIn('f"{OUTPUT_DIR}/profiling_genomes/final/mags.tsv"', text)
 
 
 if __name__ == "__main__":

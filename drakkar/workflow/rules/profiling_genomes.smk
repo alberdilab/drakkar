@@ -396,6 +396,37 @@ rule split_coverm:
         python {params.package_dir}/workflow/scripts/split_coverm.py {input} {output.counts} {output.breadth}
         """
 
+rule mag_metadata:
+    input:
+        genomes=get_mag_fna,
+        headers=f"{OUTPUT_DIR}/profiling_genomes/drep/dereplicated_genomes/.headers_renamed",
+        wdb=lambda wildcards: checkpoints.dereplicate.get(**wildcards).output.Wdb,
+        cdb=lambda wildcards: checkpoints.dereplicate.get(**wildcards).output.Cdb,
+        metadata=lambda wildcards: f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv" if (QUALITY_FILE or not IGNORE_QUALITY) else []
+    output:
+        f"{OUTPUT_DIR}/profiling_genomes/final/mags.tsv"
+    localrule: True
+    params:
+        package_dir={PACKAGE_DIR}
+    threads: 1
+    resources:
+        mem_mb = cap_mem_mb(1*1024),
+        runtime = cap_runtime(5)
+    message: "Generating dereplicated genome metadata file..."
+    shell:
+        """
+        metadata_arg=""
+        if [ -n "{input.metadata}" ]; then
+            metadata_arg="--metadata {input.metadata}"
+        fi
+        python {params.package_dir}/workflow/scripts/mag_metadata.py \
+            --genomes {input.genomes} \
+            --wdb {input.wdb} \
+            --cdb {input.cdb} \
+            $metadata_arg \
+            -o {output}
+        """
+
 # Only run if --fraction or -f is used
 
 rule singlem_profile:

@@ -29,6 +29,7 @@ def collect_transfer_files(base_dir, args):
     def add_profile():
         add_file(Path("profiling_genomes/final/bases.tsv"))
         add_file(Path("profiling_genomes/final/counts.tsv"))
+        add_file(Path("profiling_genomes/final/mags.tsv"))
         add_file(Path("profiling_genomes.tsv"))
 
     def add_expression():
