@@ -8,6 +8,31 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.1.5] - 2026-08-25
+
+### Changed
+
+- Report tables are no longer capped at 100 rows. Now that long tables are
+  paged in the browser, every row a table has is written to
+  `drakkar_report.html` — including the full per-job resource listing, which
+  previously showed only the 100 longest-running jobs. The caps that remain
+  apply to the figures, which cannot be paged.
+
+### Added
+
+- The Taxonomy section of `drakkar_report.html` now lists the lineage of every
+  genome, one row per dereplicated bin and one column per GTDB rank, ordered by
+  lineage so relatives sit together. Ranks GTDB-Tk could not place are shown as
+  `Unclassified` rather than left blank.
+- Every heading in `drakkar_report.html` — each section and each table or
+  figure within it — is now followed by a short note in plain language saying
+  what the numbers below it are and how to read them, so the page can be handed
+  to a reader who did not run the workflow. The notes distinguish statistics
+  that look interchangeable but are not, in particular the assembly table's
+  read-weighted `Mapping rate %`, pooled across the samples of one assembly,
+  against `Mean rate %` in the per-sample table, which averages one sample's
+  rate over the assemblies it contributed to.
+
 ## [2.1.4] - 2026-08-25
 
 ### Added

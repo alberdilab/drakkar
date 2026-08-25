@@ -86,9 +86,11 @@ stacked, every row listed, in the order the renderer chose.
 Each section is rendered from SQL aggregates only. ``gene_annotation``,
 ``cluster_annotation`` and ``gene_expression`` can hold tens of millions of
 rows, so every figure and table on the page comes from a ``GROUP BY`` or a
-``LIMIT``; no large table is ever read into memory whole. Long listings are
-truncated with a note pointing back at the database, and the per-genome and
-per-MAG heatmaps show the top entries by abundance or gene count.
+``LIMIT``; no large table is ever read into memory whole. What survives that
+aggregation is listed in full — a table carries every one of its rows and is
+paged in the browser rather than cut off — while the per-genome and per-MAG
+heatmaps, which cannot be paged, still show the top entries by abundance or
+gene count.
 
 .. list-table::
    :header-rows: 1
@@ -110,8 +112,9 @@ per-MAG heatmaps show the top entries by abundance or gene count.
      - Genome quality summary, a completeness-against-contamination scatter,
        and a genome-by-sample relative abundance heatmap.
    * - Taxonomy
-     - Distinct taxa and unclassified genomes at each GTDB rank, genomes per
-       phylum, and phylum composition per sample when abundances are present.
+     - Distinct taxa and unclassified genomes at each GTDB rank, the full
+       lineage of every genome with one column per rank, genomes per phylum,
+       and phylum composition per sample when abundances are present.
    * - Functional annotation
      - Hits, annotated genes and distinct terms per source, a per-MAG
        annotation coverage heatmap, retained gene clusters and regions, and
@@ -127,6 +130,15 @@ per-MAG heatmaps show the top entries by abundance or gene count.
    * - Provenance
      - The ingest log: every table, the file it came from, its row count and
        when it was ingested.
+
+Every section heading, and every subsection heading within it, is followed by
+a short note saying what the numbers below it are and how to read them, so the
+page can be handed to someone who did not run the workflow. The notes name the
+statistics that look alike but are not: the ``Mapping rate %`` of the
+Cataloging assembly table is read-weighted and pooled across the samples of one
+assembly, whereas ``Mean rate %`` in the per-sample table below it averages one
+sample's rate over the assemblies it contributed to, counting each assembly
+once.
 
 Rendering runs in-process in the plain Drakkar environment. It needs no
 Snakemake and no Conda environment, so a report can be produced on a login node

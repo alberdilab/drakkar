@@ -26,10 +26,10 @@ from html import escape
 
 from drakkar.report.schema import SCHEMA_VERSION, TAXONOMIC_RANKS
 
-# Row and category caps. Nothing on the page is allowed to grow with the size
-# of the largest tables, so every listing is bounded here rather than in SQL
-# scattered across the section renderers.
-TABLE_ROW_LIMIT = 100
+# Category caps for the figures. A heatmap or a bar chart cannot be paged, so
+# what it shows is bounded here rather than in SQL scattered across the section
+# renderers. Tables are not capped: they carry every row and are paged in the
+# browser instead.
 # Rows per page in the browser, and the smallest table worth averaging.
 PAGE_ROWS = 20
 MIN_STAT_ROWS = 2
@@ -55,6 +55,60 @@ SECTION_LABELS = {
     "function": "Functional annotation",
     "expression": "Expression",
     "resources": "Runs and resources",
+}
+
+# One plain-language sentence per section, shown under its heading. The
+# report is read by people who did not run the workflow, so each section
+# says what its numbers are before showing them.
+SECTION_INTROS = {
+    "preprocessing": (
+        "What happened to the raw sequencing reads of each sample before "
+        "anything was assembled: adapter and quality trimming with fastp, "
+        "then removal of reads matching the host genome. The metagenomic "
+        "reads that survive both steps are the input to every later section."
+    ),
+    "cataloging": (
+        "Assembly of the metagenomic reads into contigs, and the recovery of "
+        "genome bins from those contigs. An assembly may be built from one "
+        "sample or from several pooled together, which is why samples and "
+        "assemblies are reported in separate tables."
+    ),
+    "dereplication": (
+        "Bins recovered from different assemblies often represent the same "
+        "organism. Dereplication collapses them into one representative "
+        "genome per cluster, so the drop in bin count here is redundancy "
+        "being removed, not genomes being lost."
+    ),
+    "profiling": (
+        "The final genome catalogue, and how much of each sample maps to it. "
+        "Quality figures come from CheckM2 estimates: completeness is how "
+        "much of the expected genome was recovered, contamination how much "
+        "of it likely belongs to another organism."
+    ),
+    "taxonomy": (
+        "Which organisms the catalogue genomes correspond to, according to "
+        "GTDB-Tk. A genome left unclassified at a rank has no close enough "
+        "relative in the reference database, which is common for "
+        "under-sampled environments and is not an error."
+    ),
+    "function": (
+        "What the genes in the catalogue are predicted to do. Each "
+        "annotation source is a different reference database, and a gene can "
+        "be annotated by several of them at once, so figures from different "
+        "sources are not additive."
+    ),
+    "expression": (
+        "Metatranscriptomic reads mapped onto the catalogue genes, so these "
+        "counts say how much each gene was transcribed, not whether it is "
+        "present. A gene can be present in the catalogue and still have zero "
+        "counts in a sample."
+    ),
+    "resources": (
+        "How the workflow itself ran: which commands were executed and what "
+        "compute they asked for against what they actually used. Nothing "
+        "here affects the biological results; it is for tuning the resource "
+        "profile and diagnosing failed jobs."
+    ),
 }
 
 STYLESHEET = """
@@ -504,14 +558,14 @@ def _stats_html(columns, rows, stats):
     return _highlights(items)
 
 
-def _table(columns, rows, limit=TABLE_ROW_LIMIT, stats=()):
+def _table(columns, rows, stats=()):
     """Render rows as an HTML table, dropping columns that are entirely empty.
 
     ``columns`` is a sequence of ``(header, formatter)`` pairs and ``rows`` a
     sequence of raw value tuples in the same order. ``stats`` names the columns
-    whose average belongs above the table. Tables longer than ``PAGE_ROWS``
-    carry the page size the script pages them by; the rows themselves are all
-    in the markup, so the table stays complete without JavaScript.
+    whose average belongs above the table. Every row is rendered: tables longer
+    than ``PAGE_ROWS`` carry the page size the script pages them by, and
+    without JavaScript the same markup is the full listing.
     """
     if not rows:
         return ""
@@ -522,13 +576,12 @@ def _table(columns, rows, limit=TABLE_ROW_LIMIT, stats=()):
     ]
     if not keep:
         return ""
-    shown = rows[:limit]
     head = "".join(f"<th>{escape(columns[index][0])}</th>" for index in keep)
     body = []
-    for row in shown:
+    for row in rows:
         cells = "".join(_cell(row[index], columns[index][1]) for index in keep)
         body.append(f"<tr>{cells}</tr>")
-    paging = f' data-page-size="{PAGE_ROWS}"' if len(shown) > PAGE_ROWS else ""
+    paging = f' data-page-size="{PAGE_ROWS}"' if len(rows) > PAGE_ROWS else ""
     parts = [
         '<div class="table-block">',
         _stats_html(columns, rows, stats),
@@ -536,13 +589,8 @@ def _table(columns, rows, limit=TABLE_ROW_LIMIT, stats=()):
         f"<thead><tr>{head}</tr></thead>",
         "<tbody>" + "".join(body) + "</tbody>",
         "</table></div>",
+        "</div>",
     ]
-    if len(rows) > limit:
-        parts.append(
-            f'<p class="note">Showing the first {limit:,} of {len(rows):,} rows; '
-            f"query the database for the rest.</p>"
-        )
-    parts.append("</div>")
     return "".join(parts)
 
 
@@ -567,8 +615,24 @@ def _paragraph(message):
     return f"<p>{escape(message)}</p>"
 
 
-def _heading(title):
-    return f"<h3>{escape(title)}</h3>"
+def _section_intro(name):
+    """The plain-language note shown under a section's own heading."""
+    explanation = SECTION_INTROS.get(name)
+    return _note(explanation) if explanation else ""
+
+
+def _heading(title, explanation=None):
+    """A subsection heading, with a plain-language note on how to read it.
+
+    Neighbouring tables often hold statistics that look interchangeable but
+    are not — a read-weighted rate beside a mean of per-sample rates, say —
+    so each heading carries a sentence or two aimed at a reader who does not
+    already know how the number was computed.
+    """
+    markup = f"<h3>{escape(title)}</h3>"
+    if explanation:
+        markup += _note(explanation)
+    return markup
 
 
 def _duration(started, finished):
@@ -684,9 +748,21 @@ def _render_preprocessing(connection):
     if not rows:
         return []
 
-    blocks = [_paragraph(
-        f"{_quantity(len(rows), 'sample')} passed through quality filtering."
-    )]
+    blocks = [
+        _paragraph(
+            f"{_quantity(len(rows), 'sample')} passed through quality filtering."
+        ),
+        _note(
+            "Reads in are the raw reads; After fastp is what survived quality "
+            "and adapter trimming; Host reads were then removed by mapping "
+            "against the host genome, leaving the metagenomic reads. "
+            "Metagenomic % is that final count as a share of the raw reads. "
+            "SingleM fraction estimates how much of the sequenced material is "
+            "prokaryotic, and Nonpareil diversity is an index of community "
+            "diversity estimated from read redundancy — useful for ranking "
+            "samples against each other rather than as an absolute value."
+        ),
+    ]
 
     table_rows = [
         (
@@ -726,7 +802,14 @@ def _render_preprocessing(connection):
 
     figure = _read_fate_figure(rows)
     if figure is not None:
-        blocks.append(_heading("Read fates"))
+        blocks.append(_heading(
+            "Read fates",
+            "Where each sample's reads ended up: discarded by quality "
+            "filtering, matched to the host genome, or retained as "
+            "metagenomic. A tall host fraction means the extraction was "
+            "dominated by host DNA, which limits how much sequencing depth "
+            "was available for the microbes but is not a sequencing failure."
+        ))
         blocks.append(figure)
     return blocks
 
@@ -798,7 +881,16 @@ def _render_cataloging(connection):
 def _assembly_blocks(rows):
     """Contiguity and read recruitment, per assembly."""
     return [
-        _heading("Assemblies"),
+        _heading(
+            "Assemblies",
+            "One row per assembly. Contigs, total length, largest contig and "
+            "N50 describe contiguity: a higher N50 means the sequence sits in "
+            "fewer, longer pieces. Mapping rate % is read-weighted and pooled "
+            "over every sample mapped against this assembly — all mapped "
+            "reads divided by all reads — so deeply sequenced samples count "
+            "for more, and a low value means the assembly represents little "
+            "of the sequenced material."
+        ),
         _table(
             [
                 ("Assembly", _text),
@@ -821,7 +913,7 @@ def _assembly_blocks(rows):
             stats=[
                 ("Mean contigs", 1),
                 ("Mean N50", 4),
-                ("Mean mapping rate %", 6),
+                ("Mean assembly mapping rate %", 6),
             ],
         ),
     ]
@@ -834,7 +926,16 @@ def _bin_blocks(rows):
     ``final_bins`` but not given a column of their own.
     """
     return [
-        _heading("Bins"),
+        _heading(
+            "Bins",
+            "One row per assembly, counting the genome bins recovered from "
+            "it. High and medium quality follow the usual completeness and "
+            "contamination thresholds; low-quality bins are discarded "
+            "downstream, so they are included in Final bins but have no "
+            "column of their own. Completeness and contamination are "
+            "averaged over the final bins of each assembly, so an assembly "
+            "with few bins can show a high mean without having yielded much."
+        ),
         _table(
             [
                 ("Assembly", _text),
@@ -881,7 +982,14 @@ def _binner_blocks(connection):
     )
     figure.update_layout(xaxis_title="Binner", yaxis_title="Bins produced")
     return [
-        _heading("Bins per binner"),
+        _heading(
+            "Bins per binner",
+            "How many bins each binning tool produced, before the tools' "
+            "outputs were reconciled into the final set. The tools use "
+            "different strategies, so uneven counts are expected; producing "
+            "more bins is not by itself a sign of a better binner, and the "
+            "same genome is usually found by several of them."
+        ),
         _table(
             [("Binner", _text), ("Bins", _integer), ("Assemblies", _integer)],
             [tuple(row) for row in rows],
@@ -911,7 +1019,19 @@ def _mapping_rate_blocks(connection):
     if not rows:
         return []
     return [
-        _heading("Per-sample mapping rates"),
+        _heading(
+            "Per-sample mapping rates",
+            "One row per sample: how well that sample's own reads map to the "
+            "assemblies it contributed to. Mean rate % averages the sample's "
+            "rate across those assemblies, counting each assembly once "
+            "regardless of depth, so it is not the same statistic as Mapping "
+            "rate % in the assembly table above, which pools reads across "
+            "samples within one assembly. Min and max show the spread; when a "
+            "sample belongs to a single assembly the three columns coincide. "
+            "A low value flags a sample poorly represented by the "
+            "assemblies, for instance because of residual host DNA or an "
+            "unusual community."
+        ),
         _table(
             [
                 ("Sample", _text),
@@ -921,7 +1041,7 @@ def _mapping_rate_blocks(connection):
                 ("Max rate %", _ONE),
             ],
             [tuple(row) for row in rows],
-            stats=[("Mean mapping rate %", 2)],
+            stats=[("Mean sample mapping rate %", 2)],
         ),
     ]
 
@@ -1026,7 +1146,18 @@ def _genome_quality_blocks(connection):
         xaxis_title="Completeness (%)",
         yaxis_title="Contamination (%)",
     )
-    return [_heading("Genome quality"), figure]
+    return [
+        _heading(
+            "Genome quality",
+            "Each point is one dereplicated genome, placed by estimated "
+            "completeness (horizontal) against estimated contamination "
+            "(vertical). The desirable corner is the bottom right: nearly "
+            "complete and nearly clean. Points high on the vertical axis "
+            "likely mix sequence from more than one organism, and are "
+            "usually filtered out or treated with caution downstream."
+        ),
+        figure,
+    ]
 
 
 def _abundance_blocks(connection):
@@ -1090,7 +1221,14 @@ def _abundance_blocks(connection):
     total_genomes = _scalar(
         connection, "SELECT COUNT(DISTINCT genome_id) FROM genome_count", default=0
     )
-    blocks = [_heading("Genome abundance")]
+    blocks = [_heading(
+        "Genome abundance",
+        "How much of each sample each genome accounts for, as a percentage "
+        "of that sample's mapped reads rather than a raw count, so samples "
+        "sequenced to different depths can be compared. Darker cells are "
+        "more abundant. These are relative abundances: they say nothing "
+        "about the absolute amount of microbial material in a sample."
+    )]
     if total_genomes > len(genome_ids):
         blocks.append(_note(
             f"Showing the {len(genome_ids)} most abundant of {total_genomes:,} genomes, "
@@ -1130,6 +1268,13 @@ def _render_taxonomy(connection):
         _paragraph(
             f"GTDB classifications are available for {_quantity(classified, 'genome')}."
         ),
+        _note(
+            "One row per taxonomic rank, from broad to fine. Distinct taxa is "
+            "how many different groups the genomes fall into at that rank, so "
+            "it grows towards the species end; genomes unclassified grows the "
+            "same way, because assigning a genome to a species needs a closer "
+            "reference match than assigning it to a phylum."
+        ),
         _table(
             [
                 ("Rank", _text),
@@ -1140,6 +1285,8 @@ def _render_taxonomy(connection):
             rank_rows,
         ),
     ]
+
+    blocks.extend(_genome_lineage_blocks(connection))
 
     phyla = _query(connection, """
         SELECT COALESCE(NULLIF(phylum, ''), 'Unclassified') AS name, COUNT(*) AS genomes
@@ -1162,11 +1309,57 @@ def _render_taxonomy(connection):
             yaxis=dict(autorange="reversed"),
             height=max(FIGURE_HEIGHT, 22 * len(phyla) + 140),
         )
-        blocks.append(_heading("Genomes per phylum"))
+        blocks.append(_heading(
+            "Genomes per phylum",
+            "How many catalogue genomes fall in each phylum. This counts "
+            "distinct genomes recovered, not how abundant they are: a phylum "
+            "with many genomes can still be rare in the samples, and an "
+            "abundant one can be represented by a single genome."
+        ))
         blocks.append(figure)
 
     blocks.extend(_composition_blocks(connection))
     return blocks
+
+
+def _genome_lineage_blocks(connection):
+    """One row per genome, with its GTDB lineage spread across the ranks.
+
+    The rank summary above counts classifications; this is the classification
+    itself, which is what a reader who wants to know what a particular bin is
+    comes here for. Ranks GTDB-Tk left empty are named rather than blanked, so
+    a gap in a lineage is legible as an unclassified rank instead of as a
+    missing value.
+    """
+    # Every rank is a quoted identifier because one of them is "order".
+    quoted = [f'"{rank}"' for rank in TAXONOMIC_RANKS]
+    ranks = ", ".join(
+        f"COALESCE(NULLIF({name}, ''), 'Unclassified') AS {name}"
+        for name in quoted
+    )
+    order = ", ".join(quoted)
+    rows = _query(connection, f"""
+        SELECT genome_id, {ranks}
+        FROM genome_taxonomy
+        ORDER BY {order}, genome_id
+    """)
+    if not rows:
+        return []
+    return [
+        _heading(
+            "Lineage per genome",
+            "One row per genome in the catalogue — a dereplicated bin — with "
+            "its GTDB lineage split across the seven ranks. Rows are ordered by "
+            "lineage, so related genomes sit together; click any column heading "
+            "to sort by that rank or by genome name instead. Unclassified means "
+            "GTDB-Tk found no reference close enough to name the genome at that "
+            "rank, and everything finer than it is unclassified too."
+        ),
+        _table(
+            [("Genome", _text)] + [(rank.capitalize(), _text) for rank in TAXONOMIC_RANKS],
+            [tuple(row) for row in rows],
+        ),
+    ]
 
 
 def _composition_blocks(connection):
@@ -1223,7 +1416,13 @@ def _composition_blocks(connection):
         yaxis_title="Reads (% of sample)",
         legend_title_text="Phylum",
     )
-    blocks = [_heading("Composition per sample")]
+    blocks = [_heading(
+        "Composition per sample",
+        "The makeup of each sample, as the percentage of its mapped reads "
+        "assigned to each phylum. Every bar sums to 100%, so this shows "
+        "relative composition only — a phylum can appear to rise in a sample "
+        "simply because another one fell."
+    )]
     if remainder:
         blocks.append(_note(
             f"The {len(shown)} most abundant phyla are shown individually; the "
@@ -1272,6 +1471,12 @@ def _annotation_source_blocks(connection):
             f"({_ratio(annotated, total_genes):.1f}%) carry at least one functional hit."
         ))
 
+    blocks.append(_note(
+        "Hits counts every annotation record, so one gene matched several times "
+        "by the same source is counted several times; Annotated genes counts the "
+        "genes behind those hits, and Primary hits the single best match kept per "
+        "gene. Genes annotated % is out of all predicted genes in the catalogue."
+    ))
     blocks.append(_table(
         [
             ("Source", _text),
@@ -1352,7 +1557,14 @@ def _annotation_coverage_blocks(connection):
     )
 
     total_mags = _scalar(connection, "SELECT COUNT(DISTINCT mag) FROM gene", default=0)
-    blocks = [_heading("Annotation coverage per MAG")]
+    blocks = [_heading(
+        "Annotation coverage per MAG",
+        "The percentage of each genome's predicted genes that got at least "
+        "one hit from each annotation source. Sources differ enormously in "
+        "scope by design — a general database annotates most genes, a "
+        "specialised one only a handful — so compare genomes down a column "
+        "rather than sources across a row."
+    )]
     if total_mags > len(mag_ids):
         blocks.append(_note(
             f"Showing the {len(mag_ids)} MAGs with the most predicted genes, "
@@ -1378,7 +1590,13 @@ def _cluster_blocks(connection):
     if not rows:
         return []
     return [
-        _heading("Gene clusters and regions"),
+        _heading(
+            "Gene clusters and regions",
+            "Features made of several neighbouring genes, such as "
+            "biosynthetic gene clusters, grouped by the tool that reported "
+            "them and the type it assigned. Clusters counts the features "
+            "found and MAGs how many genomes carry at least one of them."
+        ),
         _table(
             [
                 ("Source", _text),
@@ -1409,7 +1627,14 @@ def _annotation_qc_blocks(connection):
     if not rows:
         return []
     return [
-        _heading("Annotation filtering"),
+        _heading(
+            "Annotation filtering",
+            "What each annotation tool reported and how much of it Drakkar "
+            "kept. Rejected records failed a confidence threshold; unmapped "
+            "ones could not be matched back to a predicted gene. A low "
+            "Retained % usually means the tool and the filter settings are "
+            "mismatched rather than that the underlying data is bad."
+        ),
         _table(
             [
                 ("Source", _text),
@@ -1493,7 +1718,13 @@ def _render_expression(connection):
                     showgrid=False, rangemode="tozero"),
         legend_title_text="",
     )
-    blocks.append(_heading("Expression per sample"))
+    blocks.append(_heading(
+        "Expression per sample",
+        "Assigned counts per sample (bars, left axis) against the number of "
+        "genes with at least one read (points, right axis). The two usually "
+        "rise together; a sample with far fewer detected genes than the rest "
+        "is more often shallowly sequenced than biologically different."
+    ))
     blocks.append(figure)
 
     lengths = _query(connection, """
@@ -1503,7 +1734,13 @@ def _render_expression(connection):
         WHERE length IS NOT NULL
     """)
     if lengths and lengths[0]["genes"]:
-        blocks.append(_heading("Quantified genes"))
+        blocks.append(_heading(
+            "Quantified genes",
+            "The size of the gene set that counts were assigned to. Gene "
+            "length matters when comparing raw counts, because a longer gene "
+            "collects more reads than a shorter one expressed just as "
+            "strongly."
+        ))
         blocks.append(_highlights([
             ("Genes with a length", _integer(lengths[0]["genes"])),
             ("Mean length", _integer(lengths[0]["mean_length"])),
@@ -1613,7 +1850,14 @@ def _benchmark_status_blocks(connection):
             notes.append(_note(f"{row['run_id']}: {message}"))
     if not notes:
         return []
-    return [_heading("Resource benchmark"), *notes]
+    return [
+        _heading(
+            "Resource benchmark",
+            "No compute usage figures were recorded for this run. The reason "
+            "reported by each run follows."
+        ),
+        *notes,
+    ]
 
 
 def _job_outcome_blocks(connection):
@@ -1643,7 +1887,13 @@ def _job_outcome_blocks(connection):
     failed = launches - (total["completed"] or 0) - (total["unknown"] or 0)
 
     blocks = [
-        _heading("Job outcomes"),
+        _heading(
+            "Job outcomes",
+            "Whether the individual cluster jobs behind this run succeeded. "
+            "Failures here are workflow-level events — a job that ran out of "
+            "memory or hit its time limit — and Snakemake retries them, so a "
+            "run can finish successfully with failed jobs on record."
+        ),
         _paragraph(
             f"{_quantity(launches, 'job')} were submitted to the scheduler for "
             f"{_quantity(total['logical_jobs'] or 0, 'distinct workflow job')}; "
@@ -1748,12 +1998,14 @@ def _rule_resource_blocks(connection):
         for row in rows
     ]
     blocks = [
-        _heading("Requested versus used resources, per rule"),
-        _paragraph(
-            "Medians across the launches of each rule. Requested figures are "
-            "what the workflow asked the scheduler for; used figures are what "
-            "the scheduler's accounting reports, so the ratio between them is "
-            "what a resource profile should be tuned against."
+        _heading(
+            "Requested versus used resources, per rule",
+            "One row per workflow step, as medians across its launches. "
+            "Requested figures are what the workflow asked the scheduler for; "
+            "used figures are what the scheduler's accounting reports. "
+            "Percentages well below 100 mean the step reserved far more than it "
+            "needed, which wastes queue time; percentages near 100 mean it ran "
+            "close to its limit and may fail on a larger dataset."
         ),
         _table(
             [
@@ -1825,8 +2077,13 @@ def _rule_efficiency_figure(rows):
 
 
 def _job_resource_blocks(connection):
-    """The individual launches, heaviest first."""
-    rows = _query(connection, f"""
+    """The individual launches, heaviest first.
+
+    Every launch is listed. ``benchmark_job`` holds one row per submitted job,
+    so it is bounded by how much the run was split up, not by the size of the
+    sequencing data.
+    """
+    rows = _query(connection, """
         SELECT run_id, rule, wildcards, attempt, state,
                requested_cpus, alloc_cpus,
                requested_mem_mb, max_rss_mb, memory_efficiency,
@@ -1834,19 +2091,19 @@ def _job_resource_blocks(connection):
                cpu_efficiency
         FROM benchmark_job
         ORDER BY COALESCE(elapsed_sec, -1) DESC, run_id, launch_index
-        LIMIT {TABLE_ROW_LIMIT + 1}
     """)
     if not rows:
         return []
 
-    total = _scalar(connection, "SELECT COUNT(*) FROM benchmark_job", default=0)
     blocks = [
-        _heading("Requested versus used resources, per job"),
+        _heading(
+            "Requested versus used resources, per job",
+            "The same comparison for individual jobs, which is where a "
+            "single oversized sample shows up as one job far heavier than "
+            "the rest of its rule."
+        ),
         _paragraph(
-            "One row per submitted job, longest-running first."
-            if total <= TABLE_ROW_LIMIT else
-            f"The {TABLE_ROW_LIMIT:,} longest-running of {total:,} submitted jobs; "
-            "the full listing stays in benchmark/drakkar_<run_id>.jobs.tsv."
+            f"{_quantity(len(rows), 'submitted job')}, longest-running first."
         ),
         _table(
             [
@@ -1875,7 +2132,7 @@ def _job_resource_blocks(connection):
                     _efficiency(row["runtime_efficiency"]),
                     _efficiency(row["cpu_efficiency"]),
                 )
-                for row in rows[:TABLE_ROW_LIMIT]
+                for row in rows
             ],
         ),
     ]
@@ -2056,6 +2313,7 @@ def render_report(db_path, html_path, sections=None):
             bodies.append(
                 f'<section class="panel" id="section-{name}">'
                 f"<h2>{escape(SECTION_LABELS[name])}</h2>"
+                + _section_intro(name)
                 + _serialize(blocks, state)
                 + "</section>"
             )

@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from drakkar.report import command as report_command
-from drakkar.report.render import PAGE_ROWS, TABLE_ROW_LIMIT, render_report
+from drakkar.report.render import PAGE_ROWS, render_report
 from drakkar.report.schema import SCHEMA_VERSION, connect, create_schema
 from drakkar.report.sources import SECTION_ORDER
 
@@ -488,21 +488,24 @@ class BoundedOutputTests(TemporaryRootMixin, unittest.TestCase):
         self.assertNotIn("MAG_1_c1_4999", text)
         self.assertIn("Quantification covers 5,000 genes across 2 samples", text)
 
-    def test_long_tables_are_truncated_with_a_note(self):
+    def test_long_tables_list_every_row_and_are_paged(self):
+        """Per-sample listings are not truncated; the browser pages them."""
         root = self.temporary_root()
         db_path = root / "drakkar.db"
         connection = connect(db_path)
         create_schema(connection, drakkar_version="2.1.0")
-        seed_preprocessing(connection, samples=TABLE_ROW_LIMIT + 50)
+        seed_preprocessing(connection, samples=150)
         connection.commit()
         connection.close()
 
         html_path = root / "drakkar_report.html"
         render_report(db_path, html_path, sections=("preprocessing",))
         text = html_path.read_text(encoding="utf-8")
-        self.assertIn(f"Showing the first {TABLE_ROW_LIMIT:,}", text)
-        # Sample ids sort as text, so S99 is the last row and must be cut.
-        self.assertNotIn("<td>S99</td>", text)
+        self.assertNotIn("Showing the first", text)
+        self.assertIn(f'<table data-page-size="{PAGE_ROWS}">', text)
+        self.assertEqual(text.count("<tr><td>S"), 150)
+        # Sample ids sort as text, so S99 is the last row: it must be present.
+        self.assertIn("<td>S99</td>", text)
 
 
 class CatalogingLayoutTests(TemporaryRootMixin, unittest.TestCase):
@@ -540,6 +543,61 @@ class CatalogingLayoutTests(TemporaryRootMixin, unittest.TestCase):
         self.assertLess(
             body.index("Per-sample mapping rates"), body.index("<h3>Bins</h3>")
         )
+
+
+class TaxonomyLineageTests(TemporaryRootMixin, unittest.TestCase):
+    """The per-genome lineage table: one row per bin, one column per rank."""
+
+    LINEAGES = [
+        ("MAG_1", "Bacteria", "Bacillota", "Clostridia", "Lachnospirales",
+         "Lachnospiraceae", "Blautia", "Blautia wexlerae"),
+        ("MAG_2", "Bacteria", "Bacteroidota", "Bacteroidia", "Bacteroidales",
+         "Muribaculaceae", None, None),
+        ("MAG_3", "Archaea", "Methanobacteriota", None, None, None, None, None),
+    ]
+
+    def section(self):
+        root = self.temporary_root()
+        db_path = root / "drakkar.db"
+        connection = connect(db_path)
+        create_schema(connection, drakkar_version="2.1.0")
+        connection.executemany(
+            "INSERT INTO genome_taxonomy (genome_id, domain, phylum, class, "
+            '"order", family, genus, species) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            self.LINEAGES,
+        )
+        log(connection, "genome_taxonomy", "taxonomy", len(self.LINEAGES))
+        connection.commit()
+        connection.close()
+
+        html_path = root / "drakkar_report.html"
+        render_report(db_path, html_path, sections=("taxonomy",))
+        text = html_path.read_text(encoding="utf-8")
+        start = text.index("<h3>Lineage per genome</h3>")
+        return text[start:text.index("</table>", start)]
+
+    def test_every_rank_has_its_own_column(self):
+        body = self.section()
+        for rank in ("Domain", "Phylum", "Class", "Order", "Family", "Genus",
+                     "Species"):
+            self.assertIn(f"<th>{rank}</th>", body)
+        self.assertIn("<th>Genome</th>", body)
+
+    def test_one_row_per_genome(self):
+        body = self.section()
+        self.assertEqual(body.count("<tr><td>MAG_"), len(self.LINEAGES))
+
+    def test_ranks_without_a_classification_are_named_not_blanked(self):
+        body = self.section()
+        # MAG_3 is placed no further than its phylum; the five finer ranks say so.
+        row = body[body.index("<tr><td>MAG_3</td>"):]
+        row = row[:row.index("</tr>")]
+        self.assertEqual(row.count("<td>Unclassified</td>"), 5)
+
+    def test_rows_are_ordered_by_lineage(self):
+        # Archaea before Bacteria, so relatives sit together by default.
+        body = self.section()
+        self.assertLess(body.index("MAG_3"), body.index("MAG_1"))
 
 
 class ResourceBenchmarkTests(TemporaryRootMixin, unittest.TestCase):
