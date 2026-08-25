@@ -180,6 +180,8 @@ Use the next pages depending on what you need:
      - Where to go next
    * - Running the complete workflow or a specific module
      - See :doc:`workflows`.
+   * - Interpreting annotation tables or migrating from Drakkar 1.x
+     - See :doc:`annotation_tables`.
    * - Databases, logging, config, transfer, outputs, and troubleshooting
      - See :doc:`operations`.
    * - Command list only

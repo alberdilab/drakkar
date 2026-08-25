@@ -130,6 +130,7 @@ def write_summary(rows, out_csv: Path):
             fh,
             delimiter="\t",
             fieldnames=[
+                "cluster_id",
                 "contig",
                 "start",
                 "end",
@@ -192,6 +193,7 @@ def main(in_path: str, summary_csv: str, gene_table: str):
             annotated = [f"{f} [{n}]" for f, n in freq.items()]
 
             summary_rows.append({
+                "cluster_id": bgc_code,
                 "contig": contig,
                 "start": start,
                 "end": end,

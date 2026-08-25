@@ -20,22 +20,28 @@ def normalize_annotation_type(annotation_type):
     }
     gene_components = {"kegg", "cazy", "pfam", "virulence", "amr", "signalp"}
     clusters_only_components = {"dbcan", "antismash", "mobile"}
-    aliases = {"vfdb": "virulence", "genomad": "mobile", "foldseek": "structure"}
-    # "structure" (Foldseek/ProstT5) is opt-in only: it needs extra staged
-    # databases, so it is never pulled in by the "function"/"genes" shortcuts.
+    aliases = {"vfdb": "virulence", "genomad": "mobile"}
     allowed = {
-        "taxonomy", "function", "genes", "clusters", "network", "structure",
+        "taxonomy", "function", "genes", "clusters", "network",
         *functional_components
     }
     option_order = [
         "taxonomy", "function", "genes", "clusters", "network",
         "kegg", "cazy", "pfam", "virulence", "amr", "signalp",
-        "dbcan", "antismash", "defense", "mobile", "structure"
+        "dbcan", "antismash", "defense", "mobile"
     ]
-    items = [aliases.get(item.strip().lower(), item.strip().lower()) for item in annotation_type.split(",") if item.strip()]
+    requested = [item.strip().lower() for item in annotation_type.split(",") if item.strip()]
+    if any(item in {"structure", "foldseek"} for item in requested):
+        print(
+            f"{ERROR}ERROR:{RESET} Structure annotation with Foldseek/ProstT5 is "
+            "work in progress and is not available in Drakkar 2.0.0."
+        )
+        return None
+
+    items = [aliases.get(item, item) for item in requested]
     invalid = [item for item in items if item not in allowed]
     if not items or invalid:
-        print(f"{ERROR}ERROR:{RESET} --annotation-type must be a comma-separated list including taxonomy, function, genes, clusters, kegg, cazy, pfam, virulence, amr, signalp, structure, dbcan, antismash, defense, mobile, and/or network.")
+        print(f"{ERROR}ERROR:{RESET} --annotation-type must be a comma-separated list including taxonomy, function, genes, clusters, kegg, cazy, pfam, virulence, amr, signalp, dbcan, antismash, defense, mobile, and/or network.")
         return None
 
     expanded = set(items)
@@ -145,6 +151,12 @@ def percent_float(value):
     parsed = nonnegative_float(value)
     if parsed > 100:
         raise argparse.ArgumentTypeError("must be between 0 and 100")
+    return parsed
+
+def unit_interval_float(value):
+    parsed = nonnegative_float(value)
+    if parsed > 1:
+        raise argparse.ArgumentTypeError("must be between 0 and 1")
     return parsed
 
 def add_resource_multiplier_arguments(parser):

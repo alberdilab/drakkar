@@ -128,12 +128,16 @@ def main() -> int:
     print("Release preparation completed.")
     print("Next steps:")
     print("1. Review changes: git diff")
-    print(f'2. Commit them: git commit -am "Release v{plan.version}"')
-    print(f"3. Tag the release: git tag v{plan.version}")
-    print(f"4. Push branch and tag: git push origin main && git push origin v{plan.version}")
-    print(f"5. Monitor the GitHub Actions release workflow for tag v{plan.version}")
+    print("2. Stage tracked and new files: git add -A")
+    print(f'3. Commit them: git commit -m "Release v{plan.version}"')
+    print("4. Push main: git push origin main")
+    print("5. Wait for the Python 3.10-3.12 test workflow on main to pass")
+    print(f"6. Tag the tested commit: git tag v{plan.version}")
+    print(f"7. Push the tag: git push origin v{plan.version}")
+    print(f"8. Monitor the GitHub Actions release workflow for tag v{plan.version}")
     print(
-        "6. The workflow will build artifacts and create/update the GitHub release. "
+        "9. The workflow will retest all supported Python versions, build artifacts, "
+        "and create/update the GitHub release. "
         "PyPI publishing runs only when the repository is public and Trusted Publishing is configured."
     )
     return 0

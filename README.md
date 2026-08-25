@@ -1,4 +1,4 @@
-![DRAKKAR](drakkar.png "DRAKKAR by the AlberdiLab")
+![DRAKKAR](https://raw.githubusercontent.com/alberdilab/drakkar/main/drakkar.png "DRAKKAR by the AlberdiLab")
 
 # DRAKKAR
 
@@ -15,18 +15,30 @@ Full documentation lives at https://drakkar.readthedocs.io/. The README is inten
 - Preprocess reads with quality filtering, optional host removal, microbial fraction, and Nonpareil.
 - Assemble and bin metagenomes into MAG catalogs.
 - Dereplicate MAGs and quantify genomes or pangenomes across samples.
-- Annotate MAGs taxonomically and functionally with configurable annotation subsets.
+- Annotate MAGs taxonomically and functionally with configurable annotation subsets, lossless evidence tables, provenance manifests, and per-source QC.
 - Map metatranscriptomes to annotated genes for expression analysis.
 - Install and manage supported annotation databases from the CLI.
 - Inspect workflow logs, recover from locked runs, and transfer results by SFTP.
 
 ## Quick start
 
-Install from GitHub:
+Install the latest release from PyPI:
+
+```bash
+pip install drakkar
+```
+
+To install the current development version from GitHub instead:
 
 ```bash
 pip install git+https://github.com/alberdilab/drakkar.git
 ```
+
+DRAKKAR targets module-based HPC systems. The Python package installs the CLI
+and workflow files, but workflow execution also requires an Environment
+Modules/Lmod `module` command and the Snakemake and tool modules configured in
+`drakkar/workflow/config.yaml`. On a supported cluster, the DRAKKAR module
+normally provides this runtime setup.
 
 Run the full workflow from a sample table:
 
@@ -52,6 +64,7 @@ Start here on Read the Docs:
 - Installation: https://drakkar.readthedocs.io/en/latest/installation.html
 - User guide and input formats: https://drakkar.readthedocs.io/en/latest/usage.html
 - Workflow modules: https://drakkar.readthedocs.io/en/latest/workflows.html
+- Annotation table schema and 1.x migration: https://drakkar.readthedocs.io/en/latest/annotation_tables.html
 - Operations, status, logging, transfer, and troubleshooting: https://drakkar.readthedocs.io/en/latest/operations.html
 - CLI reference: https://drakkar.readthedocs.io/en/latest/api.html
 

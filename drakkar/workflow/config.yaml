@@ -58,8 +58,9 @@ DBCAN_DB: "/projects/alberdilab/data/databases/drakkar/dbcan"
 ANTISMASH_DB: "/projects/alberdilab/data/databases/drakkar/antismash"
 DEFENSEFINDER_DB: "/projects/alberdilab/data/databases/drakkar/defensefinder"
   # Small trick to change the versions of models from 2.1 to 2.0 was done to avoid errors in DefenseFinder
-# The three FOLDSEEK_* paths below are installed together by:
-#   drakkar database foldseek --directory <dir> [--version <name>] --set-default
+# Structure annotation with Foldseek/ProstT5 is work in progress and is not
+# exposed by the Drakkar 2.0 CLI. These internal paths are retained for ongoing
+# development only.
 FOLDSEEK_DB: "/projects/alberdilab/data/databases/drakkar/foldseek/foldseek_db"
   # Foldseek AlphaFold/Swiss-Prot target database
 PROSTT5_MODEL: "/projects/alberdilab/data/databases/drakkar/foldseek/prostt5"
@@ -79,6 +80,8 @@ MIN_BIN_LENGTH: 200000
 MAX_BIN_LENGTH: 10000000
 ANNOTATION_EVALUE: 1e-10
 ANNOTATION_IDENTITY: 50.0
+ANNOTATION_QUERY_COVERAGE: 0.5
+ANNOTATION_TARGET_COVERAGE: 0.5
 SNAKEMAKE_MAX_GB: 1024
 SNAKEMAKE_MAX_TIME: 20160
 MEMORY_MULTIPLIER: 1

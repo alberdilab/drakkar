@@ -7,8 +7,9 @@ file (``uniprot_sprot.dat.gz``) already carries those cross-references, so this
 script parses it once into the TSV that ``merge_gene_annotations.py`` consumes.
 
 The output has the header ``accession<TAB>kegg<TAB>ec<TAB>pfam``. When an entry
-lists several KO/EC/Pfam values, the first of each is kept so the column stays a
-single value, matching the sequence-homology annotation columns.
+lists several KO/EC/Pfam values, the first of each is kept in this lookup. The
+long-form gene annotation table retains every Foldseek target hit and embeds
+its mapped values in that hit's structured ``details`` field.
 
 Stage the input with, e.g.::
 

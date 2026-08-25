@@ -95,6 +95,7 @@ def summarize_cgcs(rows, pul_map=None):
         annotated = [f"{ann} [{n}]" for ann, n in freq.items()]
 
         summaries.append({
+            "cluster_id": cgc_id,
             "contig": contig,
             "start": start,
             "end": end,
@@ -115,6 +116,7 @@ def write_summary(rows, out_path: Path):
             fh,
             delimiter="\t",
             fieldnames=[
+                "cluster_id",
                 "contig",
                 "start",
                 "end",

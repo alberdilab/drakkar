@@ -4,12 +4,22 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "drakkar"
-version = "1.8.22"
+version = "2.0.0"
 description = "Metagenomics pipeline optimized for Mjolnir."
 readme = "README.md"
-requires-python = ">=3.6"
+requires-python = ">=3.10"
 authors = [
   {name = "Antton Alberdi", email = "antton.alberdi@sund.ku.dk"},
+]
+keywords = ["bioinformatics", "metagenomics", "snakemake"]
+classifiers = [
+  "Environment :: Console",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 dependencies = [
   "numpy",
@@ -32,6 +42,13 @@ release = [
 
 [project.scripts]
 drakkar = "drakkar.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/alberdilab/drakkar"
+Documentation = "https://drakkar.readthedocs.io/"
+Repository = "https://github.com/alberdilab/drakkar"
+Changelog = "https://github.com/alberdilab/drakkar/blob/main/CHANGELOG.md"
+Issues = "https://github.com/alberdilab/drakkar/issues"
 
 [tool.setuptools.packages.find]
 include = ["drakkar*"]

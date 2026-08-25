@@ -3,4 +3,9 @@ channels:
   - bioconda
   - defaults
 dependencies:
+  - python=3.12
   - dbcan=5.2.5
+  # dbCAN 5.2.5 calls ``decode`` on pyhmmer alignment names. pyhmmer 0.12
+  # returns strings there and makes the HMM search fail internally while the
+  # CLI still exits zero, so keep the compatible 0.11 API.
+  - pyhmmer=0.11.4

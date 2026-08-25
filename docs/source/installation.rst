@@ -1,12 +1,28 @@
 Installation
 ============
 
-DRAKKAR can be installed directly from the GitHub repository or accessed as an
-HPC module on supported systems (e.g., Mjolnir). The core workflow is executed
-with Snakemake and uses Conda environments for tool dependencies.
+DRAKKAR can be installed from PyPI or directly from the GitHub repository, or
+accessed as an HPC module on supported systems (e.g., Mjolnir). DRAKKAR 2.0
+requires Python 3.10 or newer.
+
+The Python package contains the CLI and workflow files; it is not a standalone
+installation of the complete bioinformatics stack. Workflow execution targets
+module-based HPC systems and requires an Environment Modules/Lmod ``module``
+command. Snakemake and other module names, along with database paths, are
+defined in ``drakkar/workflow/config.yaml``. Conda environments provide the
+dependencies for rules that declare them.
+
+Install From PyPI
+-----------------
+
+.. code-block:: console
+
+   $ pip install drakkar
 
 Install From GitHub
 -------------------
+
+Use the GitHub URL when you intentionally want the current development version:
 
 .. code-block:: console
 
@@ -17,9 +33,9 @@ Conda environment:
 
 .. code-block:: console
 
-   $ conda create -n drakkar python=3.12
+   $ conda create -n drakkar python=3.12 pip
    $ conda activate drakkar
-   $ pip install git+https://github.com/alberdilab/drakkar.git
+   $ pip install drakkar
 
 Use on Mjolnir (module)
 -----------------------

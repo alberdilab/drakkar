@@ -3,6 +3,7 @@
 ####
 
 import importlib.util
+import shlex
 from pathlib import Path
 
 PACKAGE_DIR = config["package_dir"]
@@ -43,6 +44,12 @@ PROSTT5_MODEL = config["PROSTT5_MODEL"]
 FOLDSEEK_MAP_DB = config["FOLDSEEK_MAP_DB"]
 ANNOTATION_EVALUE = float(config.get("annotation_evalue", config.get("ANNOTATION_EVALUE", 1e-10)))
 ANNOTATION_IDENTITY = float(config.get("annotation_identity", config.get("ANNOTATION_IDENTITY", 50.0)))
+ANNOTATION_QUERY_COVERAGE = float(config.get(
+    "annotation_query_coverage", config.get("ANNOTATION_QUERY_COVERAGE", 0.5)
+))
+ANNOTATION_TARGET_COVERAGE = float(config.get(
+    "annotation_target_coverage", config.get("ANNOTATION_TARGET_COVERAGE", 0.5)
+))
 
 ANNOTATING_TYPE_SET = set(ANNOTATING_TYPE)
 
@@ -56,7 +63,90 @@ RUN_DBCAN = "dbcan" in ANNOTATING_TYPE_SET
 RUN_ANTISMASH = "antismash" in ANNOTATING_TYPE_SET
 RUN_DEFENSE = "defense" in ANNOTATING_TYPE_SET
 RUN_MOBILE = "mobile" in ANNOTATING_TYPE_SET
+# Internal work in progress; the 2.0 CLI rejects structure/Foldseek requests.
 RUN_STRUCTURE = "structure" in ANNOTATING_TYPE_SET
+
+ENABLED_GENE_SOURCES = [
+    source for source, enabled in (
+        ("kegg", RUN_KEGG),
+        ("cazy", RUN_CAZY),
+        ("pfam", RUN_PFAM),
+        ("virulence", RUN_VIRULENCE),
+        ("amr", RUN_AMR),
+        ("signalp", RUN_SIGNALP),
+        ("defense", RUN_DEFENSE),
+        ("structure", RUN_STRUCTURE),
+    )
+    if enabled
+]
+
+ENABLED_CLUSTER_SOURCES = [
+    source for source, enabled in (
+        ("dbcan", RUN_DBCAN),
+        ("mobile", RUN_MOBILE),
+        ("antismash", RUN_ANTISMASH),
+        ("defense", RUN_DEFENSE),
+    )
+    if enabled
+]
+
+REPORT_SOURCE_NAMES = {
+    "virulence": "vfdb",
+    "amr": "ncbi_amrfinder",
+    "defense": "defensefinder",
+    "mobile": "genomad",
+    "structure": "uniprot_swissprot",
+}
+ENABLED_REPORT_SOURCES = sorted({
+    REPORT_SOURCE_NAMES.get(source, source)
+    for source in ENABLED_GENE_SOURCES + ENABLED_CLUSTER_SOURCES
+})
+
+ANNOTATION_DATABASES = {}
+if RUN_KEGG:
+    ANNOTATION_DATABASES["kegg"] = config["KEGG_DB"]
+if RUN_CAZY:
+    ANNOTATION_DATABASES["cazy"] = config["CAZY_DB"]
+if RUN_PFAM:
+    ANNOTATION_DATABASES["pfam"] = config["PFAM_DB"]
+if RUN_VIRULENCE:
+    ANNOTATION_DATABASES["vfdb"] = config["VFDB_DB"]
+if RUN_AMR:
+    ANNOTATION_DATABASES["amr"] = config["AMR_DB"]
+if RUN_DBCAN:
+    ANNOTATION_DATABASES["dbcan"] = DBCAN_DB
+if RUN_ANTISMASH:
+    ANNOTATION_DATABASES["antismash"] = ANTISMASH_DB
+if RUN_DEFENSE:
+    ANNOTATION_DATABASES["defensefinder"] = DEFENSEFINDER_DB
+if RUN_MOBILE:
+    ANNOTATION_DATABASES["genomad"] = GENOMAD_DB
+if RUN_STRUCTURE:
+    ANNOTATION_DATABASES["foldseek"] = FOLDSEEK_DB
+
+ANNOTATION_TOOLS = {}
+if RUN_KEGG or RUN_PFAM or RUN_AMR:
+    ANNOTATION_TOOLS["hmmer"] = HMMER_MODULE
+if RUN_VIRULENCE:
+    ANNOTATION_TOOLS["mmseqs2"] = MMSEQS2_MODULE
+if RUN_SIGNALP:
+    ANNOTATION_TOOLS["signalp"] = SIGNALP_MODULE
+if RUN_MOBILE:
+    ANNOTATION_TOOLS["genomad"] = GENOMAD_MODULE
+if RUN_STRUCTURE:
+    ANNOTATION_TOOLS["foldseek"] = FOLDSEEK_MODULE
+
+ANNOTATION_ENVIRONMENTS = {
+    "functional": f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml",
+}
+if RUN_CAZY or RUN_DBCAN:
+    ANNOTATION_ENVIRONMENTS["dbcan"] = (
+        f"{PACKAGE_DIR}/workflow/envs/annotating_function_dbcan.yaml"
+    )
+
+
+def assignment_args(values):
+    return " ".join(shlex.quote(f"{key}={value}") for key, value in values.items())
 
 
 def selected_gene_annotation_inputs(wildcards):
@@ -64,7 +154,7 @@ def selected_gene_annotation_inputs(wildcards):
     if RUN_KEGG:
         selected.append(f"{OUTPUT_DIR}/annotating/kegg/{wildcards.mag}.tsv")
     if RUN_CAZY:
-        selected.append(f"{OUTPUT_DIR}/annotating/cazy/{wildcards.mag}.tsv")
+        selected.append(f"{OUTPUT_DIR}/annotating/cazy/{wildcards.mag}/dbCAN_hmm_results.tsv")
     if RUN_PFAM:
         selected.append(f"{OUTPUT_DIR}/annotating/pfam/{wildcards.mag}.tsv")
     if RUN_VIRULENCE:
@@ -89,7 +179,7 @@ def structure_gating_inputs(wildcards):
     if RUN_PFAM:
         gating.append(f"{OUTPUT_DIR}/annotating/pfam/{wildcards.mag}.tsv")
     if RUN_CAZY:
-        gating.append(f"{OUTPUT_DIR}/annotating/cazy/{wildcards.mag}.tsv")
+        gating.append(f"{OUTPUT_DIR}/annotating/cazy/{wildcards.mag}/dbCAN_hmm_results.tsv")
     return gating
 
 
@@ -152,7 +242,10 @@ rule kegg:
         """
         module purge
         module load {params.hmmer_module}
-        hmmscan -o {output.txt} --tblout {output.tsv} -E 1e-10 --noali {params.db} {input}
+        # KOfam acceptance is based on the per-model score cutoffs in ko_list.
+        # Keep HMMER's permissive reporting boundary here so a hit is not lost
+        # before merge_gene_annotations.py can apply its model-specific cutoff.
+        hmmscan -o {output.txt} --tblout {output.tsv} -E 10 --domE 10 --noali {params.db} {input}
         """
 
 rule select_kegg:
@@ -178,21 +271,38 @@ rule cazy:
     input:
         f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
     output:
-        txt=f"{OUTPUT_DIR}/annotating/cazy/{{mag}}.txt",
-        tsv=f"{OUTPUT_DIR}/annotating/cazy/{{mag}}.tsv"
+        f"{OUTPUT_DIR}/annotating/cazy/{{mag}}/dbCAN_hmm_results.tsv"
     params:
-        hmmer_module={HMMER_MODULE},
-        db={CAZY_DB}
+        db={CAZY_DB},
+        db_dir=f"{OUTPUT_DIR}/annotating/cazy/{{mag}}/db",
+        output_dir=f"{OUTPUT_DIR}/annotating/cazy/{{mag}}",
+        evalue=1e-15,
+        coverage=0.35
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/annotating_function_dbcan.yaml"
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
         runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10) * 2 ** (attempt - 1)))
-    message: "Annotating CAZYs of MAG {wildcards.mag}..."
+    message: "Annotating CAZymes of MAG {wildcards.mag} with dbCAN..."
     shell:
         """
-        module purge
-        module load {params.hmmer_module}
-        hmmscan -o {output.txt} --tblout {output.tsv} --noali {params.db} {input}
+        set -euo pipefail
+        mkdir -p "{params.db_dir}"
+        ln -sfn "{params.db}" "{params.db_dir}/dbCAN.hmm"
+        run_dbcan CAZyme_annotation \
+            --input_raw_data {input} \
+            --mode protein \
+            --output_dir {params.output_dir} \
+            --db_dir {params.db_dir} \
+            --methods hmm \
+            --e_value_threshold_dbcan {params.evalue} \
+            --coverage_threshold_dbcan {params.coverage} \
+            --threads {threads}
+        if [ ! -s "{output}" ]; then
+            echo "ERROR: dbCAN did not produce a non-empty coverage-filtered HMM result: {output}" >&2
+            exit 1
+        fi
         """
 
 rule pfam:
@@ -237,7 +347,7 @@ rule vfdb:
         module purge
         module load {params.mmseqs2_module}
         mmseqs easy-search {input} {params.db} {output} {params.tmp} \
-            --format-output query,target,pident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits
+            --format-output query,target,pident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,qlen,tlen,qcov,tcov
         """
 
 rule amr:
@@ -305,7 +415,7 @@ rule foldseek_orphans:
         PYTHON_BIN="${{CONDA_PREFIX}}/bin/python"
         $PYTHON_BIN {params.package_dir}/workflow/scripts/extract_unannotated_genes.py \
             -faa {input.faa} \
-            -hmmer {input.gating} \
+            -annotations {input.gating} \
             -evalue {params.evalue} \
             -o {output}
         """
@@ -348,20 +458,25 @@ rule merge_gene_annotations:
         gff=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.gff",
         selected=selected_gene_annotation_inputs
     output:
-        f"{OUTPUT_DIR}/annotating/final/{{mag}}_genes.tsv"
+        table=f"{OUTPUT_DIR}/annotating/final/{{mag}}_genes.tsv",
+        qc=f"{OUTPUT_DIR}/annotating/final/{{mag}}_genes.qc.json"
     params:
         package_dir={PACKAGE_DIR},
+        mag=lambda wildcards: wildcards.mag,
         kegg_db={KEGG_DB_JSON},
         kegg_cutoffs={KEGG_DB_KOLIST},
         ec_db={PFAM_DB_EC},
         vf_db={VFDB_DB_TSV},
         amr_db={AMR_DB_TSV},
         foldseek_db={FOLDSEEK_MAP_DB},
+        sources=",".join(ENABLED_GENE_SOURCES),
         evalue={ANNOTATION_EVALUE},
         identity={ANNOTATION_IDENTITY},
+        query_coverage={ANNOTATION_QUERY_COVERAGE},
+        target_coverage={ANNOTATION_TARGET_COVERAGE},
         kegg=lambda wildcards: f"{OUTPUT_DIR}/annotating/kegg/{wildcards.mag}.tsv",
         pfam=lambda wildcards: f"{OUTPUT_DIR}/annotating/pfam/{wildcards.mag}.tsv",
-        cazy=lambda wildcards: f"{OUTPUT_DIR}/annotating/cazy/{wildcards.mag}.tsv",
+        cazy=lambda wildcards: f"{OUTPUT_DIR}/annotating/cazy/{wildcards.mag}/dbCAN_hmm_results.tsv",
         vf=lambda wildcards: f"{OUTPUT_DIR}/annotating/vfdb/{wildcards.mag}.txt",
         amr=lambda wildcards: f"{OUTPUT_DIR}/annotating/amr/{wildcards.mag}.tsv",
         signalp=lambda wildcards: f"{OUTPUT_DIR}/annotating/signalp/{wildcards.mag}.txt",
@@ -382,6 +497,7 @@ rule merge_gene_annotations:
         echo "INFO Using python from $PYTHON_BIN"
         $PYTHON_BIN {params.package_dir}/workflow/scripts/merge_gene_annotations.py \
             -gff {input.gff} \
+            --mag {params.mag} \
             -kegg {params.kegg} \
             -keggdb {params.kegg_db} \
             -keggcutoffs {params.kegg_cutoffs} \
@@ -396,9 +512,13 @@ rule merge_gene_annotations:
             -defense {params.defense} \
             -foldseek {params.foldseek} \
             -foldseekdb {params.foldseek_db} \
+            --sources {params.sources} \
             --evalue {params.evalue} \
             --identity {params.identity} \
-            -o {output}
+            --query-coverage {params.query_coverage} \
+            --target-coverage {params.target_coverage} \
+            --qc-output {output.qc} \
+            -o {output.table}
         """
 
 rule dbcan:
@@ -663,9 +783,12 @@ rule merge_cluster_annotations:
     input:
         selected=selected_cluster_annotation_inputs
     output:
-        f"{OUTPUT_DIR}/annotating/final/{{mag}}_clusters.tsv"
+        table=f"{OUTPUT_DIR}/annotating/final/{{mag}}_clusters.tsv",
+        qc=f"{OUTPUT_DIR}/annotating/final/{{mag}}_clusters.qc.json"
     params:
         package_dir={PACKAGE_DIR},
+        mag=lambda wildcards: wildcards.mag,
+        sources=",".join(ENABLED_CLUSTER_SOURCES),
         dbcan=lambda wildcards: f"{OUTPUT_DIR}/annotating/dbcan/{wildcards.mag}.tsv",
         genomad=lambda wildcards: f"{OUTPUT_DIR}/annotating/genomad/{wildcards.mag}.tsv",
         antismash=lambda wildcards: f"{OUTPUT_DIR}/annotating/antismash/{wildcards.mag}.tsv",
@@ -688,7 +811,10 @@ rule merge_cluster_annotations:
             -genomad {params.genomad} \
             -antismash {params.antismash} \
             -defense {params.defense} \
-            -o {output}
+            --mag {params.mag} \
+            --sources {params.sources} \
+            --qc-output {output.qc} \
+            -o {output.table}
         """
 
 rule final_gene_annotation_table:
@@ -721,4 +847,76 @@ rule final_cluster_annotation_table:
     shell:
         """
         awk 'FNR==1 && NR!=1 {{ next }} {{ print }}' {input} | xz -c > {output}
+        """
+
+
+rule annotation_report:
+    input:
+        qc=[
+            *(
+                expand(f"{OUTPUT_DIR}/annotating/final/{{mag}}_genes.qc.json", mag=mags)
+                if RUN_GENE_ANNOTATIONS else []
+            ),
+            *(
+                expand(f"{OUTPUT_DIR}/annotating/final/{{mag}}_clusters.qc.json", mag=mags)
+                if RUN_CLUSTER_ANNOTATIONS else []
+            ),
+        ],
+        tables=[
+            *(
+                [f"{OUTPUT_DIR}/annotating/gene_annotations.tsv.xz"]
+                if RUN_GENE_ANNOTATIONS else []
+            ),
+            *(
+                [f"{OUTPUT_DIR}/annotating/cluster_annotations.tsv.xz"]
+                if RUN_CLUSTER_ANNOTATIONS else []
+            ),
+        ]
+    output:
+        manifest=f"{OUTPUT_DIR}/annotating/annotation_manifest.yaml",
+        qc=f"{OUTPUT_DIR}/annotating/annotation_qc.tsv"
+    params:
+        package_dir={PACKAGE_DIR},
+        sources=",".join(ENABLED_REPORT_SOURCES),
+        thresholds=assignment_args({
+            "annotation_evalue": ANNOTATION_EVALUE,
+            "annotation_identity_percent": ANNOTATION_IDENTITY,
+            "annotation_query_coverage": ANNOTATION_QUERY_COVERAGE,
+            "annotation_target_coverage": ANNOTATION_TARGET_COVERAGE,
+            "kofam_acceptance": "native_model_cutoffs",
+        }),
+        databases=assignment_args(ANNOTATION_DATABASES),
+        tools=assignment_args(ANNOTATION_TOOLS),
+        environments=assignment_args(ANNOTATION_ENVIRONMENTS),
+        tables=assignment_args({
+            **(
+                {"gene_annotations": f"{OUTPUT_DIR}/annotating/gene_annotations.tsv.xz"}
+                if RUN_GENE_ANNOTATIONS else {}
+            ),
+            **(
+                {"cluster_annotations": f"{OUTPUT_DIR}/annotating/cluster_annotations.tsv.xz"}
+                if RUN_CLUSTER_ANNOTATIONS else {}
+            ),
+        })
+    threads:
+        1
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
+    resources:
+        mem_mb=cap_mem_mb(1024),
+        runtime=cap_runtime(15)
+    message: "Writing annotation provenance manifest and QC summary..."
+    shell:
+        """
+        PYTHON_BIN="${{CONDA_PREFIX}}/bin/python"
+        $PYTHON_BIN {params.package_dir}/workflow/scripts/write_annotation_report.py \
+            --qc-input {input.qc} \
+            --manifest-output {output.manifest} \
+            --qc-output {output.qc} \
+            --enabled-sources {params.sources} \
+            --threshold {params.thresholds} \
+            --database {params.databases} \
+            --tool {params.tools} \
+            --environment {params.environments} \
+            --table {params.tables}
         """

@@ -8,6 +8,84 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.0.0] - 2026-08-25
+
+### Breaking changes
+
+- `gene_annotations.tsv.xz` is now a lossless long-form hit table instead of a
+  one-row-per-gene wide summary. Every row includes explicit MAG and gene
+  coordinates, annotation source, method and evidence provenance, hit rank,
+  primary-hit status, native scores and alignment coordinates. All qualifying
+  hits are retained; source-specific fields are stored as structured JSON in
+  `details`. A Prodigal row keeps every gene in the table even when it has no
+  functional annotation. Existing gene tables must be regenerated, and 1.x
+  consumers must migrate from database-specific columns to the `source`,
+  `annotation_id`, and `annotation` fields documented in the
+  [annotation table reference](docs/source/annotation_tables.rst).
+- `cluster_annotations.tsv.xz` now includes explicit `mag` and stable
+  `cluster_id` fields plus method, evidence, and native-record provenance.
+  Cluster inputs are schema-validated, and DefenseFinder system identifiers
+  are no longer written into the `contig` column.
+
+### Changed
+
+- KOfam searches now retain HMMER's permissively reported candidates so the
+  per-model full-sequence or domain bit-score thresholds from `ko_list` are
+  authoritative; a global `1e-10` reporting filter no longer discards hits
+  before those native cutoffs can be applied.
+- KEGG annotation now fails if its native KOfam `ko_list` cutoff table is
+  missing or empty instead of silently changing to a global e-value policy.
+- VFDB/MMseqs searches now retain query and target lengths and coverage, with
+  configurable minimum query and target coverage fractions (both default to
+  `0.5`) in addition to identity and e-value filtering.
+- Primary hits are ranked with source-specific evidence: KOfam cutoff margin,
+  Pfam/AMR bit score, dbCAN coverage, VFDB alignment coverage then identity and
+  bit score, or native predictor confidence. `rank_score` and
+  `rank_score_type` record the ranking basis.
+- Functional annotation writes `annotation_manifest.yaml` and
+  `annotation_qc.tsv`, tying result-table checksums to enabled sources,
+  filters, configured tool modules and environments, database releases, and
+  per-MAG retained/rejected/unmapped record counts.
+- Structure annotation with Foldseek/ProstT5 remains work in progress. It is no
+  longer advertised or accepted as an annotation target in 2.0.0, and its
+  experimental database installer is not exposed by the CLI.
+- CAZy gene annotation now consumes dbCAN's coverage-aware HMM output instead
+  of filtering raw `hmmscan` hits only by Drakkar's global e-value. Accepted
+  calls use dbCAN's native `i-Evalue < 1e-15` and HMM coverage `> 0.35` rules;
+  every accepted non-overlapping CAZyme domain is retained.
+- The supported Python floor is now 3.10, matching syntax already used by the
+  package. Tests run on Python 3.10, 3.11, and 3.12.
+- The dbCAN environment pins Python 3.12 and pyhmmer 0.11.4. dbCAN 5.2.5 is
+  incompatible with pyhmmer 0.12's string-returning alignment API and can exit
+  successfully after its HMM search fails; the CAZy rule now also rejects a
+  missing or empty coverage-filtered result explicitly.
+- Tag-triggered releases now rerun the complete test suite on Python 3.10,
+  3.11, and 3.12 before building or publishing artifacts, and verify that the
+  tag matches the package version. Release instructions stage new files and
+  wait for main-branch CI before creating the tag.
+- Package metadata now exposes project links and classifiers, and installation
+  documentation distinguishes the PyPI release from the GitHub development
+  version while making the module-based HPC runtime requirement explicit.
+
+### Fixed
+
+- Partial functional reruns now merge only explicitly enabled sources, so
+  stale files from a previously enabled gene or cluster annotation cannot leak
+  into the new combined tables.
+- Gene annotation merging now fails if the Prodigal GFF yields duplicate gene
+  identifiers or if any functional hit does not resolve to a Prodigal gene in
+  the same MAG, preventing invalid rows with missing coordinates.
+- Repeated KO placements in the KEGG hierarchy are collapsed before joining
+  hierarchy metadata to KOfam results, preventing one biological hit from
+  being duplicated and ranked multiple times in the long-form table. Distinct
+  EC associations remain preserved on the single hit row.
+- VFDB Set B mapping now reads the VFC-bearing classification block instead of
+  misidentifying the terminal organism block as `vf_type`. Corrected mappings
+  carry `mapping_schema=drakkar-vfdb-v2`; Drakkar refuses legacy mappings with
+  an actionable rebuild instruction. Install a fresh VFDB release with
+  `drakkar database vfdb --directory /path/to/vfdb --set-default` before
+  rerunning virulence annotation.
+
 ## [1.8.22] - 2026-08-20
 
 ### Added
@@ -244,6 +322,10 @@ This project tracks release notes here from this point forward.
   decompresses it to `*_ko_list.tsv`.
 
 ## [1.8.9] - 2026-06-19
+
+> Historical note: the structure features described below were experimental.
+> They remain work in progress and their annotation target and database command
+> are not available in Drakkar 2.0.0.
 
 ### Added
 

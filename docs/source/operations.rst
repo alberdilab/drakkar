@@ -54,6 +54,9 @@ Supported database subcommands:
 - ``vfdb``
 - ``amr``
 
+Foldseek/ProstT5 structure annotation and its database installer remain work in
+progress and are not available through the Drakkar 2.0.0 CLI.
+
 Examples:
 
 .. code-block:: console
@@ -138,7 +141,9 @@ Database-specific rules:
   current ``VFDB_setB_pro.fas.gz`` from
   ``https://www.mgc.ac.cn/VFs/Down/VFDB_setB_pro.fas.gz``, creates the MMseqs2
   database, and if ``--version`` is omitted it uses the UTC download date as
-  the release folder and logged version.
+  the release folder and logged version. Drakkar 2.0 uses a corrected,
+  schema-marked mapping table; install a fresh dated release after upgrading
+  because 1.x mappings can label the organism as the virulence-factor type.
 
 Version logging:
 
@@ -464,7 +469,8 @@ Flags:
 - ``--all``: transfer the entire output directory.
 - ``--data``: transfer everything except ``.snakemake``.
 - ``--results``: transfer the union of ``-a/-m/-p/-b/-e``.
-- ``-a/--annotations``: annotation outputs.
+- ``-a/--annotations``: annotation tables, taxonomy, provenance manifest, and
+  QC summary.
 - ``-m/--mags``: dereplicated MAGs.
 - ``-p/--profile``: profiling outputs.
 - ``-e/--expression``: expression outputs.
@@ -504,7 +510,8 @@ Key output locations:
 - ``cataloging.tsv``: assembly, mapping, and binning summary table.
 - ``profiling_genomes/``: dereplication, mapping, and abundance tables.
 - ``profiling_pangenomes/``: pangenome profiling outputs.
-- ``annotating/``: annotation tables.
+- ``annotating/``: annotation tables and provenance sidecars; see
+  :doc:`annotation_tables` for the gene-table schema and 1.x migration guide.
 - ``expressing/``: expression outputs.
 - ``dereplicating/``: dereplicated genomes in dereplication-only mode.
 - ``benchmark/``: per-SLURM-job resource tables written after each workflow run.

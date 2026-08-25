@@ -21,6 +21,8 @@ def collect_transfer_files(base_dir, args):
     def add_annotations():
         add_file(Path("annotating/cluster_annotations.tsv.xz"))
         add_file(Path("annotating/gene_annotations.tsv.xz"))
+        add_file(Path("annotating/annotation_manifest.yaml"))
+        add_file(Path("annotating/annotation_qc.tsv"))
         add_file(Path("annotating/genome_taxonomy.tsv"))
 
     def add_mags():

@@ -267,6 +267,8 @@ def run_snakemake_annotating(
     slurm_resources="",
     annotation_evalue=None,
     annotation_identity=None,
+    annotation_query_coverage=None,
+    annotation_target_coverage=None,
     gtdb_scratch=False,
 ):
     """ Run the annotating workflow """
@@ -278,6 +280,10 @@ def run_snakemake_annotating(
         annotation_filter_config += f"annotation_evalue={annotation_evalue} "
     if annotation_identity is not None:
         annotation_filter_config += f"annotation_identity={annotation_identity} "
+    if annotation_query_coverage is not None:
+        annotation_filter_config += f"annotation_query_coverage={annotation_query_coverage} "
+    if annotation_target_coverage is not None:
+        annotation_filter_config += f"annotation_target_coverage={annotation_target_coverage} "
     resource_overrides = resource_config(memory_multiplier, time_multiplier)
     default_resources = default_resource_args(memory_multiplier, time_multiplier, slurm_resources)
     snakemake_command = [

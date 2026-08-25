@@ -67,11 +67,16 @@ Options:
 - ``-t/--type``: profiling type (``genomes`` or ``pangenomes``).
 - ``--annotation-type``: comma-separated annotation targets. See *Annotating*
   below for the full set.
-- ``--annotation-evalue``: maximum e-value for merged gene annotation hits
-  (default: ``1e-10``).
+- ``--annotation-evalue``: maximum fallback e-value for applicable merged gene
+  annotation hits (default: ``1e-10``); sources with native cutoffs retain
+  those policies.
 - ``--annotation-identity``: minimum percent identity for merged gene
   annotation hits with identity values, currently VFDB/MMseqs hits
   (default: ``50``).
+- ``--annotation-query-coverage``: minimum VFDB/MMseqs query coverage as a
+  fraction from 0 to 1 (default: ``0.5``).
+- ``--annotation-target-coverage``: minimum VFDB/MMseqs target coverage as a
+  fraction from 0 to 1 (default: ``0.5``).
 - ``--min-completeness`` / ``--max-contamination`` / ``--min-bin-length`` /
   ``--max-bin-length``: bin filtering thresholds applied by Binette during
   cataloging. See *Cataloging* below.
@@ -261,13 +266,23 @@ Options:
   - ``defense``: DefenseFinder systems and genes.
   - ``mobile`` (alias: ``genomad``): geNomad mobile and viral regions.
   - ``network``: metabolic network reconstruction.
+
+Structure annotation with Foldseek/ProstT5 remains work in progress. It is not
+an available ``--annotation-type`` in Drakkar 2.0.0, and the experimental
+database preparation command is not exposed by the CLI.
+
 - ``--gtdb-version``: GTDB release number for taxonomy annotation. DRAKKAR uses
   ``GTDB_DB_<version>`` from ``config.yaml``; if omitted, it uses ``GTDB_DB``.
-- ``--annotation-evalue``: maximum e-value for merged gene annotation hits
-  (default: ``1e-10``).
+- ``--annotation-evalue``: maximum fallback e-value for applicable merged gene
+  annotation hits (default: ``1e-10``); sources with native cutoffs retain
+  those policies.
 - ``--annotation-identity``: minimum percent identity for merged gene
   annotation hits with identity values, currently VFDB/MMseqs hits
   (default: ``50``).
+- ``--annotation-query-coverage``: minimum VFDB/MMseqs query coverage as a
+  fraction from 0 to 1 (default: ``0.5``).
+- ``--annotation-target-coverage``: minimum VFDB/MMseqs target coverage as a
+  fraction from 0 to 1 (default: ``0.5``).
 - ``-e/--env_path``: shared Conda environment directory.
 - ``-p/--profile``: Snakemake profile.
 - ``--overwrite``: delete a locked output directory and rerun from scratch.
@@ -282,7 +297,51 @@ Output behavior for partial functional runs:
 - ``annotating/cluster_annotations.tsv.xz`` is generated when any cluster-level
   source is selected (``dbcan,antismash,defense,mobile``).
 - Merged tables are still generated from the available sources when only a
-  subset of functional components is selected.
+  subset of functional components is selected. Only explicitly enabled
+  sources are read; leftover source files from an earlier partial run are
+  ignored.
+- Functional runs also write ``annotating/annotation_manifest.yaml`` and
+  ``annotating/annotation_qc.tsv``.
+
+``gene_annotations.tsv.xz`` is a long-form table with one row per retained
+gene/source hit instead of one row per gene. A ``source=prodigal`` row keeps
+every predicted gene in the table, while functional sources can contribute
+several ranked rows. Use ``(mag, gene)`` as the gene key and
+``(mag, gene, source, hit_rank)`` as the row key. ``is_primary`` marks rank 1
+without discarding lower-ranked accepted evidence.
+
+See :doc:`annotation_tables` for a before/after example, the exact ordered
+schema and data types, source/method/evidence values, source-specific
+``details`` fields, a complete 1.x-to-2.0 migration map, and pandas/R examples.
+
+KOfam acceptance always requires the configured release's ``ko_list``. If the
+cutoff table is missing or empty, Drakkar stops with a database-reinstallation
+message rather than substituting a different scientific filter.
+
+``cluster_annotations.tsv.xz`` contains one row per retained region or system.
+Its stable columns are ``mag``, ``cluster_id``, ``contig``, ``start``, ``end``,
+``source``, ``method``, ``evidence``, ``type``, ``gene_count``, ``substrate``,
+``gene_functions``, ``pul_id``, and ``details``. Treat
+``(mag, source, cluster_id)`` as the unique cluster key. ``details`` preserves
+the complete native summary record, and source schema changes fail loudly
+instead of producing blank columns.
+
+The annotation sidecars provide run-level auditability:
+
+- ``annotation_manifest.yaml`` records Drakkar's version, enabled sources,
+  filters, configured tool modules and Conda dependencies, database paths and
+  available installation checksums, plus checksums of the final annotation
+  tables.
+- ``annotation_qc.tsv`` reports per-MAG/source input records, retained records,
+  rejected records when Drakkar performs the filtering, missing mappings or
+  coordinates, unique genes/clusters, and whether filtering occurred upstream
+  or during merging. A blank rejected count means the upstream tool emitted
+  only accepted calls, so the rejected total is unavailable.
+
+The 2.0 gene table is intentionally not append- or column-compatible with 1.x.
+Regenerate the annotation outputs after upgrading; do not concatenate old and
+new tables. The complete migration procedure, including the required VFDB
+mapping rebuild, is documented under :ref:`migrating-gene-tables-2`.
 
 Expressing
 ^^^^^^^^^^

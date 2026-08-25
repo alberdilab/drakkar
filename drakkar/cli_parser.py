@@ -12,6 +12,7 @@ from drakkar.cli_validation import (
     percent_float,
     percent_int,
     positive_int,
+    unit_interval_float,
 )
 from drakkar.database_registry import MANAGED_DATABASES
 
@@ -32,6 +33,22 @@ def add_annotation_filter_arguments(parser):
         type=percent_float,
         default=None,
         help="Minimum percent identity for merged gene annotation hits with identity values. Default: config value, initially 50.",
+    )
+    parser.add_argument(
+        "--annotation-query-coverage",
+        dest="annotation_query_coverage",
+        required=False,
+        type=unit_interval_float,
+        default=None,
+        help="Minimum VFDB/MMseqs query coverage as a fraction from 0 to 1. Default: config value, initially 0.5.",
+    )
+    parser.add_argument(
+        "--annotation-target-coverage",
+        dest="annotation_target_coverage",
+        required=False,
+        type=unit_interval_float,
+        default=None,
+        help="Minimum VFDB/MMseqs target coverage as a fraction from 0 to 1. Default: config value, initially 0.5.",
     )
 
 
@@ -108,7 +125,7 @@ def build_parser():
         default="taxonomy,function",
         help=(
             "Comma-separated annotation targets. Options: taxonomy, function, genes, clusters, "
-            "kegg, cazy, pfam, virulence (vfdb), amr, signalp, structure (foldseek), dbcan, antismash, "
+            "kegg, cazy, pfam, virulence (vfdb), amr, signalp, dbcan, antismash, "
             "defense, mobile (genomad), network. Default: taxonomy,function"
         ),
     )
@@ -223,7 +240,7 @@ def build_parser():
         default="taxonomy,function",
         help=(
             "Comma-separated annotation targets. Options: taxonomy, function, genes, clusters, "
-            "kegg, cazy, pfam, virulence (vfdb), amr, signalp, structure (foldseek), dbcan, antismash, "
+            "kegg, cazy, pfam, virulence (vfdb), amr, signalp, dbcan, antismash, "
             "defense, mobile (genomad), network. Default: taxonomy,function"
         ),
     )
@@ -295,7 +312,6 @@ def build_parser():
     database_pfam = database_subparsers.add_parser("pfam", parents=[database_parent], help="Install or update the PFAM database")
     database_vfdb = database_subparsers.add_parser("vfdb", parents=[database_parent], help="Install or update the VFDB database")
     database_amr = database_subparsers.add_parser("amr", parents=[database_parent], help="Install or update the AMR database")
-    database_foldseek = database_subparsers.add_parser("foldseek", parents=[database_parent], help="Install or update the Foldseek bundle (AlphaFold/Swiss-Prot DB, ProstT5 model, UniProt function map)")
     
     subparser_environments = subparsers.add_parser("environments", help="Pre-build Drakkar conda environments, or list and prune the ones no longer in use")
     subparser_environments.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
@@ -391,7 +407,7 @@ def build_parser():
         ],
         sections=[
             ("Input Sources", ["input", "file", "reference", "reference_index"]),
-            ("Workflow Scope", ["mode", "binners", "type", "annotation_type", "gtdb_version", "gtdb_scratch", "annotation_evalue", "annotation_identity", "min_completeness", "max_contamination", "min_bin_length", "max_bin_length", "multicoverage", "fraction", "nonpareil", "sanitize", "ani"]),
+            ("Workflow Scope", ["mode", "binners", "type", "annotation_type", "gtdb_version", "gtdb_scratch", "annotation_evalue", "annotation_identity", "annotation_query_coverage", "annotation_target_coverage", "min_completeness", "max_contamination", "min_bin_length", "max_bin_length", "multicoverage", "fraction", "nonpareil", "sanitize", "ani"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
             ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
@@ -484,7 +500,7 @@ def build_parser():
         ],
         sections=[
             ("Input Genomes", ["bins_dir", "bins_file"]),
-            ("Annotation Scope", ["annotation_type", "gtdb_version", "gtdb_scratch", "annotation_evalue", "annotation_identity"]),
+            ("Annotation Scope", ["annotation_type", "gtdb_version", "gtdb_scratch", "annotation_evalue", "annotation_identity", "annotation_query_coverage", "annotation_target_coverage"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
             ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),

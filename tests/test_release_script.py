@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from datetime import date
+import contextlib
 import importlib.util
+import io
 from pathlib import Path
+import re
 import sys
 import unittest
 
@@ -19,6 +22,39 @@ def _load_release_module():
 
 
 class ReleaseScriptTests(unittest.TestCase):
+    def test_package_declares_actual_minimum_python(self) -> None:
+        pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
+        match = re.search(r'^requires-python = "([^"]+)"$', pyproject, re.MULTILINE)
+        self.assertIsNotNone(match)
+        self.assertEqual(match.group(1), ">=3.10")
+
+    def test_release_workflow_gates_artifacts_on_all_supported_pythons(self) -> None:
+        workflow = Path(".github/workflows/release.yml").read_text(encoding="utf-8")
+        self.assertIn('python-version: ["3.10", "3.11", "3.12"]', workflow)
+        self.assertRegex(workflow, r"(?m)^  build:\n(?:.*\n)*?    needs: test$")
+        self.assertIn('test "v${package_version}" = "${GITHUB_REF_NAME}"', workflow)
+
+    def test_release_next_steps_stage_new_files_before_committing(self) -> None:
+        release = _load_release_module()
+        plan = release.ReleasePlan(
+            version="2.0.0",
+            release_date="2026-08-24",
+            run_tests=True,
+            run_build=True,
+            run_twine_check=True,
+            dry_run=False,
+        )
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            release.print_release_plan(plan, [])
+
+        # The actionable next steps are printed by main after the plan. Keep a
+        # source-level guard so new files cannot silently be missed again.
+        source = Path("scripts/release.py").read_text(encoding="utf-8")
+        self.assertIn("git add -A", source)
+        self.assertNotIn("git commit -am", source)
+        self.assertIn("Wait for the Python 3.10-3.12 test workflow", source)
+
     def test_update_pyproject_version_rewrites_single_version_line(self) -> None:
         release = _load_release_module()
         content = '[project]\nname = "drakkar"\nversion = "1.0.1"\n'

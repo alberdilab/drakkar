@@ -114,6 +114,7 @@ def summarize(summary_rows, gene_rows):
         annotated = [f"{f} [{n}]" for f, n in freq.items()]
 
         summaries.append({
+            "cluster_id": seq,
             "contig": seq,
             "start": start,
             "end": end,
@@ -145,6 +146,7 @@ def write_summary(rows, out_path: Path):
             fh,
             delimiter="\t",
             fieldnames=[
+                "cluster_id",
                 "contig",
                 "start",
                 "end",

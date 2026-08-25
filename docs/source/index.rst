@@ -28,6 +28,9 @@ Find what you need
      - See :doc:`workflows` for the complete workflow and all analysis modules
        such as preprocessing, cataloging, profiling, annotating, expressing,
        dereplicating, and inspecting.
+   * - Interpret annotation tables or migrate results from Drakkar 1.x
+     - See :doc:`annotation_tables` for examples, schemas, source values,
+       migration mappings, and analysis recipes.
    * - Manage databases, logs, config, transfers, outputs, or troubleshooting
      - See :doc:`operations` for operational commands and maintenance tasks.
    * - Check the command-line command list at a glance
@@ -54,4 +57,5 @@ Documentation map
    :maxdepth: 1
    :caption: Reference
 
+   annotation_tables
    api

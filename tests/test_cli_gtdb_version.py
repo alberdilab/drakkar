@@ -60,6 +60,8 @@ class GtdbVersionTests(unittest.TestCase):
         self.assertNotIn("gtdb_version=", command)
         self.assertNotIn("annotation_evalue=", command)
         self.assertNotIn("annotation_identity=", command)
+        self.assertNotIn("annotation_query_coverage=", command)
+        self.assertNotIn("annotation_target_coverage=", command)
 
     def test_run_snakemake_annotating_passes_annotation_filters(self) -> None:
         with patch.object(cli_module, "config_vars", {"SNAKEMAKE_MODULE": "snakemake"}):
@@ -73,11 +75,15 @@ class GtdbVersionTests(unittest.TestCase):
                     "local",
                     annotation_evalue=1e-20,
                     annotation_identity=80,
+                    annotation_query_coverage=0.7,
+                    annotation_target_coverage=0.6,
                 )
 
         command = run_mock.call_args.args[0][2]
         self.assertIn("annotation_evalue=1e-20", command)
         self.assertIn("annotation_identity=80", command)
+        self.assertIn("annotation_query_coverage=0.7", command)
+        self.assertIn("annotation_target_coverage=0.6", command)
 
 
 if __name__ == "__main__":
