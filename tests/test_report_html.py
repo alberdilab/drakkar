@@ -188,9 +188,21 @@ def build_db(db_path: Path, sections=SECTION_ORDER) -> Path:
     return db_path
 
 
-class RenderTests(unittest.TestCase):
+class TemporaryRootMixin:
+    def temporary_root(self) -> Path:
+        """A temporary directory removed when the test ends.
+
+        ``TestCase.enterContext`` would do the same, but it only exists from
+        Python 3.11 onwards and Drakkar supports 3.10.
+        """
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        return Path(temporary.name)
+
+
+class RenderTests(TemporaryRootMixin, unittest.TestCase):
     def render(self, sections=SECTION_ORDER, seeded=SECTION_ORDER, root=None):
-        root = root or Path(self.enterContext(tempfile.TemporaryDirectory()))
+        root = root or self.temporary_root()
         db_path = build_db(root / "drakkar.db", seeded)
         html_path = root / "drakkar_report.html"
         outcome = render_report(db_path, html_path, sections=sections)
@@ -238,9 +250,9 @@ class RenderTests(unittest.TestCase):
         self.assertIn("genome_taxonomy", text)
 
 
-class MissingSectionTests(unittest.TestCase):
+class MissingSectionTests(TemporaryRootMixin, unittest.TestCase):
     def render(self, seeded, sections=SECTION_ORDER):
-        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        root = self.temporary_root()
         db_path = build_db(root / "drakkar.db", seeded)
         html_path = root / "drakkar_report.html"
         outcome = render_report(db_path, html_path, sections=sections)
@@ -273,7 +285,7 @@ class MissingSectionTests(unittest.TestCase):
         self.assertNotIn('id="section-preprocessing"', text)
 
     def test_a_section_present_but_empty_is_treated_as_missing(self):
-        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        root = self.temporary_root()
         db_path = build_db(root / "drakkar.db", ("preprocessing",))
         connection = sqlite3.connect(db_path)
         # A loader that found its file but wrote nothing must not produce a
@@ -287,7 +299,7 @@ class MissingSectionTests(unittest.TestCase):
         self.assertIn("preprocessing", outcome["skipped"])
 
     def test_a_database_missing_a_table_degrades(self):
-        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        root = self.temporary_root()
         db_path = build_db(root / "drakkar.db", ("preprocessing", "taxonomy"))
         connection = sqlite3.connect(db_path)
         connection.execute("DROP TABLE genome_taxonomy")
@@ -300,9 +312,9 @@ class MissingSectionTests(unittest.TestCase):
         self.assertIn("taxonomy", outcome["skipped"])
 
 
-class BoundedOutputTests(unittest.TestCase):
+class BoundedOutputTests(TemporaryRootMixin, unittest.TestCase):
     def test_large_tables_are_summarized_not_listed(self):
-        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        root = self.temporary_root()
         db_path = root / "drakkar.db"
         connection = connect(db_path)
         create_schema(connection, drakkar_version="2.1.0")
@@ -319,7 +331,7 @@ class BoundedOutputTests(unittest.TestCase):
         self.assertIn("Quantification covers 5,000 genes across 2 samples", text)
 
     def test_long_tables_are_truncated_with_a_note(self):
-        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        root = self.temporary_root()
         db_path = root / "drakkar.db"
         connection = connect(db_path)
         create_schema(connection, drakkar_version="2.1.0")
@@ -335,9 +347,9 @@ class BoundedOutputTests(unittest.TestCase):
         self.assertNotIn("<td>S99</td>", text)
 
 
-class EscapingTests(unittest.TestCase):
+class EscapingTests(TemporaryRootMixin, unittest.TestCase):
     def test_identifiers_are_escaped_into_the_page(self):
-        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        root = self.temporary_root()
         db_path = root / "drakkar.db"
         connection = connect(db_path)
         create_schema(connection, drakkar_version="2.1.0")
@@ -351,9 +363,9 @@ class EscapingTests(unittest.TestCase):
         self.assertNotIn("<script>alert(1)</script>", text)
 
 
-class ReportCommandRenderTests(unittest.TestCase):
+class ReportCommandRenderTests(TemporaryRootMixin, unittest.TestCase):
     def output_dir(self) -> Path:
-        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        root = self.temporary_root()
         (root / "preprocessing.tsv").write_text(
             textwrap.dedent("""
                 sample\treads_pre_fastp\treads_post_fastp\tmetagenomic_reads

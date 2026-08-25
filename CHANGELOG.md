@@ -8,6 +8,14 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.1.2] - 2026-08-25
+
+### Fixed
+
+- The `drakkar report` HTML tests used `unittest.TestCase.enterContext`, which
+  only exists from Python 3.11 onwards, so they errored on the Python 3.10 job.
+  They now register their temporary directories with `addCleanup` instead.
+
 ## [2.1.1] - 2026-08-25
 
 ### Added
