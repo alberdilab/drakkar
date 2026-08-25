@@ -33,6 +33,9 @@ Find what you need
        migration mappings, and analysis recipes.
    * - Manage databases, logs, config, transfers, outputs, or troubleshooting
      - See :doc:`operations` for operational commands and maintenance tasks.
+   * - Summarize a finished run, or query its results as a database
+     - See :doc:`report` for the ``drakkar report`` command and the schema of
+       the report database.
    * - Check the command-line command list at a glance
      - See :doc:`api` for the CLI reference.
 
@@ -58,4 +61,5 @@ Documentation map
    :caption: Reference
 
    annotation_tables
+   report
    api

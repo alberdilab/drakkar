@@ -79,6 +79,7 @@ Start here on Read the Docs:
 - `drakkar dereplicating`: run dereplication without read mapping.
 - `drakkar database`: install or update supported annotation databases.
 - `drakkar status`: show rule and sample progress for a workflow run.
+- `drakkar report`: build a queryable SQLite database and HTML summary of a run.
 - `drakkar logging`: inspect run metadata and Snakemake logs.
 - `drakkar config`: view or edit the installed workflow configuration.
 - `drakkar transfer`: transfer selected outputs via SFTP.

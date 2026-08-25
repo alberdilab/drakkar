@@ -9,6 +9,8 @@ from pathlib import Path
 
 import yaml
 
+import drakkar
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "drakkar" / "workflow" / "scripts" / "write_annotation_report.py"
@@ -81,7 +83,7 @@ class AnnotationReportTests(unittest.TestCase):
             with qc_output.open(encoding="utf-8", newline="") as handle:
                 qc_rows = list(csv.DictReader(handle, delimiter="\t"))
 
-        self.assertEqual(manifest["drakkar_version"], "2.0.0")
+        self.assertEqual(manifest["drakkar_version"], drakkar.__version__)
         self.assertEqual(manifest["enabled_sources"], ["kegg"])
         self.assertEqual(manifest["databases"]["kegg"]["files"][0]["sha256"], "abc123")
         self.assertEqual(manifest["configured_tools"]["hmmer"], "hmmer/3.4")

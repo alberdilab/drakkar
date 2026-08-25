@@ -64,6 +64,8 @@ from drakkar.workflow_launcher import (
     run_unlock,
 )
 
+from drakkar.report import run_report, run_report_probe
+
 def main():
     parser = build_parser()
     args = parser.parse_args()
@@ -207,6 +209,17 @@ def main():
             run_id=args.run,
             show_complete=args.complete,
             view=view,
+        )
+
+    elif args.command == "report":
+        if args.list_sections:
+            return run_report_probe(args.output)
+        return run_report(
+            args.output,
+            sections=args.sections,
+            db_only=args.db_only,
+            force=args.force,
+            primary_hits_only=args.primary_hits_only,
         )
 
     elif args.command == "transfer":

@@ -2,6 +2,7 @@ import argparse
 import re
 from datetime import datetime, timezone
 
+from drakkar import __version__
 from drakkar.cli_context import (
     CATALOGING_BINNER_ALIASES,
     CATALOGING_BINNER_ORDER,
@@ -34,7 +35,7 @@ def normalize_annotation_type(annotation_type):
     if any(item in {"structure", "foldseek"} for item in requested):
         print(
             f"{ERROR}ERROR:{RESET} Structure annotation with Foldseek/ProstT5 is "
-            "work in progress and is not available in Drakkar 2.0.0."
+            f"work in progress and is not available in Drakkar {__version__}."
         )
         return None
 

@@ -35,6 +35,7 @@ from drakkar import environments as _environments
 from drakkar import failures as _failures
 from drakkar import output_paths as _output_paths
 from drakkar import run_logs as _run_logs
+from drakkar import report as _report
 from drakkar import run_metadata as _run_metadata
 from drakkar import status as _status
 from drakkar import update_command as _update_command
@@ -456,6 +457,21 @@ def run_status(*args, **kwargs):
     return _status.run_status(*args, **kwargs)
 
 
+def _sync_report_dependencies():
+    _report.command.print = print
+    _report.command.section = section
+
+
+def run_report(*args, **kwargs):
+    _sync_report_dependencies()
+    return _report.run_report(*args, **kwargs)
+
+
+def run_report_probe(*args, **kwargs):
+    _sync_report_dependencies()
+    return _report.run_report_probe(*args, **kwargs)
+
+
 def run_unlock(*args, **kwargs):
     _sync_workflow_dependencies()
     return _workflow_launcher.run_unlock(*args, **kwargs)
@@ -540,6 +556,8 @@ def _sync_main_dependencies():
     _cli_main.write_launch_metadata = write_launch_metadata
     _cli_main.run_logging = run_logging
     _cli_main.run_status = run_status
+    _cli_main.run_report = run_report
+    _cli_main.run_report_probe = run_report_probe
     _cli_main.run_update = run_update
     _cli_main.run_sftp_transfer = run_sftp_transfer
     _cli_main.run_unlock = run_unlock

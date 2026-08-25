@@ -6,6 +6,7 @@ import re
 import unittest
 from pathlib import Path
 
+import drakkar
 from drakkar.cli import normalize_annotation_type
 from drakkar.cli_parser import build_parser
 
@@ -102,7 +103,9 @@ class AnnotationTableWorkflowTests(unittest.TestCase):
                     normalized = normalize_annotation_type(requested)
                 self.assertIsNone(normalized)
                 self.assertIn("work in progress", output.getvalue())
-                self.assertIn("not available in Drakkar 2.0.0", output.getvalue())
+                self.assertIn(
+                    f"not available in Drakkar {drakkar.__version__}", output.getvalue()
+                )
 
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             with self.assertRaises(SystemExit):

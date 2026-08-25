@@ -8,6 +8,53 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.1.0] - 2026-08-25
+
+### Added
+
+- New `drakkar report` command that builds `drakkar.db`, a lean SQLite
+  projection of whatever tables a Drakkar output directory contains. The
+  database is the single source of truth for the forthcoming HTML report, so
+  the source tables are read exactly once, at ingest.
+- The command screens the output directory and builds only the sections whose
+  inputs are present, naming the missing files for anything it skips. Sections
+  can also be selected explicitly with `--sections`
+  (`preprocessing`, `cataloging`, `dereplication`, `profiling`, `taxonomy`,
+  `function`, `expression`, `resources`, or `all`). `--list` reports what an
+  output directory can support without building anything.
+- `--db-only` skips HTML rendering, `--primary-hits-only` keeps just rank-1
+  annotation hits for a smaller database, and `--force` rebuilds an existing
+  one.
+- The database records its own provenance: `schema_version` stamps the layout
+  version and the Drakkar version that wrote it, and `ingest_log` records the
+  source file, size, modification time and row count behind every table.
+
+### Changed
+
+- `annotating/genome_taxonomy.tsv` is parsed rather than copied when it reaches
+  the report database. The file is a raw concatenation of the GTDB-Tk
+  summaries, so its semicolon-packed `classification` string is split into
+  seven rank columns and its free-text blob columns are dropped, leaving the
+  ranked lineage alongside the placement evidence (`ani`, `af`, `red_value`,
+  `msa_percent`, `warnings`).
+- The long-form annotation tables are decluttered on the way into the database:
+  gene coordinates move into a `gene` table instead of repeating on every hit
+  row, annotation labels move into an `annotation_term` dimension table instead
+  of repeating on every occurrence, the `details` JSON is dropped, and
+  `source=prodigal` rows are omitted from `gene_annotation` because `gene`
+  already records every predicted gene. The `.tsv.xz` tables remain the
+  lossless archival record.
+- Packed fields are normalized: `sample_mapping_rates`, `samples` and
+  `coverage_samples` become `assembly_sample` rows, the four `<binner>_bins`
+  columns become `assembly_binner` rows, and the wide `counts.tsv` / `bases.tsv`
+  matrices are melted into long-form `genome_count` rows.
+
+### Fixed
+
+- The "structure annotation is work in progress" message no longer hardcodes a
+  release number, so it reports the running Drakkar version instead of going
+  stale at each version bump.
+
 ## [2.0.0] - 2026-08-25
 
 ### Breaking changes

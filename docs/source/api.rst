@@ -53,6 +53,13 @@ environments deployed in the environment directory and flags the ones no
 longer used by the installed DRAKKAR version; with ``--prune`` it removes
 them (dry run unless ``--yes`` is given).
 
+report
+^^^^^^
+Build ``drakkar.db`` from a finished run's output tables, and render the HTML
+report from it. Only the sections whose inputs are present are built; use
+``--sections`` to narrow that further and ``--list`` to see what an output
+directory can support. See :doc:`report` for the database schema.
+
 unlock
 ^^^^^^
 Unlock a Snakemake working directory.
