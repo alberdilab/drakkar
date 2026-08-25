@@ -58,16 +58,26 @@ Options
 The HTML report
 ---------------
 
-``drakkar_report.html`` is a single self-contained file. The stylesheet is
-inlined and the Plotly bundle is embedded once, in the first figure, so the
-report opens on a laptop with no network connection and can be emailed or
-archived as-is. Nothing is fetched when the page loads.
+``drakkar_report.html`` is a single self-contained file. The stylesheet and a
+small navigation script are inlined and the Plotly bundle is embedded once, in
+the first figure, so the report opens on a laptop with no network connection
+and can be emailed or archived as-is. Nothing is fetched when the page loads.
 
-The page opens with a summary header — the Drakkar version that wrote the
+The page is a left sidebar beside the sections it describes. The sidebar holds
+the general information about the report — the Drakkar version that wrote the
 database, the report schema version, the run identifiers found in the output
 directory, the ingest timestamps, and which sections were rendered, which were
-unavailable, and which were excluded by ``--sections``. Sections that the
-database does not hold are named on the page rather than silently dropped.
+unavailable, and which were excluded by ``--sections`` — and, above it, the
+table of contents. Sections that the database does not hold are named there
+rather than silently dropped.
+
+The table of contents is also the navigation: one section is shown at a time,
+so the whole report is not laid out on a single scrolling page. Within a
+section, tables longer than twenty rows are paged in the browser — every row is
+still in the file, only twenty are on screen — and each table is preceded by
+the averages of its numeric columns, shown as highlights. Printing, or opening
+the page with scripting disabled, falls back to the flat page: every section
+stacked and every row listed.
 
 Each section is rendered from SQL aggregates only. ``gene_annotation``,
 ``cluster_annotation`` and ``gene_expression`` can hold tens of millions of

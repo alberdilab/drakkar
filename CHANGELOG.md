@@ -8,6 +8,25 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.1.3] - 2026-08-25
+
+### Changed
+
+- `drakkar_report.html` now opens as a left sidebar beside the report body.
+  The sidebar carries the general information about the report — versions,
+  runs, ingest window, and which sections were rendered, unavailable or
+  excluded — together with the table of contents, which doubles as the
+  navigation: one section is shown at a time instead of the whole report
+  being laid out on a single page.
+- Tables longer than twenty rows are paged in the browser. Every row is still
+  written into the file, so the page remains complete when printed or opened
+  without scripting; only twenty are on screen at a time.
+- Every table is now preceded by the averages of its relevant numeric columns,
+  shown as highlight cards, so per-sample and per-assembly tables state their
+  central tendency before the reader scans the rows. The catalogue summary and
+  the quantified-gene lengths, previously two-column metric tables, are shown
+  as those same cards.
+
 ## [2.1.2] - 2026-08-25
 
 ### Fixed

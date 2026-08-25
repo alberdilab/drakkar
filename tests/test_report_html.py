@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from drakkar.report import command as report_command
-from drakkar.report.render import TABLE_ROW_LIMIT, render_report
+from drakkar.report.render import PAGE_ROWS, TABLE_ROW_LIMIT, render_report
 from drakkar.report.schema import connect, create_schema
 from drakkar.report.sources import SECTION_ORDER
 
@@ -248,6 +248,97 @@ class RenderTests(TemporaryRootMixin, unittest.TestCase):
         _, text, _ = self.render()
         self.assertIn('id="section-provenance"', text)
         self.assertIn("genome_taxonomy", text)
+
+
+class LayoutTests(TemporaryRootMixin, unittest.TestCase):
+    """The page is a sidebar beside one panel at a time, and degrades without JS."""
+
+    def render(self, sections=SECTION_ORDER, seeded=SECTION_ORDER, samples=2):
+        root = self.temporary_root()
+        db_path = root / "drakkar.db"
+        connection = connect(db_path)
+        try:
+            create_schema(connection, drakkar_version="2.1.0")
+            for name in seeded:
+                if name == "preprocessing":
+                    seed_preprocessing(connection, samples=samples)
+                else:
+                    SEEDERS[name](connection)
+            connection.commit()
+        finally:
+            connection.close()
+        html_path = root / "drakkar_report.html"
+        render_report(db_path, html_path, sections=sections)
+        return html_path.read_text(encoding="utf-8")
+
+    def test_the_sidebar_holds_the_details_and_the_contents(self):
+        text = self.render()
+        sidebar = text[text.index('<aside class="sidebar">'):text.index("</aside>")]
+        self.assertIn("Drakkar version", sidebar)
+        self.assertIn("Sections rendered", sidebar)
+        self.assertIn('<nav class="toc', sidebar)
+        self.assertIn('href="#section-taxonomy"', sidebar)
+        # Nothing of the sections themselves may leak into it.
+        self.assertNotIn("plotly", sidebar)
+
+    def test_each_section_is_a_panel_and_only_the_first_opens(self):
+        text = self.render()
+        panels = re.findall(r'<section class="panel([^"]*)" id="section-([a-z]+)"', text)
+        self.assertEqual([name for _, name in panels],
+                         list(SECTION_ORDER) + ["provenance"])
+        self.assertEqual([extra for extra, _ in panels if extra], [" is-active"])
+
+    def test_the_first_contents_entry_matches_the_open_panel(self):
+        text = self.render(sections=("taxonomy", "resources"))
+        self.assertIn('<a href="#section-taxonomy" class="is-active">', text)
+        self.assertIn('<section class="panel is-active" id="section-taxonomy"', text)
+
+    def test_the_script_is_inline_and_the_markup_stands_without_it(self):
+        text = self.render()
+        # No script means no panel switching and no paging: the CSS hides
+        # panels only once the script has stamped the document.
+        self.assertIn("html.js main .panel { display: none; }", text)
+        self.assertIn("document.documentElement.className", text)
+
+
+class TableTests(TemporaryRootMixin, unittest.TestCase):
+    """Averages above every table, and paging past twenty rows."""
+
+    def render(self, samples):
+        root = self.temporary_root()
+        db_path = root / "drakkar.db"
+        connection = connect(db_path)
+        try:
+            create_schema(connection, drakkar_version="2.1.0")
+            seed_preprocessing(connection, samples=samples)
+            connection.commit()
+        finally:
+            connection.close()
+        html_path = root / "drakkar_report.html"
+        render_report(db_path, html_path, sections=("preprocessing",))
+        return html_path.read_text(encoding="utf-8")
+
+    def test_short_tables_are_not_paginated(self):
+        text = self.render(samples=PAGE_ROWS)
+        self.assertNotIn("<table data-page-size", text)
+
+    def test_long_tables_carry_the_page_size(self):
+        text = self.render(samples=PAGE_ROWS + 1)
+        self.assertIn(f'<table data-page-size="{PAGE_ROWS}">', text)
+        # Paging happens in the browser, so every row is still in the markup.
+        self.assertEqual(text.count("<tr><td>S"), PAGE_ROWS + 1)
+
+    def test_column_averages_are_highlighted_above_the_table(self):
+        text = self.render(samples=4)
+        stats = text[text.index('<div class="stats">'):text.index('<div class="scroll">')]
+        self.assertIn("Mean reads in", stats)
+        # Reads in run 1000, 2000, 3000, 4000 for the four seeded samples.
+        self.assertIn("<span class=\"stat-value\">2,500</span>", stats)
+        self.assertIn("Mean metagenomic %", stats)
+
+    def test_a_single_row_is_its_own_average_and_gets_no_highlights(self):
+        text = self.render(samples=1)
+        self.assertNotIn('<div class="stats">', text)
 
 
 class MissingSectionTests(TemporaryRootMixin, unittest.TestCase):

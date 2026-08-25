@@ -11,8 +11,13 @@ raised. Second, ``gene_annotation``, ``cluster_annotation`` and
 ``gene_expression`` can each hold tens of millions of rows, so aggregation
 happens in SQL and only summary-sized results are ever pulled into memory.
 
-The page is self-contained: the stylesheet is inlined, and the Plotly bundle is
-embedded once, in the first figure, so the report opens offline.
+The page is self-contained: the stylesheet and the small navigation script are
+inlined, and the Plotly bundle is embedded once, in the first figure, so the
+report opens offline. Layout-wise it is a left sidebar — report details and the
+table of contents — beside a panel area that shows one section at a time; long
+tables are paginated in the browser and preceded by the averages of their
+numeric columns. Without JavaScript the same markup degrades to the flat page
+it used to be: every section stacked, every row listed.
 """
 
 import sqlite3
@@ -25,6 +30,9 @@ from drakkar.report.schema import SCHEMA_VERSION, TAXONOMIC_RANKS
 # of the largest tables, so every listing is bounded here rather than in SQL
 # scattered across the section renderers.
 TABLE_ROW_LIMIT = 100
+# Rows per page in the browser, and the smallest table worth averaging.
+PAGE_ROWS = 20
+MIN_STAT_ROWS = 2
 TOP_GENOMES = 40
 TOP_MAGS = 40
 TOP_TAXA = 12
@@ -56,44 +64,263 @@ STYLESHEET = """
   --rule: #d8dee4;
   --accent: #5f9ea0;
   --panel: #f6f8f9;
+  --sidebar: 20.5rem;
 }
 * { box-sizing: border-box; }
 body {
   margin: 0;
-  padding: 0 1.5rem 4rem;
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-size: 15px;
   line-height: 1.55;
   color: var(--ink);
   background: #ffffff;
 }
-.wrap { max-width: 1080px; margin: 0 auto; }
-header.report { border-bottom: 2px solid var(--accent); padding: 2.5rem 0 1.25rem; }
-header.report h1 { margin: 0 0 .25rem; font-size: 1.9rem; letter-spacing: .01em; }
-header.report .subtitle { margin: 0; color: var(--muted); }
-h2 { margin: 2.75rem 0 .5rem; font-size: 1.35rem; padding-bottom: .3rem; border-bottom: 1px solid var(--rule); }
+.layout { display: flex; align-items: flex-start; gap: 0; }
+main.content {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 1180px;
+  padding: 2.25rem 2rem 4rem;
+}
+h2 { margin: 0 0 .75rem; font-size: 1.35rem; padding-bottom: .3rem; border-bottom: 1px solid var(--rule); }
 h3 { margin: 1.75rem 0 .4rem; font-size: 1.05rem; color: var(--ink); }
 p { margin: .5rem 0; }
 p.note { color: var(--muted); font-size: .88rem; }
-nav.toc { margin: 1.5rem 0 0; padding: .9rem 1.1rem; background: var(--panel); border: 1px solid var(--rule); }
-nav.toc h2 { margin: 0 0 .4rem; font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); border: 0; padding: 0; }
-nav.toc ol { margin: 0; padding-left: 1.2rem; }
-nav.toc a { color: var(--ink); text-decoration: none; }
-nav.toc a:hover { color: var(--accent); text-decoration: underline; }
-dl.summary { display: grid; grid-template-columns: 13rem 1fr; gap: .2rem 1rem; margin: 1.2rem 0 0; }
-dl.summary dt { color: var(--muted); font-size: .88rem; }
-dl.summary dd { margin: 0; }
+
+/* Sidebar: report identity, navigation, and everything about the run itself. */
+aside.sidebar {
+  flex: 0 0 var(--sidebar);
+  width: var(--sidebar);
+  position: sticky;
+  top: 0;
+  max-height: 100vh;
+  overflow-y: auto;
+  padding: 1.75rem 1.4rem 2.5rem;
+  background: var(--panel);
+  border-right: 1px solid var(--rule);
+}
+aside.sidebar .brand { border-bottom: 2px solid var(--accent); padding-bottom: .9rem; }
+aside.sidebar h1 { margin: 0 0 .2rem; font-size: 1.35rem; letter-spacing: .01em; }
+aside.sidebar .subtitle { margin: 0; color: var(--muted); font-size: .82rem; }
+aside.sidebar .side-block { margin-top: 1.6rem; }
+aside.sidebar h2 {
+  margin: 0 0 .5rem;
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  color: var(--muted);
+  border: 0;
+  padding: 0;
+}
+nav.toc ol { margin: 0; padding: 0; list-style: none; counter-reset: toc; }
+nav.toc li { counter-increment: toc; }
+nav.toc a {
+  display: block;
+  padding: .3rem .6rem .3rem .55rem;
+  color: var(--ink);
+  text-decoration: none;
+  border-left: 3px solid transparent;
+  font-size: .92rem;
+}
+nav.toc a::before { content: counter(toc) ". "; color: var(--muted); font-size: .82rem; }
+nav.toc a:hover { color: var(--accent); background: #ffffff; }
+nav.toc a.is-active {
+  border-left-color: var(--accent);
+  background: #ffffff;
+  font-weight: 600;
+}
+dl.summary { display: grid; grid-template-columns: 1fr; gap: 0; margin: 0; }
+dl.summary dt {
+  color: var(--muted);
+  font-size: .68rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-top: .6rem;
+}
+dl.summary dd { margin: 0; font-size: .86rem; overflow-wrap: anywhere; }
+.skipped { margin-top: 1.6rem; padding-top: 1rem; border-top: 1px solid var(--rule); }
+.skipped p { font-size: .82rem; color: var(--muted); margin: .4rem 0 0; }
+.skipped ul { margin: .3rem 0 0; padding-left: 1.1rem; color: var(--muted); font-size: .82rem; }
+
+/* One section at a time, once the script has taken over. */
+html.js main .panel { display: none; }
+html.js main .panel.is-active { display: block; }
+html:not(.js) main .panel + .panel { margin-top: 3rem; }
+
+/* Averages of the numeric columns, above the table they summarize. */
+.stats { display: flex; flex-wrap: wrap; gap: .6rem; margin: 1rem 0 .4rem; }
+.stat {
+  flex: 1 1 10.5rem;
+  max-width: 18rem;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--accent);
+  padding: .5rem .75rem;
+}
+.stat-label {
+  display: block;
+  font-size: .68rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+}
+.stat-value { display: block; font-size: 1.2rem; font-variant-numeric: tabular-nums; }
+
 table { border-collapse: collapse; width: 100%; margin: .75rem 0; font-size: .9rem; }
+.table-block { margin: .5rem 0 1rem; }
 .scroll { overflow-x: auto; }
 th, td { padding: .35rem .6rem; text-align: right; border-bottom: 1px solid var(--rule); white-space: nowrap; }
 th { background: var(--panel); font-weight: 600; color: var(--muted); text-transform: uppercase; font-size: .72rem; letter-spacing: .05em; }
 th:first-child, td:first-child { text-align: left; }
 tbody tr:hover td { background: #fbfcfd; }
+
+.pager { display: flex; align-items: center; gap: .6rem; margin: -.25rem 0 .5rem; font-size: .82rem; color: var(--muted); }
+.pager button {
+  font: inherit;
+  color: var(--ink);
+  background: #ffffff;
+  border: 1px solid var(--rule);
+  padding: .18rem .6rem;
+  cursor: pointer;
+}
+.pager button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.pager button:disabled { opacity: .4; cursor: default; }
+
 .figure { margin: 1rem 0 .25rem; }
-.skipped { margin: 1.2rem 0 0; padding: .8rem 1.1rem; background: var(--panel); border-left: 3px solid var(--rule); }
-.skipped ul { margin: .3rem 0 0; padding-left: 1.2rem; color: var(--muted); font-size: .9rem; }
 footer.report { margin-top: 3.5rem; padding-top: 1rem; border-top: 1px solid var(--rule); color: var(--muted); font-size: .85rem; }
 code { font-family: "SFMono-Regular", Consolas, monospace; font-size: .85em; }
+
+@media (max-width: 900px) {
+  .layout { display: block; }
+  nav.toc ol { display: flex; flex-wrap: wrap; gap: .2rem .4rem; }
+  nav.toc a { border-left: 0; border-bottom: 2px solid transparent; padding: .25rem .4rem; }
+  nav.toc a.is-active { border-bottom-color: var(--accent); }
+  aside.sidebar {
+    position: static;
+    width: auto;
+    max-height: none;
+    border-right: 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  main.content { padding: 1.5rem 1.25rem 3rem; }
+}
+
+/* Printing wants the whole report, not the panel that happens to be open. */
+@media print {
+  aside.sidebar { display: none; }
+  html.js main .panel { display: block !important; }
+  .pager { display: none; }
+  main .panel + .panel { margin-top: 3rem; page-break-before: always; }
+}
+"""
+
+# The page works without this script — every section stacked, every row shown.
+# It adds the two behaviours the markup only hints at: the sidebar switches
+# panels instead of scrolling to them, and long tables are paged.
+SCRIPT = """
+(function () {
+  var panels = Array.prototype.slice.call(document.querySelectorAll("main .panel"));
+  var links = Array.prototype.slice.call(document.querySelectorAll("nav.toc a"));
+
+  function resizePlots(scope) {
+    if (!window.Plotly || !window.Plotly.Plots) { return; }
+    var plots = scope.querySelectorAll(".js-plotly-plot");
+    for (var index = 0; index < plots.length; index += 1) {
+      try { window.Plotly.Plots.resize(plots[index]); } catch (error) { /* ignore */ }
+    }
+  }
+
+  function show(id, scroll) {
+    var target = null;
+    for (var index = 0; index < panels.length; index += 1) {
+      if (panels[index].id === id) { target = panels[index]; }
+    }
+    if (!target) { return false; }
+    for (var p = 0; p < panels.length; p += 1) {
+      panels[p].classList.toggle("is-active", panels[p] === target);
+    }
+    for (var l = 0; l < links.length; l += 1) {
+      links[l].classList.toggle(
+        "is-active", links[l].getAttribute("href") === "#" + id
+      );
+    }
+    // Figures drawn inside a hidden panel have no width to measure until now.
+    resizePlots(target);
+    if (scroll) { window.scrollTo(0, 0); }
+    return true;
+  }
+
+  for (var index = 0; index < links.length; index += 1) {
+    links[index].addEventListener("click", function (event) {
+      var id = this.getAttribute("href").slice(1);
+      if (!show(id, true)) { return; }
+      event.preventDefault();
+      try { window.history.replaceState(null, "", "#" + id); } catch (error) { /* file:// */ }
+    });
+  }
+
+  window.addEventListener("hashchange", function () {
+    show(window.location.hash.slice(1), true);
+  });
+
+  function count(value) {
+    return value.toLocaleString ? value.toLocaleString("en-US") : String(value);
+  }
+
+  // Client-side paging: the rows are all in the document, only 20 are visible.
+  function paginate(table) {
+    var size = parseInt(table.getAttribute("data-page-size"), 10);
+    var body = table.tBodies[0];
+    if (!size || !body) { return; }
+    var rows = Array.prototype.slice.call(body.rows);
+    if (rows.length <= size) { return; }
+    var pages = Math.ceil(rows.length / size);
+    var current = 1;
+
+    var pager = document.createElement("div");
+    pager.className = "pager";
+    var previous = document.createElement("button");
+    previous.type = "button";
+    previous.textContent = "\u2039 Previous";
+    var next = document.createElement("button");
+    next.type = "button";
+    next.textContent = "Next \u203a";
+    var label = document.createElement("span");
+    pager.appendChild(previous);
+    pager.appendChild(next);
+    pager.appendChild(label);
+
+    function draw() {
+      var first = (current - 1) * size;
+      var last = Math.min(first + size, rows.length);
+      for (var index = 0; index < rows.length; index += 1) {
+        rows[index].style.display = (index >= first && index < last) ? "" : "none";
+      }
+      label.textContent = "Rows " + count(first + 1) + "\u2013" + count(last) +
+        " of " + count(rows.length) + " \u00b7 page " + current + " of " + pages;
+      previous.disabled = current === 1;
+      next.disabled = current === pages;
+    }
+
+    previous.addEventListener("click", function () {
+      if (current > 1) { current -= 1; draw(); }
+    });
+    next.addEventListener("click", function () {
+      if (current < pages) { current += 1; draw(); }
+    });
+
+    var scroll = table.parentNode;
+    scroll.parentNode.insertBefore(pager, scroll.nextSibling);
+    draw();
+  }
+
+  var tables = document.querySelectorAll("table[data-page-size]");
+  for (var t = 0; t < tables.length; t += 1) { paginate(tables[t]); }
+
+  if (!show(window.location.hash.slice(1), false) && panels.length) {
+    show(panels[0].id, false);
+  }
+})();
 """
 
 
@@ -143,11 +370,61 @@ def _ratio(numerator, denominator):
     return 100.0 * float(numerator) / float(denominator)
 
 
-def _table(columns, rows, limit=TABLE_ROW_LIMIT):
+def _mean(rows, index):
+    """Average of a column, ignoring blanks and anything that is not a number."""
+    values = []
+    for row in rows:
+        value = row[index]
+        if value is None or value == "":
+            continue
+        try:
+            values.append(float(value))
+        except (TypeError, ValueError):
+            continue
+    if not values:
+        return None
+    return sum(values) / len(values)
+
+
+def _highlights(items):
+    """Render ``(label, formatted value)`` pairs as a row of highlight cards."""
+    cards = [
+        f'<div class="stat"><span class="stat-label">{escape(label)}</span>'
+        f'<span class="stat-value">{value}</span></div>'
+        for label, value in items
+        if value not in (None, "")
+    ]
+    if not cards:
+        return ""
+    return '<div class="stats">' + "".join(cards) + "</div>"
+
+
+def _stats_html(columns, rows, stats):
+    """Averages of the named columns, computed over every row, not just shown ones.
+
+    ``stats`` is a sequence of ``(label, column index)`` pairs, optionally with
+    a third element overriding the column's own formatter.
+    """
+    if not stats or len(rows) < MIN_STAT_ROWS:
+        return ""
+    items = []
+    for spec in stats:
+        label, index = spec[0], spec[1]
+        formatter = spec[2] if len(spec) > 2 else columns[index][1]
+        value = _mean(rows, index)
+        if value is not None:
+            items.append((label, formatter(value)))
+    return _highlights(items)
+
+
+def _table(columns, rows, limit=TABLE_ROW_LIMIT, stats=()):
     """Render rows as an HTML table, dropping columns that are entirely empty.
 
     ``columns`` is a sequence of ``(header, formatter)`` pairs and ``rows`` a
-    sequence of raw value tuples in the same order.
+    sequence of raw value tuples in the same order. ``stats`` names the columns
+    whose average belongs above the table. Tables longer than ``PAGE_ROWS``
+    carry the page size the script pages them by; the rows themselves are all
+    in the markup, so the table stays complete without JavaScript.
     """
     if not rows:
         return ""
@@ -164,8 +441,11 @@ def _table(columns, rows, limit=TABLE_ROW_LIMIT):
     for row in shown:
         cells = "".join(f"<td>{columns[index][1](row[index])}</td>" for index in keep)
         body.append(f"<tr>{cells}</tr>")
+    paging = f' data-page-size="{PAGE_ROWS}"' if len(shown) > PAGE_ROWS else ""
     parts = [
-        '<div class="scroll"><table>',
+        '<div class="table-block">',
+        _stats_html(columns, rows, stats),
+        f'<div class="scroll"><table{paging}>',
         f"<thead><tr>{head}</tr></thead>",
         "<tbody>" + "".join(body) + "</tbody>",
         "</table></div>",
@@ -175,6 +455,7 @@ def _table(columns, rows, limit=TABLE_ROW_LIMIT):
             f'<p class="note">Showing the first {limit:,} of {len(rows):,} rows; '
             f"query the database for the rest.</p>"
         )
+    parts.append("</div>")
     return "".join(parts)
 
 
@@ -334,6 +615,13 @@ def _render_preprocessing(connection):
             ("Nonpareil diversity", _TWO),
         ],
         table_rows,
+        stats=[
+            ("Mean reads in", 1),
+            ("Mean metagenomic reads", 4),
+            ("Mean metagenomic %", 5),
+            ("Mean SingleM fraction", 7),
+            ("Mean Nonpareil diversity", 8),
+        ],
     ))
 
     figure = _read_fate_figure(rows)
@@ -411,6 +699,14 @@ def _render_cataloging(connection):
             ("Mean contamination", _ONE),
         ],
         [tuple(row) for row in rows],
+        stats=[
+            ("Mean contigs", 1),
+            ("Mean N50", 4),
+            ("Mean mapping rate %", 6),
+            ("Mean bins per assembly", 7),
+            ("Mean completeness", 11),
+            ("Mean contamination", 12),
+        ],
     ))
 
     blocks.extend(_binner_blocks(connection))
@@ -442,6 +738,7 @@ def _binner_blocks(connection):
         _table(
             [("Binner", _text), ("Bins", _integer), ("Assemblies", _integer)],
             [tuple(row) for row in rows],
+            stats=[("Mean bins per binner", 1)],
         ),
         figure,
     ]
@@ -473,6 +770,7 @@ def _mapping_rate_blocks(connection):
                 ("Max rate %", _ONE),
             ],
             [tuple(row) for row in rows],
+            stats=[("Mean mapping rate %", 2)],
         ),
     ]
 
@@ -537,20 +835,14 @@ def _render_profiling(connection):
         blocks.append(_paragraph(
             f"The catalogue holds {_quantity(genomes, 'dereplicated genome')}."
         ))
-        blocks.append(_table(
-            [
-                ("Metric", _text),
-                ("Value", _text),
-            ],
-            [
-                ("Genomes", _integer(row["genomes"])),
-                ("Mean completeness", _ONE(row["completeness"])),
-                ("Mean contamination", _ONE(row["contamination"])),
-                ("Mean size", _integer(row["size"])),
-                ("Mean N50", _integer(row["n50"])),
-                ("Clustered members", _integer(row["members"])),
-            ],
-        ))
+        blocks.append(_highlights([
+            ("Genomes", _integer(row["genomes"])),
+            ("Mean completeness %", _ONE(row["completeness"])),
+            ("Mean contamination %", _ONE(row["contamination"])),
+            ("Mean size", _integer(row["size"])),
+            ("Mean N50", _integer(row["n50"])),
+            ("Clustered members", _integer(row["members"])),
+        ]))
         blocks.extend(_genome_quality_blocks(connection))
 
     blocks.extend(_abundance_blocks(connection))
@@ -657,6 +949,7 @@ def _abundance_blocks(connection):
     blocks.append(_table(
         [("Sample", _text), ("Mapped reads", _integer)],
         [(row["sample_id"], row["reads"]) for row in totals],
+        stats=[("Mean mapped reads", 1)],
     ))
     return blocks
 
@@ -841,6 +1134,11 @@ def _annotation_source_blocks(connection):
             tuple(row) + (_ratio(row["genes"], total_genes),)
             for row in rows
         ],
+        stats=[
+            ("Mean hits per source", 1),
+            ("Mean annotated genes", 2),
+            ("Mean genes annotated %", 5),
+        ],
     ))
 
     figure = go.Figure()
@@ -939,6 +1237,7 @@ def _cluster_blocks(connection):
                 ("Mean genes per cluster", _ONE),
             ],
             [tuple(row) for row in rows],
+            stats=[("Mean clusters", 2), ("Mean genes per cluster", 4)],
         ),
     ]
 
@@ -972,6 +1271,11 @@ def _annotation_qc_blocks(connection):
                 ("Retained %", _ONE),
             ],
             [tuple(row) + (_ratio(row["retained"], row["reported"]),) for row in rows],
+            stats=[
+                ("Mean reported", 2),
+                ("Mean retained", 3),
+                ("Mean retained %", 7),
+            ],
         ),
     ]
 
@@ -1007,6 +1311,11 @@ def _render_expression(connection):
         [
             tuple(row) + (_ratio(row["detected_genes"], row["observed_genes"]),)
             for row in rows
+        ],
+        stats=[
+            ("Mean total counts", 1),
+            ("Mean genes detected", 2),
+            ("Mean genes detected %", 4),
         ],
     ))
 
@@ -1044,15 +1353,12 @@ def _render_expression(connection):
     """)
     if lengths and lengths[0]["genes"]:
         blocks.append(_heading("Quantified genes"))
-        blocks.append(_table(
-            [("Metric", _text), ("Value", _text)],
-            [
-                ("Genes with a length", _integer(lengths[0]["genes"])),
-                ("Mean length", _integer(lengths[0]["mean_length"])),
-                ("Shortest", _integer(lengths[0]["min_length"])),
-                ("Longest", _integer(lengths[0]["max_length"])),
-            ],
-        ))
+        blocks.append(_highlights([
+            ("Genes with a length", _integer(lengths[0]["genes"])),
+            ("Mean length", _integer(lengths[0]["mean_length"])),
+            ("Shortest", _integer(lengths[0]["min_length"])),
+            ("Longest", _integer(lengths[0]["max_length"])),
+        ]))
     return blocks
 
 
@@ -1102,7 +1408,8 @@ def _render_provenance(connection):
     if not rows:
         return ""
     return "".join([
-        '<h2 id="section-provenance">Provenance</h2>',
+        '<section class="panel" id="section-provenance">',
+        "<h2>Provenance</h2>",
         _paragraph(
             "Every table in the report database, the file it was read from, and "
             "when it was ingested."
@@ -1117,6 +1424,7 @@ def _render_provenance(connection):
             ],
             [tuple(row) for row in rows],
         ),
+        "</section>",
     ])
 
 
@@ -1137,7 +1445,7 @@ SECTION_RENDERERS = {
 # ---------------------------------------------------------------------------
 
 def _summary_html(connection, db_path, rendered, skipped, not_selected):
-    """The header block: versions, runs, ingest window, and section outcome."""
+    """The sidebar's report details: versions, runs, ingest window, outcome."""
     stamp = _query(
         connection,
         "SELECT version, drakkar_version, created_at FROM schema_version "
@@ -1203,18 +1511,33 @@ def _skipped_html(skipped, not_selected):
     return '<div class="skipped">' + "".join(parts) + "</div>"
 
 
-def _toc_html(rendered, with_provenance):
-    links = [
-        f'<li><a href="#section-{name}">{escape(SECTION_LABELS[name])}</a></li>'
-        for name in rendered
-    ]
-    if with_provenance:
-        links.append('<li><a href="#section-provenance">Provenance</a></li>')
-    if not links:
+def _toc_html(targets):
+    """The sidebar navigation; the first entry is the panel that opens first."""
+    if not targets:
         return ""
-    return (
-        '<nav class="toc"><h2>Contents</h2><ol>' + "".join(links) + "</ol></nav>"
-    )
+    links = []
+    for index, (target, label) in enumerate(targets):
+        active = ' class="is-active"' if index == 0 else ""
+        links.append(f'<li><a href="#{target}"{active}>{escape(label)}</a></li>')
+    return '<nav class="toc side-block"><h2>Contents</h2><ol>' + "".join(links) + "</ol></nav>"
+
+
+def _sidebar_html(connection, db_path, rendered, skipped, not_selected,
+                  targets, generated):
+    """Everything about the report itself, kept beside the sections it describes."""
+    return "".join([
+        '<aside class="sidebar">',
+        '<div class="brand">',
+        "<h1>Drakkar report</h1>",
+        f'<p class="subtitle">Rendered {escape(generated)}</p>',
+        "</div>",
+        _toc_html(targets),
+        '<section class="side-block"><h2>Report details</h2>',
+        _summary_html(connection, db_path, rendered, skipped, not_selected),
+        "</section>",
+        _skipped_html(skipped, not_selected),
+        "</aside>",
+    ])
 
 
 def render_report(db_path, html_path, sections=None):
@@ -1247,8 +1570,10 @@ def render_report(db_path, html_path, sections=None):
                 continue
             rendered.append(name)
             bodies.append(
-                f'<h2 id="section-{name}">{escape(SECTION_LABELS[name])}</h2>'
+                f'<section class="panel" id="section-{name}">'
+                f"<h2>{escape(SECTION_LABELS[name])}</h2>"
                 + _serialize(blocks, state)
+                + "</section>"
             )
 
         not_selected = [
@@ -1256,6 +1581,26 @@ def render_report(db_path, html_path, sections=None):
         ]
         provenance = _render_provenance(connection)
         generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+        panels = list(bodies)
+        targets = [(f"section-{name}", SECTION_LABELS[name]) for name in rendered]
+        if provenance:
+            panels.append(provenance)
+            targets.append(("section-provenance", "Provenance"))
+        if not panels:
+            panels.append(
+                '<section class="panel">'
+                + _paragraph(
+                    "The report database holds none of the requested sections, "
+                    "so there is nothing to show."
+                )
+                + "</section>"
+            )
+        # Whichever panel comes first is the one the page opens on, and the
+        # first entry of the table of contents points at it.
+        panels[0] = panels[0].replace(
+            '<section class="panel"', '<section class="panel is-active"', 1
+        )
 
         document = "\n".join([
             "<!DOCTYPE html>",
@@ -1265,30 +1610,24 @@ def render_report(db_path, html_path, sections=None):
             '<meta name="viewport" content="width=device-width, initial-scale=1">',
             "<title>Drakkar report</title>",
             f"<style>{STYLESHEET}</style>",
+            # Set before the body renders, so panels are never shown and then
+            # hidden; without scripting the class is absent and all of them stay.
+            "<script>document.documentElement.className += ' js';</script>",
             "</head>",
             "<body>",
-            '<div class="wrap">',
-            '<header class="report">',
-            "<h1>Drakkar report</h1>",
-            f'<p class="subtitle">Rendered {escape(generated)} from '
-            f"{escape(str(db_path))}</p>",
-            "</header>",
-            _summary_html(connection, db_path, rendered, skipped, not_selected),
-            _skipped_html(skipped, not_selected),
-            _toc_html(rendered, bool(provenance)),
-            "<main>",
-            "\n".join(bodies) if bodies
-            else _paragraph(
-                "The report database holds none of the requested sections, so "
-                "there is nothing to show."
-            ),
-            provenance,
-            "</main>",
+            '<div class="layout">',
+            _sidebar_html(connection, db_path, rendered, skipped, not_selected,
+                          targets, generated),
+            '<main class="content">',
+            "\n".join(panels),
             '<footer class="report">',
             f"Generated by Drakkar {escape(str(__version__))} from the report "
-            f"database; no source table was read at render time.",
+            f"database at {escape(str(db_path))}; no source table was read at "
+            f"render time.",
             "</footer>",
+            "</main>",
             "</div>",
+            f"<script>{SCRIPT}</script>",
             "</body>",
             "</html>",
         ])
