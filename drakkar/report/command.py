@@ -1,9 +1,9 @@
 """The `drakkar report` command.
 
 Builds ``drakkar.db``, a lean SQLite projection of whatever a Drakkar output
-directory happens to contain. The HTML report is rendered from that database in
-a later step, so the database is always the single source of truth and the
-source tables are read exactly once.
+directory happens to contain, and renders ``drakkar_report.html`` from it. The
+rendering step reads the database and nothing else, so the database is always
+the single source of truth and the source tables are read exactly once.
 """
 
 from pathlib import Path
@@ -95,13 +95,18 @@ def _check_existing_database(db_path, force):
     return True
 
 
-def run_report(output_dir, sections=None, db_only=False, force=False, primary_hits_only=False):
+def run_report(output_dir, sections=None, db_only=False, html_only=False,
+               force=False, primary_hits_only=False):
     """Entry point for `drakkar report`."""
     section("BUILDING DRAKKAR REPORT")
 
     output_path = Path(output_dir)
     if not output_path.is_dir():
         print(f"{ERROR}ERROR:{RESET} Output directory not found: {output_path}")
+        return 1
+
+    if db_only and html_only:
+        print(f"{ERROR}ERROR:{RESET} --db-only and --html-only are mutually exclusive.")
         return 1
 
     try:
@@ -111,38 +116,90 @@ def run_report(output_dir, sections=None, db_only=False, force=False, primary_hi
         return 1
 
     db_path = output_path / DATABASE_NAME
-    if not _check_existing_database(db_path, force):
+
+    if html_only:
+        if not _check_renderable_database(db_path):
+            return 1
+        print(f"{INFO}INFO:{RESET} Re-rendering from the existing database: {db_path}")
+    else:
+        if not _check_existing_database(db_path, force):
+            return 1
+
+        results = build_database(
+            output_path, requested, db_path, primary_hits_only=primary_hits_only
+        )
+
+        ingested = [entry for entry in results if entry["available"]]
+        missing = [entry for entry in results if not entry["available"]]
+
+        if not ingested:
+            print(f"{ERROR}ERROR:{RESET} No report sections could be built from: {output_path}")
+            print("None of the expected Drakkar output tables were found there.")
+            _print_skipped(missing)
+            return 1
+
+        print(f"{INFO}INFO:{RESET} Report database written: {db_path}")
+        for entry in ingested:
+            rows = entry["rows"]
+            detail = f"{rows} rows" if rows is not None else "no rows"
+            print(f"  {entry['label']:<24} {detail}")
+
+        # Sections the user explicitly asked for but whose inputs are absent are
+        # named individually; an unfiltered run just lists what was skipped.
+        _print_skipped(missing, explicit=sections is not None)
+
+        if db_only:
+            return 0
+
+    return _render_html(db_path, output_path / REPORT_NAME, requested)
+
+
+def _check_renderable_database(db_path):
+    """Verify that --html-only has a database of the expected schema to read."""
+    if not db_path.exists():
+        print(f"{ERROR}ERROR:{RESET} No report database to render: {db_path}")
+        print("Build it first with 'drakkar report' (without --html-only).")
+        return False
+    connection = None
+    try:
+        connection = connect(db_path)
+        stored = read_schema_version(connection)
+    except Exception:
+        stored = None
+    finally:
+        if connection is not None:
+            connection.close()
+    if stored != SCHEMA_VERSION:
+        print(f"{ERROR}ERROR:{RESET} Existing report database uses schema version {stored}, "
+              f"but this Drakkar build expects version {SCHEMA_VERSION}: {db_path}")
+        print("Rebuild it from the source tables with 'drakkar report --force'.")
+        return False
+    return True
+
+
+def _render_html(db_path, html_path, requested):
+    """Render the HTML report, reporting what the database could not supply."""
+    # Imported here so that the plotly import cost is paid only by a render.
+    from drakkar.report.render import render_report
+
+    try:
+        outcome = render_report(db_path, html_path, sections=requested)
+    except Exception as exc:
+        print(f"{ERROR}ERROR:{RESET} Could not render {html_path.name}: "
+              f"{exc.__class__.__name__}: {exc}")
         return 1
 
-    results = build_database(
-        output_path, requested, db_path, primary_hits_only=primary_hits_only
-    )
-
-    rendered = [entry for entry in results if entry["available"]]
-    skipped = [entry for entry in results if not entry["available"]]
-
-    if not rendered:
-        print(f"{ERROR}ERROR:{RESET} No report sections could be built from: {output_path}")
-        print("None of the expected Drakkar output tables were found there.")
-        _print_skipped(skipped)
+    if not outcome["rendered"]:
+        print(f"{ERROR}ERROR:{RESET} The report database holds none of the requested "
+              f"sections, so {html_path.name} would be empty.")
         return 1
 
-    print(f"{INFO}INFO:{RESET} Report database written: {db_path}")
-    for entry in rendered:
-        rows = entry["rows"]
-        detail = f"{rows} rows" if rows is not None else "no rows"
-        print(f"  {entry['label']:<24} {detail}")
-
-    # Sections the user explicitly asked for but whose inputs are absent are
-    # named individually; an unfiltered run just lists what was skipped.
-    _print_skipped(skipped, explicit=sections is not None)
-
-    if not db_only:
-        print(f"{INFO}INFO:{RESET} HTML rendering is not implemented yet, so no "
-              f"{REPORT_NAME} was written.")
-        print(f"Query the database directly in the meantime, e.g. "
-              f"sqlite3 {db_path} '.tables'")
-
+    print(f"{INFO}INFO:{RESET} HTML report written: {html_path}")
+    for name in outcome["rendered"]:
+        print(f"  {SECTION_SOURCES[name]['label']:<24} rendered")
+    for name in outcome["skipped"]:
+        label = SECTION_SOURCES[name]["label"]
+        print(f"  {label:<24} not rendered (absent from the database)")
     return 0
 
 

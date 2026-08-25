@@ -1,4 +1,5 @@
-"""Report generation: a lean SQLite projection of a Drakkar output directory."""
+"""Report generation: a SQLite projection of a Drakkar output directory, and
+the self-contained HTML report rendered from it."""
 
 from drakkar.report.command import (
     DATABASE_NAME,

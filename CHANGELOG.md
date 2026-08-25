@@ -8,6 +8,35 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.1.1] - 2026-08-25
+
+### Added
+
+- `drakkar report` now renders `drakkar_report.html` alongside `drakkar.db`.
+  The page is a single self-contained file: the stylesheet is inlined and the
+  Plotly bundle is embedded once, in the first figure, so the report opens
+  offline and can be emailed or archived as-is.
+- The report is rendered from the database and nothing else, so the source
+  `.tsv`/`.tsv.xz` tables are still read exactly once, at ingest. Every figure
+  and table comes from a SQL aggregate, so the tens of millions of rows that
+  `gene_annotation`, `cluster_annotation` and `gene_expression` can hold are
+  never pulled into memory.
+- The page opens with a summary header naming the Drakkar version, the report
+  schema version, the run identifiers, the ingest timestamps, and which
+  sections were rendered, which were unavailable, and which were excluded by
+  `--sections`. Sections absent from the database are named on the page rather
+  than silently dropped, and a provenance table traces every number back to the
+  file it was ingested from.
+- New `--html-only` flag re-renders `drakkar_report.html` from an existing
+  `drakkar.db` without re-ingesting the source tables. It is mutually
+  exclusive with `--db-only`.
+
+### Changed
+
+- `--db-only` still stops after the database, and `--force` still governs
+  rebuilding it. The HTML report is a derived artifact and is always
+  overwritten.
+
 ## [2.1.0] - 2026-08-25
 
 ### Added

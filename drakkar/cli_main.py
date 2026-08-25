@@ -218,6 +218,7 @@ def main():
             args.output,
             sections=args.sections,
             db_only=args.db_only,
+            html_only=args.html_only,
             force=args.force,
             primary_hits_only=args.primary_hits_only,
         )

@@ -1,23 +1,26 @@
 .. _report-database:
 
-Report database reference
-=========================
+Report database and HTML report
+===============================
 
-``drakkar report`` builds ``drakkar.db``, a SQLite projection of the tables
-found in a Drakkar output directory. The database is the single source of truth
-for the HTML report, so the ``.tsv`` and ``.tsv.xz`` outputs are read exactly
-once, at ingest, and never again at render time.
+``drakkar report`` does two things in one pass. It builds ``drakkar.db``, a
+SQLite projection of the tables found in a Drakkar output directory, and it
+renders ``drakkar_report.html`` from that database. The database is the single
+source of truth for the report, so the ``.tsv`` and ``.tsv.xz`` outputs are
+read exactly once, at ingest, and never again at render time.
 
 The database is deliberately **not** a lossless copy. It is optimized for
 querying and plotting; the source tables remain the archival record. In
 particular, the ``details`` JSON of the annotation tables is not carried over.
 
-Building the database
----------------------
+Building the report
+-------------------
 
 .. code-block:: console
 
    $ drakkar report -o drakkar_output
+
+This writes ``drakkar_output/drakkar.db`` and ``drakkar_output/drakkar_report.html``.
 
 Because Drakkar is modular, a missing source file is the normal case rather
 than an error. The command screens the output directory first and builds only
@@ -39,13 +42,78 @@ Options
   Requesting a section whose inputs are absent warns and names the missing
   file rather than silently producing an empty section.
 - ``--db-only``: build the database without rendering the HTML report.
+- ``--html-only``: re-render ``drakkar_report.html`` from an existing
+  ``drakkar.db`` without re-ingesting the source tables. Useful after
+  upgrading Drakkar, or when the source directory is no longer at hand.
+  Mutually exclusive with ``--db-only``.
 - ``--primary-hits-only``: keep only rank-1 annotation hits. This roughly
   halves the largest table, at the cost of the secondary evidence that the 2.0
   annotation schema was designed to preserve. Leave it off if you intend to
   query ambiguous assignments.
 - ``--list``: report which sections the output directory can support, without
   building anything.
-- ``--force``: delete and rebuild an existing ``drakkar.db``.
+- ``--force``: delete and rebuild an existing ``drakkar.db``. The HTML report
+  is a derived artifact and is always overwritten, so it needs no flag.
+
+The HTML report
+---------------
+
+``drakkar_report.html`` is a single self-contained file. The stylesheet is
+inlined and the Plotly bundle is embedded once, in the first figure, so the
+report opens on a laptop with no network connection and can be emailed or
+archived as-is. Nothing is fetched when the page loads.
+
+The page opens with a summary header — the Drakkar version that wrote the
+database, the report schema version, the run identifiers found in the output
+directory, the ingest timestamps, and which sections were rendered, which were
+unavailable, and which were excluded by ``--sections``. Sections that the
+database does not hold are named on the page rather than silently dropped.
+
+Each section is rendered from SQL aggregates only. ``gene_annotation``,
+``cluster_annotation`` and ``gene_expression`` can hold tens of millions of
+rows, so every figure and table on the page comes from a ``GROUP BY`` or a
+``LIMIT``; no large table is ever read into memory whole. Long listings are
+truncated with a note pointing back at the database, and the per-genome and
+per-MAG heatmaps show the top entries by abundance or gene count.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 24 76
+
+   * - Section
+     - Contents
+   * - Preprocessing
+     - Per-sample read and base counts, metagenomic fraction, SingleM fraction
+       and Nonpareil diversity, plus a stacked read-fate chart.
+   * - Cataloging
+     - Per-assembly QUAST and mapping statistics, bins contributed per binner,
+       and per-sample mapping rates.
+   * - Dereplication
+     - Bin counts and mean quality before and after dereplication, and the ANI
+       threshold used.
+   * - Profiling
+     - Genome quality summary, a completeness-against-contamination scatter,
+       and a genome-by-sample relative abundance heatmap.
+   * - Taxonomy
+     - Distinct taxa and unclassified genomes at each GTDB rank, genomes per
+       phylum, and phylum composition per sample when abundances are present.
+   * - Functional annotation
+     - Hits, annotated genes and distinct terms per source, a per-MAG
+       annotation coverage heatmap, retained gene clusters and regions, and
+       the annotation QC counts.
+   * - Expression
+     - Per-sample assigned counts and detected genes, and the length
+       distribution of the quantified genes.
+   * - Runs and resources
+     - One row per recorded Drakkar run, with its command, modules, wall-clock
+       duration and status.
+   * - Provenance
+     - The ingest log: every table, the file it came from, its row count and
+       when it was ingested.
+
+Rendering runs in-process in the plain Drakkar environment. It needs no
+Snakemake and no Conda environment, so a report can be produced on a login node
+or a laptop with only ``drakkar`` installed.
 
 Sections and their inputs
 -------------------------

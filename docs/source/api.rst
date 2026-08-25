@@ -55,10 +55,12 @@ them (dry run unless ``--yes`` is given).
 
 report
 ^^^^^^
-Build ``drakkar.db`` from a finished run's output tables, and render the HTML
-report from it. Only the sections whose inputs are present are built; use
-``--sections`` to narrow that further and ``--list`` to see what an output
-directory can support. See :doc:`report` for the database schema.
+Build ``drakkar.db`` from a finished run's output tables, and render the
+self-contained ``drakkar_report.html`` from it. Only the sections whose inputs
+are present are built; use ``--sections`` to narrow that further and ``--list``
+to see what an output directory can support. ``--db-only`` stops after the
+database, ``--html-only`` re-renders the report from an existing one. See
+:doc:`report` for the database schema and the report contents.
 
 unlock
 ^^^^^^

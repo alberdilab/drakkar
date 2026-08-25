@@ -381,6 +381,7 @@ def build_parser():
     subparser_report.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory to report on. Default is the directory from which drakkar is called.")
     subparser_report.add_argument("--sections", required=False, default=None, help="Comma-separated sections to include: preprocessing, cataloging, dereplication, profiling, taxonomy, function, expression, resources, or all. Default: every section with available inputs.")
     subparser_report.add_argument("--db-only", dest="db_only", action="store_true", help="Build drakkar.db without rendering the HTML report")
+    subparser_report.add_argument("--html-only", dest="html_only", action="store_true", help="Re-render drakkar_report.html from an existing drakkar.db without re-ingesting the source tables")
     subparser_report.add_argument("--primary-hits-only", dest="primary_hits_only", action="store_true", help="Keep only rank-1 annotation hits, producing a smaller database at the cost of secondary evidence")
     subparser_report.add_argument("--list", dest="list_sections", action="store_true", help="List which report sections the output directory can support, without building anything")
     subparser_report.add_argument("--force", action="store_true", help="Delete and rebuild an existing drakkar.db")
