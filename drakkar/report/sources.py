@@ -52,12 +52,20 @@ SECTION_SOURCES = {
         "required": ["expressing/gene_counts.tsv.xz"],
         "optional": [],
     },
+    # The resources section has no fixed file names: run metadata and the
+    # benchmark artefacts are all stamped with a run id, so they are discovered
+    # by glob in `probe_section` rather than listed here.
     "resources": {
         "label": "Runs and resources",
         "required": [],
         "optional": [],
     },
 }
+
+# Written by drakkar.benchmark next to the run metadata; absent for runs that
+# were not launched on SLURM.
+BENCHMARK_DIRECTORY = "benchmark"
+BENCHMARK_SUMMARY_SUFFIX = "_resources.yaml"
 
 SECTION_ORDER = (
     "preprocessing",
@@ -110,12 +118,51 @@ def _is_usable(path):
 
 
 def find_run_metadata(output_dir):
-    """Return the run metadata YAML files in an output directory, oldest first."""
+    """Return the run metadata YAML files in an output directory, oldest first.
+
+    The benchmark roll-ups live beside them and match the same glob, so they
+    are excluded here by suffix: they describe a run's resource usage, not the
+    run itself, and would otherwise overwrite its provenance row.
+    """
     output_path = Path(output_dir)
     try:
-        return sorted(output_path.glob("drakkar_*.yaml"))
+        candidates = sorted(output_path.glob("drakkar_*.yaml"))
     except OSError:
         return []
+    return [
+        path for path in candidates
+        if not path.name.endswith(BENCHMARK_SUMMARY_SUFFIX)
+    ]
+
+
+def find_benchmark_summaries(output_dir):
+    """Return the per-run benchmark roll-up YAMLs, oldest first."""
+    output_path = Path(output_dir)
+    try:
+        return sorted(output_path.glob(f"drakkar_*{BENCHMARK_SUMMARY_SUFFIX}"))
+    except OSError:
+        return []
+
+
+def find_benchmark_tables(output_dir, kind):
+    """Return the per-run ``jobs`` or ``rules`` benchmark TSVs, oldest first."""
+    output_path = Path(output_dir) / BENCHMARK_DIRECTORY
+    try:
+        return sorted(output_path.glob(f"drakkar_*.{kind}.tsv"))
+    except OSError:
+        return []
+
+
+def benchmark_run_id(path, kind=None):
+    """Recover the run id a benchmark file belongs to from its name."""
+    name = Path(path).name
+    if kind is not None:
+        stem = name[: -len(f".{kind}.tsv")] if name.endswith(f".{kind}.tsv") else name
+    elif name.endswith(BENCHMARK_SUMMARY_SUFFIX):
+        stem = name[: -len(BENCHMARK_SUMMARY_SUFFIX)]
+    else:
+        stem = Path(name).stem
+    return stem[len("drakkar_"):] if stem.startswith("drakkar_") else stem
 
 
 def probe_section(output_dir, section):
@@ -125,12 +172,27 @@ def probe_section(output_dir, section):
 
     if section == "resources":
         runs = find_run_metadata(output_path)
+        benchmarks = [
+            path
+            for group in (
+                find_benchmark_summaries(output_path),
+                find_benchmark_tables(output_path, "jobs"),
+                find_benchmark_tables(output_path, "rules"),
+            )
+            for path in group
+        ]
+        present = runs + benchmarks
+        missing = [] if runs else ["drakkar_<run_id>.yaml"]
+        if runs and not benchmarks:
+            # Not an error: only SLURM runs are benchmarked, so this names what
+            # the section will be missing rather than blocking it.
+            missing.append(f"drakkar_<run_id>{BENCHMARK_SUMMARY_SUFFIX}")
         return {
             "section": section,
             "label": spec["label"],
-            "available": bool(runs),
-            "present": [str(path.relative_to(output_path)) for path in runs],
-            "missing": [] if runs else ["drakkar_<run_id>.yaml"],
+            "available": bool(present),
+            "present": [str(path.relative_to(output_path)) for path in present],
+            "missing": missing,
         }
 
     present = []

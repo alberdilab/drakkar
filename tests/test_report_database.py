@@ -134,7 +134,42 @@ class ReportFixtureMixin:
             - drakkar
             - complete
             """)
+        self.write_benchmark(root, "20260825-101500")
         return root
+
+    def write_benchmark(self, root: Path, run_id: str) -> None:
+        """The artefacts drakkar.benchmark writes after a SLURM run."""
+        write(root / f"drakkar_{run_id}_resources.yaml", f"""
+            run_id: '{run_id}'
+            command: complete
+            profile: slurm
+            generated_at: '2026-08-25T14:03:00+00:00'
+            status: generated
+            benchmarked_launches: 3
+            logical_jobs: 2
+            retries: 1
+            failed_launches: 1
+            oom_launches: 1
+            timeout_launches: 0
+            jobs_missing_accounting: 0
+            max_alloc_cpus: 8
+            peak_max_rss_mb: 30000.0
+            total_elapsed_sec: 10800
+            allocated_cpu_sec: 57600
+            used_cpu_sec: 43200
+            weighted_cpu_efficiency: 0.75
+            """)
+        write(root / "benchmark" / f"drakkar_{run_id}.jobs.tsv", """
+            launch_index	rule	attempt	logical_job_key	internal_jobid	external_jobid	wildcards	requested_cpus	requested_mem_mb	requested_runtime_min	state	exit_code	alloc_cpus	elapsed_sec	cpu_time_sec	max_rss_mb	cpu_efficiency	memory_efficiency	runtime_efficiency	oom	timeout
+            1	assembly	1	assembly|wildcards|assembly=A1	12	9001	assembly=A1	8	65536	720	OUT_OF_MEMORY	0:125	8	1800	12000	65000.0	0.833	0.9918	0.0417	True	False
+            2	assembly	2	assembly|wildcards|assembly=A1	12	9002	assembly=A1	8	131072	720	COMPLETED	0:0	8	5400	38000	98000.0	0.8796	0.7477	0.125	False	False
+            3	binning	1	binning|wildcards|assembly=A1	14	9003	assembly=A1	4	16384	240	COMPLETED	0:0	4	3600	9000	8000.0	0.625	0.4883	0.25	False	False
+            """)
+        write(root / "benchmark" / f"drakkar_{run_id}.rules.tsv", """
+            rule	launches	logical_jobs	retries	failed_launches	oom_launches	timeout_launches	median_requested_cpus	median_alloc_cpus	median_requested_mem_mb	median_max_rss_mb	median_memory_efficiency	median_requested_runtime_min	median_elapsed_sec	median_runtime_efficiency	allocated_cpu_sec	used_cpu_sec	weighted_cpu_efficiency
+            assembly	2	1	1	1	1	0	8	8	98304	81500.0	0.8697	720	3600	0.0833	57600	50000	0.868
+            binning	1	1	0	0	0	0	4	4	16384	8000.0	0.4883	240	3600	0.25	14400	9000	0.625
+            """)
 
 
 class SectionParsingTests(unittest.TestCase):
@@ -177,6 +212,29 @@ class ProbeTests(ReportFixtureMixin, unittest.TestCase):
             self.assertIn(
                 "annotating/genome_taxonomy.tsv", results["taxonomy"]["missing"]
             )
+
+    def test_resources_lists_the_benchmark_files_it_found(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            entry = {item["section"]: item for item in probe(root)}["resources"]
+            self.assertTrue(entry["available"])
+            self.assertIn("drakkar_20260825-101500.yaml", entry["present"])
+            self.assertIn("drakkar_20260825-101500_resources.yaml", entry["present"])
+            self.assertIn(
+                str(Path("benchmark") / "drakkar_20260825-101500.jobs.tsv"),
+                entry["present"],
+            )
+            self.assertEqual(entry["missing"], [])
+
+    def test_resources_names_the_benchmark_a_run_never_produced(self):
+        # A local run has metadata but no benchmark: the section still builds,
+        # and the absence is named rather than hidden.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root / "drakkar_20260825-101500.yaml", "run_id: '20260825-101500'\n")
+            entry = {item["section"]: item for item in probe(root)}["resources"]
+            self.assertTrue(entry["available"])
+            self.assertEqual(entry["missing"], ["drakkar_<run_id>_resources.yaml"])
 
     def test_empty_file_does_not_count_as_available(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -408,6 +466,85 @@ class DatabaseBuildTests(ReportFixtureMixin, unittest.TestCase):
             self.assertEqual(row["command"], "complete")
             self.assertEqual(row["modules"], "preprocessing,cataloging")
             self.assertEqual(row["status"], "completed")
+            connection.close()
+
+    def test_benchmark_summary_does_not_overwrite_the_run_row(self):
+        # drakkar_<run_id>_resources.yaml matches the run metadata glob and
+        # carries the same run_id, so it must not be read as a run itself.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            connection = self.build(root)
+            rows = connection.execute("SELECT * FROM run").fetchall()
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["status"], "completed")
+            self.assertEqual(rows[0]["drakkar_version"], "2.0.0")
+            connection.close()
+
+    def test_benchmark_rollup_is_recorded_per_run(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            connection = self.build(root)
+            row = connection.execute("SELECT * FROM run_benchmark").fetchone()
+            self.assertEqual(row["run_id"], "20260825-101500")
+            self.assertEqual(row["status"], "generated")
+            self.assertEqual(row["profile"], "slurm")
+            self.assertEqual(row["benchmarked_launches"], 3)
+            self.assertEqual(row["oom_launches"], 1)
+            self.assertAlmostEqual(row["weighted_cpu_efficiency"], 0.75)
+            connection.close()
+
+    def test_requested_and_used_resources_are_kept_per_job(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            connection = self.build(root)
+            rows = connection.execute(
+                "SELECT * FROM benchmark_job ORDER BY launch_index"
+            ).fetchall()
+            self.assertEqual(len(rows), 3)
+            first = rows[0]
+            self.assertEqual(first["run_id"], "20260825-101500")
+            self.assertEqual(first["rule"], "assembly")
+            self.assertEqual(first["requested_mem_mb"], 65536.0)
+            self.assertEqual(first["max_rss_mb"], 65000.0)
+            self.assertEqual(first["requested_runtime_min"], 720.0)
+            self.assertEqual(first["elapsed_sec"], 1800.0)
+            self.assertEqual(first["state"], "OUT_OF_MEMORY")
+            # The TSV writes booleans as Python literals.
+            self.assertEqual((first["oom"], first["timeout"]), (1, 0))
+            self.assertEqual(rows[1]["attempt"], 2)
+            connection.close()
+
+    def test_rule_level_benchmark_is_recorded(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            connection = self.build(root)
+            rows = {
+                row["rule"]: row
+                for row in connection.execute("SELECT * FROM benchmark_rule")
+            }
+            self.assertEqual(set(rows), {"assembly", "binning"})
+            self.assertEqual(rows["assembly"]["launches"], 2)
+            self.assertEqual(rows["assembly"]["retries"], 1)
+            self.assertEqual(rows["assembly"]["median_requested_mem_mb"], 98304.0)
+            self.assertEqual(rows["binning"]["failed_launches"], 0)
+            connection.close()
+
+    def test_a_run_without_benchmark_files_still_ingests(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root / "drakkar_20260825-101500.yaml", """
+                run_id: '20260825-101500'
+                command: preprocessing
+                status: completed
+                """)
+            connection = self.build(root, sections=("resources",))
+            self.assertEqual(
+                connection.execute("SELECT COUNT(*) FROM run").fetchone()[0], 1
+            )
+            self.assertEqual(
+                connection.execute("SELECT COUNT(*) FROM benchmark_job").fetchone()[0],
+                0,
+            )
             connection.close()
 
     def test_ingest_log_records_provenance(self):

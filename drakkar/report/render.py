@@ -171,6 +171,13 @@ table { border-collapse: collapse; width: 100%; margin: .75rem 0; font-size: .9r
 .scroll { overflow-x: auto; }
 th, td { padding: .35rem .6rem; text-align: right; border-bottom: 1px solid var(--rule); white-space: nowrap; }
 th { background: var(--panel); font-weight: 600; color: var(--muted); text-transform: uppercase; font-size: .72rem; letter-spacing: .05em; }
+/* Sorting is offered only once the script has made the headers interactive. */
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--accent); }
+th.sortable::after { content: "\2195"; margin-left: .3em; opacity: .3; font-size: .9em; }
+th.sortable[aria-sort="ascending"]::after { content: "\2191"; opacity: 1; color: var(--accent); }
+th.sortable[aria-sort="descending"]::after { content: "\2193"; opacity: 1; color: var(--accent); }
+th.sortable:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 th:first-child, td:first-child { text-align: left; }
 tbody tr:hover td { background: #fbfcfd; }
 
@@ -214,9 +221,10 @@ code { font-family: "SFMono-Regular", Consolas, monospace; font-size: .85em; }
 }
 """
 
-# The page works without this script — every section stacked, every row shown.
-# It adds the two behaviours the markup only hints at: the sidebar switches
-# panels instead of scrolling to them, and long tables are paged.
+# The page works without this script — every section stacked, every row shown,
+# in the order the renderer chose. It adds the three behaviours the markup only
+# hints at: the sidebar switches panels instead of scrolling to them, long
+# tables are paged, and any column can be sorted on.
 SCRIPT = """
 (function () {
   var panels = Array.prototype.slice.call(document.querySelectorAll("main .panel"));
@@ -267,13 +275,81 @@ SCRIPT = """
     return value.toLocaleString ? value.toLocaleString("en-US") : String(value);
   }
 
+  // A cell sorts on its raw value when it has one, and on its text otherwise.
+  // Blanks are missing values, not zeros or empty strings, so they sit at the
+  // bottom whichever way the column is sorted.
+  function key(row, index) {
+    var cell = row.cells[index];
+    if (!cell) { return null; }
+    var raw = cell.getAttribute("data-sort");
+    if (raw !== null && raw !== "") {
+      var number = parseFloat(raw);
+      return isNaN(number) ? null : number;
+    }
+    var text = (cell.textContent || "").trim();
+    return text === "" ? null : text;
+  }
+
+  function compare(left, right) {
+    if (typeof left === "number" && typeof right === "number") {
+      return left - right;
+    }
+    return String(left).localeCompare(String(right), undefined, {
+      numeric: true, sensitivity: "base"
+    });
+  }
+
+  // Sorting reorders the shared row list, so paging keeps working on it.
+  function sortable(table, rows, redraw) {
+    var head = table.tHead;
+    if (!head || !head.rows.length || rows.length < 2) { return; }
+    var headers = Array.prototype.slice.call(head.rows[0].cells);
+
+    function sort(index, header) {
+      var descending = header.getAttribute("aria-sort") === "ascending";
+      var decorated = rows.map(function (row, position) {
+        return { row: row, position: position, value: key(row, index) };
+      });
+      decorated.sort(function (a, b) {
+        if (a.value === null && b.value === null) { return a.position - b.position; }
+        if (a.value === null) { return 1; }
+        if (b.value === null) { return -1; }
+        var order = compare(a.value, b.value);
+        if (order === 0) { return a.position - b.position; }
+        return descending ? -order : order;
+      });
+      var body = table.tBodies[0];
+      for (var index2 = 0; index2 < decorated.length; index2 += 1) {
+        rows[index2] = decorated[index2].row;
+        body.appendChild(decorated[index2].row);
+      }
+      for (var h = 0; h < headers.length; h += 1) {
+        headers[h].setAttribute("aria-sort", "none");
+      }
+      header.setAttribute("aria-sort", descending ? "descending" : "ascending");
+      redraw();
+    }
+
+    headers.forEach(function (header, index) {
+      header.classList.add("sortable");
+      header.setAttribute("role", "button");
+      header.setAttribute("tabindex", "0");
+      header.setAttribute("aria-sort", "none");
+      header.setAttribute("title", "Sort by " + (header.textContent || "").trim());
+      header.addEventListener("click", function () { sort(index, header); });
+      header.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") {
+          event.preventDefault();
+          sort(index, header);
+        }
+      });
+    });
+  }
+
   // Client-side paging: the rows are all in the document, only 20 are visible.
-  function paginate(table) {
+  function paginate(table, rows) {
     var size = parseInt(table.getAttribute("data-page-size"), 10);
-    var body = table.tBodies[0];
-    if (!size || !body) { return; }
-    var rows = Array.prototype.slice.call(body.rows);
-    if (rows.length <= size) { return; }
+    if (!size || rows.length <= size) { return null; }
     var pages = Math.ceil(rows.length / size);
     var current = 1;
 
@@ -312,10 +388,21 @@ SCRIPT = """
     var scroll = table.parentNode;
     scroll.parentNode.insertBefore(pager, scroll.nextSibling);
     draw();
+    // Re-sorting changes which rows belong on the open page, so it returns to
+    // the first one rather than leaving the reader mid-table.
+    return function () { current = 1; draw(); };
   }
 
-  var tables = document.querySelectorAll("table[data-page-size]");
-  for (var t = 0; t < tables.length; t += 1) { paginate(tables[t]); }
+  function enhance(table) {
+    var body = table.tBodies[0];
+    if (!body) { return; }
+    var rows = Array.prototype.slice.call(body.rows);
+    var redraw = paginate(table, rows) || function () {};
+    sortable(table, rows, redraw);
+  }
+
+  var tables = document.querySelectorAll("main table");
+  for (var t = 0; t < tables.length; t += 1) { enhance(tables[t]); }
 
   if (!show(window.location.hash.slice(1), false) && panels.length) {
     show(panels[0].id, false);
@@ -439,7 +526,7 @@ def _table(columns, rows, limit=TABLE_ROW_LIMIT, stats=()):
     head = "".join(f"<th>{escape(columns[index][0])}</th>" for index in keep)
     body = []
     for row in shown:
-        cells = "".join(f"<td>{columns[index][1](row[index])}</td>" for index in keep)
+        cells = "".join(_cell(row[index], columns[index][1]) for index in keep)
         body.append(f"<tr>{cells}</tr>")
     paging = f' data-page-size="{PAGE_ROWS}"' if len(shown) > PAGE_ROWS else ""
     parts = [
@@ -457,6 +544,19 @@ def _table(columns, rows, limit=TABLE_ROW_LIMIT, stats=()):
         )
     parts.append("</div>")
     return "".join(parts)
+
+
+def _cell(value, formatter):
+    """One table cell, carrying its raw value when the browser can sort on it.
+
+    The rendered text is grouped and rounded for reading — "1,234", "87.0" —
+    which sorts wrongly as text, so numeric cells keep the unformatted number
+    in ``data-sort`` for the sorting script to use.
+    """
+    rendered = formatter(value)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return f"<td>{rendered}</td>"
+    return f'<td data-sort="{value}">{rendered}</td>'
 
 
 def _note(message):
@@ -665,11 +765,17 @@ def _read_fate_figure(rows):
 
 
 def _render_cataloging(connection):
+    """Assemblies and the bins recovered from them, as two separate tables.
+
+    They describe different objects — one row per assembly either way, but
+    contiguity and mapping belong to the assembly and quality belongs to the
+    bins — and reading them side by side in one wide table meant scrolling.
+    """
     rows = _query(connection, """
         SELECT assembly_id, assembly_contigs, assembly_total_length,
                assembly_largest_contig, assembly_N50, assembly_gc_percent,
                mapping_rate_percent, final_bins, high_quality_bins,
-               medium_quality_bins, low_quality_bins, bin_mean_completeness,
+               medium_quality_bins, bin_mean_completeness,
                bin_mean_contamination
         FROM assembly
         ORDER BY assembly_id
@@ -682,36 +788,77 @@ def _render_cataloging(connection):
         f"{_quantity(len(rows), 'assembly', 'assemblies')} yielded "
         f"{_quantity(total_bins, 'bin')} in total."
     )]
-    blocks.append(_table(
-        [
-            ("Assembly", _text),
-            ("Contigs", _integer),
-            ("Total length", _integer),
-            ("Largest contig", _integer),
-            ("N50", _integer),
-            ("GC %", _ONE),
-            ("Mapping rate %", _ONE),
-            ("Final bins", _integer),
-            ("High quality", _integer),
-            ("Medium quality", _integer),
-            ("Low quality", _integer),
-            ("Mean completeness", _ONE),
-            ("Mean contamination", _ONE),
-        ],
-        [tuple(row) for row in rows],
-        stats=[
-            ("Mean contigs", 1),
-            ("Mean N50", 4),
-            ("Mean mapping rate %", 6),
-            ("Mean bins per assembly", 7),
-            ("Mean completeness", 11),
-            ("Mean contamination", 12),
-        ],
-    ))
-
-    blocks.extend(_binner_blocks(connection))
+    blocks.extend(_assembly_blocks(rows))
     blocks.extend(_mapping_rate_blocks(connection))
+    blocks.extend(_bin_blocks(rows))
+    blocks.extend(_binner_blocks(connection))
     return blocks
+
+
+def _assembly_blocks(rows):
+    """Contiguity and read recruitment, per assembly."""
+    return [
+        _heading("Assemblies"),
+        _table(
+            [
+                ("Assembly", _text),
+                ("Contigs", _integer),
+                ("Total length", _integer),
+                ("Largest contig", _integer),
+                ("N50", _integer),
+                ("GC %", _ONE),
+                ("Mapping rate %", _ONE),
+            ],
+            [
+                (
+                    row["assembly_id"], row["assembly_contigs"],
+                    row["assembly_total_length"], row["assembly_largest_contig"],
+                    row["assembly_N50"], row["assembly_gc_percent"],
+                    row["mapping_rate_percent"],
+                )
+                for row in rows
+            ],
+            stats=[
+                ("Mean contigs", 1),
+                ("Mean N50", 4),
+                ("Mean mapping rate %", 6),
+            ],
+        ),
+    ]
+
+
+def _bin_blocks(rows):
+    """Bin yield and quality, per assembly.
+
+    Low-quality bins are discarded downstream, so they are counted in
+    ``final_bins`` but not given a column of their own.
+    """
+    return [
+        _heading("Bins"),
+        _table(
+            [
+                ("Assembly", _text),
+                ("Final bins", _integer),
+                ("High quality", _integer),
+                ("Medium quality", _integer),
+                ("Mean completeness", _ONE),
+                ("Mean contamination", _ONE),
+            ],
+            [
+                (
+                    row["assembly_id"], row["final_bins"],
+                    row["high_quality_bins"], row["medium_quality_bins"],
+                    row["bin_mean_completeness"], row["bin_mean_contamination"],
+                )
+                for row in rows
+            ],
+            stats=[
+                ("Mean bins per assembly", 1),
+                ("Mean completeness", 4),
+                ("Mean contamination", 5),
+            ],
+        ),
+    ]
 
 
 def _binner_blocks(connection):
@@ -745,7 +892,11 @@ def _binner_blocks(connection):
 
 
 def _mapping_rate_blocks(connection):
-    """Per-sample mapping rates against the assemblies they contributed to."""
+    """Per-sample mapping rates against the assemblies they contributed to.
+
+    These are reads mapped back to the assembly, not to the bins recovered
+    from it, so they belong beside the assembly statistics.
+    """
     rows = _query(connection, """
         SELECT sample_id,
                COUNT(*) AS assemblies,
@@ -1363,6 +1514,12 @@ def _render_expression(connection):
 
 
 def _render_resources(connection):
+    blocks = _run_blocks(connection)
+    blocks.extend(_benchmark_blocks(connection))
+    return blocks
+
+
+def _run_blocks(connection):
     rows = _query(connection, """
         SELECT run_id, drakkar_version, command, modules, started_at,
                finished_at, status
@@ -1395,6 +1552,333 @@ def _render_resources(connection):
             for row in rows
         ],
     ))
+    return blocks
+
+
+# Why a run carries no usage figures. Keyed by the status drakkar.benchmark
+# stamps into drakkar_<run_id>_resources.yaml.
+BENCHMARK_STATUS_NOTES = {
+    "skipped": "Resource benchmarking was skipped for this run (--skip-benchmark).",
+    "unsupported_profile": (
+        "Resource benchmarking currently covers only runs launched with the "
+        "slurm profile, so no usage figures were collected."
+    ),
+    "log_missing": (
+        "The Snakemake log was not found, so no resource benchmark could be built."
+    ),
+    "no_submitted_jobs": (
+        "No submitted cluster jobs were detected in the Snakemake log."
+    ),
+    "accounting_unavailable": (
+        "SLURM accounting could not be queried, so requested resources are "
+        "recorded without the matching actual usage."
+    ),
+}
+
+
+def _percent(count, total):
+    """A count as a percentage of a total, or None when the total is zero."""
+    return _ratio(count, total) if total else None
+
+
+def _minutes(seconds):
+    return None if seconds is None else float(seconds) / 60.0
+
+
+def _efficiency(fraction):
+    """Benchmark efficiencies are stored as fractions; the page shows percent."""
+    return None if fraction is None else 100.0 * float(fraction)
+
+
+def _benchmark_blocks(connection):
+    """Requested versus used resources, and how many jobs actually succeeded."""
+    blocks = []
+    blocks.extend(_job_outcome_blocks(connection))
+    blocks.extend(_rule_resource_blocks(connection))
+    blocks.extend(_job_resource_blocks(connection))
+    if not blocks:
+        blocks.extend(_benchmark_status_blocks(connection))
+    return blocks
+
+
+def _benchmark_status_blocks(connection):
+    """Explain the absence of usage figures, when a run recorded a reason."""
+    rows = _query(connection, """
+        SELECT run_id, status FROM run_benchmark ORDER BY run_id
+    """)
+    notes = []
+    for row in rows:
+        message = BENCHMARK_STATUS_NOTES.get(row["status"])
+        if message:
+            notes.append(_note(f"{row['run_id']}: {message}"))
+    if not notes:
+        return []
+    return [_heading("Resource benchmark"), *notes]
+
+
+def _job_outcome_blocks(connection):
+    """How many submitted jobs completed, failed, or never reported back."""
+    totals = _query(connection, """
+        SELECT COUNT(*) AS launches,
+               COUNT(DISTINCT logical_job_key) AS logical_jobs,
+               SUM(CASE WHEN UPPER(COALESCE(state, '')) = 'COMPLETED'
+                        THEN 1 ELSE 0 END) AS completed,
+               SUM(CASE WHEN state IS NULL OR TRIM(state) = ''
+                        THEN 1 ELSE 0 END) AS unknown,
+               SUM(CASE WHEN COALESCE(oom, 0) = 1 THEN 1 ELSE 0 END) AS oom,
+               SUM(CASE WHEN COALESCE(timeout, 0) = 1 THEN 1 ELSE 0 END) AS timeout,
+               SUM(CASE WHEN COALESCE(attempt, 1) > 1 THEN 1 ELSE 0 END) AS retries,
+               SUM(COALESCE(alloc_cpus, 0) * COALESCE(elapsed_sec, 0)) AS allocated,
+               SUM(COALESCE(cpu_time_sec, 0)) AS used,
+               MAX(max_rss_mb) AS peak_rss,
+               SUM(COALESCE(elapsed_sec, 0)) AS elapsed
+        FROM benchmark_job
+    """)
+    if not totals or not totals[0]["launches"]:
+        return []
+    total = totals[0]
+    launches = total["launches"]
+    # A launch with no accounting row is neither a success nor a failure: it is
+    # a job sacct could not speak for, and is counted on its own.
+    failed = launches - (total["completed"] or 0) - (total["unknown"] or 0)
+
+    blocks = [
+        _heading("Job outcomes"),
+        _paragraph(
+            f"{_quantity(launches, 'job')} were submitted to the scheduler for "
+            f"{_quantity(total['logical_jobs'] or 0, 'distinct workflow job')}; "
+            "a job submitted more than once appears once per attempt."
+        ),
+        _highlights([
+            ("Jobs submitted", _integer(launches)),
+            ("Successful", f"{_integer(total['completed'])} "
+                           f"({_ONE(_percent(total['completed'], launches))}%)"),
+            ("Failed", f"{_integer(failed)} "
+                       f"({_ONE(_percent(failed, launches))}%)"),
+            ("Relaunches", _integer(total["retries"])),
+            ("CPU efficiency", f"{_ONE(_percent(total['used'], total['allocated']))}%"
+                               if total["allocated"] else None),
+            ("Peak memory", f"{_integer(total['peak_rss'])} MB"
+                            if total["peak_rss"] else None),
+            ("Job wall time", f"{_TWO((total['elapsed'] or 0) / 3600.0)} h"
+                              if total["elapsed"] else None),
+        ]),
+    ]
+
+    states = _query(connection, """
+        SELECT COALESCE(NULLIF(TRIM(state), ''), 'No accounting record') AS state,
+               COUNT(*) AS launches,
+               COUNT(DISTINCT rule) AS rules
+        FROM benchmark_job
+        GROUP BY 1
+        ORDER BY launches DESC
+    """)
+    blocks.append(_table(
+        [
+            ("Final state", _text),
+            ("Jobs", _integer),
+            ("% of jobs", _ONE),
+            ("Rules affected", _integer),
+        ],
+        [
+            (row["state"], row["launches"], _percent(row["launches"], launches),
+             row["rules"])
+            for row in states
+        ],
+    ))
+
+    failure_notes = []
+    if total["oom"]:
+        failure_notes.append(
+            f"{_quantity(total['oom'], 'job')} ran out of memory"
+        )
+    if total["timeout"]:
+        failure_notes.append(
+            f"{_quantity(total['timeout'], 'job')} hit the requested time limit"
+        )
+    if total["unknown"]:
+        failure_notes.append(
+            f"{_quantity(total['unknown'], 'job')} had no accounting record"
+        )
+    if failure_notes:
+        blocks.append(_note("Of those: " + ", ".join(failure_notes) + "."))
+    return blocks
+
+
+def _rule_resource_blocks(connection):
+    """Median requested versus actually used resources, per Snakemake rule."""
+    rows = _query(connection, """
+        SELECT rule,
+               SUM(COALESCE(launches, 0)) AS launches,
+               SUM(COALESCE(failed_launches, 0)) AS failed,
+               AVG(median_requested_cpus) AS requested_cpus,
+               AVG(median_alloc_cpus) AS alloc_cpus,
+               AVG(median_requested_mem_mb) AS requested_mem_mb,
+               AVG(median_max_rss_mb) AS max_rss_mb,
+               AVG(median_memory_efficiency) AS memory_efficiency,
+               AVG(median_requested_runtime_min) AS requested_runtime_min,
+               AVG(median_elapsed_sec) AS elapsed_sec,
+               AVG(median_runtime_efficiency) AS runtime_efficiency,
+               SUM(COALESCE(allocated_cpu_sec, 0)) AS allocated_cpu_sec,
+               SUM(COALESCE(used_cpu_sec, 0)) AS used_cpu_sec
+        FROM benchmark_rule
+        GROUP BY rule
+        ORDER BY allocated_cpu_sec DESC, rule
+    """)
+    if not rows:
+        return []
+
+    table_rows = [
+        (
+            row["rule"],
+            row["launches"],
+            row["failed"],
+            row["requested_cpus"],
+            row["alloc_cpus"],
+            row["requested_mem_mb"],
+            row["max_rss_mb"],
+            _efficiency(row["memory_efficiency"]),
+            row["requested_runtime_min"],
+            _minutes(row["elapsed_sec"]),
+            _efficiency(row["runtime_efficiency"]),
+            (row["allocated_cpu_sec"] or 0) / 3600.0,
+            (row["used_cpu_sec"] or 0) / 3600.0,
+            _percent(row["used_cpu_sec"], row["allocated_cpu_sec"]),
+        )
+        for row in rows
+    ]
+    blocks = [
+        _heading("Requested versus used resources, per rule"),
+        _paragraph(
+            "Medians across the launches of each rule. Requested figures are "
+            "what the workflow asked the scheduler for; used figures are what "
+            "the scheduler's accounting reports, so the ratio between them is "
+            "what a resource profile should be tuned against."
+        ),
+        _table(
+            [
+                ("Rule", _text),
+                ("Jobs", _integer),
+                ("Failed", _integer),
+                ("CPUs requested", _ONE),
+                ("CPUs allocated", _ONE),
+                ("Memory requested (MB)", _integer),
+                ("Peak memory (MB)", _integer),
+                ("Memory used %", _ONE),
+                ("Runtime requested (min)", _ONE),
+                ("Runtime used (min)", _ONE),
+                ("Runtime used %", _ONE),
+                ("CPU-hours allocated", _TWO),
+                ("CPU-hours used", _TWO),
+                ("CPU efficiency %", _ONE),
+            ],
+            table_rows,
+            stats=[
+                ("Mean memory used %", 7),
+                ("Mean runtime used %", 10),
+                ("Mean CPU efficiency %", 13),
+            ],
+        ),
+    ]
+    figure = _rule_efficiency_figure(rows)
+    if figure is not None:
+        blocks.append(figure)
+    return blocks
+
+
+def _rule_efficiency_figure(rows):
+    """Memory and runtime headroom for the rules that burn the most CPU time."""
+    import plotly.graph_objects as go
+
+    ranked = [
+        row for row in rows[:TOP_CATEGORIES]
+        if row["memory_efficiency"] is not None or row["runtime_efficiency"] is not None
+    ]
+    if not ranked:
+        return None
+    ranked = list(reversed(ranked))
+    rules = [row["rule"] for row in ranked]
+
+    figure = go.Figure()
+    figure.add_bar(
+        name="Memory used %",
+        y=rules,
+        x=[_efficiency(row["memory_efficiency"]) for row in ranked],
+        orientation="h",
+        marker_color=PALETTE[0],
+    )
+    figure.add_bar(
+        name="Runtime used %",
+        y=rules,
+        x=[_efficiency(row["runtime_efficiency"]) for row in ranked],
+        orientation="h",
+        marker_color=PALETTE[1],
+    )
+    figure.update_layout(
+        barmode="group",
+        xaxis_title="Percent of the requested resource actually used",
+        yaxis_title="",
+        legend_title_text="",
+        height=max(FIGURE_HEIGHT, 22 * len(rules) + 160),
+    )
+    return figure
+
+
+def _job_resource_blocks(connection):
+    """The individual launches, heaviest first."""
+    rows = _query(connection, f"""
+        SELECT run_id, rule, wildcards, attempt, state,
+               requested_cpus, alloc_cpus,
+               requested_mem_mb, max_rss_mb, memory_efficiency,
+               requested_runtime_min, elapsed_sec, runtime_efficiency,
+               cpu_efficiency
+        FROM benchmark_job
+        ORDER BY COALESCE(elapsed_sec, -1) DESC, run_id, launch_index
+        LIMIT {TABLE_ROW_LIMIT + 1}
+    """)
+    if not rows:
+        return []
+
+    total = _scalar(connection, "SELECT COUNT(*) FROM benchmark_job", default=0)
+    blocks = [
+        _heading("Requested versus used resources, per job"),
+        _paragraph(
+            "One row per submitted job, longest-running first."
+            if total <= TABLE_ROW_LIMIT else
+            f"The {TABLE_ROW_LIMIT:,} longest-running of {total:,} submitted jobs; "
+            "the full listing stays in benchmark/drakkar_<run_id>.jobs.tsv."
+        ),
+        _table(
+            [
+                ("Run", _text),
+                ("Rule", _text),
+                ("Wildcards", _text),
+                ("Attempt", _integer),
+                ("State", _text),
+                ("CPUs requested", _integer),
+                ("CPUs allocated", _integer),
+                ("Memory requested (MB)", _integer),
+                ("Peak memory (MB)", _integer),
+                ("Memory used %", _ONE),
+                ("Runtime requested (min)", _ONE),
+                ("Runtime used (min)", _ONE),
+                ("Runtime used %", _ONE),
+                ("CPU efficiency %", _ONE),
+            ],
+            [
+                (
+                    row["run_id"], row["rule"], row["wildcards"], row["attempt"],
+                    row["state"], row["requested_cpus"], row["alloc_cpus"],
+                    row["requested_mem_mb"], row["max_rss_mb"],
+                    _efficiency(row["memory_efficiency"]),
+                    row["requested_runtime_min"], _minutes(row["elapsed_sec"]),
+                    _efficiency(row["runtime_efficiency"]),
+                    _efficiency(row["cpu_efficiency"]),
+                )
+                for row in rows[:TABLE_ROW_LIMIT]
+            ],
+        ),
+    ]
     return blocks
 
 

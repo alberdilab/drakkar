@@ -19,7 +19,7 @@ import sqlite3
 from datetime import datetime, timezone
 
 # Bump when the layout below changes in a way that invalidates existing files.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 TAXONOMIC_RANKS = ("domain", "phylum", "class", "order", "family", "genus", "species")
 
@@ -55,6 +55,87 @@ SCHEMA_STATEMENTS = [
         status TEXT,
         output_directory TEXT,
         argv TEXT
+    )
+    """,
+    # -- Resource accounting ----------------------------------------------
+    # Projected from the benchmark artefacts drakkar.benchmark writes for SLURM
+    # runs: the per-run YAML roll-up and the per-launch / per-rule TSVs. Every
+    # run gets a row here, including the ones whose status explains why no
+    # usage figures exist (local profile, sacct unreachable, benchmark skipped).
+    """
+    CREATE TABLE IF NOT EXISTS run_benchmark (
+        run_id TEXT PRIMARY KEY,
+        status TEXT,
+        profile TEXT,
+        message TEXT,
+        generated_at TEXT,
+        benchmarked_launches INTEGER,
+        logical_jobs INTEGER,
+        retries INTEGER,
+        failed_launches INTEGER,
+        oom_launches INTEGER,
+        timeout_launches INTEGER,
+        jobs_missing_accounting INTEGER,
+        max_alloc_cpus INTEGER,
+        peak_max_rss_mb REAL,
+        total_elapsed_sec REAL,
+        allocated_cpu_sec REAL,
+        used_cpu_sec REAL,
+        weighted_cpu_efficiency REAL
+    )
+    """,
+    # One row per submitted job launch: what Snakemake asked SLURM for, and
+    # what sacct says the job actually used.
+    """
+    CREATE TABLE IF NOT EXISTS benchmark_job (
+        run_id TEXT NOT NULL,
+        launch_index INTEGER NOT NULL,
+        rule TEXT,
+        attempt INTEGER,
+        logical_job_key TEXT,
+        internal_jobid TEXT,
+        external_jobid TEXT,
+        wildcards TEXT,
+        requested_cpus INTEGER,
+        requested_mem_mb REAL,
+        requested_runtime_min REAL,
+        state TEXT,
+        exit_code TEXT,
+        alloc_cpus INTEGER,
+        elapsed_sec REAL,
+        cpu_time_sec REAL,
+        max_rss_mb REAL,
+        cpu_efficiency REAL,
+        memory_efficiency REAL,
+        runtime_efficiency REAL,
+        oom INTEGER,
+        timeout INTEGER,
+        PRIMARY KEY (run_id, launch_index)
+    )
+    """,
+    # The same figures collapsed per Snakemake rule, as medians and totals.
+    """
+    CREATE TABLE IF NOT EXISTS benchmark_rule (
+        run_id TEXT NOT NULL,
+        rule TEXT NOT NULL,
+        launches INTEGER,
+        logical_jobs INTEGER,
+        retries INTEGER,
+        failed_launches INTEGER,
+        oom_launches INTEGER,
+        timeout_launches INTEGER,
+        median_requested_cpus REAL,
+        median_alloc_cpus REAL,
+        median_requested_mem_mb REAL,
+        median_max_rss_mb REAL,
+        median_memory_efficiency REAL,
+        median_requested_runtime_min REAL,
+        median_elapsed_sec REAL,
+        median_runtime_efficiency REAL,
+        allocated_cpu_sec REAL,
+        used_cpu_sec REAL,
+        weighted_cpu_efficiency REAL,
+        PRIMARY KEY (run_id, rule)
     )
     """,
     # -- Preprocessing -----------------------------------------------------
@@ -283,6 +364,8 @@ SCHEMA_STATEMENTS = [
 ]
 
 INDEX_STATEMENTS = [
+    "CREATE INDEX IF NOT EXISTS idx_benchmark_job_rule ON benchmark_job (rule)",
+    "CREATE INDEX IF NOT EXISTS idx_benchmark_job_state ON benchmark_job (state)",
     "CREATE INDEX IF NOT EXISTS idx_genome_count_sample ON genome_count (sample_id)",
     "CREATE INDEX IF NOT EXISTS idx_genome_taxonomy_phylum ON genome_taxonomy (phylum)",
     "CREATE INDEX IF NOT EXISTS idx_genome_taxonomy_genus ON genome_taxonomy (genus)",

@@ -13,6 +13,12 @@ import pandas as pd
 import yaml
 
 from drakkar.report.schema import TAXONOMIC_RANKS, record_ingest
+from drakkar.report.sources import (
+    benchmark_run_id,
+    find_benchmark_summaries,
+    find_benchmark_tables,
+    find_run_metadata,
+)
 
 # Rows per chunk when streaming the large annotation and expression tables.
 CHUNK_SIZE = 200_000
@@ -152,21 +158,110 @@ def _executemany(connection, statement, rows):
 # Loaders
 # ---------------------------------------------------------------------------
 
-def ingest_resources(connection, output_dir):
-    """Load per-run metadata from the drakkar_<run_id>.yaml files."""
-    output_path = Path(output_dir)
-    metadata_files = sorted(output_path.glob("drakkar_*.yaml"))
-    if not metadata_files:
-        return None
+# Columns of the benchmark TSVs written by drakkar.benchmark, in file order,
+# paired with the cast that turns a cell into a database value.
+BENCHMARK_JOB_COLUMNS = (
+    ("launch_index", _int),
+    ("rule", _text),
+    ("attempt", _int),
+    ("logical_job_key", _text),
+    ("internal_jobid", _text),
+    ("external_jobid", _text),
+    ("wildcards", _text),
+    ("requested_cpus", _int),
+    ("requested_mem_mb", _float),
+    ("requested_runtime_min", _float),
+    ("state", _text),
+    ("exit_code", _text),
+    ("alloc_cpus", _int),
+    ("elapsed_sec", _float),
+    ("cpu_time_sec", _float),
+    ("max_rss_mb", _float),
+    ("cpu_efficiency", _float),
+    ("memory_efficiency", _float),
+    ("runtime_efficiency", _float),
+    ("oom", _bool),
+    ("timeout", _bool),
+)
 
+BENCHMARK_RULE_COLUMNS = (
+    ("rule", _text),
+    ("launches", _int),
+    ("logical_jobs", _int),
+    ("retries", _int),
+    ("failed_launches", _int),
+    ("oom_launches", _int),
+    ("timeout_launches", _int),
+    ("median_requested_cpus", _float),
+    ("median_alloc_cpus", _float),
+    ("median_requested_mem_mb", _float),
+    ("median_max_rss_mb", _float),
+    ("median_memory_efficiency", _float),
+    ("median_requested_runtime_min", _float),
+    ("median_elapsed_sec", _float),
+    ("median_runtime_efficiency", _float),
+    ("allocated_cpu_sec", _float),
+    ("used_cpu_sec", _float),
+    ("weighted_cpu_efficiency", _float),
+)
+
+# Run-level roll-up keys of drakkar_<run_id>_resources.yaml, after run_id.
+BENCHMARK_SUMMARY_KEYS = (
+    ("status", _text),
+    ("profile", _text),
+    ("message", _text),
+    ("generated_at", _text),
+    ("benchmarked_launches", _int),
+    ("logical_jobs", _int),
+    ("retries", _int),
+    ("failed_launches", _int),
+    ("oom_launches", _int),
+    ("timeout_launches", _int),
+    ("jobs_missing_accounting", _int),
+    ("max_alloc_cpus", _int),
+    ("peak_max_rss_mb", _float),
+    ("total_elapsed_sec", _float),
+    ("allocated_cpu_sec", _float),
+    ("used_cpu_sec", _float),
+    ("weighted_cpu_efficiency", _float),
+)
+
+
+def _load_yaml(path):
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            document = yaml.safe_load(handle)
+    except (OSError, yaml.YAMLError):
+        return None
+    return document if isinstance(document, dict) else None
+
+
+def ingest_resources(connection, output_dir):
+    """Load per-run provenance and, when present, its resource benchmark.
+
+    The provenance comes from the ``drakkar_<run_id>.yaml`` files. The usage
+    figures come from the artefacts ``drakkar.benchmark`` writes for SLURM
+    runs — a roll-up YAML per run and the per-launch / per-rule TSVs under
+    ``benchmark/`` — and are simply absent for runs that were not benchmarked.
+    """
+    output_path = Path(output_dir)
+    metadata_files = find_run_metadata(output_path)
+    written = 0
+    if metadata_files:
+        written = _ingest_runs(connection, output_path, metadata_files)
+    benchmark_rows = _ingest_benchmark(connection, output_path)
+    if not metadata_files and not benchmark_rows:
+        return None
+    connection.commit()
+    return written + benchmark_rows
+
+
+def _ingest_runs(connection, output_path, metadata_files):
+    """Write one `run` row per run metadata file."""
     rows = []
     for path in metadata_files:
-        try:
-            with open(path, "r", encoding="utf-8") as handle:
-                metadata = yaml.safe_load(handle) or {}
-        except (OSError, yaml.YAMLError):
-            continue
-        if not isinstance(metadata, dict) or not metadata.get("run_id"):
+        metadata = _load_yaml(path)
+        if not metadata or not metadata.get("run_id"):
             continue
         modules = metadata.get("modules") or []
         argv = metadata.get("argv") or []
@@ -190,7 +285,77 @@ def ingest_resources(connection, output_dir):
         rows,
     )
     record_ingest(connection, "run", "resources", output_path, written)
-    connection.commit()
+    return written
+
+
+def _ingest_benchmark(connection, output_path):
+    """Write the run-level, per-launch and per-rule benchmark rows.
+
+    Returns the total number of rows written across the three tables, so that
+    a directory holding benchmark files but no run metadata still counts as an
+    ingested section.
+    """
+    written = 0
+    written += _ingest_benchmark_summaries(connection, output_path)
+    written += _ingest_benchmark_table(
+        connection, output_path, "jobs", "benchmark_job", BENCHMARK_JOB_COLUMNS
+    )
+    written += _ingest_benchmark_table(
+        connection, output_path, "rules", "benchmark_rule", BENCHMARK_RULE_COLUMNS
+    )
+    return written
+
+
+def _ingest_benchmark_summaries(connection, output_path):
+    summary_files = find_benchmark_summaries(output_path)
+    if not summary_files:
+        return 0
+
+    rows = []
+    for path in summary_files:
+        summary = _load_yaml(path)
+        if summary is None:
+            continue
+        run_id = _text(summary.get("run_id")) or benchmark_run_id(path)
+        if run_id is None:
+            continue
+        rows.append(
+            (run_id, *(cast(summary.get(key)) for key, cast in BENCHMARK_SUMMARY_KEYS))
+        )
+
+    placeholders = ", ".join(["?"] * (len(BENCHMARK_SUMMARY_KEYS) + 1))
+    written = _executemany(
+        connection,
+        f"INSERT OR REPLACE INTO run_benchmark VALUES ({placeholders})",
+        rows,
+    )
+    record_ingest(connection, "run_benchmark", "resources", output_path, written)
+    return written
+
+
+def _ingest_benchmark_table(connection, output_path, kind, table, columns):
+    """Load every ``benchmark/drakkar_<run_id>.<kind>.tsv`` into one table."""
+    sources = find_benchmark_tables(output_path, kind)
+    if not sources:
+        return 0
+
+    rows = []
+    for path in sources:
+        run_id = benchmark_run_id(path, kind=kind)
+        try:
+            frame = _read_table(path)
+        except (OSError, ValueError, pd.errors.ParserError):
+            continue
+        for record in frame.to_dict("records"):
+            rows.append((run_id, *(_get(record, name, cast) for name, cast in columns)))
+
+    placeholders = ", ".join(["?"] * (len(columns) + 1))
+    written = _executemany(
+        connection,
+        f"INSERT OR REPLACE INTO {table} VALUES ({placeholders})",
+        rows,
+    )
+    record_ingest(connection, table, "resources", output_path / "benchmark", written)
     return written
 
 

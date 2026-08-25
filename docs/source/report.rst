@@ -75,9 +75,13 @@ The table of contents is also the navigation: one section is shown at a time,
 so the whole report is not laid out on a single scrolling page. Within a
 section, tables longer than twenty rows are paged in the browser — every row is
 still in the file, only twenty are on screen — and each table is preceded by
-the averages of its numeric columns, shown as highlights. Printing, or opening
+the averages of its numeric columns, shown as highlights. Any table can be
+sorted by any column: the arrow in a column heading cycles it between
+ascending and descending, numeric columns sort on their underlying values
+rather than on the grouped text, blank cells stay at the bottom either way,
+and re-sorting a paged table returns to its first page. Printing, or opening
 the page with scripting disabled, falls back to the flat page: every section
-stacked and every row listed.
+stacked, every row listed, in the order the renderer chose.
 
 Each section is rendered from SQL aggregates only. ``gene_annotation``,
 ``cluster_annotation`` and ``gene_expression`` can hold tens of millions of
@@ -96,8 +100,9 @@ per-MAG heatmaps show the top entries by abundance or gene count.
      - Per-sample read and base counts, metagenomic fraction, SingleM fraction
        and Nonpareil diversity, plus a stacked read-fate chart.
    * - Cataloging
-     - Per-assembly QUAST and mapping statistics, bins contributed per binner,
-       and per-sample mapping rates.
+     - Per-assembly QUAST and mapping statistics, per-sample mapping rates
+       against those assemblies, per-assembly bin yield and quality, and the
+       bins contributed by each binner.
    * - Dereplication
      - Bin counts and mean quality before and after dereplication, and the ANI
        threshold used.
@@ -116,7 +121,9 @@ per-MAG heatmaps show the top entries by abundance or gene count.
        distribution of the quantified genes.
    * - Runs and resources
      - One row per recorded Drakkar run, with its command, modules, wall-clock
-       duration and status.
+       duration and status; and, for benchmarked runs, how many submitted jobs
+       succeeded or failed and what each of them requested against what it
+       actually used.
    * - Provenance
      - The ingest log: every table, the file it came from, its row count and
        when it was ingested.
@@ -151,7 +158,40 @@ Sections and their inputs
    * - ``expression``
      - ``expressing/gene_counts.tsv.xz``
    * - ``resources``
-     - ``drakkar_<run_id>.yaml``
+     - ``drakkar_<run_id>.yaml``, ``drakkar_<run_id>_resources.yaml``,
+       ``benchmark/drakkar_<run_id>.jobs.tsv``,
+       ``benchmark/drakkar_<run_id>.rules.tsv``
+
+Resource benchmarks
+-------------------
+
+The resources section reports two different things. The run metadata is always
+there: one row per Drakkar invocation. The resource figures come from the
+benchmark artifacts Drakkar writes after a run, and exist only when that run
+was benchmarked, so the section renders with or without them.
+
+**Job outcomes.** How many jobs were submitted, for how many distinct workflow
+jobs, and how they ended: the count and percentage that completed, the count
+and percentage that failed, how many were relaunched, and a breakdown by final
+scheduler state. Jobs whose accounting record could not be read are counted
+separately rather than being folded into either side — they are jobs the
+scheduler could not speak for, not failures.
+
+**Requested versus used.** Per rule and per job: CPUs, memory and runtime as
+requested from the scheduler, beside the CPUs allocated, the peak resident
+memory and the elapsed time actually observed, with the ratio between them.
+The per-rule table is the one to tune a resource profile against; it is sorted
+by CPU time consumed, and the accompanying figure shows how much of each
+requested resource the heaviest rules really used. The per-job table lists the
+longest-running launches; the complete listing stays in
+``benchmark/drakkar_<run_id>.jobs.tsv``.
+
+Two limits are worth knowing. Benchmarking currently covers only runs launched
+with ``--profile slurm``, and it needs ``sacct`` to be reachable when the
+benchmark is generated; a run that misses either records the reason, and the
+report prints that reason in place of the figures. And the requested memory,
+CPU and runtime are read from the Snakemake log, so they are what the workflow
+asked for, not what a cluster-side default may have overridden.
 
 How the source tables are decluttered
 -------------------------------------
@@ -214,6 +254,16 @@ Tables
    * - ``run``
      - ``run_id``
      - One row per Drakkar invocation recorded in the output directory.
+   * - ``run_benchmark``
+     - ``run_id``
+     - Per-run resource roll-up, or the status explaining its absence.
+   * - ``benchmark_job``
+     - ``(run_id, launch_index)``
+     - One row per submitted job: resources requested, resources used, final
+       state and attempt number.
+   * - ``benchmark_rule``
+     - ``(run_id, rule)``
+     - The same figures collapsed per Snakemake rule, as medians and totals.
    * - ``sample``
      - ``sample_id``
      - Per-sample preprocessing statistics.

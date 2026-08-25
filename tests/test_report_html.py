@@ -10,7 +10,7 @@ from pathlib import Path
 
 from drakkar.report import command as report_command
 from drakkar.report.render import PAGE_ROWS, TABLE_ROW_LIMIT, render_report
-from drakkar.report.schema import connect, create_schema
+from drakkar.report.schema import SCHEMA_VERSION, connect, create_schema
 from drakkar.report.sources import SECTION_ORDER
 
 
@@ -43,10 +43,12 @@ def seed_preprocessing(connection, samples=2):
 def seed_cataloging(connection):
     connection.executemany(
         "INSERT INTO assembly (assembly_id, assembly_contigs, assembly_total_length, "
-        "assembly_N50, mapping_rate_percent, final_bins, high_quality_bins) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        [("A1", 1200, 5_000_000, 12000, 90.0, 7, 3),
-         ("A2", 800, 3_000_000, 9000, 82.5, 4, 1)],
+        "assembly_largest_contig, assembly_N50, assembly_gc_percent, "
+        "mapping_rate_percent, final_bins, high_quality_bins, medium_quality_bins, "
+        "low_quality_bins, bin_mean_completeness, bin_mean_contamination) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [("A1", 1200, 5_000_000, 180_000, 12000, 44.2, 90.0, 7, 3, 3, 1, 88.4, 2.1),
+         ("A2", 800, 3_000_000, 95_000, 9000, 41.8, 82.5, 4, 1, 2, 1, 79.6, 3.4)],
     )
     connection.executemany(
         "INSERT INTO assembly_sample VALUES (?, ?, ?, ?, ?)",
@@ -153,7 +155,7 @@ def seed_expression(connection, genes=4, samples=("S1", "S2")):
     log(connection, "gene_expression", "expression", len(counts))
 
 
-def seed_resources(connection):
+def seed_resources(connection, benchmark=True):
     connection.execute(
         "INSERT INTO run VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         ("20260825-101500", "2.1.0", "complete", "preprocessing,cataloging",
@@ -161,6 +163,55 @@ def seed_resources(connection):
          "/scratch/run", "drakkar complete"),
     )
     log(connection, "run", "resources", 1)
+    if benchmark:
+        seed_benchmark(connection)
+
+
+def seed_benchmark(connection, run_id="20260825-101500", status="generated"):
+    """The SLURM accounting projection: roll-up, launches, and rule medians."""
+    connection.execute(
+        "INSERT INTO run_benchmark VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
+        "?, ?, ?, ?, ?)",
+        (run_id, status, "slurm", None, "2026-08-25T14:03:00+00:00",
+         4, 3, 1, 1, 1, 0, 0, 8, 65000.0, 12600.0, 79200.0, 59000.0, 0.7449),
+    )
+    log(connection, "run_benchmark", "resources", 1)
+    if status != "generated":
+        return
+
+    jobs = [
+        # run, launch, rule, attempt, key, internal, external, wildcards,
+        # req cpus, req mem, req runtime, state, exit, alloc cpus, elapsed,
+        # cpu time, max rss, cpu eff, mem eff, runtime eff, oom, timeout
+        (run_id, 1, "assembly", 1, "assembly|A1", "12", "9001", "assembly=A1",
+         8, 65536.0, 720.0, "OUT_OF_MEMORY", "0:125", 8, 1800.0, 12000.0,
+         65000.0, 0.833, 0.9918, 0.0417, 1, 0),
+        (run_id, 2, "assembly", 2, "assembly|A1", "12", "9002", "assembly=A1",
+         8, 131072.0, 720.0, "COMPLETED", "0:0", 8, 5400.0, 38000.0, 98000.0,
+         0.8796, 0.7477, 0.125, 0, 0),
+        (run_id, 3, "binning", 1, "binning|A1", "14", "9003", "assembly=A1",
+         4, 16384.0, 240.0, "COMPLETED", "0:0", 4, 3600.0, 9000.0, 8000.0,
+         0.625, 0.4883, 0.25, 0, 0),
+        # A launch sacct could not speak for: neither a success nor a failure.
+        (run_id, 4, "binning", 1, "binning|A2", "15", "9004", "assembly=A2",
+         4, 16384.0, 240.0, None, None, None, None, None, None, None, None,
+         None, 0, 0),
+    ]
+    connection.executemany(
+        "INSERT INTO benchmark_job VALUES (" + ", ".join(["?"] * 22) + ")", jobs
+    )
+    log(connection, "benchmark_job", "resources", len(jobs))
+
+    rules = [
+        (run_id, "assembly", 2, 1, 1, 1, 1, 0, 8, 8, 98304.0, 81500.0, 0.8697,
+         720.0, 3600.0, 0.0833, 57600.0, 50000.0, 0.868),
+        (run_id, "binning", 2, 2, 0, 0, 0, 0, 4, 4, 16384.0, 8000.0, 0.4883,
+         240.0, 3600.0, 0.25, 14400.0, 9000.0, 0.625),
+    ]
+    connection.executemany(
+        "INSERT INTO benchmark_rule VALUES (" + ", ".join(["?"] * 19) + ")", rules
+    )
+    log(connection, "benchmark_rule", "resources", len(rules))
 
 
 SEEDERS = {
@@ -240,7 +291,7 @@ class RenderTests(TemporaryRootMixin, unittest.TestCase):
     def test_summary_header_stamps_versions_and_runs(self):
         _, text, _ = self.render()
         self.assertIn("Report schema", text)
-        self.assertIn("version 1", text)
+        self.assertIn(f"version {SCHEMA_VERSION}", text)
         self.assertIn("20260825-101500", text)
         self.assertIn("Sections rendered", text)
 
@@ -340,6 +391,22 @@ class TableTests(TemporaryRootMixin, unittest.TestCase):
         text = self.render(samples=1)
         self.assertNotIn('<div class="stats">', text)
 
+    def test_numeric_cells_carry_the_value_the_browser_sorts_on(self):
+        text = self.render(samples=2)
+        # "1,000" would sort as text before "950"; the raw number does not.
+        self.assertIn('<td data-sort="1000">1,000</td>', text)
+        # Identifiers sort as text and need nothing extra.
+        self.assertIn("<td>S1</td>", text)
+
+    def test_headers_and_the_sorting_script_travel_with_the_page(self):
+        text = self.render(samples=2)
+        # The markup stays plain: the script makes the headers interactive, so
+        # no sorting affordance is offered where it would not work.
+        self.assertIn("<th>Sample</th>", text)
+        self.assertNotIn('<th class="sortable"', text)
+        self.assertIn('header.classList.add("sortable")', text)
+        self.assertIn('th.sortable[aria-sort="ascending"]::after', text)
+
 
 class MissingSectionTests(TemporaryRootMixin, unittest.TestCase):
     def render(self, seeded, sections=SECTION_ORDER):
@@ -436,6 +503,123 @@ class BoundedOutputTests(TemporaryRootMixin, unittest.TestCase):
         self.assertIn(f"Showing the first {TABLE_ROW_LIMIT:,}", text)
         # Sample ids sort as text, so S99 is the last row and must be cut.
         self.assertNotIn("<td>S99</td>", text)
+
+
+class CatalogingLayoutTests(TemporaryRootMixin, unittest.TestCase):
+    """Assemblies and bins are described by two tables, not one wide one."""
+
+    def section(self):
+        root = self.temporary_root()
+        db_path = build_db(root / "drakkar.db", ("cataloging",))
+        html_path = root / "drakkar_report.html"
+        render_report(db_path, html_path, sections=("cataloging",))
+        text = html_path.read_text(encoding="utf-8")
+        start = text.index('id="section-cataloging"')
+        return text[start:text.index("</section>", start)]
+
+    def test_assembly_and_bin_statistics_are_separate_tables(self):
+        body = self.section()
+        self.assertIn("<h3>Assemblies</h3>", body)
+        self.assertIn("<h3>Bins</h3>", body)
+        assemblies = body[body.index("<h3>Assemblies</h3>"):body.index("<h3>Bins</h3>")]
+        bins = body[body.index("<h3>Bins</h3>"):]
+        self.assertIn("<th>N50</th>", assemblies)
+        self.assertIn("<th>Mapping rate %</th>", assemblies)
+        self.assertNotIn("<th>Final bins</th>", assemblies)
+        self.assertIn("<th>Final bins</th>", bins)
+        self.assertIn("<th>Mean completeness</th>", bins)
+        self.assertNotIn("<th>N50</th>", bins)
+
+    def test_low_quality_bins_are_not_given_a_column(self):
+        # They are discarded downstream, so only the total counts them.
+        self.assertNotIn("<th>Low quality</th>", self.section())
+
+    def test_mapping_rates_stay_with_the_assemblies_they_measure(self):
+        # They are reads mapped back to the assembly, not to its bins.
+        body = self.section()
+        self.assertLess(
+            body.index("Per-sample mapping rates"), body.index("<h3>Bins</h3>")
+        )
+
+
+class ResourceBenchmarkTests(TemporaryRootMixin, unittest.TestCase):
+    """The resources section: job outcomes and requested versus used figures."""
+
+    def render(self, seeder=seed_resources, **kwargs):
+        root = self.temporary_root()
+        db_path = root / "drakkar.db"
+        connection = connect(db_path)
+        create_schema(connection, drakkar_version="2.1.0")
+        seeder(connection, **kwargs)
+        connection.commit()
+        connection.close()
+
+        html_path = root / "drakkar_report.html"
+        render_report(db_path, html_path, sections=("resources",))
+        return html_path.read_text(encoding="utf-8")
+
+    def section(self, text):
+        start = text.index('id="section-resources"')
+        return text[start:text.index("</section>", start)]
+
+    def test_job_outcomes_are_counted_and_shown_as_percentages(self):
+        body = self.section(self.render())
+        self.assertIn("Job outcomes", body)
+        # Two of four launches completed; one failed; one has no accounting.
+        self.assertIn("<span class=\"stat-label\">Successful</span>"
+                      "<span class=\"stat-value\">2 (50.0%)</span>", body)
+        self.assertIn("<span class=\"stat-label\">Failed</span>"
+                      "<span class=\"stat-value\">1 (25.0%)</span>", body)
+        self.assertIn("Jobs submitted", body)
+        self.assertIn("Relaunches", body)
+
+    def test_final_states_are_broken_out_with_their_share(self):
+        body = self.section(self.render())
+        self.assertIn("Final state", body)
+        self.assertIn("COMPLETED", body)
+        self.assertIn("OUT_OF_MEMORY", body)
+        self.assertIn("No accounting record", body)
+        self.assertIn("ran out of memory", body)
+
+    def test_requested_and_used_resources_appear_per_rule(self):
+        body = self.section(self.render())
+        self.assertIn("Requested versus used resources, per rule", body)
+        self.assertIn("Memory requested (MB)", body)
+        self.assertIn("Peak memory (MB)", body)
+        self.assertIn("CPU-hours allocated", body)
+        # 98,304 MB requested against a 0.8697 median memory efficiency.
+        self.assertIn(">98,304</td>", body)
+        self.assertIn(">87.0</td>", body)
+        # Rules are ranked by the CPU time they consumed.
+        self.assertLess(body.index(">assembly<"), body.index(">binning<"))
+
+    def test_requested_and_used_resources_appear_per_job(self):
+        body = self.section(self.render())
+        self.assertIn("Requested versus used resources, per job", body)
+        # The longest launch leads, and carries both sides of the comparison.
+        self.assertIn(">131,072</td>", body)
+        self.assertIn(">98,000</td>", body)
+        self.assertIn("<td>assembly=A1</td>", body)
+
+    def test_seconds_are_reported_as_minutes_against_the_request(self):
+        body = self.section(self.render())
+        # 5,400 s elapsed against 720 min requested is 90 min, or 12.5%.
+        self.assertIn(">90.0</td>", body)
+        self.assertIn(">12.5</td>", body)
+
+    def test_a_run_without_usage_figures_explains_itself(self):
+        body = self.section(self.render(
+            seeder=lambda connection: seed_benchmark(
+                connection, status="unsupported_profile"
+            ),
+        ))
+        self.assertIn("slurm profile", body)
+        self.assertNotIn("Job outcomes", body)
+
+    def test_the_section_still_renders_without_any_benchmark(self):
+        body = self.section(self.render(benchmark=False))
+        self.assertIn("20260825-101500", body)
+        self.assertNotIn("Job outcomes", body)
 
 
 class EscapingTests(TemporaryRootMixin, unittest.TestCase):

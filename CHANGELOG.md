@@ -8,6 +8,47 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.1.4] - 2026-08-25
+
+### Added
+
+- The "Runs and resources" section of `drakkar_report.html` now reports the
+  computational benchmark of every run that has one. It states how many jobs
+  were submitted and what share of them completed, failed, ran out of memory,
+  hit their time limit or were relaunched, and it puts the CPUs, memory and
+  runtime requested from the scheduler beside those actually used — per
+  Snakemake rule, as medians against which a resource profile can be tuned,
+  and per job for the longest-running launches. The figures come from the
+  benchmark artifacts Drakkar already wrote after each SLURM run
+  (`drakkar_<run_id>_resources.yaml` and `benchmark/drakkar_<run_id>.*.tsv`),
+  which until now were only summarized in the terminal.
+- The report database gained the `run_benchmark`, `benchmark_job` and
+  `benchmark_rule` tables holding those figures, so requested-versus-used
+  resources can be queried directly. The schema version is now 2; rebuild an
+  existing `drakkar.db` with `drakkar report --force`.
+
+### Changed
+
+- The cataloging section is now two tables instead of one wide one. Assemblies
+  carry contigs, total length, largest contig, N50, GC and mapping rate; bins
+  carry the final, high- and medium-quality counts and mean completeness and
+  contamination. The low-quality column is gone — those bins are discarded
+  downstream and only the total still counts them. The per-sample mapping
+  rates sit with the assemblies, which is what they measure: reads mapped back
+  to the assembly, not to the bins recovered from it.
+- Every table in the report can be sorted by any column, through the arrows in
+  its headings. Numeric columns sort on their underlying values rather than on
+  the rendered text, blanks stay at the bottom in both directions, and sorting
+  a paged table returns it to the first page. The markup stays plain, so a
+  page opened without scripting still shows every row in the renderer's order.
+
+### Fixed
+
+- `drakkar_<run_id>_resources.yaml` matches the same glob as the run metadata
+  files and carries the same `run_id`, so the report ingested it as a run of
+  its own and overwrote that run's provenance row — losing its version,
+  modules, timestamps and status. Run metadata is now recognized by suffix.
+
 ## [2.1.3] - 2026-08-25
 
 ### Changed
