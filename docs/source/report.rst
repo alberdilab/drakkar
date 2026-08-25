@@ -63,13 +63,16 @@ small navigation script are inlined and the Plotly bundle is embedded once, in
 the first figure, so the report opens on a laptop with no network connection
 and can be emailed or archived as-is. Nothing is fetched when the page loads.
 
-The page is a left sidebar beside the sections it describes. The sidebar holds
-the general information about the report — the Drakkar version that wrote the
-database, the report schema version, the run identifiers found in the output
-directory, the ingest timestamps, and which sections were rendered, which were
-unavailable, and which were excluded by ``--sections`` — and, above it, the
-table of contents. Sections that the database does not hold are named there
-rather than silently dropped.
+The page is a left sidebar, full window height, beside the sections it
+describes. At its top is the Drakkar mark — embedded in the file like
+everything else — over the *Analysis Report* title and the render timestamp.
+Below that the sidebar holds the general information
+about the report — the Drakkar version that wrote the database, the report
+schema version, the run identifiers found in the output directory, the ingest
+timestamps, and which sections were rendered, which were unavailable, and
+which were excluded by ``--sections`` — and, above it, the table of contents.
+Sections that the database does not hold are named there rather than silently
+dropped.
 
 The table of contents is also the navigation: one section is shown at a time,
 so the whole report is not laid out on a single scrolling page. Within a

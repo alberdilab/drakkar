@@ -132,6 +132,50 @@ def build_logical_job_key(launch):
             return f"{launch.get('rule', 'unknown')}|{field}|{value}"
     return f"{launch.get('rule', 'unknown')}|singleton"
 
+# Snakemake prints the full ``rule <name>:`` block — the one carrying jobid,
+# threads and resources — only for rules that define no ``message:``. For every
+# rule that does, the log holds just ``Job <n>: <message>`` followed by the
+# submission line, so the block lookup finds nothing and the launch used to be
+# dropped. The SLURM executor still names each job's log after the rule and its
+# wildcard values (``.snakemake/slurm_logs/rule_<rule>/<value>/…/<jobid>.log``),
+# which is enough to rebuild the launch; the requested resources are recovered
+# from SLURM accounting instead (see ``benchmark_job_row``).
+SLURM_LOG_REFERENCE_PATTERN = re.compile(r"rule_([^/\\]+)((?:[/\\][^/\\]+)*)$")
+
+def parse_slurm_log_reference(log_path):
+    """Recover the rule name and wildcard values from a SLURM job log path."""
+    text = str(log_path or "").strip().strip("'\"").rstrip(".")
+    if not text:
+        return None
+    match = SLURM_LOG_REFERENCE_PATTERN.search(text)
+    if not match:
+        return None
+    rule = match.group(1).strip()
+    if not rule:
+        return None
+    segments = [segment for segment in re.split(r"[/\\]", match.group(2)) if segment]
+    if segments and segments[-1].endswith(".log"):
+        segments.pop()
+    return {"rule": rule, "wildcards": ",".join(segments)}
+
+def build_block_from_slurm_log(log_path, internal_jobid):
+    """Build a stand-in job block for a rule whose log block was not printed."""
+    reference = parse_slurm_log_reference(log_path)
+    if not reference:
+        return None
+    return {
+        "rule_type": "rule",
+        "rule": reference["rule"],
+        "local": False,
+        "internal_jobid": internal_jobid,
+        "threads": None,
+        "wildcards": reference["wildcards"],
+        "input": "",
+        "output": "",
+        "resources_raw": "",
+        "resources": {},
+    }
+
 def parse_snakemake_submitted_launches(log_path):
     path = Path(log_path)
     if not path.exists():
@@ -141,14 +185,17 @@ def parse_snakemake_submitted_launches(log_path):
     current_block = None
     launches = []
     launch_order = 0
-    launched_internal_jobids = set()
+    # Keyed by the pair, not by the internal jobid alone: a retried job keeps
+    # its internal jobid and only gets a new SLURM one, so deduplicating on the
+    # internal id would discard every attempt after the first.
+    launched_jobids = set()
 
     def register_launch(block, internal_jobid, external_jobid):
         nonlocal launch_order
         external_jobid = parse_slurm_job_id(external_jobid)
         if not block or block.get("local") or not internal_jobid or not external_jobid:
             return
-        if internal_jobid in launched_internal_jobids:
+        if (internal_jobid, external_jobid) in launched_jobids:
             return
 
         launch_order += 1
@@ -174,7 +221,7 @@ def parse_snakemake_submitted_launches(log_path):
         }
         launch["logical_job_key"] = build_logical_job_key(launch)
         launches.append(launch)
-        launched_internal_jobids.add(internal_jobid)
+        launched_jobids.add((internal_jobid, external_jobid))
 
     with open(path, "r", encoding="utf-8", errors="replace") as handle:
         for raw_line in handle:
@@ -196,6 +243,13 @@ def parse_snakemake_submitted_launches(log_path):
                     "resources_raw": "",
                     "resources": {},
                 }
+                continue
+
+            # ``Job <n>: <message>`` stands in for a whole rule block, so any
+            # block still open belongs to an earlier job and must not be
+            # attributed to this one.
+            if re.match(r"^Job\s+\d+:\s+\S", stripped):
+                current_block = None
                 continue
 
             if current_block is not None:
@@ -248,6 +302,12 @@ def parse_snakemake_submitted_launches(log_path):
                     and current_block.get("internal_jobid") == internal_jobid
                 ):
                     block = current_block
+                if block is None or not block.get("rule"):
+                    log_reference_match = re.search(r"\(log:\s*(.+?)\)\.?$", stripped)
+                    if log_reference_match:
+                        block = build_block_from_slurm_log(
+                            log_reference_match.group(1), internal_jobid
+                        ) or block
                 register_launch(
                     block,
                     internal_jobid,
@@ -286,17 +346,38 @@ def parse_snakemake_submitted_launches(log_path):
 
     return launches
 
+def parse_slurm_requested_memory_to_mb(value, cpus=None):
+    """Turn a sacct ``ReqMem`` value into total megabytes.
+
+    Older SLURM versions suffix the figure with ``c`` (per allocated CPU) or
+    ``n`` (per node); a per-CPU request only becomes the job total once
+    multiplied by the CPUs it was allocated.
+    """
+    text = str(value or "").strip()
+    amount = parse_slurm_memory_to_mb(text)
+    if amount is None:
+        return None
+    if text[-1:].lower() == "c":
+        if not cpus:
+            return None
+        return round(amount * float(cpus), 3)
+    return amount
+
+def _sacct_field(parts, index):
+    return parts[index].strip() if index < len(parts) else ""
+
 def _parse_sacct_output(stdout):
     rows = {}
     for raw_line in stdout.splitlines():
         if not raw_line.strip():
             continue
         parts = raw_line.split("|")
-        if len(parts) != 8:
+        if len(parts) < 8:
             continue
         job_id = parts[0].strip()
         if not job_id:
             continue
+        req_cpus = parse_int_or_none(_sacct_field(parts, 8))
         rows[job_id] = {
             "external_jobid": job_id,
             "state": parts[1].strip(),
@@ -306,6 +387,11 @@ def _parse_sacct_output(stdout):
             "alloc_cpus": parse_int_or_none(parts[5]),
             "max_rss_mb": parse_slurm_memory_to_mb(parts[6]),
             "timelimit_raw_min": parse_int_or_none(parts[7]),
+            "req_cpus": req_cpus,
+            "req_mem_mb": parse_slurm_requested_memory_to_mb(
+                _sacct_field(parts, 9),
+                req_cpus or parse_int_or_none(parts[5]),
+            ),
         }
     return rows
 
@@ -326,7 +412,7 @@ def query_sacct_for_jobs(job_ids, chunk_size=500):
             "-j",
             ",".join(str(job_id) for job_id in chunk),
             "--format",
-            "JobIDRaw,State,ExitCode,ElapsedRaw,CPUTimeRAW,AllocCPUS,MaxRSS,TimelimitRaw",
+            "JobIDRaw,State,ExitCode,ElapsedRaw,CPUTimeRAW,AllocCPUS,MaxRSS,TimelimitRaw,ReqCPUS,ReqMem",
         ]
         try:
             result = subprocess.run(command, capture_output=True, text=True, check=False)
@@ -372,6 +458,14 @@ def benchmark_job_row(launch, accounting_row):
                 "max_rss_mb": accounting_row.get("max_rss_mb"),
             }
         )
+        # Rules that define a ``message:`` never print their resource block, so
+        # what they asked for is only known to SLURM's own accounting.
+        if row["requested_cpus"] is None:
+            row["requested_cpus"] = accounting_row.get("req_cpus")
+        if row["requested_mem_mb"] is None:
+            row["requested_mem_mb"] = accounting_row.get("req_mem_mb")
+        if row["requested_runtime_min"] is None:
+            row["requested_runtime_min"] = accounting_row.get("timelimit_raw_min")
         alloc_cpus = row.get("alloc_cpus")
         elapsed_sec = row.get("elapsed_sec")
         cpu_time_sec = row.get("cpu_time_sec")

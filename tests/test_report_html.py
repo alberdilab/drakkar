@@ -300,6 +300,21 @@ class RenderTests(TemporaryRootMixin, unittest.TestCase):
         self.assertIn('id="section-provenance"', text)
         self.assertIn("genome_taxonomy", text)
 
+    def test_ingest_stamps_are_written_for_a_reader_not_a_parser(self):
+        _, text, _ = self.render()
+        stamped = datetime.now(timezone.utc)
+        friendly = f"{stamped.day} {stamped:%b %Y} at {stamped:%H:%M} UTC"
+        self.assertIn(friendly, text)
+        # The raw ISO stamps the database holds never reach a table cell,
+        # neither the ingest log nor the run table. (The embedded Plotly
+        # bundle carries ISO strings of its own, hence the cell-only search.)
+        cells = re.findall(r"<t[dh][^>]*>([^<]*)</t[dh]>", text)
+        self.assertEqual(
+            [cell for cell in cells if re.search(r"\d{4}-\d{2}-\d{2}T", cell)], []
+        )
+        # The run row is seeded at a fixed instant, so its cell is exact.
+        self.assertIn("25 Aug 2026 at 10:15 UTC", text)
+
 
 class LayoutTests(TemporaryRootMixin, unittest.TestCase):
     """The page is a sidebar beside one panel at a time, and degrades without JS."""
@@ -321,6 +336,13 @@ class LayoutTests(TemporaryRootMixin, unittest.TestCase):
         html_path = root / "drakkar_report.html"
         render_report(db_path, html_path, sections=sections)
         return html_path.read_text(encoding="utf-8")
+
+    def test_the_brand_shows_the_logo_above_the_title(self):
+        text = self.render()
+        brand = text[text.index('<div class="brand">'):text.index("</div>")]
+        self.assertIn('<img class="logo" src="data:image/png;base64,', brand)
+        self.assertLess(brand.index("<img"), brand.index("<h1>"))
+        self.assertIn("<h1>Analysis Report</h1>", brand)
 
     def test_the_sidebar_holds_the_details_and_the_contents(self):
         text = self.render()

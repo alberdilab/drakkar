@@ -283,6 +283,103 @@ class LoggingCommandTests(unittest.TestCase):
             self.assertEqual(launches[0]["external_jobid"], "8281752")
             self.assertEqual(launches[0]["rule"], "map_reads")
 
+    def test_parse_snakemake_submitted_launches_recovers_rules_that_print_only_a_message(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = Path(tmpdir) / "drakkar_test.snakemake.log"
+            log_path.write_text(
+                "\n".join(
+                    [
+                        "[Sun May 10 03:27:11 2026]",
+                        "Job 42: Assembling EHA05984...",
+                        "Job 42 has been submitted with SLURM jobid 44448391 "
+                        "(log: /work/.snakemake/slurm_logs/rule_assembly/EHA05984/44448391.log).",
+                        "[Sun May 10 04:11:02 2026]",
+                        "Job 51: Mapping S01 reads to assembly EHA05984...",
+                        "Job 51 has been submitted with SLURM jobid 44448392 "
+                        "(log: /work/.snakemake/slurm_logs/rule_assembly_map/EHA05984/S01/44448392.log).",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            launches = cli_module.parse_snakemake_submitted_launches(log_path)
+
+            self.assertEqual([launch["rule"] for launch in launches], ["assembly", "assembly_map"])
+            self.assertEqual([launch["wildcards"] for launch in launches], ["EHA05984", "EHA05984,S01"])
+            self.assertEqual(
+                [launch["external_jobid"] for launch in launches], ["44448391", "44448392"]
+            )
+            self.assertIsNone(launches[0]["requested_mem_mb"])
+
+    def test_parse_snakemake_submitted_launches_counts_retries_of_the_same_internal_job(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = Path(tmpdir) / "drakkar_test.snakemake.log"
+            log_path.write_text(
+                "\n".join(
+                    [
+                        "Job 42: Binning contigs from assembly A using metabat2...",
+                        "Job 42 has been submitted with SLURM jobid 901 "
+                        "(log: .snakemake/slurm_logs/rule_metabat2/A/901.log).",
+                        "Job 42: Binning contigs from assembly A using metabat2...",
+                        "Job 42 has been submitted with SLURM jobid 902 "
+                        "(log: .snakemake/slurm_logs/rule_metabat2/A/902.log).",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            launches = cli_module.parse_snakemake_submitted_launches(log_path)
+
+            self.assertEqual(len(launches), 2)
+            self.assertEqual([launch["attempt"] for launch in launches], [1, 2])
+            self.assertEqual([launch["rule"] for launch in launches], ["metabat2", "metabat2"])
+
+    def test_benchmark_job_row_falls_back_to_accounting_for_requested_resources(self) -> None:
+        launch = {
+            "launch_index": 1,
+            "rule": "assembly",
+            "attempt": 1,
+            "logical_job_key": "assembly|wildcards|A",
+            "internal_jobid": "42",
+            "external_jobid": "901",
+            "wildcards": "A",
+            "requested_cpus": None,
+            "requested_mem_mb": None,
+            "requested_runtime_min": None,
+        }
+        accounting = {
+            "state": "COMPLETED",
+            "exit_code": "0:0",
+            "alloc_cpus": 8,
+            "elapsed_sec": 600,
+            "cpu_time_sec": 4800,
+            "max_rss_mb": 4000.0,
+            "timelimit_raw_min": 30,
+            "req_cpus": 8,
+            "req_mem_mb": 8000.0,
+        }
+
+        row = cli_module.benchmark_job_row(launch, accounting)
+
+        self.assertEqual(row["requested_cpus"], 8)
+        self.assertEqual(row["requested_mem_mb"], 8000.0)
+        self.assertEqual(row["requested_runtime_min"], 30)
+        self.assertAlmostEqual(row["memory_efficiency"], 0.5)
+        self.assertAlmostEqual(row["runtime_efficiency"], 600 / 1800)
+
+    def test_parse_sacct_output_reads_requested_cpus_and_memory(self) -> None:
+        rows = cli_module._benchmark._parse_sacct_output(
+            "901|COMPLETED|0:0|600|4800|8|4000M|30|8|8000M\n"
+            "902|COMPLETED|0:0|600|4800|8|4000M|30|8|1000Mc\n"
+        )
+
+        self.assertEqual(rows["901"]["req_cpus"], 8)
+        self.assertEqual(rows["901"]["req_mem_mb"], 8000.0)
+        # A per-CPU request only becomes the job total once scaled by its CPUs.
+        self.assertEqual(rows["902"]["req_mem_mb"], 8000.0)
+
     def test_parse_snakemake_submitted_launches_normalizes_embedded_sbatch_output(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             log_path = Path(tmpdir) / "drakkar_test.snakemake.log"

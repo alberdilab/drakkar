@@ -1,5 +1,6 @@
 include CHANGELOG.md
 include drakkar.png
+include drakkar/report/assets/*
 include drakkar/profile/slurm/*
 include drakkar/profile/local/*
 include drakkar/workflow/*

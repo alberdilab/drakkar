@@ -8,6 +8,41 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.1.6] - 2026-08-25
+
+### Changed
+
+- The HTML report opens with the Drakkar mark above the sidebar title, and the
+  title itself now reads *Analysis Report* — the name is already in the image.
+  The logo is base64-inlined like everything else on the page, so the report
+  stays a single portable file.
+- Timestamps are written for a reader rather than a parser. The ingest window
+  in the sidebar, the *Ingested* column of the provenance table and the
+  *Started*/*Finished* columns of the run table now read
+  `25 Aug 2026 at 13:18 UTC` instead of
+  `2026-08-25T13:18:19.205575+00:00`; a window that opens and closes within the
+  same minute is shown once instead of as a span.
+- The sidebar reaches the bottom of the window whatever the section it sits
+  beside, instead of ending where its own content ends.
+
+### Fixed
+
+- Resource benchmarking no longer skips most of the workflow. Snakemake prints
+  the `rule <name>:` block that carries the job's rule, threads and resources
+  only for rules that define no `message:`; for every rule that does — which is
+  nearly all of them, `assembly`, `assembly_map`, `metabat2`, `maxbin2`,
+  `semibin2`, `comebin` and `binette` among them — it prints only
+  `Job <n>: <message>`, so those launches were dropped and never reached the
+  benchmark tables or the resource section of `drakkar_report.html`. The rule
+  name and its wildcard values are now recovered from the per-job SLURM log
+  path the executor reports, and the requested CPUs, memory and runtime — which
+  the log does not print in this case — are read from SLURM accounting
+  (`ReqCPUS`, `ReqMem`, `TimelimitRaw`).
+- Retried jobs are counted again. Snakemake keeps the same internal job id
+  across attempts and only the SLURM job id changes, so deduplicating launches
+  by internal job id discarded every attempt after the first, undercounting
+  relaunches, out-of-memory failures and total allocated CPU time.
+
 ## [2.1.5] - 2026-08-25
 
 ### Changed

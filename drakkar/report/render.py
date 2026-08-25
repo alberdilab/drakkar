@@ -20,9 +20,11 @@ numeric columns. Without JavaScript the same markup degrades to the flat page
 it used to be: every section stacked, every row listed.
 """
 
+import base64
 import sqlite3
 from datetime import datetime, timezone
 from html import escape
+from pathlib import Path
 
 from drakkar.report.schema import SCHEMA_VERSION, TAXONOMIC_RANKS
 
@@ -147,13 +149,22 @@ aside.sidebar {
   width: var(--sidebar);
   position: sticky;
   top: 0;
-  max-height: 100vh;
+  height: 100vh;
   overflow-y: auto;
   padding: 1.75rem 1.4rem 2.5rem;
   background: var(--panel);
   border-right: 1px solid var(--rule);
 }
 aside.sidebar .brand { border-bottom: 2px solid var(--accent); padding-bottom: .9rem; }
+aside.sidebar .logo {
+  display: block;
+  width: 100%;
+  max-width: 14rem;
+  height: auto;
+  margin: 0 0 .9rem;
+  /* The mark ships on white; multiply drops that onto the sidebar's panel. */
+  mix-blend-mode: multiply;
+}
 aside.sidebar h1 { margin: 0 0 .2rem; font-size: 1.35rem; letter-spacing: .01em; }
 aside.sidebar .subtitle { margin: 0; color: var(--muted); font-size: .82rem; }
 aside.sidebar .side-block { margin-top: 1.6rem; }
@@ -259,7 +270,7 @@ code { font-family: "SFMono-Regular", Consolas, monospace; font-size: .85em; }
   aside.sidebar {
     position: static;
     width: auto;
-    max-height: none;
+    height: auto;
     border-right: 0;
     border-bottom: 1px solid var(--rule);
   }
@@ -471,6 +482,55 @@ SCRIPT = """
 
 def _text(value):
     return "" if value is None else escape(str(value))
+
+
+LOGO_PATH = Path(__file__).parent / "assets" / "drakkar.png"
+
+
+def _logo_html():
+    """The Drakkar mark, base64-inlined so the report stays one portable file."""
+    try:
+        encoded = base64.b64encode(LOGO_PATH.read_bytes()).decode("ascii")
+    except OSError:
+        return ""
+    return f'<img class="logo" src="data:image/png;base64,{encoded}" alt="Drakkar">'
+
+
+def _parse_timestamp(value):
+    """Read an ISO timestamp as it is stored in the database, in UTC."""
+    if value is None:
+        return None
+    try:
+        moment = datetime.fromisoformat(str(value).strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if moment.tzinfo is None:
+        return moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(timezone.utc)
+
+
+def _friendly_datetime(value):
+    """``2026-08-25T13:18:19.205575+00:00`` reads as ``25 Aug 2026 at 13:18 UTC``."""
+    moment = _parse_timestamp(value)
+    if moment is None:
+        return "" if value is None else str(value)
+    return f"{moment.day} {moment:%b %Y} at {moment:%H:%M} UTC"
+
+
+def _friendly_window(first, last):
+    """The ingest window as one line: a moment, or a span within the same day."""
+    start = _friendly_datetime(first)
+    end = _friendly_datetime(last)
+    if not end or start == end:
+        return start
+    opened, closed = _parse_timestamp(first), _parse_timestamp(last)
+    if opened is not None and closed is not None and opened.date() == closed.date():
+        return f"{start} to {closed:%H:%M} UTC"
+    return f"{start} to {end}"
+
+
+def _timestamp(value):
+    return escape(_friendly_datetime(value))
 
 
 def _integer(value):
@@ -1775,8 +1835,8 @@ def _run_blocks(connection):
             ("Version", _text),
             ("Command", _text),
             ("Modules", _text),
-            ("Started", _text),
-            ("Finished", _text),
+            ("Started", _timestamp),
+            ("Finished", _timestamp),
             ("Duration", _text),
             ("Status", _text),
         ],
@@ -2161,7 +2221,7 @@ def _render_provenance(connection):
                 ("Section", _text),
                 ("Rows", _integer),
                 ("Source file", _text),
-                ("Ingested", _text),
+                ("Ingested", _timestamp),
             ],
             [tuple(row) for row in rows],
         ),
@@ -2207,7 +2267,7 @@ def _summary_html(connection, db_path, rendered, skipped, not_selected):
         ("Report schema", f"version {schema_version}"),
         ("Database", str(db_path)),
         ("Runs", ", ".join(run_ids) if run_ids else "no run metadata recorded"),
-        ("Ingested", first if first == last or not last else f"{first} to {last}"),
+        ("Ingested", _friendly_window(first, last)),
         ("Sections rendered", ", ".join(SECTION_LABELS[name] for name in rendered)),
     ]
     if skipped:
@@ -2269,7 +2329,8 @@ def _sidebar_html(connection, db_path, rendered, skipped, not_selected,
     return "".join([
         '<aside class="sidebar">',
         '<div class="brand">',
-        "<h1>Drakkar report</h1>",
+        _logo_html(),
+        "<h1>Analysis Report</h1>",
         f'<p class="subtitle">Rendered {escape(generated)}</p>',
         "</div>",
         _toc_html(targets),
@@ -2322,7 +2383,7 @@ def render_report(db_path, html_path, sections=None):
             name for name in SECTION_RENDERERS if name not in requested
         ]
         provenance = _render_provenance(connection)
-        generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        generated = _friendly_datetime(datetime.now(timezone.utc))
 
         panels = list(bodies)
         targets = [(f"section-{name}", SECTION_LABELS[name]) for name in rendered]
