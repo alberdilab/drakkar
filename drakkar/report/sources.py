@@ -45,7 +45,10 @@ SECTION_SOURCES = {
     "taxonomy": {
         "label": "Taxonomy",
         "required": ["annotating/genome_taxonomy.tsv"],
-        "optional": [],
+        # The GTDB-Tk placement trees, pruned back to the catalogue genomes.
+        # They are what the circular phylogeny is drawn from; without them the
+        # section is still rendered, just without the tree.
+        "optional": ["annotating/bacteria.tree", "annotating/archaea.tree"],
     },
     "function": {
         "label": "Functional annotation",

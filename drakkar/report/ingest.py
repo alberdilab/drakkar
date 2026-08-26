@@ -13,6 +13,7 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
+from drakkar.report.newick import count_tips
 from drakkar.report.schema import TAXONOMIC_RANKS, record_ingest
 from drakkar.report.sources import (
     benchmark_run_id,
@@ -983,7 +984,48 @@ def ingest_taxonomy(connection, output_dir):
         rows,
     )
     record_ingest(connection, "genome_taxonomy", "taxonomy", source, written)
+    _ingest_taxonomy_trees(connection, output_dir)
     connection.commit()
+    return written
+
+
+# The pruned GTDB-Tk placement trees, and the domain each one speaks for. Both
+# are optional: a catalogue with no archaea has no archaeal tree, and a run
+# whose GTDB-Tk output predates the pruning rule has neither.
+TAXONOMY_TREES = (
+    ("bacteria", "annotating/bacteria.tree"),
+    ("archaea", "annotating/archaea.tree"),
+)
+
+# A tree of one tip has no topology to draw and is stored as if it were absent.
+MIN_TREE_TIPS = 2
+
+
+def _ingest_taxonomy_trees(connection, output_dir):
+    """Store the pruned placement trees as the Newick text they arrive as.
+
+    The pruning rule writes an empty ``bacteria.tree`` when GTDB-Tk produced no
+    classify tree at all, so a file is kept only once it parses into a tree
+    with tips to lay out.
+    """
+    written = 0
+    for domain, relative in TAXONOMY_TREES:
+        source = _existing(output_dir, relative)
+        if source is None:
+            continue
+        try:
+            newick = source.read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        tips = count_tips(newick)
+        if tips < MIN_TREE_TIPS:
+            continue
+        connection.execute(
+            "INSERT OR REPLACE INTO genome_tree VALUES (?, ?, ?)",
+            (domain, newick, tips),
+        )
+        record_ingest(connection, f"genome_tree:{domain}", "taxonomy", source, 1)
+        written += 1
     return written
 
 

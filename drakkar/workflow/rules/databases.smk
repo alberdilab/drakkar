@@ -279,7 +279,7 @@ rule write_database_versions:
 
         checksums = []
         if DATABASE_NAME == "kegg":
-            checksums = [Path(str(TARGET_DB)), Path(f"{TARGET_DB}.json")]
+            checksums = [Path(str(TARGET_DB)), Path(f"{TARGET_DB}.json"), Path(f"{TARGET_DB}_ko_list.tsv")]
         elif DATABASE_NAME == "cazy":
             checksums = [Path(str(TARGET_DB))]
         elif DATABASE_NAME == "pfam":

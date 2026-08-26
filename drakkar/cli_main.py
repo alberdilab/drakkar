@@ -21,6 +21,12 @@ from drakkar.cli_validation import (
     validate_managed_database_version,
 )
 from drakkar.config_commands import edit_config, set_default_database_path, view_config
+from drakkar.database_checks import (
+    check_database_artifacts,
+    check_database_provenance,
+    collect_database_provenance,
+    module_requirements,
+)
 from drakkar.database_registry import MANAGED_DATABASES, database_release_dir, normalize_managed_database_name
 from drakkar.environments import run_environments_list, run_environments_prune
 from drakkar.output import print, section
@@ -164,9 +170,35 @@ def main():
     if args.command in overwrite_capable_commands:
         if not prepare_output_directory(output_dir, overwrite=getattr(args, "overwrite", False)):
             return
+
+    # Databases are validated before Snakemake starts: a missing artifact would
+    # otherwise surface hours into the run, and a database swap is invisible to
+    # Snakemake because the profiles rerun on file timestamps only.
+    database_provenance = None
+    if args.command in WORKFLOW_RUN_COMMANDS and args.command not in ("database", "environments"):
+        database_requirements = module_requirements(args.command, args)
+        if not check_database_artifacts(
+            database_requirements,
+            skip=getattr(args, "skip_database_check", False),
+        ):
+            return
+        database_provenance = collect_database_provenance(database_requirements)
+        if not check_database_provenance(
+            output_dir,
+            database_requirements,
+            database_provenance,
+            allow_change=getattr(args, "allow_database_change", False),
+        ):
+            return
+
     run_info = None
     if args.command in WORKFLOW_RUN_COMMANDS and not environments_maintenance:
-        run_info = write_launch_metadata(args, output_dir, env_path=locals().get("env_path"))
+        run_info = write_launch_metadata(
+            args,
+            output_dir,
+            env_path=locals().get("env_path"),
+            databases=database_provenance,
+        )
         if not run_info:
             return
 

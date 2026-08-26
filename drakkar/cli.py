@@ -30,6 +30,7 @@ from drakkar import cli_help as _cli_help
 from drakkar import cli_main as _cli_main
 from drakkar import cli_parser as _cli_parser
 from drakkar import cli_validation as _cli_validation
+from drakkar import database_checks as _database_checks
 from drakkar import config_commands as _config_commands
 from drakkar import environments as _environments
 from drakkar import failures as _failures
@@ -105,6 +106,20 @@ generate_benchmark_reports = _benchmark.generate_benchmark_reports
 get_run_profile = _benchmark.get_run_profile
 should_benchmark_run = _benchmark.should_benchmark_run
 should_skip_benchmark = _benchmark.should_skip_benchmark
+
+DatabaseRequirement = _database_checks.DatabaseRequirement
+MANAGED_REQUIRED_ARTIFACTS = _database_checks.MANAGED_REQUIRED_ARTIFACTS
+annotating_requirements = _database_checks.annotating_requirements
+module_requirements = _database_checks.module_requirements
+missing_artifacts = _database_checks.missing_artifacts
+reinstall_command = _database_checks.reinstall_command
+check_database_artifacts = _database_checks.check_database_artifacts
+collect_database_provenance = _database_checks.collect_database_provenance
+previous_database_provenance = _database_checks.previous_database_provenance
+manifest_provenance = _database_checks.manifest_provenance
+compare_database_provenance = _database_checks.compare_database_provenance
+stale_outputs_for = _database_checks.stale_outputs_for
+check_database_provenance = _database_checks.check_database_provenance
 
 get_modules_to_run = _run_metadata.get_modules_to_run
 build_snakemake_log_path = _run_metadata.build_snakemake_log_path

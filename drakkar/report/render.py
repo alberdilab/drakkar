@@ -21,6 +21,7 @@ it used to be: every section stacked, every row listed.
 """
 
 import base64
+import math
 import re
 import sqlite3
 from datetime import datetime, timezone
@@ -283,13 +284,65 @@ tbody tr:hover td { background: #fbfcfd; }
 .pager button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .pager button:disabled { opacity: .4; cursor: default; }
 
+/* A subsection title with a control of its own against the right edge. */
+.head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+.head-row h3 { margin-bottom: 0; }
+.unit-toggle {
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: .82rem;
+  color: var(--ink);
+  background: #ffffff;
+  border: 1px solid var(--rule);
+  padding: .18rem .7rem;
+  cursor: pointer;
+}
+.unit-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.unit-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* Nothing to switch until the script is running, and nothing to click on paper. */
+html:not(.js) .unit-toggle { display: none; }
+
 .figure { margin: 1rem 0 .25rem; }
+
+/* The circular phylogeny. The SVG scales to its column but is capped: past
+   about 46rem the rings grow without any more of the tree becoming legible,
+   and the tip labels drift away from the arcs they belong to. */
+.tree-figure { margin: 1rem 0 1.25rem; }
+.tree-figure svg.tree {
+  display: block;
+  width: 100%;
+  max-width: 46rem;
+  height: auto;
+  margin: 0 auto;
+  font-family: inherit;
+}
+.tree-key { max-width: 46rem; margin: .25rem auto 0; }
+.tree-key .key-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .25rem .9rem;
+  margin-top: .35rem;
+  font-size: .8rem;
+  color: var(--muted);
+}
+.tree-key .key-item { display: inline-flex; align-items: center; gap: .3rem; }
+.tree-key .key-swatch {
+  width: .72rem;
+  height: .72rem;
+  border: 1px solid rgba(34, 48, 60, .12);
+}
+.tree-key .key-ramp {
+  width: 2.4rem;
+  height: .72rem;
+  border: 1px solid rgba(34, 48, 60, .12);
+}
+.tree-key p.note { margin: .45rem 0 0; font-size: .78rem; }
 /* A figure that carries a whole section reads better edge to edge, so it is
    let out of the cap the text column keeps for line length: it starts where
    the text does and runs to the far side of the page, leaving the same
    gutter there. Below 900px the sidebar is no longer beside it and the
    figure goes back to the width of its column. */
-.figure.wide {
+.figure.wide, .head-row.wide {
   width: calc(100vw - var(--sidebar) - 4rem);
   max-width: none;
 }
@@ -309,13 +362,14 @@ code { font-family: "SFMono-Regular", Consolas, monospace; font-size: .85em; }
     border-bottom: 1px solid var(--rule);
   }
   main.content { padding: 1.5rem 1.25rem 3rem; }
-  .figure.wide { width: auto; }
+  .figure.wide, .head-row.wide { width: auto; }
 }
 
 /* Printing wants the whole report, not the panel that happens to be open. */
 @media print {
   aside.sidebar { display: none; }
-  .figure.wide { width: auto; }
+  .figure.wide, .head-row.wide { width: auto; }
+  .unit-toggle { display: none; }
   html.js main .panel { display: block !important; }
   .pager { display: none; }
   main .panel + .panel { margin-top: 3rem; page-break-before: always; }
@@ -504,6 +558,52 @@ SCRIPT = """
 
   var tables = document.querySelectorAll("main table");
   for (var t = 0; t < tables.length; t += 1) { enhance(tables[t]); }
+
+  // A figure whose traces carry the same quantity in a second unit, in
+  // trace.meta.alt: clicking the button swaps the two around, so the plot is
+  // redrawn in place instead of a second copy of it being shipped.
+  function unitToggle(button) {
+    var target = document.getElementById(button.getAttribute("data-target"));
+    var plot = target ? target.querySelector(".js-plotly-plot") : null;
+    if (!plot || !window.Plotly) { button.style.display = "none"; return; }
+
+    function swappable() {
+      var data = plot.data || [];
+      var found = [];
+      for (var index = 0; index < data.length; index += 1) {
+        var meta = data[index].meta;
+        if (meta && meta.alt) { found.push(index); }
+      }
+      return found;
+    }
+
+    if (!swappable().length) { button.style.display = "none"; return; }
+    var showingAlt = false;
+
+    button.addEventListener("click", function () {
+      var data = plot.data || [];
+      var indices = swappable();
+      var swapped = [];
+      for (var i = 0; i < indices.length; i += 1) {
+        var trace = data[indices[i]];
+        swapped.push(trace.meta.alt);
+        trace.meta.alt = trace.y;
+      }
+      showingAlt = !showingAlt;
+      window.Plotly.restyle(plot, { y: swapped }, indices);
+      window.Plotly.relayout(plot, {
+        "yaxis.title.text": button.getAttribute(
+          showingAlt ? "data-alt-axis" : "data-axis"
+        )
+      });
+      button.textContent = "Switch to " + button.getAttribute(
+        showingAlt ? "data-unit" : "data-alt-unit"
+      );
+    });
+  }
+
+  var toggles = document.querySelectorAll("button.unit-toggle");
+  for (var u = 0; u < toggles.length; u += 1) { unitToggle(toggles[u]); }
 
   if (!show(window.location.hash.slice(1), false) && panels.length) {
     show(panels[0].id, false);
@@ -772,18 +872,42 @@ def _section_intro(name):
     return _note(explanation) if explanation else ""
 
 
-def _heading(title, explanation=None):
+def _heading(title, explanation=None, action=None):
     """A subsection heading, with a plain-language note on how to read it.
 
     Neighbouring tables often hold statistics that look interchangeable but
     are not — a read-weighted rate beside a mean of per-sample rates, say —
     so each heading carries a sentence or two aimed at a reader who does not
     already know how the number was computed.
+
+    ``action`` is markup for a control belonging to the subsection — a unit
+    toggle, say — laid on the same line as the title, against the right edge
+    of the figure below it.
     """
-    markup = f"<h3>{escape(title)}</h3>"
+    if action:
+        markup = (
+            f'<div class="head-row wide"><h3>{escape(title)}</h3>{action}</div>'
+        )
+    else:
+        markup = f"<h3>{escape(title)}</h3>"
     if explanation:
         markup += _note(explanation)
     return markup
+
+
+def _unit_toggle(target, unit, alt_unit, axis_title, alt_axis_title):
+    """A button that swaps a figure between the two units it carries.
+
+    The figure is drawn in ``unit`` and each of its traces holds the same
+    quantity in ``alt_unit``; the script swaps the two. Without JavaScript
+    there is nothing to swap, so the button is hidden rather than dead.
+    """
+    return (
+        f'<button type="button" class="unit-toggle" data-target="{escape(target)}"'
+        f' data-unit="{escape(unit)}" data-alt-unit="{escape(alt_unit)}"'
+        f' data-axis="{escape(axis_title)}" data-alt-axis="{escape(alt_axis_title)}">'
+        f'Switch to {escape(alt_unit)}</button>'
+    )
 
 
 def _duration(started, finished):
@@ -904,7 +1028,8 @@ def present_sections(connection):
 def _render_preprocessing(connection):
     rows = _query(connection, """
         SELECT sample_id, reads_pre_fastp, bases_pre_fastp, reads_post_fastp,
-               host_reads, host_bases, metagenomic_reads, metagenomic_bases,
+               bases_post_fastp, host_reads, host_bases, metagenomic_reads,
+               metagenomic_bases,
                singlem_fraction, nonpareil_C, nonpareil_LR, nonpareil_LRstar,
                nonpareil_diversity
         FROM sample
@@ -961,9 +1086,17 @@ def _render_preprocessing(connection):
             "filtering, matched to the host genome, or retained as "
             "metagenomic. A tall host fraction means the extraction was "
             "dominated by host DNA, which limits how much sequencing depth "
-            "was available for the microbes but is not a sequencing failure."
+            "was available for the microbes but is not a sequencing failure. "
+            "Switching to bases plots the same stack in gigabases, weighing "
+            "each fate by sequence length rather than read count: the two "
+            "differ once trimming has shortened the reads that survived it.",
+            action=_unit_toggle(
+                "read-fates", "reads", "bases", "Reads", "Gigabases"
+            ),
         ))
+        blocks.append('<div id="read-fates">')
         blocks.append(figure)
+        blocks.append("</div>")
     blocks.extend(_microbial_blocks(rows))
     return blocks
 
@@ -994,29 +1127,55 @@ def _preprocessing_highlights(rows):
 
 
 def _read_fate_figure(rows):
-    """Stacked read counts per sample: low quality, host, and metagenomic."""
+    """Stacked read counts per sample: low quality, host, and metagenomic.
+
+    Every trace also carries the same fate in gigabases, which the button
+    beside the heading swaps in: the two orderings are not the same once
+    trimming has shortened the surviving reads.
+    """
     import plotly.graph_objects as go
 
     samples = [row["sample_id"] for row in rows]
-    discarded = []
-    for row in rows:
-        before, after = row["reads_pre_fastp"], row["reads_post_fastp"]
-        discarded.append(before - after if before is not None and after is not None else None)
-    host = [row["host_reads"] for row in rows]
-    metagenomic = [row["metagenomic_reads"] for row in rows]
+
+    def difference(before, after):
+        return [
+            row[before] - row[after]
+            if row[before] is not None and row[after] is not None else None
+            for row in rows
+        ]
+
+    def column(name):
+        return [row[name] for row in rows]
+
+    def in_gigabases(values):
+        return [None if v is None else v / 1e9 for v in values]
 
     traces = [
-        ("Removed by fastp", discarded),
-        ("Host", host),
-        ("Metagenomic", metagenomic),
+        ("Removed by fastp",
+         difference("reads_pre_fastp", "reads_post_fastp"),
+         difference("bases_pre_fastp", "bases_post_fastp")),
+        ("Host", column("host_reads"), column("host_bases")),
+        ("Metagenomic", column("metagenomic_reads"), column("metagenomic_bases")),
     ]
-    traces = [(name, values) for name, values in traces if any(v is not None for v in values)]
+    traces = [
+        (name, reads, bases) for name, reads, bases in traces
+        if any(v is not None for v in reads)
+    ]
     if not traces:
         return None
 
+    # The button swaps the whole stack at once, so it is only offered when
+    # every fate knows its bases: half a stack in gigabases means nothing.
+    with_bases = all(
+        any(v is not None for v in bases) for _, _, bases in traces
+    )
+
     figure = go.Figure()
-    for name, values in traces:
-        figure.add_bar(name=name, x=samples, y=values)
+    for name, reads, bases in traces:
+        figure.add_bar(
+            name=name, x=samples, y=reads,
+            meta=dict(alt=in_gigabases(bases)) if with_bases else None,
+        )
     figure.update_layout(
         barmode="stack",
         xaxis_title="Sample",
@@ -2026,9 +2185,9 @@ def _render_taxonomy(connection):
         ),
     ]
 
-    blocks.extend(_genome_lineage_blocks(connection))
-
     colours = _phylum_colours(connection)
+    blocks.extend(_phylogeny_blocks(connection, colours))
+    blocks.extend(_genome_lineage_blocks(connection))
 
     phyla = _query(connection, """
         SELECT COALESCE(NULLIF(phylum, ''), 'Unclassified') AS name, COUNT(*) AS genomes
@@ -2066,6 +2225,554 @@ def _render_taxonomy(connection):
 
     blocks.extend(_composition_blocks(connection, colours))
     return blocks
+
+
+# ---------------------------------------------------------------------------
+# Circular phylogeny
+# ---------------------------------------------------------------------------
+#
+# The tree is drawn as inline SVG rather than handed to Plotly. It has no zoom,
+# pan or hover behaviour to gain from a plotting library, it has to stay legible
+# when the panel it lives in is hidden and later shown — which is exactly what
+# Plotly cannot do without being told to resize — and drawing it directly keeps
+# a picture of several hundred genomes down to a few tens of kilobytes.
+#
+# Every length below is in the SVG's own units, on a square canvas the figure
+# scales to whatever width its column gives it.
+
+TREE_CANVAS = 1000
+TREE_CENTRE = TREE_CANVAS / 2
+# Where the root sits and where the tips do. The root is not pushed all the way
+# in: a circular phylogram with no hole crowds every deep split into a few
+# pixels.
+TREE_INNER_RADIUS = 60
+TREE_TIP_RADIUS = 300
+# A wedge left undrawn at the top, so each ring can be named where it ends
+# instead of in a key the reader has to match up by colour.
+TREE_GAP_DEGREES = 34
+TREE_RING_THICKNESS = 15
+TREE_RING_GAP = 5
+TREE_FIRST_RING_RADIUS = 312
+TREE_BRANCH_COLOUR = "#a9b6c1"
+TREE_TIP_COLOUR = "#8fa2b0"
+# The dotted run from where a branch ends to where the rings begin.
+TREE_LEADER_COLOUR = "#dde3e8"
+# The empty part of a proportional ring — drawn so a low value reads as a short
+# bar rather than as a missing one.
+TREE_TRACK_COLOUR = "#eef1f4"
+# A leaf the ring has no value for at all: left blank, and named as such in the
+# key, so absent is visibly different from zero.
+TREE_MISSING_COLOUR = "#ffffff"
+
+# The proportional rings, in the order they are drawn outwards from the tree.
+# Each names the ``genome`` column it reads, the two ends of its colour ramp,
+# and how its value is turned into the fraction of the ring that is filled.
+# Adding a ring is adding an entry here — the layout, the key and the labels in
+# the gap all follow from it.
+TREE_RINGS = (
+    {
+        "key": "size",
+        "label": "Genome size",
+        "column": "size",
+        "ramp": ("#d9e6e7", "#3d7d80"),
+    },
+    {
+        "key": "completeness",
+        "label": "Completeness",
+        "column": "completeness",
+        "ramp": ("#e1ebdb", "#4e7a3f"),
+        # A CheckM2 estimate is already a percentage of a whole genome, so the
+        # ring is filled against 100 rather than against the best genome here:
+        # a catalogue whose best genome is 82% complete should look like one.
+        "maximum": 100.0,
+    },
+    {
+        "key": "contamination",
+        "label": "Contamination",
+        "column": "contamination",
+        "ramp": ("#f2ddd9", "#a8394a"),
+        # Scaled against the worst genome, but never against less than the 5%
+        # that separates high- from medium-quality MAGs: a clean catalogue
+        # should not have its cleanest genomes redrawn as contaminated ones.
+        "floor": 5.0,
+    },
+)
+
+# Past this many tips the names no longer fit round the circle, so the tree is
+# drawn without them and the lineage table below carries the naming.
+TREE_MAX_LABELS = 110
+TREE_LABEL_CHARS = 26
+
+
+def _phylogeny_blocks(connection, colours):
+    """The GTDB-Tk placement tree, drawn as a circular phylogram with rings.
+
+    One figure per domain, because GTDB-Tk places bacteria and archaea on two
+    unrelated reference trees and there is no branch joining them. The rings a
+    figure carries are whatever the database can fill: the phylum ring needs
+    only the taxonomy, the other three come from the CheckM2 columns the
+    profiling section ingests, and each is left out when its column is empty.
+    """
+    trees = _query(
+        connection,
+        "SELECT domain, newick, tip_count FROM genome_tree ORDER BY tip_count DESC",
+    )
+    if not trees:
+        return []
+
+    phyla = {
+        row["genome_id"]: row["phylum"]
+        for row in _query(connection, """
+            SELECT genome_id, COALESCE(NULLIF(phylum, ''), 'Unclassified') AS phylum
+            FROM genome_taxonomy
+        """)
+    }
+    quality = {
+        row["genome_id"]: row
+        for row in _query(
+            connection,
+            "SELECT genome_id, size, completeness, contamination FROM genome",
+        )
+    }
+
+    blocks = []
+    for tree in trees:
+        figure = _phylogeny_figure(
+            tree["newick"], tree["domain"], phyla, quality, colours
+        )
+        if figure:
+            blocks.append(figure)
+    if not blocks:
+        return []
+
+    return [
+        _heading(
+            "Phylogeny",
+            "The GTDB-Tk placement tree, pruned back to the catalogue genomes "
+            "and drawn from the centre outwards: branch lengths are substitutions "
+            "per site, so two tips that sit close together are close relatives. "
+            "The rings around it describe each genome — its phylum in the colours "
+            "the rest of this section uses, then how large, how complete and how "
+            "contaminated it is — so a whole clade of small or half-recovered "
+            "genomes shows up as a run of similar arcs rather than as scattered "
+            "rows in a table. Point at a genome to read its figures."
+        ),
+    ] + blocks
+
+
+def _phylogeny_figure(newick, domain, phyla, quality, colours):
+    """One domain's tree, as a ``.figure`` block holding the SVG and its key."""
+    from drakkar.report.newick import NewickError, parse
+
+    try:
+        root = parse(newick)
+    except NewickError:
+        return ""
+    leaves = root.leaves()
+    if len(leaves) < 2:
+        return ""
+
+    lookup = _genome_lookup(phyla, quality)
+    # Which of the proportional rings this database can actually fill.
+    rings = []
+    for spec in TREE_RINGS:
+        values = [
+            _tree_value(leaf.name, lookup, quality, spec["column"]) for leaf in leaves
+        ]
+        present = [value for value in values if value is not None]
+        if not present:
+            continue
+        maximum = spec.get("maximum") or max(
+            max(present), spec.get("floor", 0.0)
+        )
+        if not maximum:
+            continue
+        rings.append(dict(spec, values=values, maximum=maximum))
+
+    angles, radii = _tree_layout(root)
+    parts = [_tree_branches(root, angles, radii)]
+
+    span = math.radians(360 - TREE_GAP_DEGREES)
+    slot = span / len(leaves)
+    # A hair of white between neighbouring arcs, so a run of same-coloured
+    # genomes still reads as several genomes and not as one block.
+    pad = min(0.004, slot * 0.12)
+    labelled = len(leaves) <= TREE_MAX_LABELS
+    # A tree whose tips no table can be joined to gets no phylum ring at all,
+    # rather than a ring of grey with nothing behind it.
+    named = any(_tree_phylum(leaf.name, lookup, phyla) for leaf in leaves)
+    label_radius = _tree_ring_radius(len(rings))[1] + 10
+    font = 11 if len(leaves) <= 40 else 9 if len(leaves) <= 70 else 8
+
+    # How far the longest tip name reaches past the outer ring, so the canvas
+    # is cropped to the picture instead of to the longest name it could have
+    # held. The per-character width is an over-estimate for Helvetica: a name
+    # cropped at the edge of the canvas is worse than a little air around it,
+    # and a reader without the page's fonts gets a wider substitute.
+    widest = max(
+        (len(_tree_text(_tree_genome(leaf.name, lookup) or leaf.name))
+         for leaf in leaves),
+        default=0,
+    )
+    reach = label_radius + (widest * font * 0.65 + 12 if labelled else 8)
+
+    for index, leaf in enumerate(leaves):
+        angle = angles[id(leaf)]
+        start, end = angle - slot / 2 + pad, angle + slot / 2 - pad
+        segments = []
+        # A tip is named by the genome id the tables use, so a name read off
+        # the circle can be found in the lineage table underneath it.
+        name = _tree_genome(leaf.name, lookup) or leaf.name
+
+        phylum = phyla.get(name)
+        if phylum is not None:
+            inner, outer = _tree_ring_radius(0)
+            segments.append(_tree_arc(
+                inner, outer, start, end, colours.get(phylum, OTHER_COLOUR)
+            ))
+        for position, ring in enumerate(rings, start=1):
+            inner, outer = _tree_ring_radius(position)
+            value = ring["values"][index]
+            if value is None:
+                segments.append(_tree_arc(
+                    inner, outer, start, end, TREE_MISSING_COLOUR
+                ))
+                continue
+            fraction = max(0.0, min(1.0, value / ring["maximum"]))
+            segments.append(_tree_arc(inner, outer, start, end, TREE_TRACK_COLOUR))
+            if fraction > 0:
+                segments.append(_tree_arc(
+                    inner,
+                    inner + (outer - inner) * fraction,
+                    start, end,
+                    _mix_colours(ring["ramp"][0], ring["ramp"][1], fraction),
+                ))
+        if labelled:
+            segments.append(_tree_label(name, angle, label_radius, font))
+        parts.append(
+            f'<g><title>{escape(_tree_tooltip(name, phylum, rings, index))}</title>'
+            + "".join(segments) + "</g>"
+        )
+
+    parts.append(_tree_ring_labels(rings, named))
+    parts.append(_tree_centre_label(len(leaves), domain))
+
+    box = max(TREE_TIP_RADIUS, min(reach, TREE_CENTRE))
+    view = f"{TREE_CENTRE - box:.0f} {TREE_CENTRE - box:.0f} {2 * box:.0f} {2 * box:.0f}"
+    svg = (
+        f'<svg class="tree" viewBox="{view}" role="img" '
+        f'aria-label="Circular phylogeny of {escape(str(domain))}" '
+        'xmlns="http://www.w3.org/2000/svg">'
+        f'<g transform="translate({TREE_CENTRE:.0f},{TREE_CENTRE:.0f})">'
+        + "".join(parts) +
+        "</g></svg>"
+    )
+    return (
+        '<div class="figure tree-figure">' + svg
+        + _tree_key(leaves, lookup, phyla, colours, rings) + "</div>"
+    )
+
+
+def _genome_lookup(phyla, quality):
+    """Map every name a tip might carry to the genome id the tables use.
+
+    GTDB-Tk is given the MAG names, so the tips normally match ``genome_id``
+    exactly. A catalogue whose file names reached GTDB-Tk instead carries the
+    FASTA suffix on the tip, so the stripped name is registered as well.
+    """
+    lookup = {}
+    for genome_id in set(phyla) | set(quality):
+        lookup[genome_id] = genome_id
+        stripped = re.sub(r"\.(fa|fna|fasta|fa\.gz|fna\.gz|fasta\.gz)$", "", genome_id)
+        lookup.setdefault(stripped, genome_id)
+    return lookup
+
+
+def _tree_genome(name, lookup):
+    """The genome id a tip stands for, or None when nothing matches it."""
+    if name in lookup:
+        return lookup[name]
+    stripped = re.sub(r"\.(fa|fna|fasta|fa\.gz|fna\.gz|fasta\.gz)$", "", name)
+    return lookup.get(stripped)
+
+
+def _tree_phylum(name, lookup, phyla):
+    genome_id = _tree_genome(name, lookup)
+    return phyla.get(genome_id) if genome_id else None
+
+
+def _tree_value(name, lookup, quality, column):
+    genome_id = _tree_genome(name, lookup)
+    row = quality.get(genome_id) if genome_id else None
+    return row[column] if row is not None else None
+
+
+def _tree_layout(root):
+    """Angles and radii for every node of the circular phylogram.
+
+    Tips are spread evenly round the circle in the order the Newick file lists
+    them, which is the order that keeps sister clades adjacent, and an internal
+    node sits at the mean angle of its children. Radius is cumulative branch
+    length from the root, so the picture is a phylogram; a tree written without
+    branch lengths — GTDB-Tk emits one when placement was by topology alone —
+    falls back to node depth, which draws the same topology as a cladogram.
+    """
+    angles = {}
+    radii = {}
+    leaves = root.leaves()
+    span = math.radians(360 - TREE_GAP_DEGREES)
+    for index, leaf in enumerate(leaves):
+        angles[id(leaf)] = (index + 0.5) / len(leaves) * span
+
+    # Parents before children, so a node's distance from the root is known by
+    # the time its children are reached; reversed, the same order puts every
+    # child before its parent, which is what averaging angles upwards needs.
+    order = list(root.walk())
+    distance = {id(root): root.length}
+    depth = {id(root): 0}
+    for node in order:
+        for child in node.children:
+            distance[id(child)] = distance[id(node)] + child.length
+            depth[id(child)] = depth[id(node)] + 1
+    for node in reversed(order):
+        if node.children:
+            angles[id(node)] = (
+                sum(angles[id(child)] for child in node.children) / len(node.children)
+            )
+
+    reach = max(distance[id(leaf)] for leaf in leaves)
+    if reach > 0:
+        scale = {key: value / reach for key, value in distance.items()}
+    else:
+        deepest = max(depth[id(leaf)] for leaf in leaves) or 1
+        scale = {key: value / deepest for key, value in depth.items()}
+    for key, fraction in scale.items():
+        radii[key] = TREE_INNER_RADIUS + fraction * (TREE_TIP_RADIUS - TREE_INNER_RADIUS)
+    return angles, radii
+
+
+def _tree_branches(root, angles, radii):
+    """Every branch of the tree: a radial line per node, an arc per split.
+
+    A tip whose branch ends short of the rings — most of them, in a phylogram
+    — is carried the rest of the way by a leader, so the reader can follow a
+    genome from its place in the tree out to the arcs describing it without
+    the branch lengths being falsified to reach.
+    """
+    lines = []
+    arcs = []
+    tips = []
+    leaders = []
+    for node in root.walk():
+        angle = angles[id(node)]
+        radius = radii[id(node)]
+        if node.children:
+            children = sorted(angles[id(child)] for child in node.children)
+            arcs.append(_tree_arc_path(radius, children[0], children[-1]))
+            for child in node.children:
+                lines.append(_tree_radial(angle_of=angles[id(child)],
+                                          inner=radius, outer=radii[id(child)]))
+        else:
+            tips.append(
+                f'<circle cx="{_x(radius, angle):.1f}" '
+                f'cy="{_y(radius, angle):.1f}" r="1.6"/>'
+            )
+            if TREE_TIP_RADIUS - radius > 1:
+                leaders.append(_tree_radial(
+                    angle_of=angle, inner=radius, outer=TREE_TIP_RADIUS
+                ))
+    return (
+        f'<g fill="none" stroke="{TREE_LEADER_COLOUR}" stroke-width="0.8" '
+        'stroke-dasharray="1.5 3">' + "".join(leaders) + "</g>"
+        + f'<g fill="none" stroke="{TREE_BRANCH_COLOUR}" stroke-width="1.3">'
+        + "".join(arcs) + "".join(lines) + "</g>"
+        + f'<g fill="{TREE_TIP_COLOUR}">' + "".join(tips) + "</g>"
+    )
+
+
+def _x(radius, angle):
+    """Angles run clockwise from the top, the way a circular tree is read."""
+    return radius * math.sin(angle)
+
+
+def _y(radius, angle):
+    return -radius * math.cos(angle)
+
+
+def _tree_radial(angle_of, inner, outer):
+    return (
+        f'<path d="M{_x(inner, angle_of):.1f},{_y(inner, angle_of):.1f}'
+        f'L{_x(outer, angle_of):.1f},{_y(outer, angle_of):.1f}"/>'
+    )
+
+
+def _tree_arc_path(radius, start, end):
+    """A stroked arc at one radius, joining the children of a split."""
+    if end - start < 1e-9:
+        return ""
+    large = 1 if end - start > math.pi else 0
+    return (
+        f'<path d="M{_x(radius, start):.1f},{_y(radius, start):.1f}'
+        f'A{radius:.1f},{radius:.1f} 0 {large} 1 '
+        f'{_x(radius, end):.1f},{_y(radius, end):.1f}"/>'
+    )
+
+
+def _tree_arc(inner, outer, start, end, fill):
+    """A filled annulus sector — one genome's slice of one ring."""
+    if end - start < 1e-9 or outer - inner < 1e-9:
+        return ""
+    large = 1 if end - start > math.pi else 0
+    return (
+        f'<path d="M{_x(outer, start):.1f},{_y(outer, start):.1f}'
+        f'A{outer:.1f},{outer:.1f} 0 {large} 1 {_x(outer, end):.1f},{_y(outer, end):.1f}'
+        f'L{_x(inner, end):.1f},{_y(inner, end):.1f}'
+        f'A{inner:.1f},{inner:.1f} 0 {large} 0 {_x(inner, start):.1f},{_y(inner, start):.1f}'
+        f'Z" fill="{fill}"/>'
+    )
+
+
+def _tree_ring_radius(position):
+    """The inner and outer radius of the ring at ``position``, counting out."""
+    inner = TREE_FIRST_RING_RADIUS + position * (TREE_RING_THICKNESS + TREE_RING_GAP)
+    return inner, inner + TREE_RING_THICKNESS
+
+
+def _tree_text(name):
+    """A tip name cut to what fits beside the circle, ellipsis and all."""
+    if len(name) <= TREE_LABEL_CHARS:
+        return name
+    return name[: TREE_LABEL_CHARS - 1] + "\u2026"
+
+
+def _tree_label(name, angle, radius, font):
+    """A tip name, laid along its own radius and kept the right way up."""
+    degrees = math.degrees(angle)
+    flipped = degrees > 180
+    text = _tree_text(name)
+    turn = " rotate(180)" if flipped else ""
+    return (
+        f'<text transform="rotate({degrees - 90:.2f}) translate({radius:.0f},0){turn}" '
+        f'text-anchor="{"end" if flipped else "start"}" '
+        f'dx="{-4 if flipped else 4}" dominant-baseline="middle" '
+        f'font-size="{font}" fill="#5a6a78">{escape(text)}</text>'
+    )
+
+
+def _tree_ring_labels(rings, has_phylum):
+    """The ring names, written into the wedge left empty at the top."""
+    items = []
+    if has_phylum:
+        items.append((0, "Phylum", "#6b7a88"))
+    for position, ring in enumerate(rings, start=1):
+        items.append((position, ring["label"], ring["ramp"][1]))
+    labels = []
+    for position, label, colour in items:
+        inner, outer = _tree_ring_radius(position)
+        labels.append(
+            f'<text x="-6" y="{-(inner + outer) / 2:.1f}" text-anchor="end" '
+            f'dominant-baseline="middle" font-size="11" fill="{colour}">'
+            f'{escape(label)}</text>'
+        )
+    return "".join(labels)
+
+
+def _tree_centre_label(tips, domain):
+    name = str(domain).capitalize()
+    return (
+        f'<text x="0" y="-6" text-anchor="middle" dominant-baseline="middle" '
+        f'font-size="20" fill="#8fa2b0">{tips}</text>'
+        f'<text x="0" y="14" text-anchor="middle" dominant-baseline="middle" '
+        f'font-size="11" fill="#b0bcc6">{escape(name)}</text>'
+    )
+
+
+def _tree_tooltip(name, phylum, rings, index):
+    parts = [name]
+    if phylum:
+        parts.append(f"Phylum: {phylum}")
+    for ring in rings:
+        value = ring["values"][index]
+        if value is None:
+            continue
+        if ring["key"] == "size":
+            parts.append(f"Genome size: {value / 1e6:.2f} Mbp")
+        elif ring["key"] == "completeness":
+            parts.append(f"Completeness: {value:.1f}%")
+        else:
+            parts.append(f"{ring['label']}: {value:.2f}%")
+    return "\n".join(parts)
+
+
+def _tree_key(leaves, lookup, phyla, colours, rings):
+    """What the colours mean, under the tree they are used in.
+
+    The phylum swatches list only the phyla this tree holds, in the order the
+    rest of the section colours them, so the key doubles as the reader's route
+    from an arc back to a name.
+    """
+    present = []
+    pooled = False
+    for leaf in leaves:
+        phylum = _tree_phylum(leaf.name, lookup, phyla)
+        if phylum is None:
+            continue
+        if phylum in colours:
+            if phylum not in present:
+                present.append(phylum)
+        else:
+            pooled = True
+    order = list(colours)
+    present.sort(key=order.index)
+
+    swatches = "".join(
+        f'<span class="key-item"><span class="key-swatch" '
+        f'style="background:{colours[name]}"></span>{escape(name)}</span>'
+        for name in present
+    )
+    if pooled:
+        swatches += (
+            f'<span class="key-item"><span class="key-swatch" '
+            f'style="background:{OTHER_COLOUR}"></span>Other phyla</span>'
+        )
+
+    scales = []
+    for ring in rings:
+        if ring["key"] == "size":
+            top = f"{ring['maximum'] / 1e6:.1f} Mbp"
+        else:
+            top = f"{ring['maximum']:.0f}%"
+        scales.append(
+            f'<span class="key-item"><span class="key-ramp" style="background:'
+            f'linear-gradient(to right,{ring["ramp"][0]},{ring["ramp"][1]})"></span>'
+            f'{escape(ring["label"])} 0–{top}</span>'
+        )
+
+    # Named only when a slice is actually blank, so the reader is not sent
+    # looking for gaps a complete catalogue does not have.
+    gaps = any(value is None for ring in rings for value in ring["values"])
+    note = (
+        "A blank slice in a ring is a genome that has no value for it."
+        if gaps else ""
+    )
+    return (
+        '<div class="tree-key">'
+        + (f'<div class="key-row">{swatches}</div>' if swatches else "")
+        + (f'<div class="key-row">{"".join(scales)}</div>' if scales else "")
+        + (f'<p class="note">{note}</p>' if note else "")
+        + "</div>"
+    )
+
+
+def _mix_colours(start, end, fraction):
+    """A point on a two-stop ramp, as ``#rrggbb``."""
+    fraction = max(0.0, min(1.0, fraction))
+    channels = []
+    for offset in (1, 3, 5):
+        low = int(start[offset:offset + 2], 16)
+        high = int(end[offset:offset + 2], 16)
+        channels.append(round(low + (high - low) * fraction))
+    return "#" + "".join(f"{value:02x}" for value in channels)
 
 
 def _phylum_colours(connection):

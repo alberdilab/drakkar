@@ -115,7 +115,8 @@ gene count.
      - Genome quality summary, a completeness-against-contamination scatter,
        and a genome-by-sample relative abundance heatmap.
    * - Taxonomy
-     - Distinct taxa and unclassified genomes at each GTDB rank, the full
+     - Distinct taxa and unclassified genomes at each GTDB rank, a circular
+       phylogeny of the catalogue with a ring per genome attribute, the full
        lineage of every genome with one column per rank, genomes per phylum,
        and phylum composition per sample when abundances are present.
    * - Functional annotation
@@ -165,7 +166,8 @@ Sections and their inputs
    * - ``profiling``
      - ``profiling_genomes/final/{counts,bases,mags}.tsv``
    * - ``taxonomy``
-     - ``annotating/genome_taxonomy.tsv``
+     - ``annotating/genome_taxonomy.tsv``, ``annotating/bacteria.tree``,
+       ``annotating/archaea.tree``
    * - ``function``
      - ``annotating/gene_annotations.tsv.xz``,
        ``annotating/cluster_annotations.tsv.xz``,
@@ -242,6 +244,18 @@ summary's repeated header row. GTDB-Tk renamed its closest-reference columns
 between major versions, so both the ``fastani_*`` and ``closest_genome_*``
 spellings are accepted.
 
+Placement trees
+~~~~~~~~~~~~~~~
+
+``annotating/bacteria.tree`` and ``annotating/archaea.tree`` are the GTDB-Tk
+classify trees pruned back to the catalogue genomes. Each is stored whole, as
+the Newick text it arrives as, in ``genome_tree`` — one row per domain. Nothing
+queries the topology in SQL; the report reads the string back to lay out the
+circular phylogeny, in which each tip is a genome and the rings around it carry
+its phylum, size, completeness and contamination. Both files are optional: a
+catalogue with no archaea has no archaeal tree, and a taxonomy section without
+either is rendered without the figure.
+
 Schema
 ------
 
@@ -304,6 +318,9 @@ Tables
    * - ``genome_taxonomy``
      - ``genome_id``
      - Ranked GTDB lineage plus placement evidence.
+   * - ``genome_tree``
+     - ``domain``
+     - The pruned GTDB-Tk placement tree, as Newick, one row per domain.
    * - ``gene``
      - ``(mag, gene)``
      - One row per predicted gene, with its coordinates.

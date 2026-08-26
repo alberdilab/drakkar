@@ -152,6 +152,82 @@ Version logging:
 - The log records the requested version, resolved install directory, source
   URLs, source-version label, and installed asset checksums and file sizes.
 
+Database preflight checks
+-------------------------
+
+Every workflow command that uses databases validates them before Snakemake is
+launched, so an incomplete or swapped database fails in seconds instead of
+after hours of compute.
+
+Installation check
+^^^^^^^^^^^^^^^^^^
+
+DRAKKAR verifies that each database the requested module needs is present and
+that none of its artifacts are missing or empty. For managed releases this
+covers every file the installer produces, including the pressed HMM indices,
+the KEGG hierarchy JSON, the KOfam ``ko_list`` cutoff table, and the Pfam EC
+mapping table. Only the databases the run actually needs are checked, so
+``--annotation-type kegg`` does not require a Pfam release.
+
+If something is missing, DRAKKAR names the exact files and prints the command
+that reinstalls the release:
+
+.. code-block:: console
+
+   ERROR: Required databases are missing or incomplete:
+     KEGG/KOfam (KEGG_DB): /db/kofams/2026-02-01
+       missing or empty: /db/kofams/2026-02-01/kofams_ko_list.tsv
+       reinstall with: drakkar database kegg --directory /db/kofams --version 2026-02-01
+
+This matters most for artifacts whose absence would otherwise be silent. A
+missing ``ko_list`` stops the KEGG merge with an explicit error, but a missing
+KEGG hierarchy JSON would simply drop every EC annotation without any warning.
+
+Use ``--skip-database-check`` to launch without this validation.
+
+Cross-run consistency check
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Each run records the databases it used in its ``drakkar_<run_id>.yaml`` run
+metadata file:
+
+.. code-block:: yaml
+
+   databases:
+     KEGG_DB:
+       configured: /db/kofams/2026-02-01
+       release: '2026-02-01'
+       requested_version: '2026-02-01'
+       source_version: kofam archive 2026-02-01
+
+When a later run reuses the same output directory, DRAKKAR compares the
+configured databases against the most recent recorded run. Output directories
+created before provenance recording fall back to the database paths in
+``annotating/annotation_manifest.yaml``; if neither is available, the check is
+skipped.
+
+Snakemake profiles use ``rerun-trigger: mtime``, so changing a database in
+``config.yaml`` never invalidates existing outputs. Results built with the old
+release are silently kept and merged with results built with the new one. To
+prevent that, DRAKKAR stops a run whose databases changed **and** whose output
+directory still holds files built with the earlier release:
+
+.. code-block:: console
+
+   ERROR: Databases changed since run 20260825-162931, and outputs built with the earlier releases are still present:
+     KEGG_DB: 2026-02-01 (/db/kofams/2026-02-01) -> 2026-04-01 (/db/kofams/2026-04-01)
+       built with the earlier release: /output/annotating/kegg/PV-171_bin_31.tsv
+
+Resolve it in one of three ways:
+
+- restore the earlier database values in ``config.yaml`` (``drakkar config --edit``)
+- delete the listed outputs so they are rebuilt against the new release
+- rerun with ``--allow-database-change`` to knowingly mix releases in the
+  directory, which is recorded in the run metadata
+
+A database change in a directory that holds no outputs built from it is
+reported as information only and does not stop the run.
+
 Config
 ------
 

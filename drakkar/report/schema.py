@@ -19,7 +19,7 @@ import sqlite3
 from datetime import datetime, timezone
 
 # Bump when the layout below changes in a way that invalidates existing files.
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 TAXONOMIC_RANKS = ("domain", "phylum", "class", "order", "family", "genus", "species")
 
@@ -330,6 +330,17 @@ SCHEMA_STATEMENTS = [
         red_value REAL,
         msa_percent REAL,
         warnings TEXT
+    )
+    """,
+    # The pruned GTDB-Tk placement trees, one row per domain, stored as the
+    # Newick text they arrive as. A tree is a single string rather than a set
+    # of edges because the report only ever reads it whole, to lay out the
+    # circular phylogeny; nothing queries its topology in SQL.
+    """
+    CREATE TABLE IF NOT EXISTS genome_tree (
+        domain TEXT PRIMARY KEY,
+        newick TEXT NOT NULL,
+        tip_count INTEGER
     )
     """,
     # -- Functional annotation --------------------------------------------

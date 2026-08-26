@@ -8,6 +8,51 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.2.0] - 2026-08-26
+
+### Added
+
+- The Read fates chart in the preprocessing report carries a "Switch to bases"
+  button beside its heading, redrawing the stack in gigabases instead of read
+  counts. The button is offered only when every fate has base counts, and is
+  hidden without JavaScript and when printing.
+- The taxonomy section of the report opens with a circular phylogeny: the
+  GTDB-Tk placement tree pruned to the catalogue genomes, drawn as a phylogram
+  with one ring per genome attribute around it — phylum in the colours the rest
+  of the section uses, then genome size, completeness and contamination. Each
+  tip carries its figures as a tooltip, rings whose columns the database does
+  not hold are left out, and bacteria and archaea get a figure each. The figure
+  is inline SVG, so it adds no second plotting bundle to the page.
+- The report database gained a `genome_tree` table, ingested from the pruned
+  `annotating/bacteria.tree` and `annotating/archaea.tree` written by the
+  `gtdbtk_pruned_trees` rule. Both files are optional, and a taxonomy section
+  without them renders as before.
+- Workflow commands now validate the databases they need before launching
+  Snakemake. Every artifact of a managed release is checked for presence and
+  content, including the pressed HMM indices, the KEGG hierarchy JSON, the
+  KOfam `ko_list` cutoff table and the Pfam EC table, and the error names the
+  missing files plus the `drakkar database` command that reinstalls the
+  release. Only the databases the requested module and annotation types need
+  are checked. `--skip-database-check` launches without the validation.
+- Each run records the databases it used in its `drakkar_<run_id>.yaml` run
+  metadata, and a later run in the same output directory is stopped when its
+  databases differ from the recorded ones and outputs built with the earlier
+  release are still present. Because Snakemake profiles rerun on file
+  timestamps only, such a change would otherwise mix two database releases in
+  one output directory without any trace. Directories written before this
+  release fall back to the paths in `annotating/annotation_manifest.yaml`, a
+  change with no affected outputs is reported as information only, and
+  `--allow-database-change` proceeds deliberately.
+
+### Changed
+
+- The KOfam `ko_list` cutoff table is now checksummed in the
+  `database_versions.yaml` written by `drakkar database kegg`, alongside the
+  profile database and the hierarchy JSON.
+- The report schema version moved to 4 for the new `genome_tree` table. An
+  existing `drakkar.db` built by an earlier version is refused with the message
+  it already gave for a schema change; rebuild it with `drakkar report --force`.
+
 ## [2.1.8] - 2026-08-26
 
 ### Changed

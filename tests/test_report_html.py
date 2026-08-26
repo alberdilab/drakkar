@@ -13,6 +13,7 @@ from drakkar.report.render import (
     PAGE_ROWS,
     PALETTE,
     STYLESHEET,
+    TREE_MAX_LABELS,
     _runtime_floors,
     render_report,
 )
@@ -908,6 +909,154 @@ class GenomeAbundanceTests(TemporaryRootMixin, unittest.TestCase):
         self.assertIn("<th>Mapped reads</th>", body)
         self.assertNotIn("<th>Metagenomic reads</th>", body)
         self.assertNotIn("<th>Mapped %</th>", body)
+
+
+class PhylogenyTests(TemporaryRootMixin, unittest.TestCase):
+    """The circular phylogeny: the tree, its rings, and what it leaves out."""
+
+    LINEAGES = [
+        ("MAG_1", "Bacteria", "Bacillota"),
+        ("MAG_2", "Bacteria", "Bacillota"),
+        ("MAG_3", "Bacteria", "Bacteroidota"),
+        ("MAG_4", "Bacteria", "Bacteroidota"),
+    ]
+    QUALITY = [
+        ("MAG_1", 95.0, 1.0, 3_000_000),
+        ("MAG_2", 71.0, 4.0, 1_500_000),
+        ("MAG_3", 88.0, 0.5, 2_200_000),
+        ("MAG_4", 62.0, 2.5, 4_000_000),
+    ]
+    TREE = "((MAG_1:0.10,MAG_2:0.12):0.05,(MAG_3:0.08,MAG_4:0.20):0.06);"
+    ARCHAEA = "(MAG_5:0.30,MAG_6:0.22);"
+
+    def render(self, tree=TREE, archaea=None, quality=True, lineages=None):
+        root = self.temporary_root()
+        db_path = root / "drakkar.db"
+        connection = connect(db_path)
+        create_schema(connection, drakkar_version="2.1.0")
+        connection.executemany(
+            "INSERT INTO genome_taxonomy (genome_id, domain, phylum) "
+            "VALUES (?, ?, ?)",
+            self.LINEAGES if lineages is None else lineages,
+        )
+        if quality:
+            connection.executemany(
+                "INSERT INTO genome (genome_id, completeness, contamination, size) "
+                "VALUES (?, ?, ?, ?)",
+                self.QUALITY,
+            )
+            log(connection, "genome", "profiling", len(self.QUALITY))
+        if tree is not None:
+            connection.execute(
+                "INSERT INTO genome_tree VALUES (?, ?, ?)",
+                ("bacteria", tree, tree.count(",") + 1),
+            )
+            log(connection, "genome_tree:bacteria", "taxonomy", 1)
+        if archaea is not None:
+            connection.execute(
+                "INSERT INTO genome_tree VALUES (?, ?, ?)",
+                ("archaea", archaea, archaea.count(",") + 1),
+            )
+            log(connection, "genome_tree:archaea", "taxonomy", 1)
+        log(connection, "genome_taxonomy", "taxonomy", len(self.LINEAGES))
+        connection.commit()
+        connection.close()
+
+        html_path = root / "drakkar_report.html"
+        render_report(db_path, html_path, sections=("taxonomy",))
+        return html_path.read_text(encoding="utf-8")
+
+    def figure(self, **kwargs):
+        text = self.render(**kwargs)
+        start = text.index("<h3>Phylogeny</h3>")
+        return text[start:text.index("<h3>", start + 5)]
+
+    def test_the_tree_is_drawn_as_inline_svg(self):
+        body = self.figure()
+        self.assertIn('<svg class="tree"', body)
+        # No second plotting bundle, and nothing to fetch when the page is
+        # opened from a file:// URL.
+        self.assertNotIn("<img", body)
+        self.assertNotIn("<script", body)
+
+    def test_every_tip_carries_the_rings_the_database_can_fill(self):
+        body = self.figure()
+        for label in ("Phylum", "Genome size", "Completeness", "Contamination"):
+            self.assertIn(f">{label}</text>", body)
+
+    def test_a_phylum_keeps_the_colour_the_rest_of_the_section_gives_it(self):
+        text = self.render()
+        tree = text[text.index("<h3>Phylogeny</h3>"):text.index("<h3>Lineage")]
+        counts = text[text.index("<h3>Genomes per phylum</h3>"):]
+        # Two genomes each, so the fallback ordering is by genome count and
+        # Bacillota leads. Whatever colour it takes, the tree takes too.
+        self.assertIn(f'fill="{PALETTE[0]}"', tree)
+        bars = counts.index('"marker":{"color":[')
+        self.assertIn(PALETTE[0], counts[bars:counts.index("]", bars)])
+
+    def test_each_tip_is_labelled_and_described(self):
+        body = self.figure()
+        for genome in ("MAG_1", "MAG_2", "MAG_3", "MAG_4"):
+            self.assertIn(f">{genome}</text>", body)
+        self.assertIn(
+            "MAG_1\nPhylum: Bacillota\nGenome size: 3.00 Mbp\n"
+            "Completeness: 95.0%\nContamination: 1.00%",
+            body,
+        )
+
+    def test_the_quality_rings_drop_out_without_the_profiling_tables(self):
+        body = self.figure(quality=False)
+        self.assertIn(">Phylum</text>", body)
+        for label in ("Genome size", "Completeness", "Contamination"):
+            self.assertNotIn(f">{label}</text>", body)
+
+    def test_a_genome_the_tree_holds_but_the_tables_do_not_is_still_drawn(self):
+        # The tip is placed and named; its rings are blank, and the key says so.
+        body = self.figure(
+            tree="((MAG_1:0.1,MAG_2:0.1):0.1,MAG_9:0.3);",
+            lineages=self.LINEAGES[:2],
+        )
+        self.assertIn(">MAG_9</text>", body)
+        self.assertIn("has no value for it", body)
+
+    def test_a_full_catalogue_is_not_told_to_look_for_blanks(self):
+        self.assertNotIn("has no value for it", self.figure())
+
+    def test_bacteria_and_archaea_get_a_figure_each(self):
+        body = self.figure(archaea=self.ARCHAEA)
+        self.assertEqual(body.count('<svg class="tree"'), 2)
+        self.assertIn(">Bacteria</text>", body)
+        self.assertIn(">Archaea</text>", body)
+
+    def test_the_key_names_only_the_phyla_the_tree_holds(self):
+        body = self.figure()
+        key = body[body.index('<div class="tree-key">'):]
+        self.assertIn(">Bacillota</span>", key)
+        self.assertIn(">Bacteroidota</span>", key)
+        self.assertNotIn("Other phyla", key)
+
+    def test_names_are_dropped_once_they_no_longer_fit_round_the_circle(self):
+        many = [
+            (f"MAG_{index:03d}", "Bacteria", "Bacillota")
+            for index in range(1, TREE_MAX_LABELS + 12)
+        ]
+        tree = "(" + ",".join(f"{row[0]}:0.1" for row in many) + ");"
+        body = self.figure(tree=tree, quality=False, lineages=many)
+        self.assertIn('<svg class="tree"', body)
+        self.assertNotIn(">MAG_001</text>", body)
+        # The tips are still there to point at, and still counted.
+        self.assertIn("<title>MAG_001", body)
+        self.assertIn(f">{len(many)}</text>", body)
+
+    def test_an_unreadable_tree_leaves_the_rest_of_the_section_standing(self):
+        text = self.render(tree="((MAG_1:0.1,MAG_2:0.1);")
+        self.assertNotIn("<h3>Phylogeny</h3>", text)
+        self.assertIn("<h3>Lineage per genome</h3>", text)
+
+    def test_a_taxonomy_without_a_tree_says_nothing_about_phylogeny(self):
+        text = self.render(tree=None)
+        self.assertNotIn("<h3>Phylogeny</h3>", text)
+        self.assertIn("<h3>Genomes per phylum</h3>", text)
 
 
 class PhylumColourTests(TemporaryRootMixin, unittest.TestCase):

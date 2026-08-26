@@ -180,6 +180,20 @@ def add_resource_multiplier_arguments(parser):
         ),
     )
 
+def add_database_check_arguments(parser):
+    parser.add_argument(
+        "--skip-database-check",
+        dest="skip_database_check",
+        action="store_true",
+        help="Launch without verifying that the configured databases are installed and complete.",
+    )
+    parser.add_argument(
+        "--allow-database-change",
+        dest="allow_database_change",
+        action="store_true",
+        help="Continue even if the configured databases differ from the ones earlier runs in the output directory used.",
+    )
+
 def add_snakemake_override_arguments(parser):
     snakemake_group = parser.add_argument_group("Snakemake overrides")
     snakemake_group.add_argument(

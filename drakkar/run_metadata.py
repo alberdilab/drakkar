@@ -39,7 +39,7 @@ def load_metadata_file(metadata_path):
     except OSError:
         return None
 
-def write_launch_metadata(args, output_dir, env_path=None):
+def write_launch_metadata(args, output_dir, env_path=None, databases=None):
     output_path = Path(output_dir)
     if not validate_launch_metadata_directory(output_path):
         return None
@@ -78,6 +78,8 @@ def write_launch_metadata(args, output_dir, env_path=None):
     }
     if env_path is not None:
         metadata["env_path"] = env_path
+    if databases:
+        metadata["databases"] = databases
     if snakemake_log_path is not None:
         metadata["snakemake_log"] = str(snakemake_log_path.resolve())
     if benchmark_paths is not None:

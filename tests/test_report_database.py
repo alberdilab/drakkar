@@ -796,6 +796,134 @@ class DereplicationClusterTests(ReportFixtureMixin, unittest.TestCase):
             )
 
 
+class TaxonomyTreeTests(unittest.TestCase):
+    """The pruned GTDB-Tk placement trees, stored beside the lineages."""
+
+    SUMMARY = """
+        user_genome\tclassification\tclassification_method
+        MAG_1\td__Bacteria;p__Bacillota;c__Clostridia\ttopology and ANI
+        MAG_2\td__Bacteria;p__Bacteroidota;c__Bacteroidia\ttopology and ANI
+        MAG_3\td__Archaea;p__Methanobacteriota;c__Methanobacteria\ttopology and ANI
+        MAG_4\td__Archaea;p__Methanobacteriota;c__Methanobacteria\ttopology and ANI
+        """
+
+    def ingest(self, root, bacteria=None, archaea=None):
+        write(root / "annotating/genome_taxonomy.tsv", self.SUMMARY)
+        if bacteria is not None:
+            write(root / "annotating/bacteria.tree", bacteria)
+        if archaea is not None:
+            write(root / "annotating/archaea.tree", archaea)
+        connection = connect(root / "drakkar.db")
+        create_schema(connection)
+        report_ingest.ingest_taxonomy(connection, root)
+        return connection
+
+    def trees(self, connection):
+        return {
+            row[0]: (row[1], row[2])
+            for row in connection.execute(
+                "SELECT domain, newick, tip_count FROM genome_tree"
+            )
+        }
+
+    def test_each_domain_tree_is_stored_with_its_tip_count(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            connection = self.ingest(
+                root,
+                bacteria="(MAG_1:0.12,MAG_2:0.09);\n",
+                archaea="(MAG_3:0.20,MAG_4:0.18);\n",
+            )
+            trees = self.trees(connection)
+            self.assertEqual(set(trees), {"bacteria", "archaea"})
+            self.assertEqual(trees["bacteria"][0], "(MAG_1:0.12,MAG_2:0.09);")
+            self.assertEqual(trees["bacteria"][1], 2)
+            self.assertEqual(trees["archaea"][1], 2)
+            connection.close()
+
+    def test_a_catalogue_without_archaea_stores_only_the_bacterial_tree(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            connection = self.ingest(root, bacteria="(MAG_1:0.12,MAG_2:0.09);")
+            self.assertEqual(set(self.trees(connection)), {"bacteria"})
+            connection.close()
+
+    def test_the_empty_tree_the_pruning_rule_writes_is_not_stored(self):
+        # `gtdbtk_pruned_trees` touches an empty bacteria.tree when GTDB-Tk
+        # produced no classify tree at all.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "annotating").mkdir(parents=True)
+            (root / "annotating/bacteria.tree").write_text("", encoding="utf-8")
+            connection = self.ingest(root)
+            self.assertEqual(self.trees(connection), {})
+            connection.close()
+
+    def test_a_tree_of_one_tip_has_no_topology_and_is_not_stored(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            connection = self.ingest(root, bacteria="MAG_1:0.1;")
+            self.assertEqual(self.trees(connection), {})
+            connection.close()
+
+    def test_an_unparsable_tree_is_skipped_rather_than_raised(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            connection = self.ingest(root, bacteria="((MAG_1,MAG_2);")
+            self.assertEqual(self.trees(connection), {})
+            connection.close()
+
+    def test_the_taxonomy_lineages_are_ingested_either_way(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            connection = self.ingest(root)
+            self.assertEqual(
+                connection.execute(
+                    "SELECT COUNT(*) FROM genome_taxonomy"
+                ).fetchone()[0],
+                4,
+            )
+            connection.close()
+
+    def test_each_tree_is_named_in_the_ingest_log_with_its_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            connection = self.ingest(
+                root, bacteria="(MAG_1:0.1,MAG_2:0.1);",
+                archaea="(MAG_3:0.1,MAG_4:0.1);",
+            )
+            rows = {
+                row[0]: row[1]
+                for row in connection.execute(
+                    "SELECT table_name, source_file FROM ingest_log "
+                    "WHERE table_name LIKE 'genome_tree%'"
+                )
+            }
+            self.assertEqual(
+                set(rows), {"genome_tree:bacteria", "genome_tree:archaea"}
+            )
+            self.assertTrue(rows["genome_tree:bacteria"].endswith("bacteria.tree"))
+            connection.close()
+
+    def test_the_probe_names_the_trees_it_found(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root / "annotating/genome_taxonomy.tsv", self.SUMMARY)
+            write(root / "annotating/bacteria.tree", "(MAG_1:0.1,MAG_2:0.1);")
+            entry = {item["section"]: item for item in probe(root)}["taxonomy"]
+            self.assertTrue(entry["available"])
+            self.assertIn("annotating/bacteria.tree", entry["present"])
+            self.assertNotIn("annotating/archaea.tree", entry["present"])
+
+    def test_a_taxonomy_without_trees_is_still_available(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root / "annotating/genome_taxonomy.tsv", self.SUMMARY)
+            entry = {item["section"]: item for item in probe(root)}["taxonomy"]
+            self.assertTrue(entry["available"])
+            self.assertEqual(entry["missing"], [])
+
+
 class MissingSourceTests(unittest.TestCase):
     def test_loaders_return_none_when_sources_are_absent(self):
         with tempfile.TemporaryDirectory() as tmp:
