@@ -3,6 +3,8 @@ import argparse
 import csv
 import hashlib
 import json
+import sys
+from collections import Counter
 from pathlib import Path
 
 
@@ -172,6 +174,50 @@ def normalize_sources(sources):
     return normalized
 
 
+def deduplicate_clusters(rows):
+    """Collapse repeated cluster records and make repeated cluster ids unique.
+
+    Some sources report the same cluster more than once (for example
+    DefenseFinder listing a system in several equally scoring solutions).
+    Rows that are identical in every field describe the same cluster, so only
+    the first is kept. Rows that share a cluster id but differ in content are
+    distinct clusters that the source failed to name apart, so each occurrence
+    gets an ordinal suffix. The native record stays untouched in ``details``.
+    """
+    seen_rows = set()
+    unique_rows = []
+    collapsed = Counter()
+    for row in rows:
+        signature = compact_json(row)
+        if signature in seen_rows:
+            collapsed[row["source"]] += 1
+            continue
+        seen_rows.add(signature)
+        unique_rows.append(row)
+
+    key_counts = Counter(
+        (row["mag"], row["source"], row["cluster_id"]) for row in unique_rows
+    )
+    occurrences = Counter()
+    renamed = Counter()
+    for row in unique_rows:
+        key = (row["mag"], row["source"], row["cluster_id"])
+        if key_counts[key] < 2:
+            continue
+        occurrences[key] += 1
+        renamed[row["source"]] += 1
+        row["cluster_id"] = f"{row['cluster_id']}#{occurrences[key]}"
+
+    for source in sorted(set(collapsed) | set(renamed)):
+        print(
+            f"WARNING {source} reported duplicate cluster ids: "
+            f"{collapsed[source]} identical records collapsed, "
+            f"{renamed[source]} records given an ordinal suffix",
+            file=sys.stderr,
+        )
+    return unique_rows, collapsed, renamed
+
+
 def validate_cluster_ids(rows):
     seen = set()
     duplicates = set()
@@ -196,18 +242,25 @@ def write_table(rows, out_path):
         writer.writerows(rows)
 
 
-def write_qc(rows_by_source, mag, out_path):
+def write_qc(rows_by_source, retained_rows, collapsed, renamed, mag, out_path):
+    retained_by_source = {}
+    for row in retained_rows:
+        retained_by_source.setdefault(row["source"], []).append(row)
     records = []
     for source, rows in rows_by_source.items():
+        retained = retained_by_source.get(source, [])
+        dropped = collapsed.get(source, 0)
         records.append({
             "mag": str(mag),
             "level": "cluster",
             "source": source,
             "reported_records": len(rows),
-            "retained_records": len(rows),
-            "rejected_records": None,
-            "unmapped_records": sum(not row.get("contig") for row in rows),
-            "unique_entities": len({row["cluster_id"] for row in rows}),
+            "retained_records": len(retained),
+            "rejected_records": dropped or None,
+            "duplicate_records_collapsed": dropped,
+            "renamed_cluster_ids": renamed.get(source, 0),
+            "unmapped_records": sum(not row.get("contig") for row in retained),
+            "unique_entities": len({row["cluster_id"] for row in retained}),
             "filter_stage": "upstream_native",
         })
     payload = {
@@ -245,11 +298,12 @@ def merge_cluster_annotations(
     if "defensefinder" in enabled:
         rows_by_source["defensefinder"] = defense_rows(defense, mag)
 
-    merged = [row for rows in rows_by_source.values() for row in rows]
+    reported = [row for rows in rows_by_source.values() for row in rows]
+    merged, collapsed, renamed = deduplicate_clusters(reported)
     validate_cluster_ids(merged)
     write_table(merged, output)
     if qc_output:
-        write_qc(rows_by_source, mag, qc_output)
+        write_qc(rows_by_source, merged, collapsed, renamed, mag, qc_output)
     return merged
 
 

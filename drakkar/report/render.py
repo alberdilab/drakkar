@@ -21,6 +21,7 @@ it used to be: every section stacked, every row listed.
 """
 
 import base64
+import re
 import sqlite3
 from datetime import datetime, timezone
 from html import escape
@@ -2847,6 +2848,58 @@ def _job_state_figure(states, launches):
     return figure
 
 
+# The workflow sizes most runtime requests from the input size but never lets
+# the result fall below a floor: ``cap_runtime(max(15, int(input.size_mb / 10)
+# ...))`` asks for a quarter of an hour however small the input is. Jobs that
+# sit on that floor are unaffected by the size coefficient, so a rule that
+# looks over-provisioned is only tunable through the floor, and the table
+# names the floor beside the request rather than leaving it to be looked up in
+# the rule files.
+WORKFLOW_DIR = Path(__file__).resolve().parents[1] / "workflow"
+_RULE_HEADER = re.compile(r"^(?:rule|checkpoint)\s+(\w+)\s*:")
+_RUNTIME_FLOOR = re.compile(r"max\(\s*(\d+)\s*,")
+_RUNTIME_CONSTANT = re.compile(r"cap_runtime\(\s*(\d+)\s*[)*]")
+
+
+def _runtime_floors():
+    """The smallest runtime, in minutes, each rule of the workflow can request.
+
+    Read from the rule files of the *installed* Drakkar rather than from the
+    database, which stores what the scheduler was asked for and not the
+    expression that produced it. A rule name defined in more than one module
+    file with more than one floor is left out: only one of those modules ran,
+    and the rule files alone do not say which.
+    """
+    floors = {}
+    paths = [WORKFLOW_DIR / "Snakefile", *sorted((WORKFLOW_DIR / "rules").glob("*.smk"))]
+    for path in paths:
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        rule = None
+        for line in text.splitlines():
+            header = _RULE_HEADER.match(line)
+            if header:
+                rule = header.group(1)
+                continue
+            if rule is None or "runtime=" not in line:
+                continue
+            expression = line.split("runtime=", 1)[1]
+            match = (
+                _RUNTIME_FLOOR.search(expression)
+                or _RUNTIME_CONSTANT.search(expression)
+            )
+            if match:
+                floors.setdefault(rule, set()).add(int(match.group(1)))
+            rule = None
+    return {
+        rule: values.pop()
+        for rule, values in floors.items()
+        if len(values) == 1
+    }
+
+
 def _rule_job_statistics(connection):
     """Per-rule figures the rule roll-up does not carry: totals and ceilings.
 
@@ -2856,25 +2909,47 @@ def _rule_job_statistics(connection):
     like the rule's total runtime, can only be computed from the per-job rows.
     """
     rows = _query(connection, """
-        SELECT rule, elapsed_sec, memory_efficiency, runtime_efficiency
+        SELECT rule, elapsed_sec, memory_efficiency, runtime_efficiency,
+               requested_runtime_min
         FROM benchmark_job
     """)
     grouped = {}
     for row in rows:
         entry = grouped.setdefault(
-            row["rule"], {"elapsed": [], "memory": [], "runtime": []}
+            row["rule"],
+            {"elapsed": [], "memory": [], "runtime": [], "requested": []},
         )
         entry["elapsed"].append(row["elapsed_sec"])
         entry["memory"].append(row["memory_efficiency"])
         entry["runtime"].append(row["runtime_efficiency"])
+        if row["requested_runtime_min"] is not None:
+            entry["requested"].append(float(row["requested_runtime_min"]))
     return {
         rule: {
             "jobs": len(entry["elapsed"]),
             "total_elapsed_sec": sum(value or 0 for value in entry["elapsed"]),
             "memory_p95": _percentile(entry["memory"], 0.95),
             "runtime_p95": _percentile(entry["runtime"], 0.95),
+            **_smallest_request(entry["requested"]),
         }
         for rule, entry in grouped.items()
+    }
+
+
+def _smallest_request(requested):
+    """The rule's smallest runtime request and the share of jobs asking for it.
+
+    The share is what says whether the floor matters: a rule whose jobs all
+    ask for the same smallest amount is pinned there, while one where a single
+    job happens to be the smallest is sized by its inputs.
+    """
+    if not requested:
+        return {"min_requested_runtime_min": None, "jobs_at_min_request": None}
+    smallest = min(requested)
+    at_smallest = sum(1 for value in requested if value == smallest)
+    return {
+        "min_requested_runtime_min": smallest,
+        "jobs_at_min_request": 100.0 * at_smallest / len(requested),
     }
 
 
@@ -2902,6 +2977,7 @@ def _rule_resource_blocks(connection):
         return []
 
     per_job = _rule_job_statistics(connection)
+    floors = _runtime_floors()
 
     table_rows = [
         (
@@ -2915,6 +2991,9 @@ def _rule_resource_blocks(connection):
             _efficiency(row["memory_efficiency"]),
             _efficiency(per_job.get(row["rule"], {}).get("memory_p95")),
             row["requested_runtime_min"],
+            floors.get(row["rule"]),
+            per_job.get(row["rule"], {}).get("min_requested_runtime_min"),
+            per_job.get(row["rule"], {}).get("jobs_at_min_request"),
             _minutes(row["elapsed_sec"]),
             _efficiency(row["runtime_efficiency"]),
             _efficiency(per_job.get(row["rule"], {}).get("runtime_p95")),
@@ -2940,8 +3019,8 @@ def _rule_resource_blocks(connection):
     # rule to average, but the two runtime totals hold for a single rule too.
     averages = [
         ("Mean memory used %", _cards_percent(_mean(table_rows, 7))),
-        ("Mean runtime used %", _cards_percent(_mean(table_rows, 11))),
-        ("Mean CPU efficiency %", _cards_percent(_mean(table_rows, 16))),
+        ("Mean runtime used %", _cards_percent(_mean(table_rows, 14))),
+        ("Mean CPU efficiency %", _cards_percent(_mean(table_rows, 19))),
     ] if len(table_rows) >= MIN_STAT_ROWS else []
     highlights = _highlights([
         *averages,
@@ -2970,6 +3049,18 @@ def _rule_resource_blocks(connection):
             "reached, and are what a request has to cover — a rule whose median "
             "is 20% and whose 95th percentile is 95% is not over-provisioned."
         ),
+        _note(
+            "The runtime floor is the smallest runtime the rule can ask for, "
+            "read from the rule definitions of the installed Drakkar: requests "
+            "are scaled from the input size but never drop below it. Where the "
+            "smallest request equals the floor — times the run's time "
+            "multiplier, if one was set — and the share of jobs sitting at it "
+            "is high, the rule is priced by its floor and not by its size "
+            "coefficient, so lowering the coefficient will not shorten a "
+            "single request. The floor is blank for rules whose runtime is not "
+            "written as a floored expression, and for the few rule names that "
+            "several workflow modules define with different floors."
+        ),
         highlights,
         _table(
             [
@@ -2983,6 +3074,9 @@ def _rule_resource_blocks(connection):
                 ("Memory used %, median", _ONE),
                 ("Memory used %, 95th pct", _ONE),
                 ("Runtime requested (min)", _ONE),
+                ("Runtime floor (min)", _integer),
+                ("Smallest runtime request (min)", _ONE),
+                ("Jobs at smallest request %", _ONE),
                 ("Runtime per job (min), median", _ONE),
                 ("Runtime used %, median", _ONE),
                 ("Runtime used %, 95th pct", _ONE),

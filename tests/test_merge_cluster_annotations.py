@@ -81,6 +81,77 @@ class MergeClusterAnnotationTests(unittest.TestCase):
         self.assertEqual(rows[0]["contig"], "contig_9")
         self.assertEqual(rows[0]["source"], "defensefinder")
 
+    def test_repeated_defense_systems_are_collapsed_and_disambiguated(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            defense = tmp / "defense.tsv"
+            output = tmp / "clusters.tsv"
+            qc = tmp / "clusters.qc.json"
+            header = (
+                "sys_id\treplicon\tsys_beg\tsys_end\ttype\tgenes_count\tsubtype\t"
+                "name_of_profiles_in_sys\n"
+            )
+            defense.write_text(
+                header
+                # the same system reported twice, identical in every field
+                + "MAG_C_RM_Type_II_5\tcontig_1\t100\t900\tRM\t4\tType_II\tA,B,C,D\n"
+                + "MAG_C_RM_Type_II_5\tcontig_1\t100\t900\tRM\t4\tType_II\tA,B,C,D\n"
+                # two distinct systems the source failed to name apart
+                + "MAG_C_RM_Type_II_7\tcontig_2\t50\t400\tRM\t3\tType_II\tA,B,C\n"
+                + "MAG_C_RM_Type_II_7\tcontig_3\t70\t600\tRM\t5\tType_II\tA,B,C,D,E\n",
+                encoding="utf-8",
+            )
+
+            rows = module.merge_cluster_annotations(
+                mag="MAG_C",
+                output=output,
+                sources={"defense"},
+                defense=defense,
+                qc_output=qc,
+            )
+            qc_payload = json.loads(qc.read_text(encoding="utf-8"))
+
+        self.assertEqual(
+            [row["cluster_id"] for row in rows],
+            [
+                "MAG_C_RM_Type_II_5",
+                "MAG_C_RM_Type_II_7#1",
+                "MAG_C_RM_Type_II_7#2",
+            ],
+        )
+        self.assertEqual([row["contig"] for row in rows], ["contig_1", "contig_2", "contig_3"])
+        record = qc_payload["sources"][0]
+        self.assertEqual(record["reported_records"], 4)
+        self.assertEqual(record["retained_records"], 3)
+        self.assertEqual(record["rejected_records"], 1)
+        self.assertEqual(record["duplicate_records_collapsed"], 1)
+        self.assertEqual(record["renamed_cluster_ids"], 2)
+        self.assertEqual(record["unique_entities"], 3)
+
+    def test_native_identifier_survives_disambiguation_in_details(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            defense = tmp / "defense.tsv"
+            defense.write_text(
+                "sys_id\treplicon\tsys_beg\tsys_end\ttype\tgenes_count\tsubtype\t"
+                "name_of_profiles_in_sys\n"
+                "system_1\tcontig_1\t1\t2\tRM\t2\tType_I\tA,B\n"
+                "system_1\tcontig_2\t3\t4\tRM\t2\tType_I\tA,B\n",
+                encoding="utf-8",
+            )
+
+            rows = module.merge_cluster_annotations(
+                mag="MAG_D",
+                output=tmp / "clusters.tsv",
+                sources={"defense"},
+                defense=defense,
+            )
+
+        self.assertEqual(rows[0]["cluster_id"], "system_1#1")
+        self.assertEqual(json.loads(rows[0]["details"])["sys_id"], "system_1")
+
     def test_source_schema_changes_fail_loudly(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory() as tmpdir:

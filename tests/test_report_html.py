@@ -9,7 +9,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from drakkar.report import command as report_command
-from drakkar.report.render import PAGE_ROWS, PALETTE, STYLESHEET, render_report
+from drakkar.report.render import (
+    PAGE_ROWS,
+    PALETTE,
+    STYLESHEET,
+    _runtime_floors,
+    render_report,
+)
 from drakkar.report.schema import SCHEMA_VERSION, connect, create_schema
 from drakkar.report.sources import SECTION_ORDER
 
@@ -1050,6 +1056,18 @@ class ResourceBenchmarkTests(TemporaryRootMixin, unittest.TestCase):
         # The figure reaches the same ceiling as a whisker off the median bar.
         self.assertIn('"arrayminus":[0.0,0.0]', body)
 
+    def test_the_rule_table_names_the_runtime_floor_it_cannot_go_below(self):
+        body = self.section(self.render())
+        self.assertIn("Runtime floor (min)", body)
+        self.assertIn("Smallest runtime request (min)", body)
+        self.assertIn("Jobs at smallest request %", body)
+        # assembly's runtime is cap_runtime(max(15, …)) in cataloging.smk, so
+        # 15 minutes is the least it can ask for; both its launches asked for
+        # 720, well clear of the floor and sized by the input instead.
+        self.assertIn('<td data-sort="15">15</td>', body)
+        self.assertIn('<td data-sort="720.0">720.0</td>', body)
+        self.assertIn('<td data-sort="100.0">100.0</td>', body)
+
     def test_requested_and_used_resources_appear_per_job(self):
         body = self.section(self.render())
         self.assertIn("Requested versus used resources, per job", body)
@@ -1077,6 +1095,32 @@ class ResourceBenchmarkTests(TemporaryRootMixin, unittest.TestCase):
         body = self.section(self.render(benchmark=False))
         self.assertIn("20260825-101500", body)
         self.assertNotIn("Job outcomes", body)
+
+
+class RuntimeFloorTests(unittest.TestCase):
+    """The floors the report reads back out of the workflow's rule files."""
+
+    def setUp(self):
+        self.floors = _runtime_floors()
+
+    def test_floors_are_read_from_the_rule_definitions(self):
+        # cap_runtime(max(15, int(input.size_mb / 20) * …)) in cataloging.smk.
+        self.assertEqual(self.floors["assembly"], 15)
+        # The annotation rules floor at ten minutes.
+        self.assertEqual(self.floors["genomad"], 10)
+        self.assertEqual(self.floors["antismash"], 10)
+
+    def test_a_rule_several_modules_define_differently_is_left_out(self):
+        # dereplicate is written three times over, at 60, 15 and 15 minutes,
+        # and the rule files do not say which module the run used.
+        self.assertNotIn("dereplicate", self.floors)
+
+    def test_every_floor_is_a_positive_number_of_minutes(self):
+        self.assertTrue(self.floors)
+        for rule, floor in self.floors.items():
+            with self.subTest(rule=rule):
+                self.assertIsInstance(floor, int)
+                self.assertGreater(floor, 0)
 
 
 class EscapingTests(TemporaryRootMixin, unittest.TestCase):

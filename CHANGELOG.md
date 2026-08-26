@@ -8,6 +8,38 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.1.8] - 2026-08-26
+
+### Changed
+
+- Runtime requests were cut for the annotation and catalogue-indexing rules to
+  match observed wall-time usage, which was far below the request. The
+  size-scaled coefficient was reduced to a fraction of its previous value:
+  `genomad` to 20%, `defensefinder` and `dbcan3` to 15%, `antismash`, `dbcan2`
+  and `dbcan_summary` to 10%, and `dbcan`, `dbcan4`, `antismash_regions` and
+  `index_catalogue` to 5%. The 10- and 15-minute floors and the per-attempt
+  doubling on retries are unchanged, as are all memory requests.
+
+### Added
+
+- The per-rule resource table in the report names each rule's runtime floor —
+  the smallest runtime it can request, read from the rule definitions —
+  alongside the smallest runtime actually requested and the share of jobs
+  sitting at it, so a rule priced by its floor rather than by its size
+  coefficient can be told apart at a glance.
+
+### Fixed
+
+- Cluster annotation merging no longer aborts a MAG when a source reports the
+  same cluster identifier twice. DefenseFinder does this for systems it lists
+  in more than one equally scoring solution, which failed the whole
+  `merge_cluster_annotations` job with a duplicate-key error. Records that are
+  identical in every field are now collapsed into one, and records that share
+  an identifier but differ in content — genuinely distinct clusters the source
+  failed to name apart — each get an ordinal suffix (`<sys_id>#1`, `#2`). The
+  native record is left untouched in the `details` column, the run log names
+  what was collapsed and what was renamed, and the per-MAG QC JSON counts both.
+
 ## [2.1.7] - 2026-08-26
 
 ### Added

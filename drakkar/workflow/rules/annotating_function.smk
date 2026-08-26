@@ -537,7 +537,7 @@ rule dbcan:
         f"{PACKAGE_DIR}/workflow/envs/annotating_function_dbcan.yaml"
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 100) * 2 ** (attempt - 1)))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 5) * 2 ** (attempt - 1)))
     shell:
         """
         run_dbcan CAZyme_annotation \
@@ -565,7 +565,7 @@ rule dbcan2:
         f"{PACKAGE_DIR}/workflow/envs/annotating_function_dbcan.yaml"
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 100) * 2 ** (attempt - 1)))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10) * 2 ** (attempt - 1)))
     shell:
         """
         run_dbcan gff_process \
@@ -594,7 +594,7 @@ rule dbcan3:
         f"{PACKAGE_DIR}/workflow/envs/annotating_function_dbcan.yaml"
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 100) * 2 ** (attempt - 1)))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 15) * 2 ** (attempt - 1)))
     shell:
         """
         run_dbcan cgc_finder --output_dir {params.output_dir}
@@ -616,7 +616,7 @@ rule dbcan4:
         f"{PACKAGE_DIR}/workflow/envs/annotating_function_dbcan.yaml"
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 100) * 2 ** (attempt - 1)))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 5) * 2 ** (attempt - 1)))
     shell:
         """
         run_dbcan substrate_prediction \
@@ -640,7 +640,7 @@ rule dbcan_summary:
         f"{PACKAGE_DIR}/workflow/envs/annotating_function_dbcan.yaml"
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb * 100) * 2 ** (attempt - 1)))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb * 10) * 2 ** (attempt - 1)))
     shell:
         """
         python {params.package_dir}/workflow/scripts/dbcan_region.py \
@@ -662,7 +662,7 @@ rule antismash:
         1
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 100) * 2 ** (attempt - 1)))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10) * 2 ** (attempt - 1)))
     conda:
         f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
     shell:
@@ -687,7 +687,7 @@ rule antismash_regions:
         package_dir={PACKAGE_DIR}
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb * 100) * 2 ** (attempt - 1)))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb * 5) * 2 ** (attempt - 1)))
     shell:
         """
         python {params.package_dir}/workflow/scripts/antismash_regions.py \
@@ -712,7 +712,7 @@ rule defensefinder:
         f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb * 100) * 2 ** (attempt - 1)))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb * 15) * 2 ** (attempt - 1)))
     shell:
         """
         defense-finder run \
@@ -738,7 +738,7 @@ rule genomad:
         1
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(16*1024, int(input.size_mb * 1024 * 50) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 100) * 2 ** (attempt - 1)))
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 20) * 2 ** (attempt - 1)))
     shell:
         """
         module purge
