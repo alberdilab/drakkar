@@ -19,7 +19,7 @@ import sqlite3
 from datetime import datetime, timezone
 
 # Bump when the layout below changes in a way that invalidates existing files.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 TAXONOMIC_RANKS = ("domain", "phylum", "class", "order", "family", "genus", "species")
 
@@ -214,6 +214,36 @@ SCHEMA_STATEMENTS = [
         PRIMARY KEY (assembly_id, binner)
     )
     """,
+    # One row per final bin, read from the per-assembly Binette reports. The
+    # `origin` column is what makes the binning reconcilable: an original bin
+    # names the binner(s) that produced it, a bin Binette built out of contigs
+    # from several binners is marked `binette` and is not original.
+    """
+    CREATE TABLE IF NOT EXISTS assembly_bin (
+        assembly_id TEXT NOT NULL,
+        bin_name TEXT NOT NULL,
+        is_original INTEGER,
+        origin TEXT,
+        original_name TEXT,
+        completeness REAL,
+        contamination REAL,
+        score REAL,
+        size INTEGER,
+        n50 INTEGER,
+        contig_count INTEGER,
+        PRIMARY KEY (assembly_id, bin_name)
+    )
+    """,
+    # Normalized from the ';'-packed `origin` column: a bin recovered
+    # identically by several binners carries one row per binner.
+    """
+    CREATE TABLE IF NOT EXISTS assembly_bin_origin (
+        assembly_id TEXT NOT NULL,
+        bin_name TEXT NOT NULL,
+        binner TEXT NOT NULL,
+        PRIMARY KEY (assembly_id, bin_name, binner)
+    )
+    """,
     # -- Dereplication -----------------------------------------------------
     """
     CREATE TABLE IF NOT EXISTS dereplication (
@@ -224,6 +254,33 @@ SCHEMA_STATEMENTS = [
         output_bin_number INTEGER,
         output_bin_completeness REAL,
         output_bin_contamination REAL
+    )
+    """,
+    # Projected from dRep's own data tables: Cdb (cluster assignments), Wdb
+    # (the winner of each cluster) and Mdb (raw MASH distances). Only the
+    # nearest MASH neighbour of each bin is kept: Mdb is quadratic in the
+    # number of bins, and the distance to the closest other bin is what says
+    # whether the bin had any dereplication decision to be made about it.
+    """
+    CREATE TABLE IF NOT EXISTS genome_cluster (
+        genome TEXT PRIMARY KEY,
+        primary_cluster TEXT,
+        secondary_cluster TEXT,
+        is_representative INTEGER,
+        nearest_mash_distance REAL
+    )
+    """,
+    # One row per within-primary-cluster ANI comparison (dRep's Ndb), stored
+    # once per unordered pair. These are the comparisons the dereplication ANI
+    # threshold was actually applied to.
+    """
+    CREATE TABLE IF NOT EXISTS genome_comparison (
+        genome_a TEXT NOT NULL,
+        genome_b TEXT NOT NULL,
+        primary_cluster TEXT,
+        ani REAL,
+        alignment_coverage REAL,
+        PRIMARY KEY (genome_a, genome_b)
     )
     """,
     # -- Profiling ---------------------------------------------------------
@@ -374,6 +431,9 @@ INDEX_STATEMENTS = [
     "CREATE INDEX IF NOT EXISTS idx_cluster_annotation_source ON cluster_annotation (source)",
     "CREATE INDEX IF NOT EXISTS idx_gene_expression_sample ON gene_expression (sample_id)",
     "CREATE INDEX IF NOT EXISTS idx_assembly_sample_sample ON assembly_sample (sample_id)",
+    "CREATE INDEX IF NOT EXISTS idx_assembly_bin_origin_binner ON assembly_bin_origin (binner)",
+    "CREATE INDEX IF NOT EXISTS idx_genome_cluster_secondary ON genome_cluster (secondary_cluster)",
+    "CREATE INDEX IF NOT EXISTS idx_genome_comparison_ani ON genome_comparison (ani)",
 ]
 
 

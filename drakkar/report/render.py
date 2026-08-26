@@ -37,16 +37,30 @@ PAGE_ROWS = 20
 MIN_STAT_ROWS = 2
 TOP_GENOMES = 40
 TOP_MAGS = 40
-TOP_TAXA = 12
+# How many taxa a stacked composition chart names before pooling the rest as
+# Other. Set by what its key can hold: the key is one row spread across the
+# page, so each entry gets a page-width fraction, and past eight or so a long
+# phylum name no longer fits in its share and is cut off mid-word. Staying
+# under the palette also keeps every named taxon a colour of its own, which a
+# stacked bar needs — two slices in the same colour are read as one.
+TOP_TAXA = 8
 TOP_CATEGORIES = 30
 
 FIGURE_HEIGHT = 420
+
+# Set as a figure's ``layout.meta`` to have it rendered edge to edge instead of
+# inside the content column's padding.
+WIDE = "wide"
 
 # Muted palette, deliberately close to the terminal theme in drakkar.output.
 PALETTE = (
     "#5f9ea0", "#d6a642", "#7fb069", "#e85d75", "#8878b0", "#4f7f9f",
     "#c98b5e", "#6fae9a", "#b0637f", "#8d9db6",
 )
+
+# The neutral a figure gives to everything it pooled, or to a category it is
+# not naming. It stays out of PALETTE so no named category is ever drawn in it.
+OTHER_COLOUR = "#b7c7d3"
 
 SECTION_LABELS = {
     "preprocessing": "Preprocessing",
@@ -155,13 +169,17 @@ aside.sidebar {
   background: var(--panel);
   border-right: 1px solid var(--rule);
 }
-aside.sidebar .brand { border-bottom: 2px solid var(--accent); padding-bottom: .9rem; }
+aside.sidebar .brand {
+  border-bottom: 2px solid var(--accent);
+  padding-bottom: .9rem;
+  text-align: center;
+}
 aside.sidebar .logo {
   display: block;
   width: 100%;
   max-width: 14rem;
   height: auto;
-  margin: 0 0 .9rem;
+  margin: 0 auto .9rem;
   /* The mark ships on white; multiply drops that onto the sidebar's panel. */
   mix-blend-mode: multiply;
 }
@@ -230,6 +248,12 @@ html:not(.js) main .panel + .panel { margin-top: 3rem; }
   color: var(--muted);
 }
 .stat-value { display: block; font-size: 1.2rem; font-variant-numeric: tabular-nums; }
+.stat-sub {
+  display: block;
+  font-size: .78rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
 
 table { border-collapse: collapse; width: 100%; margin: .75rem 0; font-size: .9rem; }
 .table-block { margin: .5rem 0 1rem; }
@@ -259,6 +283,15 @@ tbody tr:hover td { background: #fbfcfd; }
 .pager button:disabled { opacity: .4; cursor: default; }
 
 .figure { margin: 1rem 0 .25rem; }
+/* A figure that carries a whole section reads better edge to edge, so it is
+   let out of the cap the text column keeps for line length: it starts where
+   the text does and runs to the far side of the page, leaving the same
+   gutter there. Below 900px the sidebar is no longer beside it and the
+   figure goes back to the width of its column. */
+.figure.wide {
+  width: calc(100vw - var(--sidebar) - 4rem);
+  max-width: none;
+}
 footer.report { margin-top: 3.5rem; padding-top: 1rem; border-top: 1px solid var(--rule); color: var(--muted); font-size: .85rem; }
 code { font-family: "SFMono-Regular", Consolas, monospace; font-size: .85em; }
 
@@ -275,11 +308,13 @@ code { font-family: "SFMono-Regular", Consolas, monospace; font-size: .85em; }
     border-bottom: 1px solid var(--rule);
   }
   main.content { padding: 1.5rem 1.25rem 3rem; }
+  .figure.wide { width: auto; }
 }
 
 /* Printing wants the whole report, not the panel that happens to be open. */
 @media print {
   aside.sidebar { display: none; }
+  .figure.wide { width: auto; }
   html.js main .panel { display: block !important; }
   .pager { display: none; }
   main .panel + .panel { margin-top: 3rem; page-break-before: always; }
@@ -517,18 +552,6 @@ def _friendly_datetime(value):
     return f"{moment.day} {moment:%b %Y} at {moment:%H:%M} UTC"
 
 
-def _friendly_window(first, last):
-    """The ingest window as one line: a moment, or a span within the same day."""
-    start = _friendly_datetime(first)
-    end = _friendly_datetime(last)
-    if not end or start == end:
-        return start
-    opened, closed = _parse_timestamp(first), _parse_timestamp(last)
-    if opened is not None and closed is not None and opened.date() == closed.date():
-        return f"{start} to {closed:%H:%M} UTC"
-    return f"{start} to {end}"
-
-
 def _timestamp(value):
     return escape(_friendly_datetime(value))
 
@@ -558,6 +581,37 @@ _ONE = _decimal(1)
 _TWO = _decimal(2)
 
 
+def _gigabases(value):
+    """Base counts read better in gigabases: 1,850,000,000 becomes 1.85 GB."""
+    if value is None or value == "":
+        return ""
+    try:
+        return f"{float(value) / 1e9:,.2f} GB"
+    except (TypeError, ValueError):
+        return escape(str(value))
+
+
+def _share(value):
+    """A share as a percentage, whichever way the tool wrote it.
+
+    SingleM and Nonpareil both report shares as fractions of one, so that is
+    what ingest stores; anything above one is already a percentage and is left
+    alone rather than multiplied into nonsense.
+    """
+    if value is None or value == "":
+        return ""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return escape(str(value))
+    return f"{(number * 100 if number <= 1 else number):,.1f}%"
+
+
+def _cards_percent(value):
+    """A highlight card's percentage, or None when there is nothing to average."""
+    return None if value is None else f"{_ONE(value)}%"
+
+
 def _quantity(number, singular, plural=None):
     """Format a count with a noun that agrees with it."""
     noun = singular if number == 1 else (plural or singular + "s")
@@ -569,6 +623,33 @@ def _ratio(numerator, denominator):
     if numerator is None or not denominator:
         return None
     return 100.0 * float(numerator) / float(denominator)
+
+
+def _percentile(values, fraction):
+    """Linear-interpolated percentile of the numeric values, blanks ignored.
+
+    Written out rather than taken from ``statistics`` because a rule can have
+    launched a single job, and the quantile helpers there refuse fewer than
+    two data points.
+    """
+    numbers = []
+    for value in values:
+        if value is None or value == "":
+            continue
+        try:
+            numbers.append(float(value))
+        except (TypeError, ValueError):
+            continue
+    if not numbers:
+        return None
+    numbers.sort()
+    if len(numbers) == 1:
+        return numbers[0]
+    position = fraction * (len(numbers) - 1)
+    lower = int(position)
+    upper = min(lower + 1, len(numbers) - 1)
+    weight = position - lower
+    return numbers[lower] * (1 - weight) + numbers[upper] * weight
 
 
 def _mean(rows, index):
@@ -588,13 +669,22 @@ def _mean(rows, index):
 
 
 def _highlights(items):
-    """Render ``(label, formatted value)`` pairs as a row of highlight cards."""
-    cards = [
-        f'<div class="stat"><span class="stat-label">{escape(label)}</span>'
-        f'<span class="stat-value">{value}</span></div>'
-        for label, value in items
-        if value not in (None, "")
-    ]
+    """Render highlight cards from ``(label, value)`` triples.
+
+    An optional third element is a quieter line under the value — the same
+    quantity in other units, say — and is already formatted when it arrives.
+    """
+    cards = []
+    for item in items:
+        label, value = item[0], item[1]
+        if value in (None, ""):
+            continue
+        sub = item[2] if len(item) > 2 else None
+        under = f'<span class="stat-sub">{sub}</span>' if sub else ""
+        cards.append(
+            f'<div class="stat"><span class="stat-label">{escape(label)}</span>'
+            f'<span class="stat-value">{value}</span>{under}</div>'
+        )
     if not cards:
         return ""
     return '<div class="stats">' + "".join(cards) + "</div>"
@@ -721,22 +811,35 @@ def _duration(started, finished):
 # ---------------------------------------------------------------------------
 
 def _figure_html(figure, state):
-    """Serialize one Plotly figure, embedding the bundle only in the first."""
+    """Serialize one Plotly figure, embedding the bundle only in the first.
+
+    The house style is applied here rather than in each renderer, but a figure
+    that set a margin, a height or the ``WIDE`` marker keeps what it asked
+    for: a legend laid above the plot needs more room at the top than the
+    default leaves.
+    """
     import plotly.io as pio
+
+    margin = dict(l=70, r=30, t=40, b=70)
+    for side in margin:
+        asked = getattr(figure.layout.margin, side)
+        if asked is not None:
+            margin[side] = asked
+    wide = figure.layout.meta == WIDE
 
     figure.update_layout(
         template="simple_white",
         font=dict(family="Helvetica Neue, Helvetica, Arial, sans-serif",
                   size=13, color="#22303c"),
-        margin=dict(l=70, r=30, t=40, b=70),
+        margin=margin,
         paper_bgcolor="white",
         plot_bgcolor="white",
-        height=FIGURE_HEIGHT,
+        height=figure.layout.height or FIGURE_HEIGHT,
         colorway=list(PALETTE),
     )
     include = "inline" if not state["plotly_embedded"] else False
     state["plotly_embedded"] = True
-    return '<div class="figure">' + pio.to_html(
+    return f'<div class="figure{" wide" if wide else ""}">' + pio.to_html(
         figure,
         include_plotlyjs=include,
         full_html=False,
@@ -799,8 +902,9 @@ def present_sections(connection):
 
 def _render_preprocessing(connection):
     rows = _query(connection, """
-        SELECT sample_id, reads_pre_fastp, reads_post_fastp, host_reads,
-               metagenomic_reads, metagenomic_bases, singlem_fraction,
+        SELECT sample_id, reads_pre_fastp, bases_pre_fastp, reads_post_fastp,
+               host_reads, host_bases, metagenomic_reads, metagenomic_bases,
+               singlem_fraction, nonpareil_C, nonpareil_LR, nonpareil_LRstar,
                nonpareil_diversity
         FROM sample
         ORDER BY sample_id
@@ -817,11 +921,10 @@ def _render_preprocessing(connection):
             "and adapter trimming; Host reads were then removed by mapping "
             "against the host genome, leaving the metagenomic reads. "
             "Metagenomic % is that final count as a share of the raw reads. "
-            "SingleM fraction estimates how much of the sequenced material is "
-            "prokaryotic, and Nonpareil diversity is an index of community "
-            "diversity estimated from read redundancy — useful for ranking "
-            "samples against each other rather than as an absolute value."
+            "Each average is given as reads, with the same quantity in "
+            "gigabases underneath."
         ),
+        _preprocessing_highlights(rows),
     ]
 
     table_rows = [
@@ -833,8 +936,6 @@ def _render_preprocessing(connection):
             row["metagenomic_reads"],
             _ratio(row["metagenomic_reads"], row["reads_pre_fastp"]),
             row["metagenomic_bases"],
-            row["singlem_fraction"],
-            row["nonpareil_diversity"],
         )
         for row in rows
     ]
@@ -846,18 +947,9 @@ def _render_preprocessing(connection):
             ("Host reads", _integer),
             ("Metagenomic reads", _integer),
             ("Metagenomic %", _ONE),
-            ("Metagenomic bases", _integer),
-            ("SingleM fraction", _TWO),
-            ("Nonpareil diversity", _TWO),
+            ("Metagenomic bases", _gigabases),
         ],
         table_rows,
-        stats=[
-            ("Mean reads in", 1),
-            ("Mean metagenomic reads", 4),
-            ("Mean metagenomic %", 5),
-            ("Mean SingleM fraction", 7),
-            ("Mean Nonpareil diversity", 8),
-        ],
     ))
 
     figure = _read_fate_figure(rows)
@@ -871,7 +963,33 @@ def _render_preprocessing(connection):
             "was available for the microbes but is not a sequencing failure."
         ))
         blocks.append(figure)
+    blocks.extend(_microbial_blocks(rows))
     return blocks
+
+
+def _preprocessing_highlights(rows):
+    """Mean reads at each stage, each with the same quantity in gigabases.
+
+    Host reads sit immediately left of the metagenomic ones, so the two halves
+    of what was sequenced are read side by side.
+    """
+    if len(rows) < MIN_STAT_ROWS:
+        return ""
+
+    def card(label, reads, bases):
+        return label, _integer(_mean(rows, reads)), _gigabases(_mean(rows, bases))
+
+    # _mean reads one column out of each row, so the ratios are handed to it
+    # as rows of their own.
+    ratios = [
+        (_ratio(row["metagenomic_reads"], row["reads_pre_fastp"]),) for row in rows
+    ]
+    return _highlights([
+        card("Mean reads in", "reads_pre_fastp", "bases_pre_fastp"),
+        card("Mean host reads", "host_reads", "host_bases"),
+        card("Mean metagenomic reads", "metagenomic_reads", "metagenomic_bases"),
+        ("Mean metagenomic %", _ONE(_mean(ratios, 0))),
+    ])
 
 
 def _read_fate_figure(rows):
@@ -902,9 +1020,124 @@ def _read_fate_figure(rows):
         barmode="stack",
         xaxis_title="Sample",
         yaxis_title="Reads",
-        legend_title_text="",
+        # One bar per sample, so the plot wants every pixel of the page: the
+        # legend goes above it in a single row rather than down its right side.
+        legend=dict(orientation="h", traceorder="normal", title_text="",
+                    yanchor="bottom", y=1.02, xanchor="left", x=0),
+        margin=dict(t=60),
+        meta=WIDE,
     )
     return figure
+
+
+def _microbial_blocks(rows):
+    """Microbial fraction and Nonpareil coverage, when they were estimated.
+
+    Both come from optional preprocessing steps — ``--fraction`` and
+    ``--nonpareil`` — so the whole subsection is left out when neither ran.
+    """
+    columns = ("singlem_fraction", "nonpareil_C", "nonpareil_LR",
+               "nonpareil_LRstar", "nonpareil_diversity")
+    if not any(row[name] is not None for row in rows for name in columns):
+        return []
+
+    blocks = [_heading(
+        "Microbial fraction and coverage",
+        "Two estimates made on the metagenomic reads themselves. The microbial "
+        "fraction, from SingleM, is the share of the sequenced material that "
+        "came from prokaryotes: a low value means most of what was sequenced "
+        "was neither bacterial nor archaeal, even after host removal. "
+        "Nonpareil completeness is how much of the community's sequence space "
+        "the sample already covers at this depth, and the effort for near "
+        "coverage is the sequencing Nonpareil projects would be needed to "
+        "reach it — compare it against the effort actually spent. Nonpareil "
+        "diversity is an index of community diversity estimated from read "
+        "redundancy, useful for ranking samples against each other rather "
+        "than as an absolute value."
+    )]
+
+    if len(rows) >= MIN_STAT_ROWS:
+        blocks.append(_highlights([
+            ("Mean microbial fraction", _share(_mean(rows, "singlem_fraction"))),
+            ("Mean Nonpareil completeness", _share(_mean(rows, "nonpareil_C"))),
+            ("Mean Nonpareil diversity", _TWO(_mean(rows, "nonpareil_diversity"))),
+        ]))
+
+    blocks.append(_table(
+        [
+            ("Sample", _text),
+            ("Microbial fraction", _share),
+            ("Nonpareil completeness", _share),
+            ("Nonpareil diversity", _TWO),
+            ("Effort spent", _gigabases),
+            ("Effort for near coverage", _gigabases),
+        ],
+        [
+            (
+                row["sample_id"],
+                row["singlem_fraction"],
+                row["nonpareil_C"],
+                row["nonpareil_diversity"],
+                row["nonpareil_LR"],
+                row["nonpareil_LRstar"],
+            )
+            for row in rows
+        ],
+    ))
+
+    figure = _microbial_figure(rows)
+    if figure is not None:
+        blocks.append(figure)
+    return blocks
+
+
+def _microbial_figure(rows):
+    """Microbial fraction beside Nonpareil completeness, per sample.
+
+    Both are shares of one, so they belong on a single percentage axis; a
+    sample that is mostly prokaryotic but poorly covered reads at a glance.
+    """
+    import plotly.graph_objects as go
+
+    series = [
+        ("Microbial fraction", "singlem_fraction"),
+        ("Nonpareil completeness", "nonpareil_C"),
+    ]
+    series = [
+        (name, column) for name, column in series
+        if any(row[column] is not None for row in rows)
+    ]
+    if not series:
+        return None
+
+    def share(value):
+        """Percentages of whatever scale the value arrived on, as _share does."""
+        if value is None:
+            return None
+        return value * 100 if value <= 1 else value
+
+    samples = [row["sample_id"] for row in rows]
+    figure = go.Figure()
+    for name, column in series:
+        figure.add_bar(name=name, x=samples, y=[share(row[column]) for row in rows])
+    figure.update_layout(
+        barmode="group",
+        xaxis_title="Sample",
+        yaxis_title="%",
+        yaxis_range=[0, 100],
+        legend=dict(orientation="h", traceorder="normal", title_text="",
+                    yanchor="bottom", y=1.02, xanchor="left", x=0),
+        margin=dict(t=60),
+        meta=WIDE,
+    )
+    return figure
+
+
+def _hex_to_rgba(colour, alpha):
+    """A palette colour as an ``rgba()`` string, for translucent Sankey links."""
+    value = colour.lstrip("#")
+    red, green, blue = (int(value[index:index + 2], 16) for index in (0, 2, 4))
+    return f"rgba({red}, {green}, {blue}, {alpha})"
 
 
 def _render_cataloging(connection):
@@ -933,8 +1166,9 @@ def _render_cataloging(connection):
     )]
     blocks.extend(_assembly_blocks(rows))
     blocks.extend(_mapping_rate_blocks(connection))
-    blocks.extend(_bin_blocks(rows))
+    blocks.extend(_bin_blocks(rows, connection))
     blocks.extend(_binner_blocks(connection))
+    blocks.extend(_bin_fate_blocks(connection))
     return blocks
 
 
@@ -979,12 +1213,15 @@ def _assembly_blocks(rows):
     ]
 
 
-def _bin_blocks(rows):
+def _bin_blocks(rows, connection):
     """Bin yield and quality, per assembly.
 
     Low-quality bins are discarded downstream, so they are counted in
     ``final_bins`` but not given a column of their own.
     """
+    final_bins = sum(row["final_bins"] or 0 for row in rows)
+    produced = _scalar(connection, "SELECT SUM(bin_count) FROM assembly_binner")
+    share = _ratio(final_bins, produced)
     return [
         _heading(
             "Bins",
@@ -996,6 +1233,18 @@ def _bin_blocks(rows):
             "averaged over the final bins of each assembly, so an assembly "
             "with few bins can show a high mean without having yielded much."
         ),
+        _highlights([
+            (
+                "Bins produced by the binners",
+                _integer(produced),
+                "before Binette reconciled them",
+            ),
+            (
+                "Final bins after Binette",
+                _integer(final_bins),
+                f"{share:.1f}% of the bins produced" if share is not None else None,
+            ),
+        ]),
         _table(
             [
                 ("Assembly", _text),
@@ -1059,6 +1308,176 @@ def _binner_blocks(connection):
     ]
 
 
+def _bin_fate_counts(connection):
+    """Per binner, what became of the bins it produced.
+
+    Binette records the origin of every final bin: the binner that produced it
+    when it kept the bin as it was, several binners when they all produced the
+    same bin, and itself when it built a bin out of contigs no single binner
+    had grouped that way. Everything a binner produced that is not named by a
+    final bin was replaced — by a bin from another binner, or by one Binette
+    assembled in its place.
+    """
+    produced = {
+        row["binner"]: row["bins"] or 0
+        for row in _query(connection, """
+            SELECT binner, SUM(bin_count) AS bins
+            FROM assembly_binner
+            GROUP BY binner
+        """)
+    }
+    bins = _query(connection, """
+        SELECT bin.assembly_id, bin.bin_name,
+               GROUP_CONCAT(origin.binner) AS binners
+        FROM assembly_bin AS bin
+        LEFT JOIN assembly_bin_origin AS origin
+               ON origin.assembly_id = bin.assembly_id
+              AND origin.bin_name = bin.bin_name
+        GROUP BY bin.assembly_id, bin.bin_name
+    """)
+    if not produced or not bins:
+        return None
+
+    kept_alone = {binner: 0 for binner in produced}
+    kept_shared = {binner: 0 for binner in produced}
+    shared_bins = 0
+    built = 0
+    for row in bins:
+        names = [
+            name for name in (row["binners"] or "").split(",")
+            if name and name in produced
+        ]
+        if not names:
+            # Either a bin Binette assembled itself, or one whose origin names
+            # a binner this run did not record a count for; both are Binette's.
+            built += 1
+            continue
+        if len(names) == 1:
+            kept_alone[names[0]] += 1
+            continue
+        shared_bins += 1
+        for name in names:
+            kept_shared[name] += 1
+
+    replaced = {
+        binner: max(count - kept_alone[binner] - kept_shared[binner], 0)
+        for binner, count in produced.items()
+    }
+    if not any(kept_alone.values()) and not any(kept_shared.values()) and not built:
+        return None
+    return {
+        "produced": produced,
+        "kept_alone": kept_alone,
+        "kept_shared": kept_shared,
+        "shared_bins": shared_bins,
+        "built": built,
+        "replaced": replaced,
+    }
+
+
+def _bin_fate_figure(counts):
+    """The per-binner bin fates as a Sankey diagram."""
+    import plotly.graph_objects as go
+
+    binners = sorted(counts["produced"], key=lambda name: -counts["produced"][name])
+    labels = list(binners) + [
+        "Built by Binette",
+        "Kept as the final bin",
+        "Produced by several binners",
+        "Replaced by another bin",
+        "Final bins",
+    ]
+    built_index = len(binners)
+    kept_index = built_index + 1
+    shared_index = built_index + 2
+    replaced_index = built_index + 3
+    final_index = built_index + 4
+
+    node_colours = [PALETTE[index % len(PALETTE)] for index in range(len(binners))]
+    node_colours += [PALETTE[4], PALETTE[2], PALETTE[0], PALETTE[9], PALETTE[1]]
+
+    sources, targets, values, link_colours = [], [], [], []
+
+    def link(source, target, value, colour):
+        if value:
+            sources.append(source)
+            targets.append(target)
+            values.append(value)
+            link_colours.append(_hex_to_rgba(colour, 0.35))
+
+    for index, binner in enumerate(binners):
+        link(index, kept_index, counts["kept_alone"][binner], PALETTE[2])
+        link(index, shared_index, counts["kept_shared"][binner], PALETTE[0])
+        link(index, replaced_index, counts["replaced"][binner], PALETTE[9])
+    link(kept_index, final_index, sum(counts["kept_alone"].values()), PALETTE[2])
+    link(shared_index, final_index, counts["shared_bins"], PALETTE[0])
+    link(built_index, final_index, counts["built"], PALETTE[4])
+
+    figure = go.Figure(go.Sankey(
+        arrangement="snap",
+        node=dict(
+            label=labels,
+            color=node_colours,
+            pad=18,
+            thickness=14,
+            line=dict(width=0),
+        ),
+        link=dict(source=sources, target=targets, value=values, color=link_colours),
+    ))
+    figure.update_layout(height=460, margin=dict(l=10, r=10, t=20, b=20))
+    return figure
+
+
+def _bin_fate_blocks(connection):
+    """What happened to every bin the binners produced, per binner."""
+    counts = _bin_fate_counts(connection)
+    if counts is None:
+        return []
+    binners = sorted(counts["produced"], key=lambda name: -counts["produced"][name])
+    table_rows = [
+        (
+            binner,
+            counts["produced"][binner],
+            counts["kept_alone"][binner] + counts["kept_shared"][binner],
+            counts["kept_shared"][binner],
+            counts["replaced"][binner],
+        )
+        for binner in binners
+    ]
+    blocks = [
+        _heading(
+            "What became of each binner's bins",
+            "Binette does not pick one binner's output over another's: it "
+            "compares every bin the binners produced, keeps the best "
+            "non-overlapping ones, and builds new bins where a mix of contigs "
+            "scores better than anything a single binner proposed. A bin is "
+            "replaced when a better-scoring bin covers the same contigs, so a "
+            "binner contributing few final bins is not necessarily a poor one "
+            "— it may have found the same genomes as its neighbours and lost "
+            "the tie. Bins several binners produced identically are counted "
+            "once for each of them on the left, which is why that stream "
+            "narrows before it reaches the final bins."
+        ),
+        _bin_fate_figure(counts),
+        _table(
+            [
+                ("Binner", _text),
+                ("Bins produced", _integer),
+                ("Kept as a final bin", _integer),
+                ("Of those, also found by another binner", _integer),
+                ("Replaced", _integer),
+            ],
+            table_rows,
+        ),
+    ]
+    if counts["built"]:
+        blocks.append(_note(
+            f"Binette built {_quantity(counts['built'], 'final bin')} of its own, "
+            "out of contigs that no single binner had grouped that way."
+        ))
+    return blocks
+
+
 def _mapping_rate_blocks(connection):
     """Per-sample mapping rates against the assemblies they contributed to.
 
@@ -1106,20 +1525,33 @@ def _mapping_rate_blocks(connection):
     ]
 
 
-def _render_dereplication(connection):
-    import plotly.graph_objects as go
+def _ani_percent(value):
+    """Read a stored ANI as a percentage, whichever way dRep wrote it."""
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number * 100 if number <= 1 else number
 
+
+def _render_dereplication(connection):
     rows = _query(connection, "SELECT * FROM dereplication")
     if not rows:
         return []
     row = rows[0]
 
     blocks = []
-    ani = row["dereplication_ani"]
-    if ani is not None:
+    threshold = _ani_percent(row["dereplication_ani"])
+    if threshold is not None:
         blocks.append(_paragraph(
-            f"Bins were dereplicated at {float(ani):g} ANI."
+            f"Bins were collapsed into one representative genome wherever they "
+            f"shared at least {threshold:g}% average nucleotide identity."
         ))
+
+    before, after = row["input_bin_number"], row["output_bin_number"]
+    blocks.extend(_dereplication_yield_blocks(before, after))
     blocks.append(_table(
         [
             ("Stage", _text),
@@ -1134,22 +1566,234 @@ def _render_dereplication(connection):
              row["output_bin_completeness"], row["output_bin_contamination"]),
         ],
     ))
-
-    before, after = row["input_bin_number"], row["output_bin_number"]
-    if before is not None and after is not None:
-        figure = go.Figure()
-        figure.add_bar(
-            x=["Before", "After"],
-            y=[before, after],
-            marker_color=[PALETTE[0], PALETTE[1]],
-        )
-        figure.update_layout(xaxis_title="", yaxis_title="Bins")
-        blocks.append(figure)
-        if before:
-            blocks.append(_note(
-                f"Dereplication retained {_ratio(after, before):.1f}% of the input bins."
-            ))
+    blocks.extend(_dereplication_clustering_blocks(connection, threshold))
     return blocks
+
+
+def _dereplication_yield_blocks(before, after):
+    """How much of the input survived, as highlights and as one stacked bar.
+
+    One bar rather than two: the question is what share of the input the
+    catalogue kept, and a part-to-whole split answers it directly, where two
+    bars side by side leave the reader to do the division.
+    """
+    import plotly.graph_objects as go
+
+    if before is None or after is None:
+        return []
+    collapsed = max(before - after, 0)
+    share = _ratio(after, before)
+    blocks = [_highlights([
+        ("Bins dereplicated", _integer(before)),
+        ("Representative genomes", _integer(after)),
+        (
+            "Bins retained",
+            f"{share:.1f}%" if share is not None else None,
+            f"{collapsed:,} collapsed into a representative",
+        ),
+    ])]
+    if not before:
+        return blocks
+
+    figure = go.Figure()
+    for label, value, colour in (
+        ("Retained as a representative", after, PALETTE[0]),
+        ("Collapsed into a representative", collapsed, PALETTE[3]),
+    ):
+        figure.add_bar(
+            y=["Bins"],
+            x=[value],
+            name=label,
+            orientation="h",
+            marker_color=colour,
+            text=[f"{value:,}"],
+            textposition="inside",
+            insidetextanchor="middle",
+        )
+    figure.update_layout(
+        barmode="stack",
+        height=210,
+        margin=dict(l=30, r=30, t=60, b=40),
+        xaxis_title="Bins",
+        yaxis=dict(showticklabels=False),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
+    )
+    blocks.append(figure)
+    return blocks
+
+
+# dRep clusters bins at 90% MASH identity before it compares anything with ANI,
+# so a bin whose nearest MASH neighbour is further away than this was never a
+# candidate for dereplication: nothing was close enough to collapse it into.
+PRIMARY_MASH_DISTANCE = 0.1
+
+# Half-percent bands from 100% down to this floor, then one bucket for the rest.
+ANI_BAND_FLOOR = 95.0
+ANI_BAND_WIDTH = 0.5
+
+# The histogram is drawn finer than the bands are counted, so that a pile-up
+# against the threshold is visible rather than averaged into a half-point bar.
+ANI_BIN_WIDTH = 0.25
+
+
+def _ani_bands():
+    """The ``(lower, upper)`` band edges, widest identity first."""
+    bands = []
+    upper = 100.0
+    while upper > ANI_BAND_FLOOR + 1e-9:
+        bands.append((upper - ANI_BAND_WIDTH, upper))
+        upper -= ANI_BAND_WIDTH
+    return bands
+
+
+def _dereplication_clustering_blocks(connection, threshold):
+    """How the ANI threshold acted on the pairs it was actually applied to.
+
+    dRep only compares bins that already look alike: it clusters them by MASH
+    first and runs ANI within those clusters. So the bins whose fate the
+    threshold decided are the ones with a near MASH neighbour, and the pairs
+    worth looking at are the ones inside a cluster. A run whose comparisons all
+    sit far from the threshold was insensitive to its exact value; a dense band
+    of pairs just either side of it means the opposite.
+    """
+    total = _scalar(connection, "SELECT COUNT(*) FROM genome_cluster", default=0)
+    if not total:
+        return []
+
+    with_neighbour = _scalar(
+        connection,
+        "SELECT COUNT(*) FROM genome_cluster "
+        "WHERE nearest_mash_distance IS NOT NULL AND nearest_mash_distance <= ?",
+        (PRIMARY_MASH_DISTANCE,),
+        default=0,
+    )
+    pairs = _query(connection, """
+        SELECT comparison.ani AS ani,
+               CASE
+                   WHEN first.secondary_cluster IS NOT NULL
+                    AND first.secondary_cluster = second.secondary_cluster
+                   THEN 1 ELSE 0
+               END AS same_cluster
+        FROM genome_comparison AS comparison
+        LEFT JOIN genome_cluster AS first ON first.genome = comparison.genome_a
+        LEFT JOIN genome_cluster AS second ON second.genome = comparison.genome_b
+        WHERE comparison.ani IS NOT NULL
+    """)
+
+    neighbour_share = _ratio(with_neighbour, total)
+    blocks = [
+        _heading(
+            "How the identity threshold acted",
+            "dRep never compares every bin with every other one: it groups "
+            "them by MASH sketch first and computes identity only inside those "
+            "groups. A bin with no MASH neighbour within "
+            f"{PRIMARY_MASH_DISTANCE:.0%} distance was therefore never a "
+            "candidate for collapsing, whatever the threshold had been set to. "
+            "The comparisons below are the ones the threshold was applied to, "
+            "each pair counted once, at the average of the two directions dRep "
+            "clusters on."
+        ),
+        _highlights([
+            ("Bins with a MASH neighbour", _integer(with_neighbour),
+             f"within {PRIMARY_MASH_DISTANCE:.0%} distance — "
+             f"{neighbour_share:.1f}% of {total:,} bins"
+             if neighbour_share is not None else None),
+            ("Pairwise comparisons", _integer(len(pairs)) if pairs else None),
+        ]),
+    ]
+    if not pairs:
+        return blocks
+
+    identities = [
+        (_ani_percent(pair["ani"]), bool(pair["same_cluster"]))
+        for pair in pairs
+    ]
+    identities = [item for item in identities if item[0] is not None]
+    if not identities:
+        return blocks
+    blocks.append(_ani_histogram(identities, threshold))
+    blocks.append(_ani_band_table(identities))
+    return blocks
+
+
+def _ani_histogram(identities, threshold):
+    """Pairwise identities, split by whether the pair was collapsed."""
+    import plotly.graph_objects as go
+
+    # Snap the first bin edge onto a multiple of the bin width, so the bars
+    # fall on round identities instead of wherever the lowest pair happens to be.
+    lowest = min(value for value, _ in identities)
+    start = max(int(lowest / ANI_BIN_WIDTH) * ANI_BIN_WIDTH, 0.0)
+    figure = go.Figure()
+    for label, keep, colour in (
+        ("Collapsed into one genome", True, PALETTE[0]),
+        ("Kept as separate genomes", False, PALETTE[3]),
+    ):
+        values = [value for value, same in identities if same is keep]
+        if not values:
+            continue
+        figure.add_histogram(
+            x=values,
+            name=label,
+            marker_color=colour,
+            xbins=dict(start=start, end=100.0 + ANI_BIN_WIDTH, size=ANI_BIN_WIDTH),
+        )
+    if threshold is not None:
+        figure.add_vline(
+            x=threshold,
+            line_dash="dash",
+            line_color="#22303c",
+            annotation_text=f"{threshold:g}% threshold",
+            annotation_position="top left",
+        )
+    figure.update_layout(
+        barmode="stack",
+        xaxis_title="Average nucleotide identity between the pair (%)",
+        yaxis_title="Pairs of bins",
+        margin=dict(l=70, r=30, t=70, b=70),
+        legend=dict(orientation="h", yanchor="bottom", y=1.06, x=0),
+    )
+    return figure
+
+
+def _ani_band_table(identities):
+    """The same distribution as counts, in half-percent bands."""
+    bands = _ani_bands()
+    counts = [[0, 0] for _ in bands]
+    below = [0, 0]
+    for value, same in identities:
+        index = 1 if same else 0
+        for position, (lower, upper) in enumerate(bands):
+            # The top band is closed at 100 so that an identical pair lands in it.
+            if value > lower and (value <= upper or position == 0):
+                counts[position][index] += 1
+                break
+        else:
+            below[index] += 1
+
+    rows = [
+        (f"{upper:g} – {lower:g}%", separate + collapsed, collapsed, separate)
+        for (lower, upper), (separate, collapsed) in zip(bands, counts)
+    ]
+    rows.append((
+        f"below {ANI_BAND_FLOOR:g}%", below[0] + below[1], below[1], below[0],
+    ))
+    # Empty bands between two populated ones are the point of the table — an
+    # empty band next to the threshold says the decision was clear-cut — so
+    # only the leading and trailing runs of zeroes are trimmed.
+    populated = [index for index, row in enumerate(rows) if row[1]]
+    if not populated:
+        return ""
+    rows = rows[populated[0]:populated[-1] + 1]
+    return _table(
+        [
+            ("Identity band", _text),
+            ("Pairs", _integer),
+            ("Collapsed", _integer),
+            ("Kept separate", _integer),
+        ],
+        rows,
+    )
 
 
 def _render_profiling(connection):
@@ -1224,12 +1868,18 @@ def _abundance_blocks(connection):
     """Relative abundance of the most abundant genomes across samples."""
     import plotly.graph_objects as go
 
+    # The metagenomic read count comes from preprocessing, so it is only there
+    # when that section was ingested too; the join is left outer for that reason
+    # and the column drops out of the table on its own when it is empty.
     totals = _query(connection, """
-        SELECT sample_id, SUM(read_count) AS reads
-        FROM genome_count
-        WHERE read_count IS NOT NULL
-        GROUP BY sample_id
-        ORDER BY sample_id
+        SELECT c.sample_id AS sample_id,
+               SUM(c.read_count) AS reads,
+               MAX(s.metagenomic_reads) AS metagenomic_reads
+        FROM genome_count AS c
+        LEFT JOIN sample AS s ON s.sample_id = c.sample_id
+        WHERE c.read_count IS NOT NULL
+        GROUP BY c.sample_id
+        ORDER BY c.sample_id
     """)
     if not totals:
         return []
@@ -1295,10 +1945,39 @@ def _abundance_blocks(connection):
             f"as a percentage of each sample's mapped reads."
         ))
     blocks.append(figure)
+    # Mapped reads on their own say nothing about how well the catalogue
+    # represents a sample: the same count is a good result for a shallow
+    # sample and a poor one for a deep sample, so the metagenomic reads the
+    # mapping started from and the share of them that landed sit beside it.
+    blocks.append(_note(
+        "Mapped reads are the reads assigned to a catalogue genome; "
+        "metagenomic reads are what preprocessing handed the mapper, after "
+        "low-quality and host reads were removed. Mapped % is the first as a "
+        "share of the second, and is how much of the sample the catalogue "
+        "accounts for — a low value means most of the sample matched no "
+        "genome in the catalogue."
+    ))
     blocks.append(_table(
-        [("Sample", _text), ("Mapped reads", _integer)],
-        [(row["sample_id"], row["reads"]) for row in totals],
-        stats=[("Mean mapped reads", 1)],
+        [
+            ("Sample", _text),
+            ("Mapped reads", _integer),
+            ("Metagenomic reads", _integer),
+            ("Mapped %", _ONE),
+        ],
+        [
+            (
+                row["sample_id"],
+                row["reads"],
+                row["metagenomic_reads"],
+                _ratio(row["reads"], row["metagenomic_reads"]),
+            )
+            for row in totals
+        ],
+        stats=[
+            ("Mean mapped reads", 1),
+            ("Mean metagenomic reads", 2),
+            ("Mean mapped %", 3),
+        ],
     ))
     return blocks
 
@@ -1348,6 +2027,8 @@ def _render_taxonomy(connection):
 
     blocks.extend(_genome_lineage_blocks(connection))
 
+    colours = _phylum_colours(connection)
+
     phyla = _query(connection, """
         SELECT COALESCE(NULLIF(phylum, ''), 'Unclassified') AS name, COUNT(*) AS genomes
         FROM genome_taxonomy
@@ -1361,7 +2042,9 @@ def _render_taxonomy(connection):
             x=[row["genomes"] for row in phyla],
             y=[row["name"] for row in phyla],
             orientation="h",
-            marker_color=PALETTE[0],
+            marker_color=[
+                colours.get(row["name"], OTHER_COLOUR) for row in phyla
+            ],
         )
         figure.update_layout(
             xaxis_title="Genomes",
@@ -1374,12 +2057,51 @@ def _render_taxonomy(connection):
             "How many catalogue genomes fall in each phylum. This counts "
             "distinct genomes recovered, not how abundant they are: a phylum "
             "with many genomes can still be rare in the samples, and an "
-            "abundant one can be represented by a single genome."
+            "abundant one can be represented by a single genome. Each phylum "
+            "keeps the colour it has in the composition chart below; the ones "
+            "that chart pools as Other are drawn in its grey."
         ))
         blocks.append(figure)
 
-    blocks.extend(_composition_blocks(connection))
+    blocks.extend(_composition_blocks(connection, colours))
     return blocks
+
+
+def _phylum_colours(connection):
+    """One colour per phylum, shared by every figure in the taxonomy section.
+
+    The two phylum figures rank their bars differently — one by how many
+    genomes a phylum contributed, the other by how many reads it accounts for
+    — so a colour assigned per figure would give the same phylum a different
+    colour in each. The assignment is made once here, in abundance order so
+    the stacked composition chart still runs from its largest phylum down, and
+    both figures look their colours up by name. Phyla past ``TOP_TAXA`` are
+    the ones the composition chart pools as Other, and are left out so that
+    both figures draw them in ``OTHER_COLOUR``.
+    """
+    rows = _query(connection, """
+        SELECT COALESCE(NULLIF(t.phylum, ''), 'Unclassified') AS name,
+               SUM(c.read_count) AS weight
+        FROM genome_count AS c
+        JOIN genome_taxonomy AS t ON t.genome_id = c.genome_id
+        WHERE c.read_count IS NOT NULL
+        GROUP BY name
+        ORDER BY weight DESC
+    """)
+    if not rows:
+        # No abundances ingested: fall back to how many genomes each phylum
+        # holds, which is the only ordering the section can still offer.
+        rows = _query(connection, """
+            SELECT COALESCE(NULLIF(phylum, ''), 'Unclassified') AS name,
+                   COUNT(*) AS weight
+            FROM genome_taxonomy
+            GROUP BY name
+            ORDER BY weight DESC
+        """)
+    return {
+        row["name"]: PALETTE[index % len(PALETTE)]
+        for index, row in enumerate(rows[:TOP_TAXA])
+    }
 
 
 def _genome_lineage_blocks(connection):
@@ -1422,9 +2144,12 @@ def _genome_lineage_blocks(connection):
     ]
 
 
-def _composition_blocks(connection):
+def _composition_blocks(connection, colours=None):
     """Phylum-level composition per sample, when abundances are also present."""
     import plotly.graph_objects as go
+
+    if colours is None:
+        colours = _phylum_colours(connection)
 
     rows = _query(connection, """
         SELECT COALESCE(NULLIF(t.phylum, ''), 'Unclassified') AS name,
@@ -1458,6 +2183,7 @@ def _composition_blocks(connection):
             name=name,
             x=samples,
             y=[_ratio(per_sample.get((name, s), 0), sample_totals.get(s)) for s in samples],
+            marker_color=colours.get(name, OTHER_COLOUR),
         )
     if remainder:
         figure.add_bar(
@@ -1468,13 +2194,33 @@ def _composition_blocks(connection):
                        sample_totals.get(s))
                 for s in samples
             ],
-            marker_color="#b7c7d3",
+            marker_color=OTHER_COLOUR,
         )
+    entries = len(shown) + (1 if remainder else 0)
     figure.update_layout(
         barmode="stack",
         xaxis_title="Sample",
         yaxis_title="Reads (% of sample)",
-        legend_title_text="Phylum",
+        # One bar per sample and a dozen phyla in the key: the plot takes the
+        # full page and the key goes underneath it, laid out as a single row.
+        # Giving every entry the same fraction of the width spreads them
+        # across it instead of letting Plotly pack them into stacked rows.
+        legend=dict(
+            orientation="h",
+            traceorder="normal",
+            title_text="",
+            xref="container",
+            yref="container",
+            yanchor="bottom",
+            y=0.01,
+            xanchor="left",
+            x=0.005,
+            entrywidthmode="fraction",
+            entrywidth=1 / entries,
+            font=dict(size=11),
+        ),
+        margin=dict(l=45, r=10, t=20, b=110),
+        meta=WIDE,
     )
     blocks = [_heading(
         "Composition per sample",
@@ -1983,6 +2729,9 @@ def _job_outcome_blocks(connection):
         GROUP BY 1
         ORDER BY launches DESC
     """)
+    figure = _job_state_figure(states, launches)
+    if figure is not None:
+        blocks.append(figure)
     blocks.append(_table(
         [
             ("Final state", _text),
@@ -2015,6 +2764,120 @@ def _job_outcome_blocks(connection):
     return blocks
 
 
+# The colour a final job state is drawn in, matched on the leading word so
+# that sacct's qualified states ("CANCELLED by 501") land with their family.
+# Success is the one green in the palette; the failure modes a run is tuned
+# against — running out of memory, running out of time — are kept apart from
+# each other so a bar says at a glance which one to fix.
+JOB_STATE_COLOURS = (
+    ("COMPLETED", PALETTE[2]),
+    ("OUT_OF_MEMORY", PALETTE[3]),
+    ("TIMEOUT", PALETTE[1]),
+    ("FAILED", PALETTE[8]),
+    ("CANCELLED", PALETTE[6]),
+    ("NODE_FAIL", PALETTE[4]),
+    ("PREEMPTED", PALETTE[5]),
+)
+
+
+def _job_state_colour(state):
+    upper = str(state or "").upper()
+    for name, colour in JOB_STATE_COLOURS:
+        if upper.startswith(name):
+            return colour
+    return OTHER_COLOUR
+
+
+def _job_state_figure(states, launches):
+    """The mix of final job states as one stacked bar across the page.
+
+    The table below carries the same numbers, but a run with a handful of
+    failures among hundreds of jobs reads as a table of near-identical
+    percentages; as a single bar, the failing slice is visible without being
+    looked for.
+    """
+    import plotly.graph_objects as go
+
+    if not states or not launches:
+        return None
+
+    figure = go.Figure()
+    for row in states:
+        share = _percent(row["launches"], launches)
+        figure.add_bar(
+            name=row["state"],
+            y=["Jobs"],
+            x=[row["launches"]],
+            orientation="h",
+            marker_color=_job_state_colour(row["state"]),
+            # Only a slice with room for it is labelled; the rest are in the
+            # key and the hover.
+            text=[f"{row['launches']:,}"],
+            textposition="inside",
+            insidetextanchor="middle",
+            cliponaxis=False,
+            hovertemplate=(
+                f"{row['state']}<br>%{{x:,}} jobs"
+                + (f" ({share:.1f}% of all jobs)" if share is not None else "")
+                + "<extra></extra>"
+            ),
+        )
+    figure.update_layout(
+        barmode="stack",
+        xaxis_title="Jobs",
+        # One bar and no categories to name on it, so the whole vertical axis
+        # goes; the key sits above the bar, clear of the axis title below it.
+        yaxis=dict(visible=False),
+        legend=dict(
+            orientation="h",
+            traceorder="normal",
+            title_text="",
+            yanchor="bottom",
+            y=1.06,
+            xanchor="left",
+            x=0,
+            entrywidthmode="fraction",
+            entrywidth=1 / len(states),
+        ),
+        margin=dict(l=30, t=60, b=60),
+        height=240,
+        uniformtext=dict(mode="hide", minsize=11),
+        meta=WIDE,
+    )
+    return figure
+
+
+def _rule_job_statistics(connection):
+    """Per-rule figures the rule roll-up does not carry: totals and ceilings.
+
+    ``benchmark_rule`` stores medians, which is what a rule's typical job
+    needs; a resource request has to cover its heaviest jobs instead. The 95th
+    percentile of what the rule's jobs actually used is that ceiling, and it,
+    like the rule's total runtime, can only be computed from the per-job rows.
+    """
+    rows = _query(connection, """
+        SELECT rule, elapsed_sec, memory_efficiency, runtime_efficiency
+        FROM benchmark_job
+    """)
+    grouped = {}
+    for row in rows:
+        entry = grouped.setdefault(
+            row["rule"], {"elapsed": [], "memory": [], "runtime": []}
+        )
+        entry["elapsed"].append(row["elapsed_sec"])
+        entry["memory"].append(row["memory_efficiency"])
+        entry["runtime"].append(row["runtime_efficiency"])
+    return {
+        rule: {
+            "jobs": len(entry["elapsed"]),
+            "total_elapsed_sec": sum(value or 0 for value in entry["elapsed"]),
+            "memory_p95": _percentile(entry["memory"], 0.95),
+            "runtime_p95": _percentile(entry["runtime"], 0.95),
+        }
+        for rule, entry in grouped.items()
+    }
+
+
 def _rule_resource_blocks(connection):
     """Median requested versus actually used resources, per Snakemake rule."""
     rows = _query(connection, """
@@ -2038,6 +2901,8 @@ def _rule_resource_blocks(connection):
     if not rows:
         return []
 
+    per_job = _rule_job_statistics(connection)
+
     table_rows = [
         (
             row["rule"],
@@ -2048,15 +2913,50 @@ def _rule_resource_blocks(connection):
             row["requested_mem_mb"],
             row["max_rss_mb"],
             _efficiency(row["memory_efficiency"]),
+            _efficiency(per_job.get(row["rule"], {}).get("memory_p95")),
             row["requested_runtime_min"],
             _minutes(row["elapsed_sec"]),
             _efficiency(row["runtime_efficiency"]),
+            _efficiency(per_job.get(row["rule"], {}).get("runtime_p95")),
+            per_job.get(row["rule"], {}).get("total_elapsed_sec", 0) / 3600.0,
             (row["allocated_cpu_sec"] or 0) / 3600.0,
             (row["used_cpu_sec"] or 0) / 3600.0,
             _percent(row["used_cpu_sec"], row["allocated_cpu_sec"]),
         )
         for row in rows
     ]
+
+    # Two different runtime questions get asked of this table and read as one
+    # number if they share a card: how long a single job of the rule takes,
+    # which is what the runtime request has to cover, and how much wall time
+    # the rule consumed altogether, which is what says whether tuning it is
+    # worth the effort at all. They are given separate, explicitly named cards.
+    total_jobs = sum(entry["jobs"] for entry in per_job.values())
+    total_elapsed_sec = sum(entry["total_elapsed_sec"] for entry in per_job.values())
+    mean_job_minutes = (
+        total_elapsed_sec / total_jobs / 60.0 if total_jobs else None
+    )
+    # The three column means only say something once there is more than one
+    # rule to average, but the two runtime totals hold for a single rule too.
+    averages = [
+        ("Mean memory used %", _cards_percent(_mean(table_rows, 7))),
+        ("Mean runtime used %", _cards_percent(_mean(table_rows, 11))),
+        ("Mean CPU efficiency %", _cards_percent(_mean(table_rows, 16))),
+    ] if len(table_rows) >= MIN_STAT_ROWS else []
+    highlights = _highlights([
+        *averages,
+        (
+            "Mean runtime per job",
+            f"{_ONE(mean_job_minutes)} min" if mean_job_minutes is not None else None,
+            f"averaged over {_quantity(total_jobs, 'job')}",
+        ),
+        (
+            "Total runtime, all jobs",
+            f"{_TWO(total_elapsed_sec / 3600.0)} h" if total_elapsed_sec else None,
+            "wall time summed across every job",
+        ),
+    ])
+
     blocks = [
         _heading(
             "Requested versus used resources, per rule",
@@ -2065,8 +2965,12 @@ def _rule_resource_blocks(connection):
             "used figures are what the scheduler's accounting reports. "
             "Percentages well below 100 mean the step reserved far more than it "
             "needed, which wastes queue time; percentages near 100 mean it ran "
-            "close to its limit and may fail on a larger dataset."
+            "close to its limit and may fail on a larger dataset. The 95th "
+            "percentile columns are the ceiling the heaviest jobs of the rule "
+            "reached, and are what a request has to cover — a rule whose median "
+            "is 20% and whose 95th percentile is 95% is not over-provisioned."
         ),
+        highlights,
         _table(
             [
                 ("Rule", _text),
@@ -2076,30 +2980,43 @@ def _rule_resource_blocks(connection):
                 ("CPUs allocated", _ONE),
                 ("Memory requested (MB)", _integer),
                 ("Peak memory (MB)", _integer),
-                ("Memory used %", _ONE),
+                ("Memory used %, median", _ONE),
+                ("Memory used %, 95th pct", _ONE),
                 ("Runtime requested (min)", _ONE),
-                ("Runtime used (min)", _ONE),
-                ("Runtime used %", _ONE),
+                ("Runtime per job (min), median", _ONE),
+                ("Runtime used %, median", _ONE),
+                ("Runtime used %, 95th pct", _ONE),
+                ("Total runtime (h)", _TWO),
                 ("CPU-hours allocated", _TWO),
                 ("CPU-hours used", _TWO),
                 ("CPU efficiency %", _ONE),
             ],
             table_rows,
-            stats=[
-                ("Mean memory used %", 7),
-                ("Mean runtime used %", 10),
-                ("Mean CPU efficiency %", 13),
-            ],
         ),
     ]
-    figure = _rule_efficiency_figure(rows)
+    figure = _rule_efficiency_figure(rows, per_job)
     if figure is not None:
         blocks.append(figure)
+        blocks.append(_note(
+            "The bar is the rule's median job; the whisker runs out to its "
+            "95th percentile. A short bar with a long whisker is a rule whose "
+            "request is sized for its typical job and is being carried by its "
+            "heaviest ones — raise the request towards the whisker's end. A "
+            "short bar with no whisker is simply over-provisioned throughout, "
+            "and the request can come down to a little above the bar."
+        ))
     return blocks
 
 
-def _rule_efficiency_figure(rows):
-    """Memory and runtime headroom for the rules that burn the most CPU time."""
+def _rule_efficiency_figure(rows, per_job):
+    """Memory and runtime headroom for the rules that burn the most CPU time.
+
+    Each bar is the rule's median job and each whisker reaches its 95th
+    percentile, because those are the two figures a request has to be set
+    between: the median says how much of the reservation a normal job leaves
+    unused, and the 95th percentile says how far the request can actually be
+    cut before the rule's heaviest jobs start failing.
+    """
     import plotly.graph_objects as go
 
     ranked = [
@@ -2111,24 +3028,50 @@ def _rule_efficiency_figure(rows):
     ranked = list(reversed(ranked))
     rules = [row["rule"] for row in ranked]
 
+    def whisker(medians, ceilings):
+        """The span from each median out to its 95th percentile, never negative."""
+        return [
+            max(0.0, ceiling - median)
+            if median is not None and ceiling is not None else 0.0
+            for median, ceiling in zip(medians, ceilings)
+        ]
+
     figure = go.Figure()
-    figure.add_bar(
-        name="Memory used %",
-        y=rules,
-        x=[_efficiency(row["memory_efficiency"]) for row in ranked],
-        orientation="h",
-        marker_color=PALETTE[0],
-    )
-    figure.add_bar(
-        name="Runtime used %",
-        y=rules,
-        x=[_efficiency(row["runtime_efficiency"]) for row in ranked],
-        orientation="h",
-        marker_color=PALETTE[1],
-    )
+    for name, column, key, colour in (
+        ("Memory used %", "memory_efficiency", "memory_p95", PALETTE[0]),
+        ("Runtime used %", "runtime_efficiency", "runtime_p95", PALETTE[1]),
+    ):
+        medians = [_efficiency(row[column]) for row in ranked]
+        ceilings = [
+            _efficiency(per_job.get(row["rule"], {}).get(key)) for row in ranked
+        ]
+        figure.add_bar(
+            name=name,
+            y=rules,
+            x=medians,
+            orientation="h",
+            marker_color=colour,
+            error_x=dict(
+                type="data",
+                symmetric=False,
+                array=whisker(medians, ceilings),
+                arrayminus=[0.0] * len(rules),
+                color="#22303c",
+                thickness=1.2,
+                width=4,
+            ),
+            customdata=[
+                [0.0 if value is None else value] for value in ceilings
+            ],
+            hovertemplate=(
+                f"%{{y}}<br>{name} — median %{{x:.1f}}%"
+                "<br>95th percentile %{customdata[0]:.1f}%<extra></extra>"
+            ),
+        )
     figure.update_layout(
         barmode="group",
-        xaxis_title="Percent of the requested resource actually used",
+        xaxis_title="Percent of the requested resource actually used "
+                    "(bar: median job, whisker: 95th percentile)",
         yaxis_title="",
         legend_title_text="",
         height=max(FIGURE_HEIGHT, 22 * len(rules) + 160),
@@ -2246,7 +3189,7 @@ SECTION_RENDERERS = {
 # ---------------------------------------------------------------------------
 
 def _summary_html(connection, db_path, rendered, skipped, not_selected):
-    """The sidebar's report details: versions, runs, ingest window, outcome."""
+    """The sidebar's report details: versions, runs, and section outcome."""
     stamp = _query(
         connection,
         "SELECT version, drakkar_version, created_at FROM schema_version "
@@ -2256,18 +3199,12 @@ def _summary_html(connection, db_path, rendered, skipped, not_selected):
     drakkar_version = stamp[0]["drakkar_version"] if stamp else None
 
     run_ids = [row[0] for row in _query(connection, "SELECT run_id FROM run ORDER BY run_id")]
-    window = _query(
-        connection, "SELECT MIN(ingested_at), MAX(ingested_at) FROM ingest_log"
-    )
-    first = window[0][0] if window else None
-    last = window[0][1] if window else None
 
     entries = [
         ("Drakkar version", drakkar_version or "unknown"),
         ("Report schema", f"version {schema_version}"),
         ("Database", str(db_path)),
         ("Runs", ", ".join(run_ids) if run_ids else "no run metadata recorded"),
-        ("Ingested", _friendly_window(first, last)),
         ("Sections rendered", ", ".join(SECTION_LABELS[name] for name in rendered)),
     ]
     if skipped:

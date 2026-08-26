@@ -91,6 +91,35 @@ def parse_slurm_memory_to_mb(value):
         return None
     return round(amount * factor, 3)
 
+def parse_slurm_duration_to_seconds(value):
+    """Turn a sacct duration such as ``2-03:04:05`` or ``12:30.500`` into seconds.
+
+    Consumed CPU time is the one figure sacct offers no ``RAW`` variant of, so
+    it arrives in SLURM's own duration format: days are split off with a dash,
+    and a value with only two colon-separated parts is minutes and seconds
+    rather than hours and minutes.
+    """
+    text = str(value or "").strip()
+    if not text or text in {"Unknown", "None", "N/A"}:
+        return None
+    days = 0
+    if "-" in text:
+        day_text, _, text = text.partition("-")
+        days = parse_int_or_none(day_text)
+        if days is None:
+            return None
+    parts = text.split(":")
+    if len(parts) > 3:
+        return None
+    try:
+        numbers = [float(part) for part in parts]
+    except ValueError:
+        return None
+    while len(numbers) < 3:
+        numbers.insert(0, 0.0)
+    hours, minutes, seconds = numbers
+    return days * 86400 + hours * 3600 + minutes * 60 + seconds
+
 def safe_ratio(numerator, denominator):
     if numerator in (None, "") or denominator in (None, "", 0):
         return None
@@ -383,7 +412,11 @@ def _parse_sacct_output(stdout):
             "state": parts[1].strip(),
             "exit_code": parts[2].strip(),
             "elapsed_sec": parse_int_or_none(parts[3]),
-            "cpu_time_sec": parse_int_or_none(parts[4]),
+            # TotalCPU, not CPUTimeRAW: the latter is AllocCPUS x Elapsed, the
+            # CPU time the job *reserved*, so dividing it by the same product
+            # reports every job as 100% CPU efficient. TotalCPU is the user
+            # plus system time the job's steps actually burned.
+            "cpu_time_sec": parse_slurm_duration_to_seconds(parts[4]),
             "alloc_cpus": parse_int_or_none(parts[5]),
             "max_rss_mb": parse_slurm_memory_to_mb(parts[6]),
             "timelimit_raw_min": parse_int_or_none(parts[7]),
@@ -412,7 +445,7 @@ def query_sacct_for_jobs(job_ids, chunk_size=500):
             "-j",
             ",".join(str(job_id) for job_id in chunk),
             "--format",
-            "JobIDRaw,State,ExitCode,ElapsedRaw,CPUTimeRAW,AllocCPUS,MaxRSS,TimelimitRaw,ReqCPUS,ReqMem",
+            "JobIDRaw,State,ExitCode,ElapsedRaw,TotalCPU,AllocCPUS,MaxRSS,TimelimitRaw,ReqCPUS,ReqMem",
         ]
         try:
             result = subprocess.run(command, capture_output=True, text=True, check=False)

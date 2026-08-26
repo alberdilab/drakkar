@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from drakkar.report import command as report_command
-from drakkar.report.render import PAGE_ROWS, render_report
+from drakkar.report.render import PAGE_ROWS, PALETTE, STYLESHEET, render_report
 from drakkar.report.schema import SCHEMA_VERSION, connect, create_schema
 from drakkar.report.sources import SECTION_ORDER
 
@@ -58,9 +58,32 @@ def seed_cataloging(connection):
         "INSERT INTO assembly_binner VALUES (?, ?, ?)",
         [("A1", "metabat2", 5), ("A1", "semibin2", 6), ("A2", "metabat2", 3)],
     )
+    # One row per final bin, with the origin Binette recorded for it: two bins
+    # a single binner produced, one both of them produced identically, and one
+    # Binette built itself.
+    connection.executemany(
+        "INSERT INTO assembly_bin (assembly_id, bin_name, is_original, origin) "
+        "VALUES (?, ?, ?, ?)",
+        [("A1", "A1_bin_1", 1, "metabat"),
+         ("A1", "A1_bin_2", 1, "metabat;semibin"),
+         ("A1", "A1_bin_3", 0, "binette"),
+         ("A1", "A1_bin_4", 1, "semibin"),
+         ("A2", "A2_bin_1", 1, "metabat")],
+    )
+    connection.executemany(
+        "INSERT INTO assembly_bin_origin VALUES (?, ?, ?)",
+        [("A1", "A1_bin_1", "metabat2"),
+         ("A1", "A1_bin_2", "metabat2"),
+         ("A1", "A1_bin_2", "semibin2"),
+         ("A1", "A1_bin_3", "binette"),
+         ("A1", "A1_bin_4", "semibin2"),
+         ("A2", "A2_bin_1", "metabat2")],
+    )
     log(connection, "assembly", "cataloging", 2)
     log(connection, "assembly_sample", "cataloging", 2)
     log(connection, "assembly_binner", "cataloging", 3)
+    log(connection, "assembly_bin", "cataloging", 5)
+    log(connection, "assembly_bin_origin", "cataloging", 6)
 
 
 def seed_dereplication(connection):
@@ -68,7 +91,29 @@ def seed_dereplication(connection):
         "INSERT INTO dereplication VALUES (?, ?, ?, ?, ?, ?, ?)",
         (11, 82.4, 3.1, 0.98, 6, 88.0, 2.4),
     )
+    # Four pairs sat close enough for dRep to compare them; the last three bins
+    # had no MASH neighbour at all and were never candidates for collapsing.
+    clusters = [
+        ("G1", "1", "1_1", 1, 0.03), ("G2", "1", "1_1", 0, 0.03),
+        ("G3", "2", "2_1", 1, 0.03), ("G4", "2", "2_1", 0, 0.03),
+        ("G5", "3", "3_1", 1, 0.05), ("G6", "3", "3_1", 0, 0.05),
+        ("G7", "4", "4_1", 1, 0.08), ("G8", "4", "4_2", 1, 0.08),
+        ("G9", "5", "5_1", 1, 0.40), ("G10", "6", "6_1", 1, 0.42),
+        ("G11", "7", "7_1", 1, 0.44),
+    ]
+    connection.executemany(
+        "INSERT INTO genome_cluster VALUES (?, ?, ?, ?, ?)", clusters
+    )
+    connection.executemany(
+        "INSERT INTO genome_comparison VALUES (?, ?, ?, ?, ?)",
+        [("G1", "G2", "1", 0.9990, 0.85),
+         ("G3", "G4", "2", 0.9935, 0.81),
+         ("G5", "G6", "3", 0.9812, 0.77),
+         ("G7", "G8", "4", 0.9702, 0.72)],
+    )
     log(connection, "dereplication", "dereplication", 1)
+    log(connection, "genome_cluster", "dereplication", len(clusters))
+    log(connection, "genome_comparison", "dereplication", 4)
 
 
 def seed_profiling(connection, genomes=2):
@@ -399,7 +444,9 @@ class TableTests(TemporaryRootMixin, unittest.TestCase):
         text = self.render(samples=PAGE_ROWS + 1)
         self.assertIn(f'<table data-page-size="{PAGE_ROWS}">', text)
         # Paging happens in the browser, so every row is still in the markup.
-        self.assertEqual(text.count("<tr><td>S"), PAGE_ROWS + 1)
+        # Preprocessing lists each sample twice: once in the read table and
+        # once where the microbial fraction is reported.
+        self.assertEqual(text.count("<tr><td>S"), 2 * (PAGE_ROWS + 1))
 
     def test_column_averages_are_highlighted_above_the_table(self):
         text = self.render(samples=4)
@@ -525,9 +572,83 @@ class BoundedOutputTests(TemporaryRootMixin, unittest.TestCase):
         text = html_path.read_text(encoding="utf-8")
         self.assertNotIn("Showing the first", text)
         self.assertIn(f'<table data-page-size="{PAGE_ROWS}">', text)
-        self.assertEqual(text.count("<tr><td>S"), 150)
+        # Once in the read table, once in the microbial fraction table.
+        self.assertEqual(text.count("<tr><td>S"), 300)
         # Sample ids sort as text, so S99 is the last row: it must be present.
         self.assertIn("<td>S99</td>", text)
+
+
+class PreprocessingLayoutTests(TemporaryRootMixin, unittest.TestCase):
+    """Read fates, the gigabases under each mean, and the optional estimates."""
+
+    def section(self, rows):
+        root = self.temporary_root()
+        db_path = root / "drakkar.db"
+        connection = connect(db_path)
+        create_schema(connection, drakkar_version="2.1.0")
+        connection.executemany(
+            "INSERT INTO sample (sample_id, reads_pre_fastp, bases_pre_fastp, "
+            "reads_post_fastp, host_reads, host_bases, metagenomic_reads, "
+            "metagenomic_bases, singlem_fraction, nonpareil_C, "
+            "nonpareil_diversity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            rows,
+        )
+        log(connection, "sample", "preprocessing", len(rows))
+        connection.commit()
+        connection.close()
+
+        html_path = root / "drakkar_report.html"
+        render_report(db_path, html_path, sections=("preprocessing",))
+        text = html_path.read_text(encoding="utf-8")
+        start = text.index('id="section-preprocessing"')
+        return text[start:text.index("</section>", start)]
+
+    def rows(self, estimates=True):
+        return [
+            (f"S{index}", 1_000_000 * index, 150_000_000 * index,
+             950_000 * index, 100_000 * index, 15_000_000 * index,
+             850_000 * index, 127_000_000 * index,
+             0.8 if estimates else None,
+             0.9 if estimates else None,
+             18.0 + index if estimates else None)
+            for index in (1, 2)
+        ]
+
+    def test_mean_reads_carry_the_same_quantity_in_gigabases(self):
+        body = self.section(self.rows())
+        stats = body[body.index('<div class="stats">'):body.index('<div class="scroll">')]
+        # 150 and 300 million bases in, so 0.23 GB on average.
+        self.assertIn('<span class="stat-sub">0.23 GB</span>', stats)
+        # Host bases run 15 and 30 million, so 0.02 GB on average.
+        self.assertIn('<span class="stat-sub">0.02 GB</span>', stats)
+
+    def test_host_reads_are_summarised_before_the_metagenomic_ones(self):
+        body = self.section(self.rows())
+        self.assertLess(
+            body.index("Mean host reads"), body.index("Mean metagenomic reads")
+        )
+
+    def test_the_read_fates_chart_is_wide_and_lays_its_legend_in_a_row(self):
+        body = self.section(self.rows())
+        self.assertIn('<div class="figure wide">', body)
+        self.assertIn('"legend":{"title":{"text":""},"orientation":"h"', body)
+        # The class only widens the figure if the page carries the rule.
+        self.assertIn(".figure.wide", STYLESHEET)
+
+    def test_the_optional_estimates_get_a_subsection_of_their_own(self):
+        body = self.section(self.rows())
+        self.assertIn("<h3>Microbial fraction and coverage</h3>", body)
+        reads = body[:body.index("<h3>Microbial fraction and coverage</h3>")]
+        estimates = body[body.index("<h3>Microbial fraction and coverage</h3>"):]
+        self.assertNotIn("<th>Microbial fraction</th>", reads)
+        # Fractions of one are shown as the percentages they are.
+        self.assertIn("<td data-sort=\"0.8\">80.0%</td>", estimates)
+        self.assertIn("<th>Nonpareil completeness</th>", estimates)
+
+    def test_the_subsection_is_absent_when_neither_estimate_was_made(self):
+        body = self.section(self.rows(estimates=False))
+        self.assertIn("<h3>Read fates</h3>", body)
+        self.assertNotIn("Microbial fraction and coverage", body)
 
 
 class CatalogingLayoutTests(TemporaryRootMixin, unittest.TestCase):
@@ -565,6 +686,132 @@ class CatalogingLayoutTests(TemporaryRootMixin, unittest.TestCase):
         self.assertLess(
             body.index("Per-sample mapping rates"), body.index("<h3>Bins</h3>")
         )
+
+    def test_the_bins_subsection_totals_what_went_in_and_what_came_out(self):
+        body = self.section()
+        bins = body[body.index("<h3>Bins</h3>"):]
+        self.assertIn("Bins produced by the binners", bins)
+        # 5 + 6 from A1 and 3 from A2.
+        self.assertIn('<span class="stat-value">14</span>', bins)
+        self.assertIn("Final bins after Binette", bins)
+        # 7 from A1 and 4 from A2.
+        self.assertIn('<span class="stat-value">11</span>', bins)
+        self.assertIn("78.6% of the bins produced", bins)
+
+
+class BinFateTests(TemporaryRootMixin, unittest.TestCase):
+    """What Binette did with the bins each binner produced."""
+
+    def section(self):
+        root = self.temporary_root()
+        db_path = build_db(root / "drakkar.db", ("cataloging",))
+        html_path = root / "drakkar_report.html"
+        render_report(db_path, html_path, sections=("cataloging",))
+        text = html_path.read_text(encoding="utf-8")
+        start = text.index('id="section-cataloging"')
+        return text[start:text.index("</section>", start)]
+
+    def test_the_fates_follow_the_bins_produced_chart(self):
+        body = self.section()
+        self.assertLess(
+            body.index("<h3>Bins per binner</h3>"),
+            body.index("What became of each binner"),
+        )
+
+    def test_the_fates_are_drawn_as_a_sankey(self):
+        self.assertIn('"type":"sankey"', self.section())
+
+    def test_every_bin_a_binner_produced_is_accounted_for(self):
+        body = self.section()
+        fates = body[body.index("What became of each binner"):]
+        rows = re.findall(r"<tr>(.*?)</tr>", fates, re.S)
+        counts = {}
+        for row in rows:
+            cells = re.findall(r"<td[^>]*>(.*?)</td>", row, re.S)
+            if cells:
+                counts[cells[0]] = [int(value) for value in cells[1:]]
+        # metabat2 produced 8 bins: one kept alone, one shared with semibin2,
+        # one more kept alone in A2, and the remaining five replaced.
+        self.assertEqual(counts["metabat2"], [8, 3, 1, 5])
+        self.assertEqual(counts["semibin2"], [6, 2, 1, 4])
+        for produced, kept, _shared, replaced in counts.values():
+            self.assertEqual(produced, kept + replaced)
+
+    def test_the_bins_binette_built_itself_are_named(self):
+        self.assertIn("Binette built 1 final bin of its own", self.section())
+
+    def test_a_database_without_the_bin_reports_omits_the_subsection(self):
+        root = self.temporary_root()
+        db_path = build_db(root / "drakkar.db", ("cataloging",))
+        connection = sqlite3.connect(db_path)
+        connection.execute("DELETE FROM assembly_bin")
+        connection.execute("DELETE FROM assembly_bin_origin")
+        connection.commit()
+        connection.close()
+        html_path = root / "drakkar_report.html"
+        render_report(db_path, html_path, sections=("cataloging",))
+        text = html_path.read_text(encoding="utf-8")
+        self.assertNotIn("What became of each binner", text)
+        self.assertIn("<h3>Bins per binner</h3>", text)
+
+
+class DereplicationLayoutTests(TemporaryRootMixin, unittest.TestCase):
+    """Retention, and how the identity threshold acted on the pairs."""
+
+    def section(self, seeded=("dereplication",)):
+        root = self.temporary_root()
+        db_path = build_db(root / "drakkar.db", seeded)
+        html_path = root / "drakkar_report.html"
+        render_report(db_path, html_path, sections=("dereplication",))
+        text = html_path.read_text(encoding="utf-8")
+        start = text.index('id="section-dereplication"')
+        return text[start:text.index("</section>", start)]
+
+    def test_retention_is_highlighted_as_a_share(self):
+        body = self.section()
+        self.assertIn("Bins retained", body)
+        self.assertIn('<span class="stat-value">54.5%</span>', body)
+        self.assertIn("5 collapsed into a representative", body)
+
+    def test_the_yield_is_one_stacked_bar_not_two_columns(self):
+        body = self.section()
+        self.assertIn('"orientation":"h"', body)
+        self.assertIn('"barmode":"stack"', body)
+        self.assertIn("Collapsed into a representative", body)
+
+    def test_bins_with_no_near_neighbour_are_separated_out(self):
+        body = self.section()
+        self.assertIn("Bins with a MASH neighbour", body)
+        # Eight of the eleven bins sit within 10% MASH distance of another.
+        self.assertIn('<span class="stat-value">8</span>', body)
+        self.assertIn("72.7% of 11 bins", body)
+
+    def test_pairwise_identities_are_banded_around_the_threshold(self):
+        body = self.section()
+        bands = body[body.index("Identity band"):]
+        self.assertIn("100 – 99.5%", bands)
+        self.assertIn("99.5 – 99%", bands)
+        # The band between the populated ones is kept, at zero: an empty band
+        # beside the threshold is the answer, not a row to hide.
+        self.assertIn("99 – 98.5%", bands)
+        self.assertIn("97.5 – 97%", bands)
+
+    def test_the_threshold_is_drawn_on_the_histogram(self):
+        self.assertIn("98% threshold", self.section())
+
+    def test_a_database_without_the_drep_tables_still_renders_the_summary(self):
+        root = self.temporary_root()
+        db_path = build_db(root / "drakkar.db", ("dereplication",))
+        connection = sqlite3.connect(db_path)
+        connection.execute("DELETE FROM genome_cluster")
+        connection.execute("DELETE FROM genome_comparison")
+        connection.commit()
+        connection.close()
+        html_path = root / "drakkar_report.html"
+        render_report(db_path, html_path, sections=("dereplication",))
+        text = html_path.read_text(encoding="utf-8")
+        self.assertIn("Bins retained", text)
+        self.assertNotIn("How the identity threshold acted", text)
 
 
 class TaxonomyLineageTests(TemporaryRootMixin, unittest.TestCase):
@@ -622,6 +869,105 @@ class TaxonomyLineageTests(TemporaryRootMixin, unittest.TestCase):
         self.assertLess(body.index("MAG_3"), body.index("MAG_1"))
 
 
+class GenomeAbundanceTests(TemporaryRootMixin, unittest.TestCase):
+    """The per-sample mapping table under the abundance heatmap."""
+
+    def section(self):
+        root = self.temporary_root()
+        db_path = build_db(root / "drakkar.db", ("preprocessing", "profiling"))
+        html_path = root / "drakkar_report.html"
+        render_report(db_path, html_path, sections=("profiling",))
+        text = html_path.read_text(encoding="utf-8")
+        start = text.index("<h3>Genome abundance</h3>")
+        return text[start:text.index("</section>", start)]
+
+    def test_mapped_reads_are_shown_against_what_was_mapped(self):
+        body = self.section()
+        for header in ("Mapped reads", "Metagenomic reads", "Mapped %"):
+            self.assertIn(f"<th>{header}</th>", body)
+
+    def test_the_three_mapping_figures_are_highlighted(self):
+        body = self.section()
+        for label in ("Mean mapped reads", "Mean metagenomic reads",
+                      "Mean mapped %"):
+            self.assertIn(f'<span class="stat-label">{label}</span>', body)
+
+    def test_the_metagenomic_columns_drop_out_without_preprocessing(self):
+        root = self.temporary_root()
+        db_path = build_db(root / "drakkar.db", ("profiling",))
+        html_path = root / "drakkar_report.html"
+        render_report(db_path, html_path, sections=("profiling",))
+        text = html_path.read_text(encoding="utf-8")
+        body = text[text.index("<h3>Genome abundance</h3>"):]
+        self.assertIn("<th>Mapped reads</th>", body)
+        self.assertNotIn("<th>Metagenomic reads</th>", body)
+        self.assertNotIn("<th>Mapped %</th>", body)
+
+
+class PhylumColourTests(TemporaryRootMixin, unittest.TestCase):
+    """Both phylum figures name their colours from one shared assignment."""
+
+    LINEAGES = [
+        # Two genomes of the rarer phylum, one of the more abundant one: the
+        # two figures therefore rank the phyla in opposite orders.
+        ("MAG_1", "Bacteria", "Bacillota"),
+        ("MAG_2", "Bacteria", "Bacteroidota"),
+        ("MAG_3", "Bacteria", "Bacteroidota"),
+    ]
+    COUNTS = [("MAG_1", "S1", 9000.0), ("MAG_2", "S1", 500.0),
+              ("MAG_3", "S1", 500.0)]
+
+    def section(self):
+        root = self.temporary_root()
+        db_path = root / "drakkar.db"
+        connection = connect(db_path)
+        create_schema(connection, drakkar_version="2.1.0")
+        connection.executemany(
+            "INSERT INTO genome_taxonomy (genome_id, domain, phylum) "
+            "VALUES (?, ?, ?)", self.LINEAGES,
+        )
+        connection.executemany(
+            "INSERT INTO genome_count (genome_id, sample_id, read_count) "
+            "VALUES (?, ?, ?)", self.COUNTS,
+        )
+        log(connection, "genome_taxonomy", "taxonomy", len(self.LINEAGES))
+        connection.commit()
+        connection.close()
+
+        html_path = root / "drakkar_report.html"
+        render_report(db_path, html_path, sections=("taxonomy",))
+        text = html_path.read_text(encoding="utf-8")
+        start = text.index("<h3>Genomes per phylum</h3>")
+        return text[start:text.index("</section>", start)]
+
+    def test_a_phylum_keeps_one_colour_across_both_figures(self):
+        body = self.section()
+        counts, composition = body.split("<h3>Composition per sample</h3>")
+        # Bacillota holds the most reads, so it takes the first palette colour
+        # in the composition chart; Bacteroidota holds the most genomes, so it
+        # leads the counts chart — and must still be drawn in the second.
+        self.assertIn(f'{{"marker":{{"color":"{PALETTE[0]}"}},"name":"Bacillota"',
+                      composition)
+        self.assertIn(
+            f'{{"marker":{{"color":"{PALETTE[1]}"}},"name":"Bacteroidota"',
+            composition,
+        )
+        # The counts chart colours its bars by name, in its own bar order.
+        self.assertIn(f'"color":["{PALETTE[1]}","{PALETTE[0]}"]', counts)
+
+    def test_the_composition_chart_runs_the_width_of_the_page(self):
+        body = self.section()
+        composition = body[body.index("<h3>Composition per sample</h3>"):]
+        self.assertIn('<div class="figure wide">', composition)
+        # A single legend row spread across that width, under the plot.
+        self.assertIn('"orientation":"h"', composition)
+        self.assertIn('"entrywidthmode":"fraction"', composition)
+        # Measured against the whole figure, not the plotting area, so an
+        # entry gets as much of the page's width as there is to give it.
+        self.assertIn('"xref":"container"', composition)
+        self.assertIn('"yref":"container"', composition)
+
+
 class ResourceBenchmarkTests(TemporaryRootMixin, unittest.TestCase):
     """The resources section: job outcomes and requested versus used figures."""
 
@@ -672,6 +1018,37 @@ class ResourceBenchmarkTests(TemporaryRootMixin, unittest.TestCase):
         self.assertIn(">87.0</td>", body)
         # Rules are ranked by the CPU time they consumed.
         self.assertLess(body.index(">assembly<"), body.index(">binning<"))
+
+    def test_job_states_are_also_drawn_as_a_stacked_bar(self):
+        body = self.section(self.render())
+        outcomes = body[body.index("Job outcomes"):body.index("Requested versus used")]
+        # One trace per final state, stacked into a single horizontal bar.
+        self.assertIn('"barmode":"stack"', outcomes)
+        self.assertIn('"orientation":"h"', outcomes)
+        for state in ("COMPLETED", "OUT_OF_MEMORY", "No accounting record"):
+            self.assertIn(f'"name":"{state}"', outcomes)
+        # Success is drawn in the palette's one green, whatever its rank.
+        self.assertIn(f'"color":"{PALETTE[2]}"', outcomes)
+
+    def test_rule_highlights_separate_per_job_runtime_from_the_total(self):
+        body = self.section(self.render())
+        # 1,800 + 5,400 + 3,600 s over the three jobs sacct spoke for, and a
+        # fourth launch it had no record of: 10,800 s in total over 4 jobs.
+        self.assertIn('<span class="stat-label">Mean runtime per job</span>'
+                      '<span class="stat-value">45.0 min</span>', body)
+        self.assertIn('<span class="stat-label">Total runtime, all jobs</span>'
+                      '<span class="stat-value">3.00 h</span>', body)
+
+    def test_rule_table_and_figure_carry_the_95th_percentile(self):
+        body = self.section(self.render())
+        self.assertIn("Memory used %, 95th pct", body)
+        self.assertIn("Runtime used %, 95th pct", body)
+        self.assertIn("Total runtime (h)", body)
+        # assembly's two launches used 99.18% and 74.77% of the memory they
+        # asked for; the 95th percentile of that pair is 97.96%.
+        self.assertIn(">98.0</td>", body)
+        # The figure reaches the same ceiling as a whisker off the median bar.
+        self.assertIn('"arrayminus":[0.0,0.0]', body)
 
     def test_requested_and_used_resources_appear_per_job(self):
         body = self.section(self.render())

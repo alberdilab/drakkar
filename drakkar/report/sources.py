@@ -24,7 +24,15 @@ SECTION_SOURCES = {
     "dereplication": {
         "label": "Dereplication",
         "required": ["dereplicating.tsv"],
-        "optional": [],
+        # dRep's own data tables: the cluster assignments, the within-cluster
+        # ANI comparisons and the raw MASH distances. They turn the two-number
+        # summary into a picture of how the ANI threshold acted.
+        "optional": [
+            "dereplicating/drep/data_tables/Cdb.csv",
+            "dereplicating/drep/data_tables/Wdb.csv",
+            "dereplicating/drep/data_tables/Ndb.csv",
+            "dereplicating/drep/data_tables/Mdb.csv",
+        ],
     },
     "profiling": {
         "label": "Profiling",
@@ -61,6 +69,9 @@ SECTION_SOURCES = {
         "optional": [],
     },
 }
+
+# Per-assembly Binette reports, one ``<assembly>.tsv`` per assembly.
+BIN_REPORT_DIRECTORY = "cataloging/final"
 
 # Written by drakkar.benchmark next to the run metadata; absent for runs that
 # were not launched on SLURM.
@@ -135,6 +146,22 @@ def find_run_metadata(output_dir):
     ]
 
 
+def find_bin_reports(output_dir):
+    """Return the per-assembly Binette bin quality reports, in assembly order.
+
+    ``cataloging/final/<assembly>.tsv`` is a verbatim copy of Binette's
+    ``final_bins_quality_reports.tsv``, so it carries the ``origin`` column
+    that says which binner each final bin came from — or that Binette built it
+    itself. The file names are assembly ids rather than a fixed name, so they
+    are found by glob rather than listed in ``SECTION_SOURCES``.
+    """
+    directory = Path(output_dir) / BIN_REPORT_DIRECTORY
+    try:
+        return sorted(path for path in directory.glob("*.tsv") if _is_usable(path))
+    except OSError:
+        return []
+
+
 def find_benchmark_summaries(output_dir):
     """Return the per-run benchmark roll-up YAMLs, oldest first."""
     output_path = Path(output_dir)
@@ -205,6 +232,11 @@ def probe_section(output_dir, section):
         for relative in spec["optional"]
         if _is_usable(output_path / relative)
     ]
+    if section == "cataloging":
+        optional_present.extend(
+            str(path.relative_to(output_path))
+            for path in find_bin_reports(output_path)
+        )
     return {
         "section": section,
         "label": spec["label"],

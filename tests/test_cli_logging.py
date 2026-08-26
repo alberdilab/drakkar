@@ -6,6 +6,7 @@ import io
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import yaml
@@ -371,14 +372,77 @@ class LoggingCommandTests(unittest.TestCase):
 
     def test_parse_sacct_output_reads_requested_cpus_and_memory(self) -> None:
         rows = cli_module._benchmark._parse_sacct_output(
-            "901|COMPLETED|0:0|600|4800|8|4000M|30|8|8000M\n"
-            "902|COMPLETED|0:0|600|4800|8|4000M|30|8|1000Mc\n"
+            "901|COMPLETED|0:0|600|01:20:00|8|4000M|30|8|8000M\n"
+            "902|COMPLETED|0:0|600|01:20:00|8|4000M|30|8|1000Mc\n"
         )
 
         self.assertEqual(rows["901"]["req_cpus"], 8)
         self.assertEqual(rows["901"]["req_mem_mb"], 8000.0)
         # A per-CPU request only becomes the job total once scaled by its CPUs.
         self.assertEqual(rows["902"]["req_mem_mb"], 8000.0)
+
+    def test_parse_sacct_output_reads_consumed_not_reserved_cpu_time(self) -> None:
+        # sacct is asked for TotalCPU, which arrives as a duration rather than
+        # as raw seconds. CPUTimeRAW would have been AllocCPUS x Elapsed here
+        # — 4,800 s — and would report the job as 100% CPU efficient whatever
+        # it actually did.
+        rows = cli_module._benchmark._parse_sacct_output(
+            "901|COMPLETED|0:0|600|01:20:00|8|4000M|30|8|8000M\n"
+        )
+
+        self.assertEqual(rows["901"]["cpu_time_sec"], 4800.0)
+        self.assertEqual(rows["901"]["elapsed_sec"], 600)
+        self.assertEqual(rows["901"]["alloc_cpus"], 8)
+
+    def test_sacct_is_queried_for_total_cpu(self) -> None:
+        with patch.object(cli_module._benchmark.subprocess, "run") as run:
+            run.return_value = SimpleNamespace(returncode=0, stdout="")
+            cli_module._benchmark.query_sacct_for_jobs(["901"])
+
+        command = run.call_args[0][0]
+        self.assertIn("TotalCPU", command[-1])
+        self.assertNotIn("CPUTimeRAW", command[-1])
+
+    def test_parse_slurm_duration_covers_the_formats_sacct_writes(self) -> None:
+        parse = cli_module._benchmark.parse_slurm_duration_to_seconds
+        # Two colon-separated fields are minutes and seconds, not hours.
+        self.assertAlmostEqual(parse("12:30.500"), 750.5)
+        self.assertEqual(parse("01:20:00"), 4800)
+        self.assertEqual(parse("2-03:04:05"), 2 * 86400 + 3 * 3600 + 4 * 60 + 5)
+        self.assertEqual(parse("00:00:00"), 0)
+        for blank in ("", None, "Unknown", "not a duration"):
+            self.assertIsNone(parse(blank))
+
+    def test_cpu_efficiency_is_the_share_of_the_reservation_actually_burned(self) -> None:
+        launch = {
+            "launch_index": 1,
+            "rule": "assembly",
+            "attempt": 1,
+            "logical_job_key": "assembly|wildcards|A",
+            "internal_jobid": "42",
+            "external_jobid": "901",
+            "wildcards": "A",
+            "requested_cpus": 8,
+            "requested_mem_mb": 8000.0,
+            "requested_runtime_min": 30,
+        }
+        # 8 CPUs held for 600 s is a 4,800 CPU-second reservation; the job
+        # burned 1,200 of them, which is a quarter of what it held.
+        accounting = {
+            "state": "COMPLETED",
+            "exit_code": "0:0",
+            "alloc_cpus": 8,
+            "elapsed_sec": 600,
+            "cpu_time_sec": 1200.0,
+            "max_rss_mb": 4000.0,
+            "timelimit_raw_min": 30,
+            "req_cpus": 8,
+            "req_mem_mb": 8000.0,
+        }
+
+        row = cli_module.benchmark_job_row(launch, accounting)
+
+        self.assertAlmostEqual(row["cpu_efficiency"], 0.25)
 
     def test_parse_snakemake_submitted_launches_normalizes_embedded_sbatch_output(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

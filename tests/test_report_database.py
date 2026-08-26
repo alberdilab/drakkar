@@ -54,9 +54,59 @@ class ReportFixtureMixin:
             A1\tS1,S2\tS1,S2\t1200\t90.0\tS1:88.50;S2:91.20\t5\t4\t6\t3\t7
             A2\tS2\tNA\t800\t0\tNA\t3\t2\t4\t2\t4
             """)
+        # Binette's per-assembly final bin report, copied verbatim into
+        # cataloging/final. `origin` names the binner a bin came from; a bin
+        # several binners produced identically names all of them, and one
+        # Binette built itself is marked `binette` and is not original.
+        write(root / "cataloging/final/A1.tsv", """
+            name\torigin\tis_original\toriginal_name\tcompleteness\tcontamination\tscore\tcheckm2_model\tsize\tN50\tcoding_density\tcontig_count
+            binette_bin1\tmetabat\tTrue\tmetabat_3\t95.1\t2.0\t91.1\tgeneral\t3000000\t50000\t0.88\t120
+            binette_bin2\tmetabat;semibin\tTrue\tmetabat_5\t88.0\t1.0\t86.0\tgeneral\t2600000\t41000\t0.89\t140
+            binette_bin3\tbinette\tFalse\tbinette_bin3\t78.4\t4.5\t69.4\tgeneral\t2100000\t22000\t0.9\t310
+            """)
+        write(root / "cataloging/final/A2.tsv", """
+            name\torigin\tis_original\toriginal_name\tcompleteness\tcontamination\tscore\tcheckm2_model\tsize\tN50\tcoding_density\tcontig_count
+            binette_bin1\tmaxbin\tTrue\tmaxbin_1\t91.0\t3.0\t85.0\tgeneral\t2400000\t31000\t0.88\t160
+            """)
         write(root / "dereplicating.tsv", """
             input_bin_number\tinput_bin_completeness\tdereplication_ani\toutput_bin_number
             11\t82.4\t0.98\t6
+            """)
+        # dRep's own data tables. Cdb/Wdb name bins bare, Ndb/Mdb by full path,
+        # and Ndb holds both directions of every comparison.
+        write(root / "dereplicating/drep/data_tables/Cdb.csv", """
+            genome,secondary_cluster,threshold,cluster_method,comparison_algorithm,primary_cluster
+            A1_bin_1.fa,1_1,0.02,average,ANImf,1
+            A1_bin_2.fa,1_1,0.02,average,ANImf,1
+            A1_bin_3.fa,2_1,0.02,average,ANImf,2
+            A2_bin_1.fa,2_2,0.02,average,ANImf,2
+            A2_bin_2.fa,3_1,0.02,average,ANImf,3
+            """)
+        write(root / "dereplicating/drep/data_tables/Wdb.csv", """
+            genome,cluster,score
+            A1_bin_1.fa,1_1,95.0
+            A1_bin_3.fa,2_1,91.0
+            A2_bin_1.fa,2_2,88.0
+            A2_bin_2.fa,3_1,80.0
+            """)
+        write(root / "dereplicating/drep/data_tables/Ndb.csv", """
+            reference,querry,ani,alignment_coverage,primary_cluster
+            /scratch/genomes/A1_bin_1.fa,/scratch/genomes/A1_bin_2.fa,0.9990,0.82,1
+            /scratch/genomes/A1_bin_2.fa,/scratch/genomes/A1_bin_1.fa,0.9970,0.80,1
+            /scratch/genomes/A1_bin_3.fa,/scratch/genomes/A2_bin_1.fa,0.9600,0.71,2
+            /scratch/genomes/A2_bin_1.fa,/scratch/genomes/A1_bin_3.fa,0.9600,0.70,2
+            """)
+        write(root / "dereplicating/drep/data_tables/Mdb.csv", """
+            genome1,genome2,dist,similarity
+            /scratch/genomes/A1_bin_1.fa,/scratch/genomes/A1_bin_1.fa,0.0,1.0
+            /scratch/genomes/A1_bin_1.fa,/scratch/genomes/A1_bin_2.fa,0.02,0.98
+            /scratch/genomes/A1_bin_2.fa,/scratch/genomes/A1_bin_1.fa,0.02,0.98
+            /scratch/genomes/A1_bin_3.fa,/scratch/genomes/A2_bin_1.fa,0.06,0.94
+            /scratch/genomes/A2_bin_1.fa,/scratch/genomes/A1_bin_3.fa,0.06,0.94
+            /scratch/genomes/A1_bin_1.fa,/scratch/genomes/A1_bin_3.fa,0.41,0.59
+            /scratch/genomes/A1_bin_3.fa,/scratch/genomes/A1_bin_1.fa,0.41,0.59
+            /scratch/genomes/A2_bin_2.fa,/scratch/genomes/A1_bin_1.fa,0.45,0.55
+            /scratch/genomes/A1_bin_1.fa,/scratch/genomes/A2_bin_2.fa,0.45,0.55
             """)
         write(root / "profiling_genomes/final/mags.tsv", """
             magid\tcompleteness\tcontamination\tsize\tcontigs\tn50\tgc\tcluster\tcluster_members\tscore
@@ -592,6 +642,158 @@ class DatabaseBuildTests(ReportFixtureMixin, unittest.TestCase):
                 connection.close()
         finally:
             report_ingest.CHUNK_SIZE = original
+
+
+class BinOriginTests(ReportFixtureMixin, unittest.TestCase):
+    """The per-assembly Binette reports behind `cataloging/final`."""
+
+    def build(self, root):
+        db_path = Path(root) / "drakkar.db"
+        report_command.build_database(root, parse_sections(None), db_path)
+        connection = sqlite3.connect(db_path)
+        connection.row_factory = sqlite3.Row
+        self.addCleanup(connection.close)
+        return connection
+
+    def test_bins_are_named_the_way_drakkar_renames_them(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            names = [
+                row[0] for row in
+                self.build(root).execute("SELECT bin_name FROM assembly_bin ORDER BY bin_name")
+            ]
+            self.assertEqual(
+                names, ["A1_bin_1", "A1_bin_2", "A1_bin_3", "A2_bin_1"]
+            )
+
+    def test_binner_names_are_normalized_to_the_ones_the_counts_use(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            connection = self.build(root)
+            binners = [
+                row[0] for row in connection.execute(
+                    "SELECT DISTINCT binner FROM assembly_bin_origin ORDER BY binner"
+                )
+            ]
+            # Binette names the sets after its input directories — `metabat`,
+            # `semibin` — while the counts table uses the tool versions.
+            self.assertEqual(binners, ["binette", "maxbin2", "metabat2", "semibin2"])
+
+    def test_a_bin_several_binners_produced_names_all_of_them(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            connection = self.build(root)
+            binners = [
+                row[0] for row in connection.execute(
+                    "SELECT binner FROM assembly_bin_origin "
+                    "WHERE bin_name = 'A1_bin_2' ORDER BY binner"
+                )
+            ]
+            self.assertEqual(binners, ["metabat2", "semibin2"])
+
+    def test_a_bin_binette_built_is_not_original(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            row = self.build(root).execute(
+                "SELECT is_original, origin FROM assembly_bin WHERE bin_name = 'A1_bin_3'"
+            ).fetchone()
+            self.assertEqual(row["is_original"], 0)
+            self.assertEqual(row["origin"], "binette")
+
+    def test_absent_reports_leave_the_rest_of_cataloging_intact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root / "cataloging.tsv", """
+                assembly\tmetabat2_bins\tfinal_bins
+                A1\t5\t3
+                """)
+            connection = self.build(root)
+            self.assertEqual(
+                connection.execute("SELECT COUNT(*) FROM assembly").fetchone()[0], 1
+            )
+            self.assertEqual(
+                connection.execute("SELECT COUNT(*) FROM assembly_bin").fetchone()[0], 0
+            )
+
+
+class DereplicationClusterTests(ReportFixtureMixin, unittest.TestCase):
+    """dRep's cluster assignments and pairwise comparisons."""
+
+    def build(self, root):
+        db_path = Path(root) / "drakkar.db"
+        report_command.build_database(root, parse_sections(None), db_path)
+        connection = sqlite3.connect(db_path)
+        connection.row_factory = sqlite3.Row
+        self.addCleanup(connection.close)
+        return connection
+
+    def test_cluster_assignments_and_winners_are_loaded(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            connection = self.build(root)
+            rows = {
+                row["genome"]: row for row in
+                connection.execute("SELECT * FROM genome_cluster")
+            }
+            self.assertEqual(len(rows), 5)
+            self.assertEqual(rows["A1_bin_1"]["secondary_cluster"], "1_1")
+            self.assertEqual(rows["A1_bin_1"]["is_representative"], 1)
+            # Clustered with A1_bin_1 and lost to it.
+            self.assertEqual(rows["A1_bin_2"]["is_representative"], 0)
+
+    def test_only_the_nearest_mash_neighbour_is_kept(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            connection = self.build(root)
+            rows = {
+                row["genome"]: row["nearest_mash_distance"] for row in
+                connection.execute(
+                    "SELECT genome, nearest_mash_distance FROM genome_cluster"
+                )
+            }
+            # A1_bin_1 is 0.02 from A1_bin_2 and 0.41 from A1_bin_3; the
+            # self-comparison at distance 0 must not win.
+            self.assertAlmostEqual(rows["A1_bin_1"], 0.02)
+            self.assertAlmostEqual(rows["A2_bin_2"], 0.45)
+
+    def test_a_bin_with_no_near_neighbour_is_distinguishable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            near = self.build(root).execute(
+                "SELECT COUNT(*) FROM genome_cluster WHERE nearest_mash_distance <= 0.1"
+            ).fetchone()[0]
+            self.assertEqual(near, 4)
+
+    def test_reciprocal_comparisons_collapse_to_one_averaged_pair(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            rows = self.build(root).execute(
+                "SELECT genome_a, genome_b, ani, primary_cluster "
+                "FROM genome_comparison ORDER BY genome_a"
+            ).fetchall()
+            self.assertEqual(len(rows), 2)
+            self.assertEqual((rows[0]["genome_a"], rows[0]["genome_b"]),
+                             ("A1_bin_1", "A1_bin_2"))
+            # dRep clusters on the average of the two directions.
+            self.assertAlmostEqual(rows[0]["ani"], 0.998)
+            self.assertEqual(rows[0]["primary_cluster"], "1")
+
+    def test_absent_drep_tables_leave_the_summary_intact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root / "dereplicating.tsv", """
+                input_bin_number\tdereplication_ani\toutput_bin_number
+                11\t0.98\t6
+                """)
+            connection = self.build(root)
+            self.assertEqual(
+                connection.execute(
+                    "SELECT input_bin_number FROM dereplication"
+                ).fetchone()[0], 11
+            )
+            self.assertEqual(
+                connection.execute("SELECT COUNT(*) FROM genome_cluster").fetchone()[0], 0
+            )
 
 
 class MissingSourceTests(unittest.TestCase):

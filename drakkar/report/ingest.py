@@ -7,6 +7,7 @@ catalogue-scale annotation table never has to fit in memory.
 
 import lzma
 import math
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -17,6 +18,7 @@ from drakkar.report.sources import (
     benchmark_run_id,
     find_benchmark_summaries,
     find_benchmark_tables,
+    find_bin_reports,
     find_run_metadata,
 )
 
@@ -32,6 +34,22 @@ BINNER_COLUMNS = (
     ("semibin2_bins", "semibin2"),
     ("comebin_bins", "comebin"),
 )
+
+# Binette names each input bin set after the differing part of the paths it was
+# given, which for Drakkar is the binner's rule directory: `metabat`, `maxbin`,
+# `semibin`, `comebin`. Bins Binette assembled itself carry `binette` instead.
+# The names are matched as substrings so that a single-binner run — where
+# Binette falls back to the whole path — still resolves.
+BINNER_ORIGIN_ALIASES = (
+    ("metabat", "metabat2"),
+    ("maxbin", "maxbin2"),
+    ("semibin", "semibin2"),
+    ("comebin", "comebin"),
+    ("binette", "binette"),
+)
+
+# The name Binette gives bins it built itself, rather than took from a binner.
+BINETTE_ORIGIN = "binette"
 
 # GTDB-Tk renamed the closest-reference columns between major versions, so each
 # logical field is looked up through a list of candidates.
@@ -94,6 +112,23 @@ def _int(value):
     return int(number)
 
 
+def _fraction(value):
+    """A share written either as ``0.85`` or as ``85%``, stored as a fraction.
+
+    SingleM writes its read fraction with a percent sign in some versions and
+    without one in others; the report reads the column as a fraction of one
+    either way.
+    """
+    text = _text(value)
+    if text is None:
+        return None
+    percent = text.endswith("%")
+    number = _float(text[:-1] if percent else text)
+    if number is None:
+        return None
+    return number / 100.0 if percent else number
+
+
 def _bool(value):
     text = _text(value)
     if text is None:
@@ -152,6 +187,54 @@ def _executemany(connection, statement, rows):
     if rows:
         connection.executemany(statement, rows)
     return len(rows)
+
+
+def _read_csv(path, **kwargs):
+    """Read one of dRep's comma-separated data tables."""
+    kwargs.setdefault("sep", ",")
+    return pd.read_csv(path, **kwargs)
+
+
+def _genome_name(value):
+    """Strip the directory and the FASTA extension off a dRep genome name.
+
+    dRep writes bare file names in ``Cdb``/``Wdb`` but absolute paths in
+    ``Ndb`` and ``Mdb``, so the two only join once both are reduced to the bin
+    id Drakkar uses everywhere else.
+    """
+    text = _text(value)
+    if text is None:
+        return None
+    name = Path(text).name
+    for suffix in (".gz", ".fa", ".fna", ".fasta"):
+        if name.lower().endswith(suffix):
+            name = name[: -len(suffix)]
+    return name or None
+
+
+def _identity(value):
+    """Read an ANI or a MASH similarity as a fraction of one.
+
+    dRep writes these as fractions, but some versions of some comparison
+    algorithms report percentages; anything above one is read as a percentage
+    rather than stored as an impossible identity.
+    """
+    number = _float(value)
+    if number is None:
+        return None
+    return number / 100.0 if number > 1.0 else number
+
+
+def _canonical_binner(origin):
+    """Map one Binette origin token onto the binner name the report uses."""
+    text = _text(origin)
+    if text is None:
+        return None
+    lowered = text.lower()
+    for alias, canonical in BINNER_ORIGIN_ALIASES:
+        if alias in lowered:
+            return canonical
+    return text
 
 
 # ---------------------------------------------------------------------------
@@ -373,8 +456,8 @@ def ingest_preprocessing(connection, output_dir):
         "host_reads", "host_bases", "metagenomic_reads", "metagenomic_bases",
     ]
     float_columns = [
-        "singlem_fraction", "nonpareil_C", "nonpareil_LR",
-        "nonpareil_modelR", "nonpareil_LRstar", "nonpareil_diversity",
+        "nonpareil_C", "nonpareil_LR", "nonpareil_modelR",
+        "nonpareil_LRstar", "nonpareil_diversity",
     ]
 
     rows = []
@@ -385,10 +468,11 @@ def ingest_preprocessing(connection, output_dir):
         rows.append(
             (sample_id,)
             + tuple(_get(row, column, _int) for column in columns)
+            + (_get(row, "singlem_fraction", _fraction),)
             + tuple(_get(row, column, _float) for column in float_columns)
         )
 
-    placeholders = ", ".join(["?"] * (1 + len(columns) + len(float_columns)))
+    placeholders = ", ".join(["?"] * (2 + len(columns) + len(float_columns)))
     written = _executemany(
         connection,
         f"INSERT OR REPLACE INTO sample VALUES ({placeholders})",
@@ -491,8 +575,90 @@ def ingest_cataloging(connection, output_dir):
     record_ingest(connection, "assembly", "cataloging", source, written)
     record_ingest(connection, "assembly_sample", "cataloging", source, len(sample_rows))
     record_ingest(connection, "assembly_binner", "cataloging", source, len(binner_rows))
+    _ingest_bin_reports(connection, output_dir)
     connection.commit()
     return written
+
+
+_BINETTE_BIN_NUMBER = re.compile(r"bin(\d+)$")
+
+
+def _bin_name(assembly_id, reported):
+    """Rebuild the Drakkar bin id from the name Binette gave the bin.
+
+    Binette names its output `<prefix>_bin<n>`; Drakkar renames the FASTA to
+    `<assembly>_bin_<n>.fa` and uses that id everywhere downstream, so the
+    report stores the Drakkar form and keeps the two joinable.
+    """
+    text = _text(reported)
+    if text is None:
+        return None
+    match = _BINETTE_BIN_NUMBER.search(text)
+    return f"{assembly_id}_bin_{match.group(1)}" if match else text
+
+
+def _ingest_bin_reports(connection, output_dir):
+    """Load the per-assembly Binette reports behind ``cataloging/final``.
+
+    They are what says where each final bin came from: `origin` names the
+    binner that produced it, or `binette` when Binette assembled it out of
+    contigs that no single binner had grouped that way. Without them the
+    report can only say how many bins each binner made, not what became of
+    them. Absent reports are the normal case for an output directory written
+    before the reports were kept, and are not an error.
+    """
+    reports = find_bin_reports(output_dir)
+    if not reports:
+        return 0, 0
+
+    bin_rows = []
+    origin_rows = []
+    for report in reports:
+        assembly_id = report.stem
+        try:
+            frame = _read_table(report)
+        except (OSError, ValueError, pd.errors.ParserError):
+            continue
+        for row in frame.to_dict("records"):
+            bin_name = _bin_name(assembly_id, row.get("name") or row.get("bin_id"))
+            if bin_name is None:
+                continue
+            origin = _get(row, "origin")
+            is_original = _get(row, "is_original", _bool)
+            bin_rows.append((
+                assembly_id,
+                bin_name,
+                is_original,
+                origin,
+                _get(row, "original_name"),
+                _get(row, "completeness", _float),
+                _get(row, "contamination", _float),
+                _get(row, "score", _float),
+                _get(row, "size", _int),
+                _get(row, "N50", _int),
+                _get(row, "contig_count", _int),
+            ))
+            # Binette packs the origins of a bin several binners found
+            # identically as "metabat;maxbin", so one bin can name two binners.
+            for token in _split_list(origin):
+                binner = _canonical_binner(token)
+                if binner is not None:
+                    origin_rows.append((assembly_id, bin_name, binner))
+
+    written = _executemany(
+        connection,
+        "INSERT OR REPLACE INTO assembly_bin VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        bin_rows,
+    )
+    origins = _executemany(
+        connection,
+        "INSERT OR REPLACE INTO assembly_bin_origin VALUES (?, ?, ?)",
+        sorted(set(origin_rows)),
+    )
+    if reports:
+        record_ingest(connection, "assembly_bin", "cataloging", reports[0], written)
+        record_ingest(connection, "assembly_bin_origin", "cataloging", reports[0], origins)
+    return written, origins
 
 
 def ingest_dereplication(connection, output_dir):
@@ -521,8 +687,179 @@ def ingest_dereplication(connection, output_dir):
         rows,
     )
     record_ingest(connection, "dereplication", "dereplication", source, written)
+    _ingest_drep_tables(connection, output_dir)
     connection.commit()
     return written
+
+
+DREP_DATA_TABLES = "dereplicating/drep/data_tables"
+
+# dRep writes bare file names in some tables and absolute paths in others, so
+# every genome column is reduced to a bin id before anything is joined on it.
+_FASTA_SUFFIX = re.compile(r"\.(fa|fna|fasta)$", re.IGNORECASE)
+_GZIP_SUFFIX = re.compile(r"\.gz$", re.IGNORECASE)
+
+
+def _genome_column(values):
+    """Reduce a whole dRep genome column to bin ids at once.
+
+    ``Mdb`` is quadratic in the number of bins, so this is done with vectorized
+    string operations rather than a Python call per cell.
+    """
+    names = values.astype(str).str.rsplit("/", n=1).str[-1]
+    names = names.str.replace(_GZIP_SUFFIX, "", regex=True)
+    return names.str.replace(_FASTA_SUFFIX, "", regex=True)
+
+
+def _nearest_mash_distances(path):
+    """Return each bin's MASH distance to its closest other bin.
+
+    Only the minimum is kept. The full matrix is quadratic and none of it is
+    needed once the question is whether a bin had any near neighbour at all —
+    which is what decides whether dereplication could have acted on it.
+    """
+    nearest = {}
+    for chunk in _read_csv(path, chunksize=CHUNK_SIZE):
+        columns = set(chunk.columns)
+        if not {"genome1", "genome2"}.issubset(columns):
+            return {}
+        if "dist" in columns:
+            distances = pd.to_numeric(chunk["dist"], errors="coerce")
+        elif "similarity" in columns:
+            distances = 1.0 - pd.to_numeric(chunk["similarity"], errors="coerce")
+        else:
+            return {}
+        first = _genome_column(chunk["genome1"])
+        second = _genome_column(chunk["genome2"])
+        frame = pd.DataFrame({"genome": first, "other": second, "dist": distances})
+        frame = frame[(frame["genome"] != frame["other"]) & frame["dist"].notna()]
+        if frame.empty:
+            continue
+        for genome, distance in frame.groupby("genome")["dist"].min().items():
+            value = float(distance)
+            if genome not in nearest or value < nearest[genome]:
+                nearest[genome] = value
+    return nearest
+
+
+def _pairwise_comparisons(path):
+    """Return one averaged row per unordered pair of dRep's ANI comparisons.
+
+    dRep compares each pair in both directions and clusters on the average of
+    the two, so the report stores that average: it is the number the
+    dereplication threshold was actually applied to, and storing both
+    directions separately would double every bar of the histogram.
+    """
+    totals = {}
+    for chunk in _read_csv(path, chunksize=CHUNK_SIZE):
+        columns = set(chunk.columns)
+        if not {"reference", "querry", "ani"}.issubset(columns):
+            return []
+        frame = pd.DataFrame({
+            "a": _genome_column(chunk["reference"]),
+            "b": _genome_column(chunk["querry"]),
+            "ani": pd.to_numeric(chunk["ani"], errors="coerce"),
+            "coverage": (
+                pd.to_numeric(chunk["alignment_coverage"], errors="coerce")
+                if "alignment_coverage" in columns
+                else pd.Series([None] * len(chunk), index=chunk.index)
+            ),
+            "cluster": (
+                chunk["primary_cluster"].astype(str)
+                if "primary_cluster" in columns
+                else pd.Series([None] * len(chunk), index=chunk.index)
+            ),
+        })
+        frame = frame[(frame["a"] != frame["b"]) & frame["ani"].notna()]
+        if frame.empty:
+            continue
+        # Order each pair so that A-B and B-A land on the same key, then fold
+        # the chunk down in pandas: only the collapsed pairs cross into Python.
+        frame["first"] = frame[["a", "b"]].min(axis=1)
+        frame["second"] = frame[["a", "b"]].max(axis=1)
+        grouped = frame.groupby(["first", "second"], sort=False).agg(
+            ani_sum=("ani", "sum"),
+            ani_count=("ani", "size"),
+            coverage_sum=("coverage", "sum"),
+            coverage_count=("coverage", "count"),
+            cluster=("cluster", "first"),
+        )
+        for key, record in grouped.iterrows():
+            entry = totals.setdefault(key, [0.0, 0, 0.0, 0, record["cluster"]])
+            entry[0] += float(record["ani_sum"])
+            entry[1] += int(record["ani_count"])
+            entry[2] += float(record["coverage_sum"] or 0.0)
+            entry[3] += int(record["coverage_count"])
+    rows = []
+    for (first, second), (ani_sum, ani_count, cov_sum, cov_count, cluster) in totals.items():
+        ani = ani_sum / ani_count
+        rows.append((
+            first,
+            second,
+            _text(cluster),
+            ani / 100.0 if ani > 1.0 else ani,
+            (cov_sum / cov_count) if cov_count else None,
+        ))
+    return rows
+
+
+def _ingest_drep_tables(connection, output_dir):
+    """Load dRep's cluster assignments and pairwise comparisons.
+
+    These are what turn "11 bins in, 6 out" into an account of why: which bins
+    were near enough to anything else to be compared at all, how similar the
+    compared pairs were, and where the ANI threshold fell among them. All four
+    tables are optional — an output directory written by an older run, or one
+    whose dRep working directory was cleaned up, still renders the summary.
+    """
+    cdb = _existing(output_dir, f"{DREP_DATA_TABLES}/Cdb.csv")
+    if cdb is None:
+        return 0, 0
+
+    clusters = {}
+    for row in _read_csv(cdb, dtype=str).to_dict("records"):
+        genome = _genome_name(row.get("genome"))
+        if genome is None:
+            continue
+        clusters[genome] = [
+            _get(row, "primary_cluster"),
+            _get(row, "secondary_cluster"),
+            0,
+            None,
+        ]
+
+    wdb = _existing(output_dir, f"{DREP_DATA_TABLES}/Wdb.csv")
+    if wdb is not None:
+        for row in _read_csv(wdb, dtype=str).to_dict("records"):
+            genome = _genome_name(row.get("genome"))
+            if genome in clusters:
+                clusters[genome][2] = 1
+
+    mdb = _existing(output_dir, f"{DREP_DATA_TABLES}/Mdb.csv")
+    if mdb is not None:
+        for genome, distance in _nearest_mash_distances(mdb).items():
+            if genome in clusters:
+                clusters[genome][3] = distance
+
+    connection.execute("DELETE FROM genome_cluster")
+    written = _executemany(
+        connection,
+        "INSERT INTO genome_cluster VALUES (?, ?, ?, ?, ?)",
+        [(genome,) + tuple(values) for genome, values in sorted(clusters.items())],
+    )
+    record_ingest(connection, "genome_cluster", "dereplication", cdb, written)
+
+    ndb = _existing(output_dir, f"{DREP_DATA_TABLES}/Ndb.csv")
+    comparisons = 0
+    if ndb is not None:
+        connection.execute("DELETE FROM genome_comparison")
+        comparisons = _executemany(
+            connection,
+            "INSERT INTO genome_comparison VALUES (?, ?, ?, ?, ?)",
+            _pairwise_comparisons(ndb),
+        )
+        record_ingest(connection, "genome_comparison", "dereplication", ndb, comparisons)
+    return written, comparisons
 
 
 def ingest_profiling(connection, output_dir):

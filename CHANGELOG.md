@@ -8,6 +8,91 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.1.7] - 2026-08-26
+
+### Added
+
+- The preprocessing section reports the estimated microbial fraction (SingleM)
+  and Nonpareil coverage in a subsection of their own, with the sequencing
+  effort spent against the effort projected for near-complete coverage, and a
+  chart putting microbial fraction beside Nonpareil completeness per sample.
+  The subsection appears only when `--fraction` or `--nonpareil` was run.
+- Mean host reads are summarised beside the mean metagenomic reads, and every
+  mean read count carries the same quantity in gigabases underneath.
+- The Bins subsection of the cataloging section opens with the totals: how many
+  bins the binners produced between them, how many survived as final bins after
+  Binette reconciled them, and what share of the first the second is.
+- Cataloging reports what Binette did, which the report previously never
+  mentioned. Below the bins-per-binner chart, a Sankey diagram traces every bin
+  each binner produced to its fate — kept as a final bin, kept but produced
+  identically by another binner too, or replaced by a better-scoring bin — with
+  the bins Binette assembled itself out of contigs no single binner had grouped
+  that way shown as their own stream. The same figures are listed as a table
+  underneath. The per-assembly Binette reports already written to
+  `cataloging/final/<assembly>.tsv` are the source, so existing output
+  directories gain the subsection without being re-run.
+- The genome abundance table of the profiling section reports the metagenomic
+  reads each sample handed the mapper and the share of them that landed on a
+  catalogue genome, beside the mapped read count it already carried. All three
+  are summarised as highlights above the table: mapped reads on their own say
+  nothing about how well the catalogue represents a sample, and the share is
+  what does.
+- The job outcomes subsection draws the mix of final job states as a horizontal
+  stacked bar across the page, so a run's failing slice is visible without
+  being looked for in the table of percentages underneath.
+- The per-rule resource table and chart report the 95th percentile of memory
+  and runtime used alongside the median. The median says how much of a
+  reservation a normal job leaves unused; the 95th percentile is the ceiling
+  the rule's heaviest jobs reach, and is how far a request can actually be cut.
+  In the chart each bar is the rule's median job and its whisker reaches that
+  ceiling.
+- Dereplication highlights the share of bins retained, and reports how the
+  identity threshold actually acted. dRep's own data tables are read where they
+  are present: the number of bins that had a MASH neighbour close enough to be
+  compared at all, a histogram of the pairwise identities of those comparisons
+  split by whether the pair was collapsed, with the threshold drawn on it, and
+  a table counting the pairs in half-percent identity bands from 100% down.
+  Reciprocal comparisons are averaged into one pair, as dRep clusters on.
+
+### Changed
+
+- The read fates chart runs the full width of the page, with its legend laid
+  out in a single row above the plot instead of down its right side.
+- Metagenomic bases are shown in gigabases rather than as a raw base count.
+- Dereplication shows its yield as one horizontal stacked bar — retained beside
+  collapsed within the same whole — instead of two bars whose ratio the reader
+  had to work out.
+- The phylum composition chart runs the full width of the page, with its key
+  laid out as a single row spread across the width below the plot instead of
+  stacked into several rows beside it. It names the eight most abundant phyla,
+  down from twelve: past eight a long phylum name no longer fits its share of
+  that row, and twelve named phyla also outran the palette, which drew two of
+  them in the colour of another.
+- Both phylum figures in the taxonomy section draw a phylum in the same colour.
+  The colours are assigned once, in abundance order, and looked up by name, so
+  the genomes-per-phylum chart — which ranks its bars by genome count instead —
+  no longer gives a phylum a different colour from the composition chart below
+  it. Phyla the composition chart pools as Other are drawn in its grey.
+- The per-rule resource highlights separate the mean runtime of a single job
+  from the total runtime of every job, which read as one figure before, and the
+  runtime column names itself as per-job.
+- The report database gains `assembly_bin`, `assembly_bin_origin`,
+  `genome_cluster` and `genome_comparison`, and the schema version is bumped to
+  3. A `drakkar.db` written by an earlier build is refused with the usual
+  version message and has to be rebuilt with `drakkar report --force`.
+
+### Fixed
+
+- CPU efficiency is no longer 100% for every job. The benchmark asked sacct for
+  `CPUTimeRAW`, which is `AllocCPUS x Elapsed` — the CPU time a job *reserved*,
+  not the time it burned — so dividing it by that same product reported every
+  job as perfectly efficient. `TotalCPU`, the user plus system time the job's
+  steps actually consumed, is read instead, and with it the per-job and
+  per-rule CPU efficiencies and the run's `used_cpu_sec` become real figures.
+  Existing benchmark tables carry the old value and have to be regenerated.
+- SingleM's read fraction is read whether it is written as `0.85` or as `85%`;
+  the percent form was previously dropped and left the column empty.
+
 ## [2.1.6] - 2026-08-25
 
 ### Changed
