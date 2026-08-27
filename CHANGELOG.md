@@ -8,6 +8,15 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.4.1] - 2026-08-27
+
+### Fixed
+
+- ``amr_amrfinder`` conda environment pinned a non-existent package name
+  (``amrfinderplus``), which made ``drakkar database update amrfinderplus``
+  and the AMR workflow fail with ``PackagesNotFoundError``. The bioconda
+  package is ``ncbi-amrfinderplus``.
+
 ## [2.4.0] - 2026-08-27
 
 ### Added
