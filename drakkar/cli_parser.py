@@ -15,6 +15,7 @@ from drakkar.cli_validation import (
     positive_int,
     unit_interval_float,
 )
+from drakkar.database_latest import DEFAULT_TIMEOUT as DEFAULT_LATEST_TIMEOUT
 from drakkar.database_registry import MANAGED_DATABASES
 
 
@@ -298,17 +299,21 @@ def build_parser():
     add_resource_multiplier_arguments(subparser_expressing)
     add_snakemake_override_arguments(subparser_expressing)
     
-    database_parent = RichArgumentParser(add_help=False)
-    database_parent.add_argument("--directory", required=True, help="Base directory where the database release directory will be created")
+    # Arguments shared by every command that launches a database install, so
+    # that "update" can drive the same workflow without --directory/--version.
+    database_launch_parent = RichArgumentParser(add_help=False)
+    database_launch_parent.add_argument("--download-runtime", type=int, default=120, help="Runtime in minutes for the database download/preparation rule (default: 120)")
+    database_launch_parent.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
+    database_launch_parent.add_argument("-e", "--env_path", type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
+    database_launch_parent.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
+    add_benchmark_argument(database_launch_parent)
+    add_resource_multiplier_arguments(database_launch_parent)
+    add_snakemake_override_arguments(database_launch_parent)
+
+    database_parent = RichArgumentParser(add_help=False, parents=[database_launch_parent])
+    database_parent.add_argument("--directory", required=False, help="Base directory where the database release directory will be created (default: DATABASES_DIR/<database> from config.yaml)")
     database_parent.add_argument("--version", required=False, help="Release folder name to create inside --directory (optional for vfdb; defaults to the UTC download date)")
-    database_parent.add_argument("--download-runtime", type=int, default=120, help="Runtime in minutes for the database download/preparation rule (default: 120)")
-    database_parent.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
     database_parent.add_argument("--set-default", action="store_true", help="Update config.yaml to use this installed database release by default")
-    database_parent.add_argument("-e", "--env_path", type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
-    database_parent.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
-    add_benchmark_argument(database_parent)
-    add_resource_multiplier_arguments(database_parent)
-    add_snakemake_override_arguments(database_parent)
     
     subparser_database = subparsers.add_parser("database", help="Install or update managed annotation database releases used by Drakkar workflows")
     database_subparsers = subparser_database.add_subparsers(dest="database_name", help="Managed databases")
@@ -319,6 +324,16 @@ def build_parser():
     database_pfam = database_subparsers.add_parser("pfam", parents=[database_parent], help="Install or update the PFAM database")
     database_vfdb = database_subparsers.add_parser("vfdb", parents=[database_parent], help="Install or update the VFDB database")
     database_amr = database_subparsers.add_parser("amr", parents=[database_parent], help="Install or update the AMR database")
+
+    database_latest = database_subparsers.add_parser("latest", help="Check the upstream sources and report which configured databases are out of date")
+    database_latest.add_argument("databases", nargs="*", default=[], help="Databases to check (default: all of them)")
+    database_latest.add_argument("--timeout", type=int, default=DEFAULT_LATEST_TIMEOUT, help=f"Seconds to wait for each source before giving up (default: {DEFAULT_LATEST_TIMEOUT})")
+
+    database_update = database_subparsers.add_parser("update", parents=[database_launch_parent], help="Install the newest release of every configured database that is out of date")
+    database_update.add_argument("databases", nargs="*", default=[], help="Databases to update (default: all of them)")
+    database_update.add_argument("--yes", dest="assume_yes", action="store_true", help="Download and install the releases. Dry run unless this is given")
+    database_update.add_argument("--no-set-default", dest="set_default", action="store_false", help="Install the releases without repointing config.yaml at them")
+    database_update.add_argument("--timeout", type=int, default=DEFAULT_LATEST_TIMEOUT, help=f"Seconds to wait for each source before giving up (default: {DEFAULT_LATEST_TIMEOUT})")
     
     subparser_environments = subparsers.add_parser("environments", help="Pre-build Drakkar conda environments, or list and prune the ones no longer in use")
     subparser_environments.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
@@ -558,16 +573,19 @@ def build_parser():
         ],
     )
     
-    subparser_database.description = "Install or update one managed annotation database release and optionally make it the default in config.yaml."
+    subparser_database.description = "Install a managed database release, or check the configured ones for updates."
     _set_help_metadata(
         subparser_database,
         category="Operations and management",
         examples=[
+            "drakkar database latest",
+            "drakkar database update --yes",
             "drakkar database kegg --directory /db/kofams --version 2026-02-01",
             "drakkar database vfdb --directory /db/vfdb --set-default",
         ],
         command_groups=[
             ("Managed Databases", ["kegg", "cazy", "pfam", "vfdb", "amr"]),
+            ("Version Checks", ["latest", "update"]),
         ],
         sections=[
             ("General", ["help"]),
@@ -623,6 +641,39 @@ def build_parser():
                 ("SLURM Overrides", ["slurm_partition", "slurm_account", "slurm_constraint", "slurm_nodes", "slurm_nodelist", "slurm_qos", "slurm_extra"]),
             ],
         )
+
+    database_latest.description = "Report which configured databases have a newer release upstream."
+    _set_help_metadata(
+        database_latest,
+        category="Database management",
+        examples=[
+            "drakkar database latest",
+            "drakkar database latest kegg pfam",
+        ],
+        sections=[
+            ("Version Check", ["databases", "timeout"]),
+            ("General", ["help"]),
+        ],
+    )
+
+    database_update.description = "Install the newest release of every configured database that is behind."
+    _set_help_metadata(
+        database_update,
+        category="Database management",
+        examples=[
+            "drakkar database update",
+            "drakkar database update --yes",
+            "drakkar database update kegg pfam --yes",
+        ],
+        sections=[
+            ("Update Selection", ["databases", "assume_yes", "set_default", "timeout"]),
+            ("Run Configuration", ["download_runtime", "env_path", "profile", "overwrite", "skip_benchmark"]),
+            ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
+            ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
+            ("SLURM Overrides", ["slurm_partition", "slurm_account", "slurm_constraint", "slurm_nodes", "slurm_nodelist", "slurm_qos", "slurm_extra"]),
+            ("General", ["help"]),
+        ],
+    )
     
     subparser_environments.description = "Pre-build workflow conda environments before launching production runs, or inspect the environment directory and remove environments left behind by earlier Drakkar versions."
     _set_help_metadata(

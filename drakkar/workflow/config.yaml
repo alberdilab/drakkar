@@ -37,6 +37,14 @@ GENOMAD_MODULE: "genomad/1.11.0"
 FOLDSEEK_MODULE: "foldseek/9.427df8a"
 
 # Annotation databases
+
+# Base directory holding the database releases Drakkar installs itself. The
+# per-database commands default --directory to DATABASES_DIR/<database>, so
+# "drakkar database pfam --version Pfam38.2" installs into
+# DATABASES_DIR/pfam/Pfam38.2. Databases installed by other tools (GTDB,
+# CheckM2, SingleM, geNomad, eggNOG) are unaffected and keep their own paths.
+DATABASES_DIR: "/maps/projects/alberdilab/data/databases/drakkar"
+
 CHECKM2_DB: "/maps/datasets/globe_databases/checkm2/20250215/CheckM2_database/uniref100.KO.1.dmnd"
 GTDB_DB: "/maps/datasets/globe_databases/gtdbtk_db/20260426/release232"
 GTDB_DB_232: "/maps/datasets/globe_databases/gtdbtk_db/20260426/release232"

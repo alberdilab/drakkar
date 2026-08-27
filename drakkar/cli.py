@@ -31,6 +31,8 @@ from drakkar import cli_main as _cli_main
 from drakkar import cli_parser as _cli_parser
 from drakkar import cli_validation as _cli_validation
 from drakkar import database_checks as _database_checks
+from drakkar import database_latest as _database_latest
+from drakkar import database_update as _database_update
 from drakkar import config_commands as _config_commands
 from drakkar import environments as _environments
 from drakkar import failures as _failures
@@ -120,6 +122,20 @@ manifest_provenance = _database_checks.manifest_provenance
 compare_database_provenance = _database_checks.compare_database_provenance
 stale_outputs_for = _database_checks.stale_outputs_for
 check_database_provenance = _database_checks.check_database_provenance
+
+LATEST_SOURCES = _database_latest.LATEST_SOURCES
+LatestRelease = _database_latest.LatestRelease
+installed_version = _database_latest.installed_version
+normalize_latest_names = _database_latest.normalize_latest_names
+resolve_latest = _database_latest.resolve_latest
+resolve_all = _database_latest.resolve_all
+run_database_latest = _database_latest.run_database_latest
+
+DatabaseUpdate = _database_update.DatabaseUpdate
+plan_database_updates = _database_update.plan_database_updates
+print_update_plan = _database_update.print_update_plan
+apply_database_updates = _database_update.apply_database_updates
+run_database_update = _database_update.run_database_update
 
 get_modules_to_run = _run_metadata.get_modules_to_run
 build_snakemake_log_path = _run_metadata.build_snakemake_log_path
@@ -600,6 +616,8 @@ def _sync_main_dependencies():
     _cli_main.view_config = view_config
     _cli_main.edit_config = edit_config
     _cli_main.set_default_database_path = set_default_database_path
+    _cli_main.run_database_latest = run_database_latest
+    _cli_main.run_database_update = run_database_update
 
 
 def main():

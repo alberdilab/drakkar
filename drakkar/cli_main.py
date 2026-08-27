@@ -1,5 +1,6 @@
 import json
 import os
+import subprocess
 from pathlib import Path
 
 from drakkar.cli_context import (
@@ -21,13 +22,20 @@ from drakkar.cli_validation import (
     validate_managed_database_version,
 )
 from drakkar.config_commands import edit_config, set_default_database_path, view_config
+from drakkar.database_latest import DEFAULT_TIMEOUT as DEFAULT_LATEST_TIMEOUT, run_database_latest
+from drakkar.database_update import run_database_update
 from drakkar.database_checks import (
     check_database_artifacts,
     check_database_provenance,
     collect_database_provenance,
     module_requirements,
 )
-from drakkar.database_registry import MANAGED_DATABASES, database_release_dir, normalize_managed_database_name
+from drakkar.database_registry import (
+    MANAGED_DATABASES,
+    database_base_directory,
+    database_release_dir,
+    normalize_managed_database_name,
+)
 from drakkar.environments import run_environments_list, run_environments_prune
 from drakkar.output import print, section
 from drakkar.output_paths import prepare_output_directory, validate_path
@@ -85,9 +93,34 @@ def main():
         getattr(args, "list_environments", False) or getattr(args, "prune_environments", False)
     )
 
+    # Checking database versions against their upstream sources downloads
+    # nothing and touches no output directory, so it skips the screen check and
+    # the validation below in the same way the read-only commands do.
+    database_version_check = args.command == "database" and getattr(args, "database_name", None) == "latest"
+
+    # A dry-run update downloads nothing, so it skips the screen check the way
+    # the read-only commands do. With --yes it launches hours of downloads and
+    # the warning applies as usual.
+    database_update_dry_run = (
+        args.command == "database"
+        and getattr(args, "database_name", None) == "update"
+        and not getattr(args, "assume_yes", False)
+    )
+
     # Check screen session
-    if args.command not in READ_ONLY_COMMANDS and not environments_maintenance:
+    if (
+        args.command not in READ_ONLY_COMMANDS
+        and not environments_maintenance
+        and not database_version_check
+        and not database_update_dry_run
+    ):
         check_screen_session()
+
+    if database_version_check:
+        return run_database_latest(
+            getattr(args, "databases", None),
+            timeout=getattr(args, "timeout", None) or DEFAULT_LATEST_TIMEOUT,
+        )
 
     path_checks = [
         (getattr(args, "input", None), "Input", True),
@@ -134,7 +167,15 @@ def main():
             return
         args.binners = normalized_binners
 
-    if args.command == "database":
+    database_update_run = args.command == "database" and getattr(args, "database_name", None) == "update"
+
+    if database_update_run:
+        normalized_download_runtime = validate_download_runtime(getattr(args, "download_runtime", None))
+        if normalized_download_runtime is None:
+            return
+        args.download_runtime = normalized_download_runtime
+
+    if args.command == "database" and not database_update_run:
         normalized_database_name = normalize_managed_database_name(getattr(args, "database_name", None))
         if not normalized_database_name:
             print(f"{ERROR}ERROR:{RESET} Supported database commands are: {', '.join(MANAGED_DATABASES)}")
@@ -146,6 +187,16 @@ def main():
         normalized_download_runtime = validate_download_runtime(getattr(args, "download_runtime", None))
         if normalized_download_runtime is None:
             return
+        if not getattr(args, "directory", None):
+            default_directory = database_base_directory(
+                normalized_database_name, config_vars.get("DATABASES_DIR")
+            )
+            if default_directory is None:
+                print(f"{ERROR}ERROR:{RESET} No --directory given and DATABASES_DIR is not set in config.yaml.")
+                print(f"{INFO}Pass --directory, or set DATABASES_DIR with 'drakkar config --edit'.{RESET}")
+                return
+            args.directory = str(default_directory)
+            print(f"{INFO}INFO:{RESET} No --directory provided; using {args.directory} from DATABASES_DIR.")
         if Path(args.directory).exists() and Path(args.directory).is_file():
             print(f"{ERROR}ERROR:{RESET} --directory must be a directory path, not a file: {args.directory}")
             return
@@ -162,12 +213,16 @@ def main():
 
     if args.command == "transfer":
         output_dir = getattr(args, "local_dir", os.getcwd())
+    elif database_update_run:
+        # Each release installed by "update" gets its own output directory,
+        # prepared inside the loop below.
+        output_dir = None
     elif args.command == "database":
         output_dir = database_release_dir(args.database_name, args.directory, args.version)
     else:
         output_dir = getattr(args, "output", os.getcwd())
 
-    if args.command in overwrite_capable_commands:
+    if args.command in overwrite_capable_commands and not database_update_run:
         if not prepare_output_directory(output_dir, overwrite=getattr(args, "overwrite", False)):
             return
 
@@ -192,7 +247,7 @@ def main():
             return
 
     run_info = None
-    if args.command in WORKFLOW_RUN_COMMANDS and not environments_maintenance:
+    if args.command in WORKFLOW_RUN_COMMANDS and not environments_maintenance and not database_update_run:
         run_info = write_launch_metadata(
             args,
             output_dir,
@@ -287,6 +342,51 @@ def main():
             run_info,
             snakemake_flags=snakemake_flags,
             slurm_resources=slurm_resources,
+        )
+
+    elif database_update_run:
+        section("UPDATING DRAKKAR DATABASES")
+
+        def install_database_release(update):
+            # One install per release directory, so each keeps its own lock,
+            # log, failure report and database_versions.yaml.
+            if not prepare_output_directory(update.release_dir, overwrite=args.overwrite):
+                return False
+            install_info = write_launch_metadata(args, update.release_dir, env_path=env_path)
+            if not install_info:
+                return False
+            try:
+                run_snakemake_database(
+                    "database",
+                    update.release_dir.name,
+                    update.release_dir.resolve(),
+                    env_path,
+                    args.profile,
+                    update.name,
+                    Path(update.base_directory).resolve(),
+                    update.latest,
+                    args.download_runtime,
+                    args.memory_multiplier,
+                    args.time_multiplier,
+                    install_info,
+                    snakemake_flags=snakemake_flags,
+                    slurm_resources=slurm_resources,
+                )
+            except subprocess.CalledProcessError:
+                return False
+            if args.set_default:
+                for config_key, default_path in set_default_database_path(
+                    update.name, Path(update.base_directory).resolve(), update.latest
+                ).items():
+                    print(f"{INFO}INFO:{RESET} Updated {config_key} in config.yaml to {default_path}")
+            return True
+
+        return run_database_update(
+            args.databases,
+            install=install_database_release,
+            timeout=args.timeout or DEFAULT_LATEST_TIMEOUT,
+            assume_yes=args.assume_yes,
+            set_default=args.set_default,
         )
 
     elif args.command == "database":

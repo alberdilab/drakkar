@@ -16,7 +16,9 @@ Operations overview
      - Purpose
      - Typical use
    * - ``drakkar database``
-     - Install or update supported annotation database releases.
+     - Install supported annotation database releases, check the configured ones
+       against their sources with ``drakkar database latest``, or bring them all
+       up to date with ``drakkar database update``.
      - Prepare KEGG, CAZy, PFAM, AMR, or VFDB resources before annotation.
    * - ``drakkar config``
      - View or edit the installed workflow configuration.
@@ -53,11 +55,19 @@ Supported database subcommands:
 - ``pfam``
 - ``vfdb``
 - ``amr``
+- ``latest`` (reports newer releases instead of installing one; see
+  `Checking for newer releases`_)
+- ``update`` (installs every outdated release in one command; see
+  `Updating every outdated database`_)
 
 Foldseek/ProstT5 structure annotation and its database installer remain work in
 progress and are not available through the Drakkar 2.0.0 CLI.
 
 Examples:
+
+.. code-block:: console
+
+   $ drakkar database amr --version 2025-07-16.1
 
 .. code-block:: console
 
@@ -86,6 +96,11 @@ Examples:
 Options:
 
 - ``--directory``: base directory where the release folder will be created.
+  Optional: it defaults to ``DATABASES_DIR/<database>`` from ``config.yaml``,
+  so ``drakkar database pfam --version Pfam38.2`` installs into
+  ``DATABASES_DIR/pfam/Pfam38.2``. KEGG releases live under ``kofams``. Pass
+  ``--directory`` to install somewhere else, and set ``DATABASES_DIR`` with
+  ``drakkar config --edit`` if the command reports that it is unset.
 - ``--version``: folder name to create inside ``--directory``. For ``kegg``,
   use the KEGG archive date such as ``2026-02-01``. For ``cazy``, use the
   upstream dbCAN release label such as ``V14``. For ``pfam``, use the Pfam
@@ -151,6 +166,122 @@ Version logging:
   directory.
 - The log records the requested version, resolved install directory, source
   URLs, source-version label, and installed asset checksums and file sizes.
+
+Checking for newer releases
+---------------------------
+
+``drakkar database latest`` queries each database source and compares its newest
+release with the version wired into ``config.yaml``. Nothing is downloaded or
+installed, and no output directory is touched.
+
+.. code-block:: console
+
+   $ drakkar database latest
+
+.. code-block:: console
+
+   $ drakkar database latest kegg pfam
+
+.. code-block:: text
+
+   DATABASE               CONFIGURED       LATEST           STATUS
+   amr                    2025-07-16.1     2026-08-07.1     outdated
+   cazy                   V14              V15              outdated
+   gtdb                   232              232              up to date
+
+Every outdated database is followed by the command that installs the newer
+release, so the reported version can be applied directly.
+
+Databases that can be checked:
+
+- ``kegg`` (alias: ``kofams``), ``cazy``, ``pfam``, ``vfdb``, ``amr`` and
+  ``foldseek``, using the release directory recorded in ``config.yaml``.
+- ``gtdb``, read from the ``GTDB_DB`` entry. GTDB reference data is installed by
+  GTDB-Tk rather than by DRAKKAR, so its row reports the newest release without
+  offering an install command.
+
+Options:
+
+- ``databases``: names to check. All of them are checked when none is given.
+- ``--timeout``: seconds to wait for each source before giving up
+  (default: ``20``).
+
+Behavior:
+
+- ``vfdb`` and ``foldseek`` have no upstream version numbers, so their releases
+  are compared by date: the download date the release folder is named after
+  against the ``Last-Modified`` date of the source file.
+- ``cazy`` publishes no directory listing, so consecutive dbCAN release numbers
+  are requested until one is missing.
+- A source that cannot be reached is reported as ``unknown`` for that database
+  only. The command still reports every other database and exits ``0``, so an
+  unreachable mirror never blocks the check.
+- Installing a newer release does not rebuild existing outputs. See
+  `Cross-run consistency check`_ for what happens on the next run in a
+  directory built with the earlier release.
+
+Updating every outdated database
+--------------------------------
+
+``drakkar database update`` runs the version check above and then installs the
+newest release of every managed database that is behind, one after another,
+without naming each one by hand.
+
+.. code-block:: console
+
+   $ drakkar database update
+
+.. code-block:: console
+
+   $ drakkar database update --yes
+
+.. code-block:: console
+
+   $ drakkar database update kegg pfam --yes
+
+The command prints its plan and stops unless ``--yes`` is given, because a full
+update downloads tens of gigabytes and then repoints ``config.yaml`` at the new
+releases:
+
+.. code-block:: text
+
+   The following databases will be installed:
+
+     pfam Pfam37.4 -> Pfam38.2
+       into: /db/pfam/Pfam38.2
+       config.yaml key: PFAM_DB
+
+   7 database(s) checked: 5 to install, 1 up to date, 1 skipped.
+
+Options:
+
+- ``databases``: names to update. All of them are checked when none is given.
+- ``--yes``: download and install. Without it the command is a dry run.
+- ``--no-set-default``: install the releases but leave ``config.yaml`` alone.
+  The paths to set are printed at the end.
+- ``--timeout``: seconds to wait for each source before giving up.
+- The install options of the per-database commands also apply:
+  ``--download-runtime``, ``--overwrite``, ``-e/--env_path``, ``-p/--profile``,
+  and the resource, Snakemake and SLURM overrides.
+
+Behavior:
+
+- Each release is installed into a new folder beside the configured one, by the
+  same workflow ``drakkar database <name>`` runs. Each install keeps its own
+  Snakemake working directory, so ``drakkar logging -o <release_dir>``,
+  ``drakkar unlock -o <release_dir>``, the failure report and
+  ``database_versions.yaml`` work exactly as they do for a single install.
+- The installs run sequentially, and one that fails does not stop the others.
+  Failed databases are listed at the end with the command that inspects them,
+  and ``config.yaml`` is never repointed at a release that failed to install.
+- Databases that are up to date are left alone. Databases DRAKKAR does not
+  install, such as GTDB, are reported with the newest release available and
+  skipped, as are any whose source could not be reached.
+- Unless ``--no-set-default`` is given, each installed release becomes the
+  default in ``config.yaml``. Existing outputs were built with the earlier
+  releases, so rerunning a directory that holds them needs
+  ``--allow-database-change`` or the affected outputs deleted. See
+  `Cross-run consistency check`_.
 
 Database preflight checks
 -------------------------

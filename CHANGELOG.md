@@ -8,6 +8,35 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.3.0] - 2026-08-27
+
+### Added
+
+- `drakkar database latest` queries each database source and reports whether the
+  release wired into `config.yaml` is still the newest one available, printing
+  the install command for every database that is behind. Nothing is downloaded
+  and no output directory is touched. It covers the managed databases (`kegg`,
+  `cazy`, `pfam`, `vfdb`, `amr`, `foldseek`) plus the GTDB reference data read
+  from `GTDB_DB`. Sources are queried in parallel, and one that cannot be
+  reached is reported as `unknown` for that database instead of failing the
+  command.
+- `drakkar database update` installs the newest release of every managed
+  database that is behind, in one command instead of one invocation per
+  database. It prints its plan and stops unless `--yes` is given, installs each
+  release beside the configured one using the same per-database workflow, and
+  repoints `config.yaml` at the releases that installed successfully
+  (`--no-set-default` opts out). Installs run sequentially so each keeps its own
+  Snakemake lock, log, failure report and `database_versions.yaml`; one that
+  fails does not stop the others and never repoints `config.yaml`.
+- `config.yaml` gained a `DATABASES_DIR` entry naming the base directory that
+  holds the database releases Drakkar installs. `--directory` is now optional on
+  every `drakkar database <name>` command and defaults to
+  `DATABASES_DIR/<database>`, so a release can be installed with just
+  `drakkar database pfam --version Pfam38.2`. Passing `--directory` still wins,
+  and the command explains what to set when neither is available. Databases
+  installed by other tools (GTDB, CheckM2, SingleM, geNomad, eggNOG) keep their
+  own paths and are unaffected.
+
 ## [2.2.0] - 2026-08-26
 
 ### Added

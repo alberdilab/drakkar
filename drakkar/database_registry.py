@@ -5,6 +5,7 @@ from pathlib import Path
 
 MANAGED_DATABASES = {
     "kegg": {
+        "directory_name": "kofams",
         "aliases": ["kofams"],
         "config_key": "KEGG_DB",
         "basename": "kofams",
@@ -16,6 +17,7 @@ MANAGED_DATABASES = {
         ],
     },
     "cazy": {
+        "directory_name": "cazy",
         "aliases": [],
         "config_key": "CAZY_DB",
         "basename": "cazy",
@@ -25,6 +27,7 @@ MANAGED_DATABASES = {
         ],
     },
     "pfam": {
+        "directory_name": "pfam",
         "aliases": [],
         "config_key": "PFAM_DB",
         "basename": "pfam",
@@ -35,6 +38,7 @@ MANAGED_DATABASES = {
         ],
     },
     "vfdb": {
+        "directory_name": "vfdb",
         "aliases": [],
         "config_key": "VFDB_DB",
         "basename": "vfdb",
@@ -44,6 +48,7 @@ MANAGED_DATABASES = {
         ],
     },
     "amr": {
+        "directory_name": "amr",
         "aliases": [],
         "config_key": "AMR_DB",
         "basename": "amr",
@@ -54,6 +59,7 @@ MANAGED_DATABASES = {
         ],
     },
     "foldseek": {
+        "directory_name": "foldseek",
         "aliases": [],
         # Bundled database: one release dir holds three artifacts, each wired to
         # its own config key (see config_targets). basename/config_key point at
@@ -89,6 +95,18 @@ def normalize_managed_database_name(name: str) -> str | None:
     if normalized in MANAGED_DATABASES:
         return normalized
     return None
+
+
+def database_base_directory(database_name: str, databases_dir: str | Path | None) -> Path | None:
+    """Where this database's release directories live under DATABASES_DIR.
+
+    Returns None when no base directory is configured, so callers can fall back
+    to an explicit --directory.
+    """
+    databases_dir = str(databases_dir or "").strip()
+    if not databases_dir:
+        return None
+    return Path(databases_dir) / MANAGED_DATABASES[database_name]["directory_name"]
 
 
 def database_release_dir(database_name: str, base_directory: str | Path, version: str) -> Path:

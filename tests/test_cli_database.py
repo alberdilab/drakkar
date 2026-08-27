@@ -16,6 +16,7 @@ from drakkar.cli import (
 )
 from drakkar.database_registry import (
     database_artifact_path,
+    database_base_directory,
     database_release_from_config,
     database_source_version_label,
     database_sources,
@@ -169,6 +170,62 @@ class DatabaseCommandTests(unittest.TestCase):
                 config_path.read_text(encoding="utf-8"),
                 'KEGG_DB: "/tmp/kofams/2026-02-01"\n',
             )
+
+
+class DatabaseBaseDirectoryTests(unittest.TestCase):
+    def test_base_directory_uses_the_release_folder_name_of_the_database(self) -> None:
+        # KEGG releases live under "kofams", not under "kegg".
+        self.assertEqual(
+            database_base_directory("kegg", "/db"),
+            Path("/db/kofams"),
+        )
+
+    def test_base_directory_matches_the_database_name_elsewhere(self) -> None:
+        self.assertEqual(database_base_directory("pfam", "/db"), Path("/db/pfam"))
+
+    def test_base_directory_is_none_when_databases_dir_is_unset(self) -> None:
+        self.assertIsNone(database_base_directory("pfam", None))
+        self.assertIsNone(database_base_directory("pfam", "  "))
+
+
+class DatabaseDirectoryDefaultTests(unittest.TestCase):
+    def _install(self, argv, config):
+        from drakkar import cli_main
+
+        with patch.object(cli_module, "config_vars", config), \
+                patch.object(cli_main, "check_screen_session"), \
+                patch.object(cli_module, "prepare_output_directory", return_value=True), \
+                patch.object(cli_module, "write_launch_metadata", return_value={"run_id": "1"}), \
+                patch.object(cli_module, "run_snakemake_database") as launched, \
+                patch.object(cli_module.sys, "argv", argv):
+            with contextlib.redirect_stdout(io.StringIO()) as output:
+                cli_module.main()
+        return launched, output.getvalue()
+
+    def test_directory_defaults_to_the_configured_databases_dir(self) -> None:
+        launched, rendered = self._install(
+            ["drakkar", "database", "pfam", "--version", "Pfam38.2"],
+            {"DATABASES_DIR": "/db", "ENVIRONMENTS_DIR": "/envs"},
+        )
+        launched.assert_called_once()
+        self.assertEqual(launched.call_args.args[6], Path("/db/pfam"))
+        self.assertEqual(launched.call_args.args[2], Path("/db/pfam/Pfam38.2"))
+        self.assertIn("using /db/pfam from DATABASES_DIR", rendered)
+
+    def test_explicit_directory_still_wins(self) -> None:
+        launched, _ = self._install(
+            ["drakkar", "database", "pfam", "--version", "Pfam38.2", "--directory", "/elsewhere"],
+            {"DATABASES_DIR": "/db", "ENVIRONMENTS_DIR": "/envs"},
+        )
+        self.assertEqual(launched.call_args.args[6], Path("/elsewhere"))
+
+    def test_missing_directory_and_databases_dir_is_an_error(self) -> None:
+        launched, rendered = self._install(
+            ["drakkar", "database", "pfam", "--version", "Pfam38.2"],
+            {"ENVIRONMENTS_DIR": "/envs"},
+        )
+        launched.assert_not_called()
+        self.assertIn("DATABASES_DIR is not set", rendered)
 
 
 if __name__ == "__main__":
