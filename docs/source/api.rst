@@ -34,6 +34,11 @@ annotating
 ^^^^^^^^^^
 Taxonomic and functional annotation.
 
+amr
+^^^
+Assembly-level AMRFinderPlus and CARD/RGI reconciliation with geNomad mobility
+context. See :doc:`workflows` for assembly directory and manifest formats.
+
 expressing
 ^^^^^^^^^^
 Metatranscriptome mapping to annotated genes.

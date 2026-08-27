@@ -37,6 +37,7 @@ from drakkar.database_registry import (
     normalize_managed_database_name,
 )
 from drakkar.environments import run_environments_list, run_environments_prune
+from drakkar.amr_inputs import write_amr_assemblies_manifest
 from drakkar.output import print, section
 from drakkar.output_paths import prepare_output_directory, validate_path
 from drakkar.quality import validate_and_write_quality_file
@@ -66,6 +67,7 @@ from drakkar.utils import (
     path_mags_to_json,
 )
 from drakkar.workflow_launcher import (
+    run_snakemake_amr,
     run_snakemake_annotating,
     run_snakemake_cataloging,
     run_snakemake_database,
@@ -208,7 +210,7 @@ def main():
 
     overwrite_capable_commands = {
         "complete", "preprocessing", "cataloging", "profiling", "dereplicating",
-        "annotating", "inspecting", "expressing", "database",
+        "annotating", "amr", "inspecting", "expressing", "database",
     }
 
     if args.command == "transfer":
@@ -221,6 +223,21 @@ def main():
         output_dir = database_release_dir(args.database_name, args.directory, args.version)
     else:
         output_dir = getattr(args, "output", os.getcwd())
+
+    if args.command == "amr" and getattr(args, "overwrite", False):
+        output_path = Path(output_dir).resolve()
+        source_values = [getattr(args, "input", None), getattr(args, "file", None)]
+        for source_value in source_values:
+            if not source_value:
+                continue
+            source_path = Path(source_value).resolve()
+            if source_path == output_path or output_path in source_path.parents:
+                print(
+                    f"{ERROR}ERROR:{RESET} --overwrite cannot be used when an AMR input "
+                    f"({source_path}) is inside the output directory ({output_path})."
+                )
+                print(f"{INFO}Choose a separate output directory or rerun without --overwrite.{RESET}")
+                return
 
     if args.command in overwrite_capable_commands and not database_update_run:
         if not prepare_output_directory(output_dir, overwrite=getattr(args, "overwrite", False)):
@@ -417,6 +434,47 @@ def main():
 
     else:            
         project_name = os.path.basename(os.path.normpath(args.output))
+
+    ###
+    # Assembly-level antimicrobial resistance
+    ###
+
+    if args.command == "amr":
+        section("STARTING AMR PIPELINE")
+        if args.file and args.input:
+            print("Both an assembly manifest and input directory were provided.")
+            print("DRAKKAR will continue with the assembly manifest.")
+        elif args.file:
+            print("DRAKKAR will run with the assemblies in the manifest.")
+        elif args.input:
+            print("DRAKKAR will discover assemblies in the input directory.")
+
+        write_amr_assemblies_manifest(
+            output=args.output,
+            input_dir=None if args.file else args.input,
+            table=args.file,
+            default_type=args.assembly_type,
+        )
+        run_snakemake_amr(
+            "amr",
+            project_name,
+            args.output,
+            env_path,
+            args.profile,
+            assembly_type=args.assembly_type,
+            rgi_alignment_tool=args.rgi_alignment_tool,
+            rgi_include_loose=args.rgi_include_loose,
+            rgi_include_nudge=args.rgi_include_nudge,
+            genomad_preset=args.genomad_preset,
+            genomad_splits=args.genomad_splits,
+            locus_overlap=args.locus_overlap,
+            memory_multiplier=args.memory_multiplier,
+            time_multiplier=args.time_multiplier,
+            run_info=run_info,
+            snakemake_flags=snakemake_flags,
+            slurm_resources=slurm_resources,
+        )
+        return
 
     ###
     # Preprocessing

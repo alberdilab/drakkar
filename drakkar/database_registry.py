@@ -58,6 +58,30 @@ MANAGED_DATABASES = {
             "https://ftp.ncbi.nlm.nih.gov/hmm/NCBIfam-AMRFinder/{version}/NCBIfam-AMRFinder.tsv",
         ],
     },
+    "amrfinderplus": {
+        "directory_name": "amrfinderplus",
+        "aliases": ["amrfinder"],
+        "config_key": "AMRFINDER_DB",
+        "basename": "AMRProt.fa",
+        "version_label": "requested AMRFinderPlus database version",
+        # AMRFinderPlus 4.2.x is pinned in workflow/envs/amr_amrfinder.yaml.
+        # Database releases are partitioned upstream by compatible software
+        # minor version, and amrfinder_index prepares the files from this exact
+        # release directory during installation.
+        "sources": [
+            "https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/4.2/{version}/",
+        ],
+    },
+    "card": {
+        "directory_name": "card",
+        "aliases": [],
+        "config_key": "CARD_DB",
+        "basename": "card.json",
+        "version_label": "requested CARD data version",
+        "sources": [
+            "https://card.mcmaster.ca/download/0/broadstreet-v{version}.tar.bz2",
+        ],
+    },
     "foldseek": {
         "directory_name": "foldseek",
         "aliases": [],
@@ -165,6 +189,10 @@ def database_source_version_label(database_name: str, version: str | None = None
         return f"VFDB_setB downloaded {version}"
     if database_name == "amr" and version:
         return f"NCBIfam-AMRFinder {version}"
+    if database_name == "amrfinderplus" and version:
+        return f"AMRFinderPlus database {version} (software 4.2.x)"
+    if database_name == "card" and version:
+        return f"CARD {version}"
     if database_name == "foldseek" and version:
         return f"Foldseek AlphaFold/Swiss-Prot + UniProt Swiss-Prot downloaded {version}"
     return MANAGED_DATABASES[database_name]["version_label"]

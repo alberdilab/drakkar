@@ -220,6 +220,116 @@ if DATABASE_NAME == "amr":
             touch {output}
             """
 
+if DATABASE_NAME == "amrfinderplus":
+    rule prepare_database:
+        output:
+            touch(f"{OUTPUT_DIR}/amrfinderplus.done")
+        params:
+            source=DATABASE_SOURCES[0],
+            staging=f"{OUTPUT_DIR}/amrfinderplus.download",
+            expected_version=DATABASE_VERSION
+        threads: 1
+        conda:
+            f"{PACKAGE_DIR}/workflow/envs/amr_amrfinder.yaml"
+        resources:
+            runtime=lambda wildcards, attempt: cap_runtime(DOWNLOAD_RUNTIME * 2 ** (attempt - 1))
+        shell:
+            r"""
+            set -euo pipefail
+            rm -rf {params.staging:q}
+            mkdir -p {params.staging:q}
+
+            for filename in \
+                AMR.LIB \
+                AMRProt.fa \
+                AMRProt-mutation.tsv \
+                AMRProt-suppress.tsv \
+                AMRProt-susceptible.fa \
+                AMRProt-susceptible.tsv \
+                AMR_CDS.fa \
+                database_format_version.txt \
+                fam.tsv \
+                taxgroup.tsv \
+                version.txt \
+                changes.txt
+            do
+                curl -L --fail \
+                    --output "{params.staging}/$filename" \
+                    "{params.source}$filename"
+            done
+
+            while read -r taxgroup gpipe mutation_count rest
+            do
+                case "$taxgroup" in
+                    ""|\#*) continue ;;
+                esac
+                if [ "$mutation_count" -gt 0 ] 2>/dev/null
+                then
+                    for extension in fa tsv
+                    do
+                        filename="AMR_DNA-${{taxgroup}}.${{extension}}"
+                        curl -L --fail \
+                            --output "{params.staging}/$filename" \
+                            "{params.source}$filename"
+                    done
+                fi
+            done < {params.staging:q}/taxgroup.tsv
+
+            if ! grep -Fxq {params.expected_version:q} {params.staging:q}/version.txt
+            then
+                echo "Downloaded AMRFinderPlus database version does not match requested version {params.expected_version}." >&2
+                cat {params.staging:q}/version.txt >&2
+                exit 1
+            fi
+
+            amrfinder_index {params.staging:q}
+            test -s {params.staging:q}/AMRProt.fa.phr
+            test -s {params.staging:q}/AMRProt.fa.pin
+            test -s {params.staging:q}/AMRProt.fa.psq
+
+            cp -a {params.staging:q}/. {OUTPUT_DIR:q}/
+            rm -rf {params.staging:q}
+            touch {output}
+            """
+
+if DATABASE_NAME == "card":
+    rule prepare_database:
+        output:
+            touch(f"{OUTPUT_DIR}/card.done")
+        params:
+            archive=f"{OUTPUT_DIR}/card-data.tar.bz2",
+            staging=f"{OUTPUT_DIR}/card.download",
+            url=DATABASE_SOURCES[0],
+            validator=f"{PACKAGE_DIR}/workflow/scripts/validate_card_database.py",
+            expected_version=DATABASE_VERSION
+        threads: 1
+        conda:
+            f"{PACKAGE_DIR}/workflow/envs/amr_rgi.yaml"
+        resources:
+            runtime=lambda wildcards, attempt: cap_runtime(DOWNLOAD_RUNTIME * 2 ** (attempt - 1))
+        shell:
+            r"""
+            set -euo pipefail
+            rm -f {params.archive:q}
+            rm -rf {params.staging:q} {OUTPUT_DIR:q}/localDB
+            mkdir -p {params.staging:q}
+
+            curl -L --fail --output {params.archive:q} {params.url:q}
+            tar -xjf {params.archive:q} -C {params.staging:q} ./card.json
+            python {params.validator:q} \
+                {params.staging:q}/card.json \
+                --expect {params.expected_version:q}
+            mv {params.staging:q}/card.json {TARGET_DB:q}
+            rm -rf {params.staging:q}
+            rm -f {params.archive:q}
+
+            cd {OUTPUT_DIR:q}
+            rgi load --card_json {TARGET_DB:q} --local
+            test -s {OUTPUT_DIR:q}/localDB/card.json
+            test -s {OUTPUT_DIR:q}/localDB/loaded_databases.json
+            touch {output}
+            """
+
 if DATABASE_NAME == "foldseek":
     rule prepare_database:
         output:
@@ -288,6 +398,19 @@ rule write_database_versions:
             checksums = [Path(f"{TARGET_DB}.idx"), Path(f"{TARGET_DB}.tsv")]
         elif DATABASE_NAME == "amr":
             checksums = [Path(str(TARGET_DB)), Path(f"{TARGET_DB}.tsv")]
+        elif DATABASE_NAME == "amrfinderplus":
+            checksums = [
+                Path(str(TARGET_DB)),
+                Path(f"{OUTPUT_DIR}/version.txt"),
+                Path(f"{OUTPUT_DIR}/database_format_version.txt"),
+                Path(f"{OUTPUT_DIR}/fam.tsv"),
+            ]
+        elif DATABASE_NAME == "card":
+            checksums = [
+                Path(str(TARGET_DB)),
+                Path(f"{OUTPUT_DIR}/localDB/card.json"),
+                Path(f"{OUTPUT_DIR}/localDB/loaded_databases.json"),
+            ]
         elif DATABASE_NAME == "foldseek":
             checksums = [Path(str(TARGET_DB)), Path(f"{OUTPUT_DIR}/foldseek_map.tsv")]
 

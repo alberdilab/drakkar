@@ -8,6 +8,25 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.4.0] - 2026-08-27
+
+### Added
+
+- ``drakkar amr`` accepts assembly manifests, flat FASTA directories, nested
+  assembly folders, or an existing ``cataloging/megahit`` tree; runs
+  AMRFinderPlus, CARD/RGI, and geNomad; preserves native hit evidence; reconciles
+  cross-caller coordinates into per-assembly loci; attaches plasmid, virus, and
+  provirus context; and writes cohort tables, zero-hit-aware QC, per-assembly
+  digests, and a checksum-bearing provenance manifest for downstream analysis.
+- ``drakkar database amrfinderplus`` and ``drakkar database card`` install the
+  complete runtime databases used by ``drakkar amr``. They discover and install
+  exact upstream releases, index AMRFinderPlus, load CARD into a release-local
+  RGI ``localDB``, record checksums and provenance, and update
+  ``AMRFINDER_DB``/``CARD_DB`` with ``--set-default``. Both targets participate
+  in ``database latest`` and ``database update``; an all-database update now
+  installs managed databases whose config keys are empty when ``DATABASES_DIR``
+  is configured.
+
 ## [2.3.0] - 2026-08-27
 
 ### Added

@@ -1,9 +1,9 @@
-"""Install the newest release of every managed database that has fallen behind.
+"""Install the newest release of every managed database that needs one.
 
 ``drakkar database update`` is ``drakkar database latest`` followed by the
 install command it prints, for each database at once. It reuses the discovery in
-:mod:`drakkar.database_latest` to decide what is outdated, then runs the ordinary
-per-database install workflow once per database.
+:mod:`drakkar.database_latest` to decide what is outdated or not yet configured,
+then runs the ordinary per-database install workflow once per database.
 
 The installs run one after another rather than as a single Snakemake session on
 purpose. Each release directory *is* the Snakemake working directory for its
@@ -24,18 +24,20 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from drakkar.cli_context import ERROR, INFO, RESET
+from drakkar.cli_context import ERROR, INFO, RESET, config_vars
 from drakkar.database_latest import (
     DEFAULT_TIMEOUT,
     LATEST_SOURCES,
     STATUS_AHEAD,
     STATUS_CURRENT,
     STATUS_OUTDATED,
+    STATUS_UNCONFIGURED,
     normalize_latest_names,
     resolve_all,
 )
 from drakkar.database_registry import (
     MANAGED_DATABASES,
+    database_base_directory,
     database_release_dir,
     database_release_from_config,
 )
@@ -49,7 +51,7 @@ class DatabaseUpdate:
     name: str
     label: str
     config_key: str
-    installed: str
+    installed: str | None
     latest: str
     base_directory: Path
     release_dir: Path
@@ -66,7 +68,8 @@ def plan_database_updates(names=None, timeout=DEFAULT_TIMEOUT, config=None):
     Returns ``(updates, skipped)``, where ``skipped`` pairs each untouched
     database with the reason it is being left alone.
     """
-    results = resolve_all(names, config=config, timeout=timeout)
+    active_config = config_vars if config is None else config
+    results = resolve_all(names, config=active_config, timeout=timeout)
     updates, skipped = [], []
     for result in results:
         if result.status == STATUS_CURRENT:
@@ -74,6 +77,25 @@ def plan_database_updates(names=None, timeout=DEFAULT_TIMEOUT, config=None):
         if result.status == STATUS_AHEAD:
             skipped.append((result, f"configured release {result.installed} is newer than the source lists"))
             continue
+        if result.status == STATUS_UNCONFIGURED and result.name in MANAGED_DATABASES and result.latest:
+            base_directory = database_base_directory(
+                result.name, (active_config or {}).get("DATABASES_DIR")
+            )
+            if base_directory is not None:
+                updates.append(
+                    DatabaseUpdate(
+                        name=result.name,
+                        label=result.label,
+                        config_key=result.config_key,
+                        installed=None,
+                        latest=result.latest,
+                        base_directory=base_directory,
+                        release_dir=database_release_dir(
+                            result.name, base_directory, result.latest
+                        ),
+                    )
+                )
+                continue
         if result.status != STATUS_OUTDATED:
             skipped.append((result, result.detail or "could not be checked"))
             continue
@@ -102,7 +124,8 @@ def print_update_plan(updates, skipped, checked, assume_yes):
         print("The following databases will be installed:")
         print("")
         for update in updates:
-            print(f"  {update.name} {update.installed} -> {update.latest}")
+            installed = update.installed or "not configured"
+            print(f"  {update.name} {installed} -> {update.latest}")
             print(f"    into: {update.release_dir}")
             print(f"    config.yaml key: {update.config_key}")
         print("")
@@ -170,7 +193,7 @@ def run_database_update(
         print(f"Databases that can be checked: {', '.join(LATEST_SOURCES)}")
         return 1
 
-    print("Checking the configured databases against their sources.")
+    print("Checking managed databases against their sources.")
     print("")
     updates, skipped = plan_database_updates(selected, timeout=timeout, config=config)
     print_update_plan(updates, skipped, len(selected), assume_yes)

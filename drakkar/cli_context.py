@@ -28,6 +28,7 @@ WORKFLOW_RUN_COMMANDS = {
     "profiling",
     "dereplicating",
     "annotating",
+    "amr",
     "inspecting",
     "expressing",
     "database",

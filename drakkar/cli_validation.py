@@ -160,6 +160,13 @@ def unit_interval_float(value):
         raise argparse.ArgumentTypeError("must be between 0 and 1")
     return parsed
 
+
+def positive_unit_interval_float(value):
+    parsed = unit_interval_float(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be greater than 0 and at most 1")
+    return parsed
+
 def add_resource_multiplier_arguments(parser):
     parser.add_argument(
         "--memory-multiplier",
@@ -383,4 +390,18 @@ def validate_managed_database_version(database_name, version):
             print(f"{ERROR}ERROR:{RESET} KEGG --version must be an archive date in YYYY-MM-DD format, e.g. 2026-02-01")
             return None
         return parsed.strftime("%Y-%m-%d")
+    if database_name == "amrfinderplus" and not re.fullmatch(
+        r"\d{4}-\d{2}-\d{2}\.\d+", version
+    ):
+        print(
+            f"{ERROR}ERROR:{RESET} AMRFinderPlus --version must use the upstream "
+            "YYYY-MM-DD.N format, e.g. 2026-08-07.1"
+        )
+        return None
+    if database_name == "card" and not re.fullmatch(r"\d+\.\d+\.\d+", version):
+        print(
+            f"{ERROR}ERROR:{RESET} CARD --version must use semantic X.Y.Z format, "
+            "e.g. 4.0.2"
+        )
+        return None
     return version

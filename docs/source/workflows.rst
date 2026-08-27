@@ -31,6 +31,11 @@ Workflow overview
    * - ``drakkar annotating``
      - Annotate MAGs taxonomically and functionally.
      - Taxonomy tables plus gene- and cluster-level annotation tables.
+   * - ``drakkar amr``
+     - Reconcile assembly-level AMRFinderPlus and CARD/RGI calls and attach
+       geNomad mobility context.
+     - Lossless evidence, reconciled loci, drug-class, mobility, QC, and
+       provenance tables under ``amr/``.
    * - ``drakkar expressing``
      - Map metatranscriptomes to annotated genes.
      - Gene expression tables under ``expressing/``.
@@ -342,6 +347,108 @@ The 2.0 gene table is intentionally not append- or column-compatible with 1.x.
 Regenerate the annotation outputs after upgrading; do not concatenate old and
 new tables. The complete migration procedure, including the required VFDB
 mapping rebuild, is documented under :ref:`migrating-gene-tables-2`.
+
+Assembly AMR and mobility context
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``drakkar amr`` is the assembly-level resistome workflow. It runs
+AMRFinderPlus in combined nucleotide/protein/GFF mode, CARD's RGI in contig
+mode, and geNomad for plasmid, virus, and provirus context. It is separate from
+``drakkar annotating --annotation-type amr``: the latter retains the historical
+NCBIfam-AMRFinder HMM gene annotation, while this command preserves two native
+AMR callers and reconciles their coordinates for statistical analysis.
+
+Run it on a flat FASTA directory, one assembly folder per sample, or an
+existing Drakkar output containing ``cataloging/megahit``:
+
+.. code-block:: console
+
+   $ drakkar amr -i assemblies/ -o amr_output
+   $ drakkar amr -i existing_drakkar_output -o amr_output
+
+Directory discovery accepts ``.fa``, ``.fna``, and ``.fasta`` files, including
+``.gz`` forms. A nested folder is accepted when it contains an unambiguous
+``<assembly>.fna``, ``final.contigs.fa``, or exactly one FASTA. Discovery only
+examines the input directory and its immediate children; it does not silently
+select a FASTA from a deeper, ambiguous tree.
+
+For explicit metadata, pass a tab-, comma-, or semicolon-separated manifest:
+
+.. code-block:: text
+
+   assembly_id  assembly_path                  assembly_type  organism
+   sample_1     assemblies/sample_1.fna        metagenome
+   isolate_2    assemblies/isolate_2.fna.gz    isolate        Escherichia_coli
+
+``assembly_id`` and ``assembly_path`` are required. Relative assembly paths are
+resolved from the manifest's directory. ``assembly_type`` is either
+``metagenome`` or ``isolate`` and controls Prodigal mode and RGI's
+``--low_quality`` behavior; a missing value uses ``--assembly-type``
+(``metagenome`` by default). ``organism`` is optional and, when provided, must
+be an organism value accepted by the installed AMRFinderPlus database. IDs may
+contain letters, numbers, dots, underscores, and hyphens. First-token FASTA
+contig IDs must be unique within an assembly.
+
+.. code-block:: console
+
+   $ drakkar amr -f assemblies.tsv -o amr_output
+
+Before launching, install the two managed AMR databases (or include them in a
+full ``drakkar database update --yes``):
+
+.. code-block:: console
+
+   $ drakkar database update amrfinderplus card --yes
+
+Then confirm these configured paths with ``drakkar config --view``:
+
+- ``AMRFINDER_DB``: an installed AMRFinderPlus database directory.
+- ``CARD_DB``: the parent directory in which ``rgi load --local`` created a
+  populated ``localDB`` directory.
+- ``GENOMAD_DB``: the installed geNomad database directory.
+
+These resources are deliberately separate from ``AMR_DB``, which is the HMM
+release used by the older annotation component. The managed AMRFinderPlus
+installer downloads the database compatible with the bundled 4.2.x tool and
+indexes it; the CARD installer verifies the archive version and creates the
+release-local ``localDB`` with RGI. The preflight check stops on an unset or
+incomplete AMR-workflow database.
+
+Calling and reconciliation options include:
+
+- ``--rgi-alignment-tool DIAMOND|BLAST`` (default: ``DIAMOND``).
+- ``--rgi-include-loose`` to retain Loose calls; otherwise RGI's Perfect and
+  Strict calls are used.
+- ``--rgi-include-nudge`` to let RGI promote qualifying Loose calls to Strict.
+- ``--genomad-preset default|conservative|relaxed``.
+- ``--genomad-splits N`` (default: ``GENOMAD_SPLITS`` in ``config.yaml``).
+- ``--locus-overlap FRACTION`` (default: ``0.8``).
+
+AMRFinderPlus and RGI rows remain independent in ``amr_hits.tsv.xz``, including
+their native record as JSON in ``raw_details``. Calls from different tools are
+assigned to the same locus only when they are on the same contig, have
+compatible strands, and their overlap covers at least ``--locus-overlap`` of
+the shorter call. Gene and drug-class agreement are reported separately;
+coordinate overlap is not treated as ontology equivalence.
+
+The principal outputs are:
+
+- ``amr/amr_hits.tsv.xz``: one row per retained caller hit, with ``locus_id``.
+- ``amr/amr_loci.tsv.xz``: coordinate-reconciled loci and support status.
+- ``amr/amr_drug_classes.tsv.xz``: one locus/hit/drug-class row without
+  manufacturing class-to-subclass pairings.
+- ``amr/mobility_regions.tsv.xz``: geNomad plasmid, virus, and provirus regions.
+- ``amr/amr_mobility.tsv.xz``: locus-to-region overlaps.
+- ``amr/assembly_summary.tsv`` and ``amr/amr_qc.tsv``: per-assembly counts,
+  including assemblies with zero retained AMR calls.
+- ``amr/assemblies/<assembly>/digest.tsv``: one analysis-ready digest per
+  assembly.
+- ``amr/manifest.yaml``: input checksums and sizes, parameters, software and
+  database releases, plus final table checksums and row counts.
+
+A locus with no geNomad overlap is labelled ``unclassified``. This means no
+plasmid or viral context was detected; it must not be interpreted as confirmed
+chromosomal context.
 
 Expressing
 ^^^^^^^^^^

@@ -33,6 +33,9 @@ class DatabaseCommandTests(unittest.TestCase):
     def test_normalize_managed_database_name_accepts_kofams_alias(self) -> None:
         self.assertEqual(normalize_managed_database_name("kofams"), "kegg")
 
+    def test_normalize_managed_database_name_accepts_amrfinder_alias(self) -> None:
+        self.assertEqual(normalize_managed_database_name("amrfinder"), "amrfinderplus")
+
     def test_validate_database_version_rejects_paths(self) -> None:
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertIsNone(validate_database_version("2026/04/21"))
@@ -57,6 +60,15 @@ class DatabaseCommandTests(unittest.TestCase):
         with patch.object(cli_module, "default_database_version", return_value="2026-04-24"):
             with contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(validate_managed_database_version("vfdb", None), "2026-04-24")
+
+    def test_validate_amrfinderplus_and_card_versions(self) -> None:
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(
+                validate_managed_database_version("amrfinderplus", "2026-08-07.1"),
+                "2026-08-07.1",
+            )
+            self.assertEqual(validate_managed_database_version("card", "4.0.2"), "4.0.2")
+            self.assertIsNone(validate_managed_database_version("card", "August-2026"))
 
     def test_database_release_dir_joins_base_and_version(self) -> None:
         release_dir = database_release_dir("amr", "/tmp/amr", "20260421")
@@ -123,6 +135,19 @@ class DatabaseCommandTests(unittest.TestCase):
 
     def test_amr_database_source_version_label_uses_requested_version(self) -> None:
         self.assertEqual(database_source_version_label("amr", "2025-07-16.1"), "NCBIfam-AMRFinder 2025-07-16.1")
+
+    def test_amrfinderplus_and_card_sources_are_release_specific(self) -> None:
+        self.assertEqual(
+            database_sources("amrfinderplus", "2026-08-07.1"),
+            [
+                "https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/"
+                "AMRFinderPlus/database/4.2/2026-08-07.1/"
+            ],
+        )
+        self.assertEqual(
+            database_sources("card", "4.0.2"),
+            ["https://card.mcmaster.ca/download/0/broadstreet-v4.0.2.tar.bz2"],
+        )
 
     def test_cazy_database_sources_use_requested_upstream_version(self) -> None:
         self.assertEqual(

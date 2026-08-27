@@ -10,8 +10,8 @@ the upstream source.
 Sources expose their releases in three different ways, so each database
 declares which one applies:
 
-* ``index`` — the source publishes a browsable directory whose subdirectories
-  are the releases (KEGG/KOfam, Pfam, NCBIfam-AMRFinder).
+* ``index`` — the source publishes a browsable page whose links identify the
+  releases (KEGG/KOfam, Pfam, NCBIfam-AMRFinder, AMRFinderPlus, CARD).
 * ``probe`` — the source has no listing at all, so consecutive version numbers
   are requested until one is missing (dbCAN/CAZy).
 * ``mtime`` — the source is a single rolling file with no versions, so its
@@ -121,6 +121,25 @@ LATEST_SOURCES = {
         "strategy": "index",
         "url": "https://ftp.ncbi.nlm.nih.gov/hmm/NCBIfam-AMRFinder/",
         "entry_pattern": r"^(\d{4}-\d{2}-\d{2}\.\d+)/$",
+    },
+    "amrfinderplus": {
+        "label": "AMRFinderPlus database",
+        "config_key": "AMRFINDER_DB",
+        "managed": True,
+        "strategy": "index",
+        # The AMR workflow pins AMRFinderPlus 4.2.x. NCBI partitions database
+        # releases by compatible software minor version, so this deliberately
+        # reports the newest database the bundled executable can consume.
+        "url": "https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/4.2/",
+        "entry_pattern": r"^(\d{4}-\d{2}-\d{2}\.\d+)/$",
+    },
+    "card": {
+        "label": "CARD",
+        "config_key": "CARD_DB",
+        "managed": True,
+        "strategy": "index",
+        "url": "https://card.mcmaster.ca/download",
+        "entry_pattern": r"^/download/0/broadstreet-v(\d+\.\d+\.\d+)\.tar\.bz2$",
     },
     "foldseek": {
         "label": "Foldseek/UniProt Swiss-Prot",

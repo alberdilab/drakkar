@@ -55,6 +55,8 @@ Supported database subcommands:
 - ``pfam``
 - ``vfdb``
 - ``amr``
+- ``amrfinderplus`` (alias: ``amrfinder``)
+- ``card``
 - ``latest`` (reports newer releases instead of installing one; see
   `Checking for newer releases`_)
 - ``update`` (installs every outdated release in one command; see
@@ -93,6 +95,14 @@ Examples:
 
    $ drakkar database vfdb --directory /projects/alberdilab/data/databases/drakkar/vfdb --set-default
 
+.. code-block:: console
+
+   $ drakkar database amrfinderplus --version 2026-08-07.1 --set-default
+
+.. code-block:: console
+
+   $ drakkar database card --version 4.0.2 --set-default
+
 Options:
 
 - ``--directory``: base directory where the release folder will be created.
@@ -106,7 +116,9 @@ Options:
   upstream dbCAN release label such as ``V14``. For ``pfam``, use the Pfam
   release directory name such as ``Pfam37.4``. For ``amr``, use the NCBI
   AMRFinder release directory name such as ``2025-07-16.1``. For ``vfdb``,
-  you can omit ``--version`` and DRAKKAR will use the UTC download date.
+  you can omit ``--version`` and DRAKKAR will use the UTC download date. For
+  ``amrfinderplus``, use the NCBI data release such as ``2026-08-07.1``; for
+  ``card``, use the CARD version such as ``4.0.2``.
 - ``--download-runtime``: runtime in minutes for the database download and
   preparation rule (default: ``120``).
 - ``--set-default``: update the corresponding database path in ``config.yaml``
@@ -152,6 +164,17 @@ Database-specific rules:
   extracted HMMs into one database, and runs ``hmmpress``. If the requested
   release is missing, DRAKKAR points you to
   ``https://ftp.ncbi.nlm.nih.gov/hmm/NCBIfam-AMRFinder/``.
+- ``amrfinderplus`` (alias: ``amrfinder``): installs the complete runtime
+  database used by the dedicated ``drakkar amr`` workflow. DRAKKAR downloads
+  the requested release from NCBI's AMRFinderPlus 4.2 database branch, fetches
+  taxon-specific mutation files declared by that release, runs
+  ``amrfinder_index``, and points ``AMRFINDER_DB`` at the release directory.
+  This is distinct from ``amr``, the legacy HMM-only annotation database.
+- ``card``: downloads the exact versioned CARD Broad Street archive, verifies
+  the ``_version`` embedded in ``card.json``, and runs
+  ``rgi load --card_json ... --local`` inside the release directory. The
+  resulting ``CARD_DB`` contains the populated ``localDB`` required by
+  ``drakkar amr``.
 - ``vfdb``: there is no upstream version directory. DRAKKAR downloads the
   current ``VFDB_setB_pro.fas.gz`` from
   ``https://www.mgc.ac.cn/VFs/Down/VFDB_setB_pro.fas.gz``, creates the MMseqs2
@@ -194,8 +217,9 @@ release, so the reported version can be applied directly.
 
 Databases that can be checked:
 
-- ``kegg`` (alias: ``kofams``), ``cazy``, ``pfam``, ``vfdb``, ``amr`` and
-  ``foldseek``, using the release directory recorded in ``config.yaml``.
+- ``kegg`` (alias: ``kofams``), ``cazy``, ``pfam``, ``vfdb``, ``amr``,
+  ``amrfinderplus`` (alias: ``amrfinder``), ``card`` and ``foldseek``, using
+  the release directory recorded in ``config.yaml``.
 - ``gtdb``, read from the ``GTDB_DB`` entry. GTDB reference data is installed by
   GTDB-Tk rather than by DRAKKAR, so its row reports the newest release without
   offering an install command.
@@ -239,6 +263,10 @@ without naming each one by hand.
 
    $ drakkar database update kegg pfam --yes
 
+.. code-block:: console
+
+   $ drakkar database update amrfinderplus card --yes
+
 The command prints its plan and stops unless ``--yes`` is given, because a full
 update downloads tens of gigabytes and then repoints ``config.yaml`` at the new
 releases:
@@ -271,6 +299,10 @@ Behavior:
   Snakemake working directory, so ``drakkar logging -o <release_dir>``,
   ``drakkar unlock -o <release_dir>``, the failure report and
   ``database_versions.yaml`` work exactly as they do for a single install.
+- A managed database whose config key is empty is included in the update plan
+  when ``DATABASES_DIR`` is set. This is how a full
+  ``drakkar database update --yes`` performs the initial AMRFinderPlus and CARD
+  installations and wires ``AMRFINDER_DB`` and ``CARD_DB`` automatically.
 - The installs run sequentially, and one that fails does not stop the others.
   Failed databases are listed at the end with the command that inspects them,
   and ``config.yaml`` is never repointed at a release that failed to install.
@@ -392,7 +424,7 @@ Snakemake and SLURM management
 
 Every workflow subcommand (``complete``, ``preprocessing``, ``cataloging``,
 ``profiling``, ``annotating``, ``expressing``, ``dereplicating``,
-``inspecting``, ``database``, and ``environments``) accepts the flags
+``amr``, ``inspecting``, ``database``, and ``environments``) accepts the flags
 described in this section. They let you tune resource limits, override
 Snakemake profile settings, and pass SLURM directives without editing profile
 files.

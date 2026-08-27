@@ -33,7 +33,7 @@ def detect_table_delimiter(table_path):
     delimiter = max(INPUT_TABLE_DELIMITERS, key=lambda candidate: counts[candidate])
     return delimiter if counts[delimiter] else "\t"
 
-def read_input_table(table_path, label="input table"):
+def read_input_table(table_path, label="input table", dtype=None):
     """Read a user-provided table, accepting tab, comma, or semicolon delimiters.
 
     Column names are stripped of surrounding whitespace, and unreadable files
@@ -45,7 +45,9 @@ def read_input_table(table_path, label="input table"):
         print(f"Reading {label} {table_path} as a {DELIMITER_LABELS[delimiter]} table.")
 
     try:
-        df = pd.read_csv(table_path, sep=delimiter, encoding="utf-8-sig")
+        df = pd.read_csv(
+            table_path, sep=delimiter, encoding="utf-8-sig", dtype=dtype
+        )
     except Exception as exc:
         report_input_resolution_errors([f"Could not read the {label} {table_path}: {exc}"])
 

@@ -120,6 +120,27 @@ ANNOTATION_DATABASE_REQUIREMENTS = {
     },
 }
 
+AMR_WORKFLOW_DATABASES = (
+    (
+        "AMRFINDER_DB",
+        "AMRFinderPlus database",
+        ("amr/raw/amrfinder/*", "amr/amr_*.tsv.xz", "amr/manifest.yaml"),
+        "amrfinderplus",
+    ),
+    (
+        "CARD_DB",
+        "CARD database loaded for local RGI use",
+        ("amr/raw/rgi/*", "amr/amr_*.tsv.xz", "amr/manifest.yaml"),
+        "card",
+    ),
+    (
+        "GENOMAD_DB",
+        "geNomad database",
+        ("amr/raw/genomad/*", "amr/mobility_regions.tsv.xz", "amr/amr_mobility.tsv.xz", "amr/manifest.yaml"),
+        None,
+    ),
+)
+
 # Annotation manifest source name -> config key, used when an output directory
 # predates provenance recording but already holds an annotation manifest.
 MANIFEST_SOURCE_TO_CONFIG_KEY = {
@@ -195,6 +216,21 @@ def annotating_requirements(annotation_type, gtdb_version=None, config=None):
     return requirements
 
 
+def amr_requirements(config=None):
+    """Databases that are mandatory for the dedicated AMR workflow."""
+    config = config_vars if config is None else config
+    return [
+        DatabaseRequirement(
+            config_key=config_key,
+            label=label,
+            configured=_configured_value(config, config_key) or "",
+            database=database,
+            stale_outputs=stale_outputs,
+        )
+        for config_key, label, stale_outputs, database in AMR_WORKFLOW_DATABASES
+    ]
+
+
 def module_requirements(command, args, config=None):
     """Databases needed by the module the user launched."""
     config = config_vars if config is None else config
@@ -220,6 +256,9 @@ def module_requirements(command, args, config=None):
             config=config,
         ):
             add(requirement)
+    if command == "amr":
+        for requirement in amr_requirements(config=config):
+            add(requirement)
     return requirements
 
 
@@ -232,7 +271,23 @@ def _is_populated(path):
 
 def missing_artifacts(requirement):
     """Return the artifacts of one database that are absent or empty."""
+    if not str(requirement.configured).strip():
+        return [f"{requirement.config_key} is not configured in config.yaml"]
     configured = Path(requirement.configured)
+    if requirement.database == "amrfinderplus":
+        release_dir = database_release_from_config(requirement.database, configured)
+        if not release_dir.is_dir():
+            return [str(release_dir)]
+        required = (
+            release_dir / "AMRProt.fa",
+            release_dir / "AMRProt.fa.phr",
+            release_dir / "AMRProt.fa.pin",
+            release_dir / "AMRProt.fa.psq",
+            release_dir / "database_format_version.txt",
+            release_dir / "version.txt",
+            release_dir / "fam.tsv",
+        )
+        return [str(path) for path in required if not _is_populated(path)]
     if requirement.database in MANAGED_REQUIRED_ARTIFACTS:
         release_dir = database_release_from_config(requirement.database, configured)
         if not release_dir.is_dir():
@@ -245,6 +300,11 @@ def missing_artifacts(requirement):
             )
             if not _is_populated(artifact)
         ]
+    if requirement.config_key == "CARD_DB":
+        local_database = configured / "localDB"
+        if not local_database.is_dir() or not _is_populated(local_database):
+            return [str(local_database)]
+        return []
     if not configured.exists() or not _is_populated(configured):
         return [str(configured)]
     return []
@@ -287,6 +347,8 @@ def check_database_artifacts(requirements, skip=False):
 
 def _release_record(configured, database=None):
     """Describe one configured database for the run metadata."""
+    if not str(configured).strip():
+        return {"configured": "", "release": ""}
     path = Path(configured)
     if database in MANAGED_DATABASES:
         path = database_release_from_config(database, path)

@@ -53,6 +53,12 @@ GTDB_DB_220: "/maps/datasets/globe_databases/gtdbtk_db/20241001"
 KEGG_DB: "/maps/projects/alberdilab/data/databases/drakkar/kofams/2026-02-01"
 CAZY_DB: "/maps/projects/alberdilab/data/databases/drakkar/cazy/V14"
 AMR_DB: "/maps/projects/alberdilab/data/databases/drakkar/amr/2025-07-16.1"
+# Databases used by the dedicated `drakkar amr` workflow. Install and wire the
+# first two with `drakkar database update amrfinderplus card --yes`, or use the
+# individual database commands. AMRFINDER_DB points to an AMRFinderPlus runtime
+# database; CARD_DB points to a release containing RGI's `localDB` directory.
+AMRFINDER_DB: ""
+CARD_DB: ""
 PFAM_DB: "/maps/projects/alberdilab/data/databases/drakkar/pfam/Pfam37.4"
 VFDB_DB: "/maps/projects/alberdilab/data/databases/drakkar/vfdb/2026-04-24"
 GENOMAD_DB: "/datasets/globe_databases/genomad/genomad_db_v1.9/genomad_db"
@@ -94,3 +100,4 @@ SNAKEMAKE_MAX_GB: 1024
 SNAKEMAKE_MAX_TIME: 20160
 MEMORY_MULTIPLIER: 1
 TIME_MULTIPLIER: 1
+GENOMAD_SPLITS: 8

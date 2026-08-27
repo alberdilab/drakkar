@@ -48,9 +48,9 @@ KEGG_OUTDATED = release(
 
 
 class PlanTests(unittest.TestCase):
-    def plan(self, results):
+    def plan(self, results, config=None):
         with patch.object(database_update, "resolve_all", return_value=results):
-            return plan_database_updates(["pfam"], timeout=1)
+            return plan_database_updates(["pfam"], timeout=1, config=config)
 
     def test_outdated_managed_database_becomes_an_update(self) -> None:
         updates, skipped = self.plan([PFAM_OUTDATED])
@@ -91,9 +91,22 @@ class PlanTests(unittest.TestCase):
         unconfigured = release(
             "pfam", "PFAM_DB", None, "Pfam38.2", STATUS_UNCONFIGURED, None, "PFAM_DB is empty"
         )
-        updates, skipped = self.plan([unconfigured])
+        updates, skipped = self.plan([unconfigured], config={})
         self.assertEqual(updates, [])
         self.assertEqual(len(skipped), 1)
+
+    def test_unconfigured_managed_database_is_installed_under_databases_dir(self) -> None:
+        unconfigured = release(
+            "card", "CARD_DB", None, "4.0.2", STATUS_UNCONFIGURED, None, "CARD_DB is empty"
+        )
+        with patch.object(database_update, "resolve_all", return_value=[unconfigured]):
+            updates, skipped = plan_database_updates(
+                ["card"], timeout=1, config={"DATABASES_DIR": "/db"}
+            )
+        self.assertEqual(skipped, [])
+        self.assertEqual(updates[0].base_directory, Path("/db/card"))
+        self.assertEqual(updates[0].release_dir, Path("/db/card/4.0.2"))
+        self.assertIsNone(updates[0].installed)
 
     def test_release_ahead_of_the_source_is_skipped_rather_than_downgraded(self) -> None:
         ahead = release(

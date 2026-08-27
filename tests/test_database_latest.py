@@ -43,6 +43,13 @@ AMR_INDEX = """
 <a href="latest/">latest/</a>
 """
 
+CARD_INDEX = """
+<a href="/download/0/broadstreet-v3.3.0.tar.bz2">DOWNLOAD</a>
+<a href="/download/0/broadstreet-v4.0.1.tar.bz2">DOWNLOAD</a>
+<a href="/download/0/broadstreet-v4.0.2.tar.bz2">DOWNLOAD</a>
+<a href="/download/6/prevalence-v4.0.0.tar.bz2">DOWNLOAD</a>
+"""
+
 
 class VersionKeyTests(unittest.TestCase):
     def test_pfam_minor_release_sorts_above_earlier_major(self) -> None:
@@ -74,6 +81,11 @@ class IndexDiscoveryTests(unittest.TestCase):
         with patch.object(database_latest, "_fetch_text", return_value="<a href='none/'>none</a>"):
             with self.assertRaises(ValueError):
                 _latest_from_index(LATEST_SOURCES["pfam"], timeout=1)
+
+    def test_card_download_page_returns_newest_card_data_release(self) -> None:
+        with patch.object(database_latest, "_fetch_text", return_value=CARD_INDEX):
+            latest, _ = _latest_from_index(LATEST_SOURCES["card"], timeout=1)
+        self.assertEqual(latest, "4.0.2")
 
 
 class ProbeDiscoveryTests(unittest.TestCase):
@@ -196,6 +208,11 @@ class ResolveLatestTests(unittest.TestCase):
     def test_empty_config_key_is_reported_as_unconfigured(self) -> None:
         result = self._resolve("pfam", "Pfam38.2", {"PFAM_DB": "  "})
         self.assertEqual(result.status, STATUS_UNCONFIGURED)
+
+    def test_card_release_directory_is_compared_to_the_download_page(self) -> None:
+        result = self._resolve("card", "4.0.2", {"CARD_DB": "/db/card/4.0.1"})
+        self.assertEqual(result.status, STATUS_OUTDATED)
+        self.assertEqual(result.install_command, "drakkar database card --directory /db/card --version 4.0.2")
 
     def test_unreachable_source_is_reported_as_unknown_without_raising(self) -> None:
         with patch.object(
@@ -323,6 +340,16 @@ class DatabaseLatestDispatchTests(unittest.TestCase):
         )
         self.assertEqual(args.database_name, "kegg")
         self.assertFalse(hasattr(args, "databases"))
+
+    def test_amr_runtime_databases_are_parsed_as_install_commands(self) -> None:
+        amrfinder = cli_parser.build_parser().parse_args(
+            ["database", "amrfinderplus", "--version", "2026-08-07.1"]
+        )
+        card = cli_parser.build_parser().parse_args(
+            ["database", "card", "--version", "4.0.2"]
+        )
+        self.assertEqual(amrfinder.database_name, "amrfinderplus")
+        self.assertEqual(card.database_name, "card")
 
 
 if __name__ == "__main__":

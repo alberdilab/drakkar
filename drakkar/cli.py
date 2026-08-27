@@ -43,6 +43,7 @@ from drakkar import run_metadata as _run_metadata
 from drakkar import status as _status
 from drakkar import update_command as _update_command
 from drakkar import workflow_launcher as _workflow_launcher
+from drakkar.amr_inputs import write_amr_assemblies_manifest
 from drakkar.cli_context import (
     CATALOGING_BINNER_ALIASES,
     CATALOGING_BINNER_ORDER,
@@ -112,6 +113,7 @@ should_skip_benchmark = _benchmark.should_skip_benchmark
 DatabaseRequirement = _database_checks.DatabaseRequirement
 MANAGED_REQUIRED_ARTIFACTS = _database_checks.MANAGED_REQUIRED_ARTIFACTS
 annotating_requirements = _database_checks.annotating_requirements
+amr_requirements = _database_checks.amr_requirements
 module_requirements = _database_checks.module_requirements
 missing_artifacts = _database_checks.missing_artifacts
 reinstall_command = _database_checks.reinstall_command
@@ -555,6 +557,11 @@ def run_snakemake_annotating(*args, **kwargs):
     return _workflow_launcher.run_snakemake_annotating(*args, **kwargs)
 
 
+def run_snakemake_amr(*args, **kwargs):
+    _sync_workflow_dependencies()
+    return _workflow_launcher.run_snakemake_amr(*args, **kwargs)
+
+
 def run_snakemake_inspecting(*args, **kwargs):
     _sync_workflow_dependencies()
     return _workflow_launcher.run_snakemake_inspecting(*args, **kwargs)
@@ -602,6 +609,8 @@ def _sync_main_dependencies():
     _cli_main.run_snakemake_profiling = run_snakemake_profiling
     _cli_main.run_snakemake_dereplicating = run_snakemake_dereplicating
     _cli_main.run_snakemake_annotating = run_snakemake_annotating
+    _cli_main.run_snakemake_amr = run_snakemake_amr
+    _cli_main.write_amr_assemblies_manifest = write_amr_assemblies_manifest
     _cli_main.run_snakemake_inspecting = run_snakemake_inspecting
     _cli_main.run_snakemake_expressing = run_snakemake_expressing
     _cli_main.run_snakemake_database = run_snakemake_database

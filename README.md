@@ -16,6 +16,7 @@ Full documentation lives at https://drakkar.readthedocs.io/. The README is inten
 - Assemble and bin metagenomes into MAG catalogs.
 - Dereplicate MAGs and quantify genomes or pangenomes across samples.
 - Annotate MAGs taxonomically and functionally with configurable annotation subsets, lossless evidence tables, provenance manifests, and per-source QC.
+- Reconcile assembly-level AMRFinderPlus and CARD/RGI calls and attach geNomad plasmid or viral context for downstream resistome analysis.
 - Map metatranscriptomes to annotated genes for expression analysis.
 - Install and manage supported annotation databases from the CLI.
 - Inspect workflow logs, recover from locked runs, and transfer results by SFTP.
@@ -75,6 +76,7 @@ Start here on Read the Docs:
 - `drakkar cataloging`: assemble, bin, and summarize MAG catalogs.
 - `drakkar profiling`: dereplicate genomes and estimate abundance.
 - `drakkar annotating`: run taxonomy and selected functional annotations.
+- `drakkar amr`: digest assembly resistomes with AMRFinderPlus, CARD/RGI, and geNomad.
 - `drakkar expressing`: quantify microbial gene expression.
 - `drakkar dereplicating`: run dereplication without read mapping.
 - `drakkar database`: install or update supported annotation databases.

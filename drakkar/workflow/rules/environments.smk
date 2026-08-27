@@ -8,7 +8,7 @@
 # run ends with "Nothing to be done".
 PACKAGE_DIR = config["package_dir"]
 
-ENVIRONMENTS_TARGET = "drakkar_environments/env7.txt"
+ENVIRONMENTS_TARGET = "drakkar_environments/env10.txt"
 
 rule env1:
     output:
@@ -103,5 +103,47 @@ rule env7:
     shell:
         """
         echo "Created conda environment for semibin"
+        touch {output}
+        """
+
+rule env8:
+    input:
+        f"drakkar_environments/env7.txt"
+    output:
+        f"drakkar_environments/env8.txt"
+    threads: 1
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/amr_amrfinder.yaml"
+    shell:
+        """
+        echo "Created conda environment for AMRFinderPlus"
+        touch {output}
+        """
+
+rule env9:
+    input:
+        f"drakkar_environments/env8.txt"
+    output:
+        f"drakkar_environments/env9.txt"
+    threads: 1
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/amr_rgi.yaml"
+    shell:
+        """
+        echo "Created conda environment for CARD/RGI"
+        touch {output}
+        """
+
+rule env10:
+    input:
+        f"drakkar_environments/env9.txt"
+    output:
+        f"drakkar_environments/env10.txt"
+    threads: 1
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/amr_digest.yaml"
+    shell:
+        """
+        echo "Created conda environment for AMR digestion"
         touch {output}
         """

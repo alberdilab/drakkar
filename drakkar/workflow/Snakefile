@@ -360,6 +360,26 @@ if WORKFLOW == "annotating":
     if "network" in ANNOTATING_TYPE:
         include: "rules/annotating_network.smk"
 
+if WORKFLOW == "amr":
+
+    with open(f"{OUTPUT_DIR}/data/amr_assemblies.json", "r") as f:
+        AMR_ASSEMBLIES = json.load(f)
+
+    assemblies = sorted(AMR_ASSEMBLIES)
+
+    rule all:
+        input:
+            f"{OUTPUT_DIR}/amr/amr_hits.tsv.xz",
+            f"{OUTPUT_DIR}/amr/amr_loci.tsv.xz",
+            f"{OUTPUT_DIR}/amr/amr_drug_classes.tsv.xz",
+            f"{OUTPUT_DIR}/amr/mobility_regions.tsv.xz",
+            f"{OUTPUT_DIR}/amr/amr_mobility.tsv.xz",
+            f"{OUTPUT_DIR}/amr/assembly_summary.tsv",
+            f"{OUTPUT_DIR}/amr/amr_qc.tsv",
+            f"{OUTPUT_DIR}/amr/manifest.yaml"
+
+    include: "rules/amr.smk"
+
 if WORKFLOW == "inspecting":
 
     with open(f"{OUTPUT_DIR}/data/microdiversity_selection.json", "r") as f:

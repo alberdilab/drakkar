@@ -1,7 +1,9 @@
+import shlex
 import subprocess
 import sys
 from pathlib import Path
 
+from drakkar import __version__
 from drakkar.cli_context import CONFIG_PATH, DEFAULT_CATALOGING_BINNERS, PACKAGE_DIR, config_vars
 from drakkar.cli_validation import bin_filter_args, default_resource_args, resource_config
 from drakkar.display import display_end, display_unlock
@@ -301,6 +303,65 @@ def run_snakemake_annotating(
         f"{snakemake_flags}"
     ]
     run_subprocess_with_logging(snakemake_command, run_info=run_info, workflow_name=workflow)
+
+
+def run_snakemake_amr(
+    workflow,
+    project_name,
+    output_dir,
+    env_path,
+    profile,
+    assembly_type="metagenome",
+    rgi_alignment_tool="DIAMOND",
+    rgi_include_loose=False,
+    rgi_include_nudge=False,
+    genomad_preset="default",
+    genomad_splits=None,
+    locus_overlap=0.8,
+    memory_multiplier=1,
+    time_multiplier=1,
+    run_info=None,
+    snakemake_flags="",
+    slurm_resources="",
+):
+    """Run the assembly-level AMR and mobility-context workflow."""
+
+    output_dir = Path(output_dir).resolve()
+    quote = lambda value: shlex.quote(str(value))
+    config_arg = lambda key, value: quote(f"{key}={value}")
+    resource_overrides = resource_config(memory_multiplier, time_multiplier)
+    default_resources = default_resource_args(
+        memory_multiplier, time_multiplier, slurm_resources
+    )
+    splits_config = (
+        f"{config_arg('genomad_splits', genomad_splits)} " if genomad_splits else ""
+    )
+    snakemake_command = [
+        "/bin/bash", "-c",
+        f"module load {quote(config_vars['SNAKEMAKE_MODULE'])} && "
+        "snakemake "
+        f"-s {quote(PACKAGE_DIR / 'workflow' / 'Snakefile')} "
+        f"--directory {quote(output_dir)} "
+        f"--workflow-profile {quote(PACKAGE_DIR / 'profile' / profile)} "
+        f"--configfile {quote(CONFIG_PATH)} "
+        f"--config {config_arg('package_dir', PACKAGE_DIR)} {config_arg('project_name', project_name)} "
+        f"{config_arg('workflow', workflow)} {config_arg('output_dir', output_dir)} "
+        f"{config_arg('drakkar_version', __version__)} "
+        f"{config_arg('assembly_type', assembly_type)} "
+        f"{config_arg('rgi_alignment_tool', rgi_alignment_tool)} "
+        f"{config_arg('rgi_include_loose', rgi_include_loose)} "
+        f"{config_arg('rgi_include_nudge', rgi_include_nudge)} "
+        f"{config_arg('genomad_preset', genomad_preset)} "
+        f"{splits_config}{config_arg('locus_overlap', locus_overlap)} "
+        f"{resource_overrides}"
+        f"{default_resources}"
+        f"--conda-prefix {quote(env_path)} "
+        f"--use-conda "
+        f"{snakemake_flags}"
+    ]
+    run_subprocess_with_logging(
+        snakemake_command, run_info=run_info, workflow_name=workflow
+    )
 
 def run_snakemake_inspecting(workflow, project_name, output_dir, env_path, profile, memory_multiplier=1, time_multiplier=1, run_info=None, snakemake_flags="", slurm_resources=""):
     """ Run the inspecting workflow """

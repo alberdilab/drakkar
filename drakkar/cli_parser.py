@@ -12,6 +12,7 @@ from drakkar.cli_validation import (
     nonnegative_float,
     percent_float,
     percent_int,
+    positive_unit_interval_float,
     positive_int,
     unit_interval_float,
 )
@@ -272,6 +273,58 @@ def build_parser():
     add_benchmark_argument(subparser_annotating)
     add_resource_multiplier_arguments(subparser_annotating)
     add_snakemake_override_arguments(subparser_annotating)
+
+    subparser_amr = subparsers.add_parser(
+        "amr",
+        help="Call assembly-level AMR loci with AMRFinderPlus and CARD/RGI, then attach geNomad mobility context",
+    )
+    subparser_amr.add_argument(
+        "-i", "--input", required=False,
+        help="Assembly directory: flat FASTAs, one FASTA per child folder, or a Drakkar output containing cataloging/megahit",
+    )
+    subparser_amr.add_argument(
+        "-f", "--file", required=False,
+        help="CSV/TSV manifest with assembly_id and assembly_path columns; assembly_type and organism are optional",
+    )
+    subparser_amr.add_argument(
+        "-o", "--output", required=False, default=os.getcwd(),
+        help="Output directory. Default is the directory from which drakkar is called.",
+    )
+    subparser_amr.add_argument(
+        "--assembly-type", choices=("metagenome", "isolate"), default="metagenome",
+        help="Default assembly type when the manifest does not specify one. It selects Prodigal mode and RGI low-quality handling. Default: metagenome",
+    )
+    subparser_amr.add_argument(
+        "--rgi-alignment-tool", choices=("DIAMOND", "BLAST"), default="DIAMOND",
+        help="Protein alignment backend used by RGI. Default: DIAMOND",
+    )
+    subparser_amr.add_argument(
+        "--rgi-include-loose", action="store_true",
+        help="Retain CARD Loose hits in addition to Perfect and Strict hits",
+    )
+    subparser_amr.add_argument(
+        "--rgi-include-nudge", action="store_true",
+        help="Allow RGI to promote qualifying Loose hits to Strict",
+    )
+    subparser_amr.add_argument(
+        "--genomad-preset", choices=("default", "conservative", "relaxed"), default="default",
+        help="geNomad end-to-end score preset. Default: default",
+    )
+    subparser_amr.add_argument(
+        "--genomad-splits", type=positive_int, default=None,
+        help="Number of geNomad database splits. Default: GENOMAD_SPLITS from config.yaml",
+    )
+    subparser_amr.add_argument(
+        "--locus-overlap", type=positive_unit_interval_float, default=0.8,
+        help="Minimum fraction of the shorter call that must overlap to reconcile two calls into one locus. Default: 0.8",
+    )
+    subparser_amr.add_argument("-e", "--env_path", type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
+    subparser_amr.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
+    subparser_amr.add_argument("--overwrite", action="store_true", help="Delete a locked output directory and rerun from scratch")
+    add_database_check_arguments(subparser_amr)
+    add_benchmark_argument(subparser_amr)
+    add_resource_multiplier_arguments(subparser_amr)
+    add_snakemake_override_arguments(subparser_amr)
     
     subparser_inspecting = subparsers.add_parser("inspecting", help="Combine bins and coverage or mapping inputs into inspection-ready summaries for follow-up exploration")
     subparser_inspecting.add_argument("-b", "--bins_dir", required=False, help="Directory in which bins (.fa or .fna) are stored")
@@ -323,13 +376,24 @@ def build_parser():
     database_cazy = database_subparsers.add_parser("cazy", parents=[database_parent], help="Install or update the CAZy database")
     database_pfam = database_subparsers.add_parser("pfam", parents=[database_parent], help="Install or update the PFAM database")
     database_vfdb = database_subparsers.add_parser("vfdb", parents=[database_parent], help="Install or update the VFDB database")
-    database_amr = database_subparsers.add_parser("amr", parents=[database_parent], help="Install or update the AMR database")
+    database_amr = database_subparsers.add_parser("amr", parents=[database_parent], help="Install or update the legacy NCBIfam-AMRFinder HMM database")
+    database_amrfinderplus = database_subparsers.add_parser(
+        "amrfinderplus",
+        parents=[database_parent],
+        aliases=["amrfinder"],
+        help="Install an AMRFinderPlus runtime database for drakkar amr",
+    )
+    database_card = database_subparsers.add_parser(
+        "card",
+        parents=[database_parent],
+        help="Install CARD data and load it for local RGI use",
+    )
 
     database_latest = database_subparsers.add_parser("latest", help="Check the upstream sources and report which configured databases are out of date")
     database_latest.add_argument("databases", nargs="*", default=[], help="Databases to check (default: all of them)")
     database_latest.add_argument("--timeout", type=int, default=DEFAULT_LATEST_TIMEOUT, help=f"Seconds to wait for each source before giving up (default: {DEFAULT_LATEST_TIMEOUT})")
 
-    database_update = database_subparsers.add_parser("update", parents=[database_launch_parent], help="Install the newest release of every configured database that is out of date")
+    database_update = database_subparsers.add_parser("update", parents=[database_launch_parent], help="Install the newest release of every managed database that is outdated or not yet configured")
     database_update.add_argument("databases", nargs="*", default=[], help="Databases to update (default: all of them)")
     database_update.add_argument("--yes", dest="assume_yes", action="store_true", help="Download and install the releases. Dry run unless this is given")
     database_update.add_argument("--no-set-default", dest="set_default", action="store_false", help="Install the releases without repointing config.yaml at them")
@@ -419,7 +483,7 @@ def build_parser():
             "drakkar logging -o drakkar_output --summary",
         ],
         command_groups=[
-            ("Data Generation and Analysis", ["complete", "preprocessing", "cataloging", "profiling", "dereplicating", "annotating", "inspecting", "expressing"]),
+            ("Data Generation and Analysis", ["complete", "preprocessing", "cataloging", "profiling", "dereplicating", "annotating", "amr", "inspecting", "expressing"]),
             ("Operations and Management", ["database", "environments", "status", "report", "logging", "transfer", "config", "unlock", "update"]),
         ],
         sections=[
@@ -538,6 +602,28 @@ def build_parser():
             ("SLURM Overrides", ["slurm_partition", "slurm_account", "slurm_constraint", "slurm_nodes", "slurm_nodelist", "slurm_qos", "slurm_extra"]),
         ],
     )
+
+    subparser_amr.description = (
+        "Call antimicrobial-resistance evidence per assembly, reconcile overlapping "
+        "AMRFinderPlus and CARD/RGI calls, and attach geNomad plasmid or viral context."
+    )
+    _set_help_metadata(
+        subparser_amr,
+        category="Analysis workflow",
+        examples=[
+            "drakkar amr -i assemblies/ -o amr_output",
+            "drakkar amr -i existing_drakkar_output -o amr_output",
+            "drakkar amr -f assemblies.tsv --rgi-include-loose -o amr_output",
+        ],
+        sections=[
+            ("Input Assemblies", ["input", "file", "assembly_type"]),
+            ("Calling and Reconciliation", ["rgi_alignment_tool", "rgi_include_loose", "rgi_include_nudge", "genomad_preset", "genomad_splits", "locus_overlap"]),
+            ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark", "skip_database_check", "allow_database_change"]),
+            ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
+            ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
+            ("SLURM Overrides", ["slurm_partition", "slurm_account", "slurm_constraint", "slurm_nodes", "slurm_nodelist", "slurm_qos", "slurm_extra"]),
+        ],
+    )
     
     subparser_inspecting.description = "Combine bins and mapping coverage into inspection-ready summaries."
     _set_help_metadata(
@@ -580,11 +666,12 @@ def build_parser():
         examples=[
             "drakkar database latest",
             "drakkar database update --yes",
+            "drakkar database update amrfinderplus card --yes",
             "drakkar database kegg --directory /db/kofams --version 2026-02-01",
             "drakkar database vfdb --directory /db/vfdb --set-default",
         ],
         command_groups=[
-            ("Managed Databases", ["kegg", "cazy", "pfam", "vfdb", "amr"]),
+            ("Managed Databases", ["kegg", "cazy", "pfam", "vfdb", "amr", "amrfinderplus", "card"]),
             ("Version Checks", ["latest", "update"]),
         ],
         sections=[
@@ -621,9 +708,23 @@ def build_parser():
             ],
         ),
         database_amr: (
-            "Install a versioned NCBIfam-AMRFinder release used for antimicrobial resistance annotation.",
+            "Install a versioned legacy NCBIfam-AMRFinder HMM release used by functional annotation.",
             [
                 "drakkar database amr --directory /db/amr --version 2025-07-16.1",
+            ],
+        ),
+        database_amrfinderplus: (
+            "Install and index a versioned AMRFinderPlus database compatible with the bundled 4.2.x executable.",
+            [
+                "drakkar database amrfinderplus --directory /db/amrfinderplus --version 2026-08-07.1",
+                "drakkar database amrfinderplus --version 2026-08-07.1 --set-default",
+            ],
+        ),
+        database_card: (
+            "Install a versioned CARD archive and load card.json into a release-local RGI database.",
+            [
+                "drakkar database card --directory /db/card --version 4.0.2",
+                "drakkar database card --version 4.0.2 --set-default",
             ],
         ),
     }
@@ -656,7 +757,7 @@ def build_parser():
         ],
     )
 
-    database_update.description = "Install the newest release of every configured database that is behind."
+    database_update.description = "Install the newest release of every managed database that is behind or not yet configured."
     _set_help_metadata(
         database_update,
         category="Database management",
@@ -664,6 +765,7 @@ def build_parser():
             "drakkar database update",
             "drakkar database update --yes",
             "drakkar database update kegg pfam --yes",
+            "drakkar database update amrfinderplus card --yes",
         ],
         sections=[
             ("Update Selection", ["databases", "assume_yes", "set_default", "timeout"]),
