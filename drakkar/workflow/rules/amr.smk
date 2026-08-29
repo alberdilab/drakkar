@@ -94,7 +94,7 @@ rule amr_prodigal:
             -f gff \
             -o {output.gff:q} \
             -p {params.mode:q}
-        python {params.converter:q} {output.gff:q} {output.amrfinder_gff:q}
+        python {params.converter:q} {output.gff:q} {output.amrfinder_gff:q} --proteins {output.proteins:q}
         """
 
 

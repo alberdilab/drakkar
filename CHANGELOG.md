@@ -8,6 +8,19 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.4.2] - 2026-08-29
+
+### Fixed
+
+- ``amrfinderplus`` failed with ``GFF file mismatch`` / ``Protein FASTA id
+  ... is not in the GFF file``. The Prodigal-to-AMRFinderPlus GFF converter
+  copied Prodigal's ``ID`` attribute (``<sequence ordinal>_<gene ordinal>``,
+  e.g. ``1_1``) into ``Name``, but Prodigal names proteins
+  ``<contig name>_<gene ordinal>`` in the FASTA, so the two could never be
+  joined. The converter now rebuilds the identifier from the GFF sequence
+  column, writes it to both ``ID`` and ``Name``, and verifies it against the
+  protein FASTA so a mismatch fails at conversion time with a clear message.
+
 ## [2.4.1] - 2026-08-27
 
 ### Fixed
