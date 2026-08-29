@@ -183,11 +183,15 @@ class DatabaseCommandTests(unittest.TestCase):
             config_path.write_text('KEGG_DB: "/old/path"\n', encoding="utf-8")
 
             from drakkar import cli as cli_module
+            from drakkar import config_persistence as persistence
 
             original = cli_module.CONFIG_PATH
             try:
                 cli_module.CONFIG_PATH = config_path
-                cli_module.set_default_database_path("kegg", "/tmp/kofams", "2026-02-01")
+                with patch.dict("os.environ", {"DRAKKAR_HOME": str(Path(tmpdir) / "home")}, clear=False):
+                    cli_module.set_default_database_path("kegg", "/tmp/kofams", "2026-02-01")
+                    # Mirrored outside the package so the next reinstall can restore it.
+                    saved = persistence.read_store()
             finally:
                 cli_module.CONFIG_PATH = original
 
@@ -195,6 +199,7 @@ class DatabaseCommandTests(unittest.TestCase):
                 config_path.read_text(encoding="utf-8"),
                 'KEGG_DB: "/tmp/kofams/2026-02-01"\n',
             )
+            self.assertEqual(saved, {"KEGG_DB": "/tmp/kofams/2026-02-01"})
 
 
 class DatabaseBaseDirectoryTests(unittest.TestCase):

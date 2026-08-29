@@ -438,10 +438,11 @@ def build_parser():
     subparser_transfer.add_argument("-b", "--bins", action="store_true", help="Transfer cataloging bins")
     subparser_transfer.add_argument("-v", "--verbose", action="store_true", help="Log each transfer on screen")
     
-    subparser_config = subparsers.add_parser("config", help="View or edit the installed workflow/config.yaml used by this Drakkar environment")
+    subparser_config = subparsers.add_parser("config", help="View, edit or restore the installed workflow/config.yaml used by this Drakkar environment")
     config_actions = subparser_config.add_mutually_exclusive_group(required=True)
     config_actions.add_argument("--view", action="store_true", help="Print workflow/config.yaml")
     config_actions.add_argument("--edit", action="store_true", help="Open workflow/config.yaml in a terminal editor")
+    config_actions.add_argument("--restore", action="store_true", help="Write the saved database paths back into workflow/config.yaml after an upgrade replaced it")
     
     subparser_logging = subparsers.add_parser("logging", help="Inspect run metadata, progress summaries, and Snakemake logs to troubleshoot workflows")
     subparser_logging.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
@@ -838,16 +839,17 @@ def build_parser():
         ],
     )
     
-    subparser_config.description = "View or edit the installed workflow/config.yaml used by the current Drakkar installation."
+    subparser_config.description = "View, edit or restore the installed workflow/config.yaml used by the current Drakkar installation."
     _set_help_metadata(
         subparser_config,
         category="Operations and management",
         examples=[
             "drakkar config --view",
             "drakkar config --edit",
+            "drakkar config --restore",
         ],
         sections=[
-            ("Actions", ["view", "edit"]),
+            ("Actions", ["view", "edit", "restore"]),
         ],
     )
     

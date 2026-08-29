@@ -1,22 +1,24 @@
 import os
-import re
 import shlex
 import shutil
 import subprocess
 import sys
 
-from drakkar.cli_context import CONFIG_PATH, ERROR, RESET
+from drakkar.cli_context import CONFIG_PATH, ERROR, INFO, RESET
+from drakkar.config_persistence import (
+    backup_config,
+    print_reconcile_report,
+    read_store,
+    reconcile_config,
+    record_values,
+    set_config_value,
+    store_path,
+)
 from drakkar.database_registry import database_config_targets
 from drakkar.output import print
 
 def replace_config_value(config_key, new_value):
-    pattern = re.compile(rf"^({re.escape(config_key)}:\s*)(\".*?\"|'.*?'|[^\n#]+)(\s*(#.*)?)?$", re.MULTILINE)
-    config_text = CONFIG_PATH.read_text(encoding="utf-8")
-    replacement = rf'\1"{new_value}"\3'
-    updated_text, count = pattern.subn(replacement, config_text, count=1)
-    if count != 1:
-        raise ValueError(f"Could not update {config_key} in {CONFIG_PATH}")
-    CONFIG_PATH.write_text(updated_text, encoding="utf-8")
+    set_config_value(CONFIG_PATH, config_key, new_value)
 
 def set_default_database_path(database_name, directory, version):
     # Returns {config_key: path} for every key this database sets. Single-target
@@ -24,6 +26,9 @@ def set_default_database_path(database_name, directory, version):
     targets = database_config_targets(database_name, directory, version)
     for config_key, path in targets.items():
         replace_config_value(config_key, path)
+    # Mirrored outside the package so the next reinstall, which replaces
+    # config.yaml wholesale, can put these paths back.
+    record_values(targets)
     return targets
 
 def resolve_editor_command():
@@ -65,4 +70,17 @@ def edit_config():
     except subprocess.CalledProcessError as exc:
         print(f"{ERROR}ERROR:{RESET} Editor exited with code {exc.returncode}")
         return exc.returncode or 1
+    return 0
+
+def restore_config():
+    """Put the saved database values back into a config.yaml an upgrade replaced."""
+    if not CONFIG_PATH.exists():
+        print(f"{ERROR}ERROR:{RESET} config.yaml not found: {CONFIG_PATH}")
+        return 1
+    if not read_store():
+        print(f"{ERROR}ERROR:{RESET} No saved configuration values found: {store_path()}")
+        print(f"{INFO}Values are saved by 'drakkar database', 'drakkar update' and this command.{RESET}")
+        return 1
+    backup_config(CONFIG_PATH)
+    print_reconcile_report(reconcile_config(CONFIG_PATH), CONFIG_PATH)
     return 0

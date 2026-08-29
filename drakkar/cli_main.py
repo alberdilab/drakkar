@@ -21,7 +21,7 @@ from drakkar.cli_validation import (
     validate_gtdb_version,
     validate_managed_database_version,
 )
-from drakkar.config_commands import edit_config, set_default_database_path, view_config
+from drakkar.config_commands import edit_config, restore_config, set_default_database_path, view_config
 from drakkar.database_latest import DEFAULT_TIMEOUT as DEFAULT_LATEST_TIMEOUT, run_database_latest
 from drakkar.database_update import run_database_update
 from drakkar.database_checks import (
@@ -290,6 +290,9 @@ def main():
             return view_config()
         if args.edit:
             return edit_config()
+        if args.restore:
+            section("RESTORING DRAKKAR CONFIGURATION")
+            return restore_config()
         return 0
 
     elif args.command == "logging":

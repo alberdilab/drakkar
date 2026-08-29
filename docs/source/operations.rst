@@ -348,6 +348,8 @@ KEGG hierarchy JSON would simply drop every EC annotation without any warning.
 
 Use ``--skip-database-check`` to launch without this validation.
 
+.. _cross-run-database-check:
+
 Cross-run consistency check
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -409,6 +411,8 @@ Options:
 
 - ``--view``: print the config file path and contents.
 - ``--edit``: open the config file in a terminal editor.
+- ``--restore``: write the saved database paths back into the config file after
+  an upgrade replaced it.
 
 Behavior:
 
@@ -416,6 +420,47 @@ Behavior:
   ``vim``, or ``vi``.
 - The command edits the installed package config directly, so changes affect
   later workflow runs from that installation.
+
+.. _config-across-upgrades:
+
+Configuration across upgrades
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``workflow/config.yaml`` ships inside the package, so every reinstall replaces
+it with the defaults of the new release. To keep site-specific values from
+being lost, DRAKKAR mirrors them outside the package, in
+``~/.drakkar/config-values.yaml`` (set ``$DRAKKAR_HOME`` to use another
+directory), together with timestamped copies of the whole file in
+``~/.drakkar/config-backups/``. The mirrored keys are ``DATABASES_DIR``,
+``ENVIRONMENTS_DIR``, and every database path (``*_DB``, ``*_MODEL``). Module
+versions and workflow parameters are not mirrored, because those are what a new
+release is expected to change.
+
+The values are saved whenever ``drakkar database`` writes a default path, and
+again just before ``drakkar update`` reinstalls the package. Once the new
+config is in place, ``drakkar update`` writes them back and reports what it
+restored. After an upgrade run outside DRAKKAR (``pip install --upgrade``),
+do the same with:
+
+.. code-block:: console
+
+   $ drakkar config --restore
+
+Restoring is not a blind copy. For each key, DRAKKAR checks what exists on
+disk:
+
+- the saved path exists: it is kept, unless a newer release of the same
+  database sits beside it, in which case the newest one is used;
+- the saved path is gone: the newest release that does exist next to it is
+  used, falling back to the path shipped with the new version;
+- nothing exists: the saved value is kept anyway, since a missing path usually
+  means an unmounted filesystem rather than a deleted database.
+
+Keys that name one specific release on purpose, such as ``GTDB_DB_226``, are
+only ever preserved and never re-pointed at a newer release. Because a restore
+can move a database to a newer release, rerunning an output directory built
+with the previous one needs ``--allow-database-change`` (see
+:ref:`cross-run-database-check`).
 
 .. _snakemake-slurm-management:
 
@@ -738,6 +783,10 @@ dependencies (useful when only the workflow scripts have changed):
 .. code-block:: console
 
    $ drakkar update --skip-deps
+
+The reinstall replaces ``workflow/config.yaml`` with the defaults of the new
+release, so ``drakkar update`` saves the database paths beforehand and writes
+them back afterwards; see :ref:`config-across-upgrades`.
 
 Outputs
 -------

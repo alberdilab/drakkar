@@ -34,6 +34,7 @@ from drakkar import database_checks as _database_checks
 from drakkar import database_latest as _database_latest
 from drakkar import database_update as _database_update
 from drakkar import config_commands as _config_commands
+from drakkar import config_persistence as _config_persistence
 from drakkar import environments as _environments
 from drakkar import failures as _failures
 from drakkar import output_paths as _output_paths
@@ -182,6 +183,10 @@ _CONFIG_REPLACE_CONFIG_VALUE = _config_commands.replace_config_value
 _CONFIG_SET_DEFAULT_DATABASE_PATH = _config_commands.set_default_database_path
 _CONFIG_VIEW_CONFIG = _config_commands.view_config
 _CONFIG_EDIT_CONFIG = _config_commands.edit_config
+_CONFIG_RESTORE_CONFIG = _config_commands.restore_config
+_PERSISTENCE_SNAPSHOT_CONFIG = _config_persistence.snapshot_config
+_PERSISTENCE_RECONCILE_CONFIG = _config_persistence.reconcile_config
+_PERSISTENCE_PRINT_RECONCILE_REPORT = _config_persistence.print_reconcile_report
 _VALIDATION_DEFAULT_DATABASE_VERSION = _cli_validation.default_database_version
 _UPDATE_GET_INSTALLED_VERSION = _update_command.get_installed_drakkar_version
 _OUTPUT_OVERWRITE_OUTPUT_DIRECTORY = _output_paths.overwrite_output_directory
@@ -207,6 +212,8 @@ def _sync_validation_dependencies():
 def _sync_config_dependencies():
     _config_commands.CONFIG_PATH = CONFIG_PATH
     _config_commands.print = print
+    _config_persistence.CONFIG_PATH = CONFIG_PATH
+    _config_persistence.print = print
     editor_func = globals()["resolve_editor_command"]
     if _is_facade_function(editor_func, "resolve_editor_command"):
         editor_func = _CONFIG_RESOLVE_EDITOR_COMMAND
@@ -290,6 +297,9 @@ def _sync_update_dependencies():
         version_func = _UPDATE_GET_INSTALLED_VERSION
     _update_command.get_installed_drakkar_version = version_func
     _update_command.display_update_success = globals()["display_update_success"]
+    _sync_config_dependencies()
+    for name in ("snapshot_config", "reconcile_config", "print_reconcile_report"):
+        setattr(_update_command, name, globals()[name])
 
 
 class RichArgumentParser(_cli_help.RichArgumentParser):
@@ -433,6 +443,26 @@ def view_config(*args, **kwargs):
 def edit_config(*args, **kwargs):
     _sync_config_dependencies()
     return _CONFIG_EDIT_CONFIG(*args, **kwargs)
+
+
+def restore_config(*args, **kwargs):
+    _sync_config_dependencies()
+    return _CONFIG_RESTORE_CONFIG(*args, **kwargs)
+
+
+def snapshot_config(*args, **kwargs):
+    _sync_config_dependencies()
+    return _PERSISTENCE_SNAPSHOT_CONFIG(*args, **kwargs)
+
+
+def reconcile_config(*args, **kwargs):
+    _sync_config_dependencies()
+    return _PERSISTENCE_RECONCILE_CONFIG(*args, **kwargs)
+
+
+def print_reconcile_report(*args, **kwargs):
+    _sync_config_dependencies()
+    return _PERSISTENCE_PRINT_RECONCILE_REPORT(*args, **kwargs)
 
 
 def overwrite_output_directory(*args, **kwargs):
@@ -624,6 +654,7 @@ def _sync_main_dependencies():
     _cli_main.resource_config = resource_config
     _cli_main.view_config = view_config
     _cli_main.edit_config = edit_config
+    _cli_main.restore_config = restore_config
     _cli_main.set_default_database_path = set_default_database_path
     _cli_main.run_database_latest = run_database_latest
     _cli_main.run_database_update = run_database_update

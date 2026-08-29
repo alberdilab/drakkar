@@ -8,6 +8,45 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.4.3] - 2026-08-29
+
+### Fixed
+
+- Upgrading Drakkar no longer wipes the database configuration. `config.yaml`
+  ships inside the package, so every reinstall replaced it with the defaults of
+  the new release and every configured database path was lost. The
+  site-specific keys (`DATABASES_DIR`, `ENVIRONMENTS_DIR`, and every `*_DB` /
+  `*_MODEL` path) are now mirrored outside the package in
+  `~/.drakkar/config-values.yaml` (`$DRAKKAR_HOME` overrides the directory),
+  next to timestamped backups of the whole file in `~/.drakkar/config-backups/`.
+  They are saved whenever `drakkar database` writes a default path and again
+  just before `drakkar update` reinstalls, and written back into the freshly
+  installed `config.yaml` afterwards.
+
+### Changed
+
+- Default database releases in `workflow/config.yaml` now point at the newest
+  installed releases: KEGG/KOfam `2026-02-01` -> `2026-07-02`, CAZy `V14` ->
+  `V15`, NCBIfam-AMRFinder `2025-07-16.1` -> `2026-08-07.1`, Pfam `Pfam37.4` ->
+  `Pfam38.2`, VFDB `2026-04-24` -> `2026-08-21`. `AMRFINDER_DB` and `CARD_DB`,
+  which shipped empty, are now wired to AMRFinderPlus `2026-08-07.1` and CARD
+  `4.0.2`. Installations that configured their own paths keep them, since the
+  restore described below prefers whichever release is newest and present.
+
+### Added
+
+- `drakkar update` now reports which database values it restored, and reconciles
+  them against what exists on disk instead of copying them blindly: a saved path
+  that still exists is kept unless a newer release of the same database sits
+  beside it, a saved path that is gone falls back to the newest release that
+  does exist (then to the path shipped with the new version), and when nothing
+  exists the saved value is kept, since a missing path usually means an
+  unmounted filesystem rather than a deleted database. Keys naming one specific
+  release on purpose, such as `GTDB_DB_226`, are only preserved, never
+  re-pointed.
+- `drakkar config --restore` runs the same reconciliation on demand, for
+  upgrades performed outside Drakkar with `pip install --upgrade`.
+
 ## [2.4.2] - 2026-08-29
 
 ### Fixed
