@@ -8,6 +8,22 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.4.4] - 2026-08-30
+
+### Fixed
+
+- MetaBAT2 no longer hands its unbinned contigs to Binette. `--saveCls` writes
+  one row per contig, giving cluster `0` to every contig MetaBAT2 left unbinned
+  and to every contig below the 1500 bp threshold, and those rows went straight
+  into Binette's `--contig2bin_tables`. Binette read `0` as an ordinary bin, so
+  a single junk bin containing the unbinned half of the assembly was quality
+  assessed with CheckM2, expanded into intermediate bins, and — because the
+  union of all input bins drives gene prediction — dragged the whole assembly
+  through pyrodigal and diamond instead of just the binned contigs. The
+  `metabat2` rule now filters cluster `0` (and the header row emitted by
+  MetaBAT2 releases after 2.17) before writing its contig-to-bin table, which
+  also corrects the `metabat2_bins` count in `cataloging.tsv`.
+
 ## [2.4.3] - 2026-08-29
 
 ### Fixed

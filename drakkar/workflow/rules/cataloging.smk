@@ -272,7 +272,8 @@ rule metabat2:
     output:
         f"{OUTPUT_DIR}/cataloging/metabat2/{{assembly}}/{{assembly}}.tsv"
     params:
-        metabat2_module={METABAT2_MODULE}
+        metabat2_module={METABAT2_MODULE},
+        raw_cls=f"{OUTPUT_DIR}/cataloging/metabat2/{{assembly}}/{{assembly}}.raw.tsv"
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 50) * 2 ** (attempt - 1))),
@@ -287,7 +288,16 @@ rule metabat2:
         else
             module purge
             module load {params.metabat2_module}
-            metabat2 -i {input.assembly} -a {input.depth} -o {output} -m 1500 --saveCls --noBinOut
+            # --saveCls writes one row per contig, including every contig
+            # metabat2 left unbinned (cluster 0) and every contig below -m 1500.
+            # Handing those to binette would turn them into a single junk bin
+            # that drags the whole assembly through gene prediction and
+            # diamond, so keep only the contigs that were actually binned.
+            # The header filter covers metabat2 > 2.17, which prepends a
+            # "ContigName ClusterId" line to the membership matrix.
+            metabat2 -i {input.assembly} -a {input.depth} -o {params.raw_cls} -m 1500 --saveCls --noBinOut
+            awk -F'\t' '$1 != "ContigName" && $2 != "0"' {params.raw_cls} > {output}
+            rm -f {params.raw_cls}
         fi
         """
 
