@@ -8,6 +8,39 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.4.5] - 2026-08-31
+
+### Fixed
+
+- Retries now actually escalate resources. 173 of the resource declarations
+  across the rule files applied the retry multiplier inside the floor —
+  `max(8*1024, size * 2 ** (attempt - 1))` — so whenever the floor dominated,
+  which is the common case for small and mid-sized inputs, every retry
+  requested exactly the same memory and runtime and failed identically each
+  time. The multiplier is now applied to the whole term,
+  `max(8*1024, size) * 2 ** (attempt - 1)`, matching the convention already
+  documented in `deep_binner_mem_mb`. Explicit `min(...)` caps still bind.
+- Rules that declare no resources of their own no longer get a static
+  allocation. `--default-resources` is built by the CLI and overrides the
+  attempt-aware defaults in the profile, so it pinned those rules at 8 GB and
+  10 minutes on every attempt. It now emits the same doubling expression the
+  profiles use, still capped by `SNAKEMAKE_MAX_GB` / `SNAKEMAKE_MAX_TIME`.
+  This covers real cluster jobs including `concatenate_or_link_reads`,
+  `run_mmseqs`, `cluster_genomes` and `write_database_versions`.
+- `map_to_metagenome` requested `int(input.size_mb) ** (attempt - 1)` memory —
+  an exponentiation of the input size rather than a doubling, which asked for
+  1 MB on the first attempt and an absurd figure by the third. It now matches
+  the equivalent mapping rule in `profiling_genomes`.
+
+### Changed
+
+- `assembly_flagstat` runtime raised from a static 5 minutes to
+  `max(20, input.size_mb / 100)`, doubling per retry, and its memory now
+  scales with BAM size too. The static 5-minute allocation was timing out on
+  large assemblies, and retrying bought no additional time.
+- The remaining 12 rules with static resources now scale with the attempt
+  number, so no rule in the workflow requests a fixed allocation any more.
+
 ## [2.4.4] - 2026-08-30
 
 ### Fixed

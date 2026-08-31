@@ -33,8 +33,8 @@ if not IGNORE_QUALITY and not QUALITY_FILE:
             genome_dir=f"{OUTPUT_DIR}/data/genomes"
         threads: 8
         resources:
-            mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-            runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 10) * 2 ** (attempt - 1)))
+            mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5)) * 2 ** (attempt - 1)),
+            runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 10)) * 2 ** (attempt - 1))
         message: "Estimating MAG completeness/contamination with CheckM2..."
         shell:
             """
@@ -141,8 +141,8 @@ checkpoint dereplicate:
         use_genomeinfo_flag="true" if (QUALITY_FILE or not IGNORE_QUALITY) else "false"
     threads: 8
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 10) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(60, int(input.size_mb / 10) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 10)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(60, int(input.size_mb / 10)) * 2 ** (attempt - 1))
     message: "Dereplicating bins using dRep..."
     shell:
         """
@@ -229,8 +229,8 @@ rule dereplicating_stats:
         ani={DREP_ANI}
     threads: 1
     resources:
-        mem_mb=cap_mem_mb(1*1024),
-        runtime=cap_runtime(5)
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(1*1024 * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(5 * 2 ** (attempt - 1))
     message: "Creating dereplication stats file..."
     shell:
         """

@@ -209,8 +209,8 @@ rule prodigal:
     params:
         prodigal_module={PRODIGAL_MODULE}
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(1*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(1*1024, int(input.size_mb * 1024 * 4)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10)) * 2 ** (attempt - 1))
     threads: 1
     message: "Predicting genes of MAG {wildcards.mag}..."
     shell:
@@ -234,8 +234,8 @@ rule kegg:
         hmmer_module={HMMER_MODULE},
         db={KEGG_DB}
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 60) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 60)) * 2 ** (attempt - 1))
     threads: 1
     message: "Annotating KEGG orthologs of MAG {wildcards.mag}..."
     shell:
@@ -282,8 +282,8 @@ rule cazy:
         f"{PACKAGE_DIR}/workflow/envs/annotating_function_dbcan.yaml"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10)) * 2 ** (attempt - 1))
     message: "Annotating CAZymes of MAG {wildcards.mag} with dbCAN..."
     shell:
         """
@@ -317,8 +317,8 @@ rule pfam:
     threads:
         1
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 30) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 30)) * 2 ** (attempt - 1))
     message: "Annotating PFAMs of MAG {wildcards.mag}..."
     shell:
         """
@@ -339,8 +339,8 @@ rule vfdb:
     threads:
         1
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10)) * 2 ** (attempt - 1))
     message: "Annotating virulence factors of MAG {wildcards.mag}..."
     shell:
         """
@@ -362,8 +362,8 @@ rule amr:
     threads:
         1
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10)) * 2 ** (attempt - 1))
     message: "Annotating AMRs of MAG {wildcards.mag}..."
     shell:
         """
@@ -383,8 +383,8 @@ rule signalp:
     threads:
         8
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 100) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 100)) * 2 ** (attempt - 1))
     shell:
         """
         module purge
@@ -407,8 +407,8 @@ rule foldseek_orphans:
     conda:
         f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(1024, int(input.size_mb * 1024 * 4)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10)) * 2 ** (attempt - 1))
     message: "Selecting genes of MAG {wildcards.mag} without a sequence-homology annotation..."
     shell:
         """
@@ -433,8 +433,8 @@ rule foldseek:
     threads:
         8
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(16*1024, int(input.size_mb * 1024 * 8) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(30, int(input.size_mb * 120) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(16*1024, int(input.size_mb * 1024 * 8)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(30, int(input.size_mb * 120)) * 2 ** (attempt - 1))
     message: "Structurally annotating orphan genes of MAG {wildcards.mag} with Foldseek/ProstT5..."
     shell:
         """
@@ -487,8 +487,8 @@ rule merge_gene_annotations:
     conda:
         f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 50) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 50)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10)) * 2 ** (attempt - 1))
     message: "Merging gene annotations of MAG {wildcards.mag}..."
     shell:
         """
@@ -536,8 +536,8 @@ rule dbcan:
     conda:
         f"{PACKAGE_DIR}/workflow/envs/annotating_function_dbcan.yaml"
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 5) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 5)) * 2 ** (attempt - 1))
     shell:
         """
         run_dbcan CAZyme_annotation \
@@ -564,8 +564,8 @@ rule dbcan2:
     conda:
         f"{PACKAGE_DIR}/workflow/envs/annotating_function_dbcan.yaml"
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10)) * 2 ** (attempt - 1))
     shell:
         """
         run_dbcan gff_process \
@@ -593,8 +593,8 @@ rule dbcan3:
     conda:
         f"{PACKAGE_DIR}/workflow/envs/annotating_function_dbcan.yaml"
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 15) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 15)) * 2 ** (attempt - 1))
     shell:
         """
         run_dbcan cgc_finder --output_dir {params.output_dir}
@@ -615,8 +615,8 @@ rule dbcan4:
     conda:
         f"{PACKAGE_DIR}/workflow/envs/annotating_function_dbcan.yaml"
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 5) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 5)) * 2 ** (attempt - 1))
     shell:
         """
         run_dbcan substrate_prediction \
@@ -639,8 +639,8 @@ rule dbcan_summary:
     conda:
         f"{PACKAGE_DIR}/workflow/envs/annotating_function_dbcan.yaml"
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb * 10) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(1024, int(input.size_mb * 1024 * 4)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb * 10)) * 2 ** (attempt - 1))
     shell:
         """
         python {params.package_dir}/workflow/scripts/dbcan_region.py \
@@ -661,8 +661,8 @@ rule antismash:
     threads:
         1
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10)) * 2 ** (attempt - 1))
     conda:
         f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
     shell:
@@ -686,8 +686,8 @@ rule antismash_regions:
     params:
         package_dir={PACKAGE_DIR}
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb * 5) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(1024, int(input.size_mb * 1024 * 4)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb * 5)) * 2 ** (attempt - 1))
     shell:
         """
         python {params.package_dir}/workflow/scripts/antismash_regions.py \
@@ -711,8 +711,8 @@ rule defensefinder:
     conda:
         f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(1024, int(input.size_mb * 1024 * 4) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb * 15) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(1024, int(input.size_mb * 1024 * 4)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb * 15)) * 2 ** (attempt - 1))
     shell:
         """
         defense-finder run \
@@ -737,8 +737,8 @@ rule genomad:
     threads:
         1
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(16*1024, int(input.size_mb * 1024 * 50) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 20) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(16*1024, int(input.size_mb * 1024 * 50)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 20)) * 2 ** (attempt - 1))
     shell:
         """
         module purge
@@ -798,8 +798,8 @@ rule merge_cluster_annotations:
     conda:
         f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 50) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 50)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10)) * 2 ** (attempt - 1))
     message: "Merging cluster annotations of MAG {wildcards.mag}..."
     shell:
         """
@@ -825,8 +825,8 @@ rule final_gene_annotation_table:
     threads:
         1
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 50) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 50)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10)) * 2 ** (attempt - 1))
     message: "Generating final gene annotation file..."
     shell:
         """
@@ -841,8 +841,8 @@ rule final_cluster_annotation_table:
     threads:
         1
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 50) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 50)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10)) * 2 ** (attempt - 1))
     message: "Generating final cluster annotation file..."
     shell:
         """
@@ -903,8 +903,8 @@ rule annotation_report:
     conda:
         f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
     resources:
-        mem_mb=cap_mem_mb(1024),
-        runtime=cap_runtime(15)
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(1024 * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(15 * 2 ** (attempt - 1))
     message: "Writing annotation provenance manifest and QC summary..."
     shell:
         """

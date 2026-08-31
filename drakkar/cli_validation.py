@@ -363,10 +363,16 @@ def resource_config(memory_multiplier=1, time_multiplier=1):
 def default_resource_args(memory_multiplier=1, time_multiplier=1, slurm_resources=""):
     max_mem_mb = int(config_vars.get("SNAKEMAKE_MAX_GB", 1024)) * 1024
     max_runtime = int(config_vars.get("SNAKEMAKE_MAX_TIME", 14 * 24 * 60))
-    default_mem_mb = min(max_mem_mb, 8 * 1024 * memory_multiplier)
-    default_runtime = min(max_runtime, 10 * time_multiplier)
+    base_mem_mb = 8 * 1024 * memory_multiplier
+    base_runtime = 10 * time_multiplier
+    # Scale after the floor so a rule that declares no resources of its own and
+    # was killed at the default actually grows on retry instead of asking for
+    # the same allocation again. Snakemake evaluates these as expressions with
+    # `attempt` in scope, exactly like the profile defaults they override.
+    default_mem_mb = f"min({max_mem_mb}, {base_mem_mb} * 2 ** (attempt - 1))"
+    default_runtime = f"min({max_runtime}, {base_runtime} * 2 ** (attempt - 1))"
     extra = f" {slurm_resources}" if slurm_resources else ""
-    return f"--default-resources mem_mb={default_mem_mb} runtime={default_runtime}{extra} "
+    return f'--default-resources "mem_mb={default_mem_mb}" "runtime={default_runtime}"{extra} '
 
 def default_database_version(database_name):
     if database_name in ("vfdb", "foldseek"):

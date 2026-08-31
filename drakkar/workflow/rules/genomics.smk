@@ -51,8 +51,8 @@ rule genomics_reference_dict:
         python_module={PYTHON_MODULE}
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 1024 * 10) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 1024 * 10)) * 2 ** (attempt - 1))
     message: "Building sequence dictionary for reference {wildcards.reference}..."
     shell:
         """
@@ -89,8 +89,8 @@ rule genomics_mark_duplicates:
         tempdir=f"{OUTPUT_DIR}/genomics/markdup/{{sample}}_tmp"
     threads: 4
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(16*1024, int(input.size_mb * 3) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(30, int(input.size_mb / 50) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(16*1024, int(input.size_mb * 3)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(30, int(input.size_mb / 50)) * 2 ** (attempt - 1))
     message: "Marking duplicates in {wildcards.sample}..."
     shell:
         """
@@ -130,7 +130,7 @@ rule genomics_split_intervals:
         outdir=f"{OUTPUT_DIR}/genomics/intervals/{{reference}}"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb) * 2 ** (attempt - 1))),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb)) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: cap_runtime(15 * 2 ** (attempt - 1))
     message: "Splitting reference {wildcards.reference} into {params.scatter_count} interval shards..."
     shell:
@@ -167,8 +167,8 @@ rule genomics_haplotype_caller:
         python_module={PYTHON_MODULE}
     threads: 4
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(16*1024, int(input.size_mb * 2) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(60, int(input.size_mb / 10) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(16*1024, int(input.size_mb * 2)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(60, int(input.size_mb / 10)) * 2 ** (attempt - 1))
     message: "Calling variants in {wildcards.sample} (shard {wildcards.shard})..."
     shell:
         """
@@ -215,8 +215,8 @@ rule genomics_combine_gvcfs:
         variant_args=lambda wildcards, input: " ".join(f"-V {gvcf}" for gvcf in input.gvcfs)
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(16*1024, int(input.size_mb * 3) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(60, int(input.size_mb / 10) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(16*1024, int(input.size_mb * 3)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(60, int(input.size_mb / 10)) * 2 ** (attempt - 1))
     message: "Combining GVCFs of reference {wildcards.reference} (shard {wildcards.shard})..."
     shell:
         """
@@ -249,8 +249,8 @@ rule genomics_genotype_gvcfs:
         python_module={PYTHON_MODULE}
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(16*1024, int(input.size_mb * 3) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(60, int(input.size_mb / 10) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(16*1024, int(input.size_mb * 3)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(60, int(input.size_mb / 10)) * 2 ** (attempt - 1))
     message: "Genotyping reference {wildcards.reference} (shard {wildcards.shard})..."
     shell:
         """
@@ -285,8 +285,8 @@ rule genomics_gather_vcfs:
         bcftools_module={BCFTOOLS_MODULE}
     threads: 4
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 2) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(30, int(input.size_mb / 50) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 2)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(30, int(input.size_mb / 50)) * 2 ** (attempt - 1))
     message: "Gathering cohort variants for reference {wildcards.reference}..."
     shell:
         """

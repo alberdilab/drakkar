@@ -28,8 +28,8 @@ rule seqkit_sana:
         workdir=lambda wildcards: f"{OUTPUT_DIR}/preprocessing/seqkit/.tmp_{wildcards.sample}"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 512) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 512)) * 2 ** (attempt - 1))
     message: "Sanitizing FASTQ files for sample {wildcards.sample}..."
     shell:
         """

@@ -33,8 +33,8 @@ rule fastp:
         fastp_module={FASTP_MODULE}
     threads: 4
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 1024 * 3) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 1024 * 3)) * 2 ** (attempt - 1))
     message: "Quality-filtering sample {wildcards.sample}..."
     shell:
         """
@@ -84,8 +84,8 @@ rule reference_map:
         basename=lambda wildcards: f"{OUTPUT_DIR}/data/references/{SAMPLE_TO_REFERENCE[wildcards.sample]}"
     threads: 16
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 20) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 20)) * 2 ** (attempt - 1))
     message: "Mapping {wildcards.sample} against reference genome..."
     shell:
         """
@@ -113,7 +113,7 @@ rule samtools_stats:
         samtools_module={SAMTOOLS_MODULE}
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 2) * 2 ** (attempt - 1))),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 2)) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: cap_runtime(20 * 2 ** (attempt - 1))
     message: "Generating mapping stats for {wildcards.sample}..."
     shell:
@@ -150,8 +150,8 @@ rule split_reads:
         samtools_module={SAMTOOLS_MODULE}
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(30, int(input.size_mb / 50) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(30, int(input.size_mb / 50)) * 2 ** (attempt - 1))
     message: "Extracting metagenomic reads of {wildcards.sample}..."
     shell:
         """
@@ -181,8 +181,8 @@ rule singlem:
         singlem_db={SINGLEM_DB}
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 100) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 100)) * 2 ** (attempt - 1))
     shell:
         """
         module purge
@@ -211,8 +211,8 @@ rule singlem_mf:
         singlem_db={SINGLEM_DB}
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 100) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 100)) * 2 ** (attempt - 1))
     shell:
         """
         module purge
@@ -249,8 +249,8 @@ rule preprocessing_stats:
         seqkit_arg=lambda wildcards, input: "-k " + " ".join(input.seqkit) if input.seqkit else ""
     threads: 1
     resources:
-        mem_mb=cap_mem_mb(1*1024),
-        runtime=cap_runtime(5)
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(1*1024 * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(5 * 2 ** (attempt - 1))
     message: "Creating preprocessing stats..."
     shell:
         """
@@ -272,8 +272,8 @@ rule preprocessing_report:
         package_dir={PACKAGE_DIR}
     threads: 1
     resources:
-        mem_mb=cap_mem_mb(1*1024),
-        runtime=cap_runtime(5)
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(1*1024 * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(5 * 2 ** (attempt - 1))
     message: "Creating preprocessing stats..."
     shell:
         """
@@ -297,8 +297,8 @@ rule preprocessing_multiqc:
         title="Preprocessing report"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5) * 2 ** (attempt - 1))),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 100) * 2 ** (attempt - 1)))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 100)) * 2 ** (attempt - 1))
     message: "Building MultiQC report..."
     shell:
         """
