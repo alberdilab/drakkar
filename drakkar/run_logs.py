@@ -9,7 +9,13 @@ from drakkar.benchmark import format_hours, format_megabytes, format_percent, ge
 from drakkar.cli_context import ERROR, INFO, RESET, WORKFLOW_RUN_COMMANDS
 from drakkar.failures import generate_failure_report, print_failure_report
 from drakkar.output import print, section
-from drakkar.run_metadata import build_snakemake_log_path, load_metadata_file
+from drakkar.run_metadata import (
+    BENCHMARK_DIRNAME,
+    LEGACY_LOG_DIRNAME,
+    find_snakemake_log,
+    load_metadata_file,
+    logging_dir,
+)
 from drakkar.system_checks import is_snakemake_locked
 
 def workflow_run_sort_key(metadata_path):
@@ -24,27 +30,69 @@ def is_launch_metadata_path(metadata_path):
 
 def run_id_from_metadata_name(value):
     name = Path(str(value)).name
-    match = re.fullmatch(r"drakkar_(\d{8}-\d{6})(?:_resources)?\.ya?ml", name)
+    match = re.fullmatch(r"drakkar_(\d{8}-\d{6})(?:[._]resources)?\.ya?ml", name)
     if match:
         return match.group(1)
     return str(value).strip().removeprefix("drakkar_").removesuffix(".yaml").removesuffix(".yml")
 
 def discover_run_metadata(output_dir):
+    """Return the workflow runs in an output directory, newest first.
+
+    Runs are looked for in the logging directory and, for output directories
+    written before it existed, in the output root. A run id present in both is
+    taken from the logging directory.
+    """
     output_path = Path(output_dir)
+    seen = set()
     runs = []
-    for metadata_path in sorted(output_path.glob("drakkar_*.yaml"), key=workflow_run_sort_key, reverse=True):
-        if not is_launch_metadata_path(metadata_path):
-            continue
+    for directory in (logging_dir(output_path), output_path):
         try:
-            with open(metadata_path, "r", encoding="utf-8") as handle:
-                metadata = yaml.safe_load(handle) or {}
+            candidates = sorted(directory.glob("drakkar_*.yaml"))
         except OSError:
             continue
-        command = metadata.get("command")
-        if command not in WORKFLOW_RUN_COMMANDS:
-            continue
-        runs.append((metadata_path, metadata))
+        for metadata_path in candidates:
+            if not is_launch_metadata_path(metadata_path):
+                continue
+            run_key = run_id_from_metadata_name(metadata_path)
+            if run_key in seen:
+                continue
+            try:
+                with open(metadata_path, "r", encoding="utf-8") as handle:
+                    metadata = yaml.safe_load(handle) or {}
+            except OSError:
+                continue
+            seen.add(run_key)
+            command = metadata.get("command")
+            if command not in WORKFLOW_RUN_COMMANDS:
+                continue
+            runs.append((metadata_path, metadata))
+    runs.sort(key=lambda item: workflow_run_sort_key(item[0]), reverse=True)
     return runs
+
+def discover_job_logs(output_dir):
+    """Return the per-rule job logs the workflow wrote, from either layout.
+
+    Job logs sit in module subdirectories of the logging directory
+    (``logging/annotating/prodigal/<mag>.log``). The run artefacts themselves
+    sit at its top level and under ``benchmark/``, and are reported separately,
+    so both are skipped here. Runs predating the logging directory wrote their
+    job logs into ``log/``, which is searched whole.
+    """
+    output_path = Path(output_dir)
+    logs = []
+    current_dir = logging_dir(output_path)
+    if current_dir.is_dir():
+        for path in current_dir.rglob("*"):
+            if not path.is_file():
+                continue
+            relative = path.relative_to(current_dir)
+            if len(relative.parts) == 1 or relative.parts[0] == BENCHMARK_DIRNAME:
+                continue
+            logs.append(path)
+    legacy_dir = output_path / LEGACY_LOG_DIRNAME
+    if legacy_dir.is_dir():
+        logs.extend(path for path in legacy_dir.rglob("*") if path.is_file())
+    return sorted(logs)
 
 def resolve_run_metadata(output_dir, run_id=None):
     runs = discover_run_metadata(output_dir)
@@ -315,7 +363,7 @@ def print_logging_usage_guide(output_path, selected_run_id=None):
     print(f"  Failure excerpt or tail: {excerpt_cmd}")
     print(f"  Full Snakemake log: {full_cmd}")
     print(f"  Available runs: {list_cmd}")
-    print("  Benchmark tables: inspect benchmark/drakkar_<run_id>.jobs.tsv and .rules.tsv when present")
+    print("  Benchmark tables: inspect logging/benchmark/drakkar_<run_id>.jobs.tsv and .rules.tsv when present")
 
 def run_logging(output_dir, run_id=None, tail=50, full=False, paths=False, list_runs=False, summary=False, excerpt=False, failures=False):
     output_path = Path(output_dir).resolve()
@@ -354,9 +402,7 @@ def run_logging(output_dir, run_id=None, tail=50, full=False, paths=False, list_
         if configured_log:
             snakemake_log_path = Path(configured_log)
         elif metadata.get("run_id"):
-            candidate = build_snakemake_log_path(output_path, metadata["run_id"])
-            if candidate.exists():
-                snakemake_log_path = candidate
+            snakemake_log_path = find_snakemake_log(output_path, metadata["run_id"])
     if snakemake_log_path is None and fallback_logs:
         snakemake_log_path = fallback_logs[0]
 
@@ -411,10 +457,7 @@ def run_logging(output_dir, run_id=None, tail=50, full=False, paths=False, list_
             print("Main Snakemake log: not found")
         for fallback_log in fallback_logs[:5]:
             print(f"Snakemake fallback log: {fallback_log}")
-        extra_logs = sorted(
-            path for path in (output_path / "log").rglob("*")
-            if path.is_file() and path != snakemake_log_path
-        ) if (output_path / "log").exists() else []
+        extra_logs = [path for path in discover_job_logs(output_path) if path != snakemake_log_path]
         for extra_log in extra_logs[:20]:
             print(f"Additional log: {extra_log}")
         if metadata is not None:

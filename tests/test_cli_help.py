@@ -8,6 +8,8 @@ import unittest
 from unittest.mock import patch
 
 from drakkar import cli as cli_module
+from drakkar import cli_main
+from drakkar.cli_parser import build_parser
 
 
 ANSI_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
@@ -71,6 +73,10 @@ class CliHelpTests(unittest.TestCase):
         self.assertIn("-b, --binners", plain)
         self.assertRegex(plain, r"metabat,\s+maxbin,\s+semibin,\s+comebin")
 
+    def test_reporting_is_listed_with_its_report_alias(self) -> None:
+        plain = self.run_help()
+        self.assertIn("reporting (report)", plain)
+
     def test_help_fallback_explains_missing_rich_dependency(self) -> None:
         parser = cli_module.RichArgumentParser(prog="drakkar-test", description="test parser")
         buffer = io.StringIO()
@@ -85,6 +91,42 @@ class CliHelpTests(unittest.TestCase):
         self.assertIn("usage: drakkar-test", plain)
         self.assertIn("Rich-styled help is unavailable", plain)
         self.assertIn("python -m pip install rich", plain)
+
+
+class ReportingAliasTests(unittest.TestCase):
+    """`report` was the command's original name and still has to work."""
+
+    def parse(self, name: str):
+        return build_parser().parse_args([name, "-o", "/tmp", "--db-only"])
+
+    def test_both_names_reach_the_same_arguments(self) -> None:
+        for name in ("reporting", "report"):
+            with self.subTest(name=name):
+                args = self.parse(name)
+                self.assertEqual(args.output, "/tmp")
+                self.assertTrue(args.db_only)
+
+    def test_both_names_dispatch_to_the_report_runner(self) -> None:
+        for name in ("reporting", "report"):
+            with self.subTest(name=name):
+                argv = ["drakkar", name, "-o", "/tmp", "--db-only"]
+                with patch.object(sys, "argv", argv), \
+                        patch.object(cli_main, "display_drakkar"), \
+                        patch.object(cli_main, "run_report", return_value=0) as runner:
+                    self.assertEqual(cli_main.main(), 0)
+                runner.assert_called_once_with(
+                    "/tmp",
+                    sections=None,
+                    db_only=True,
+                    html_only=False,
+                    force=False,
+                    primary_hits_only=False,
+                )
+
+    def test_both_names_count_as_read_only(self) -> None:
+        for name in ("reporting", "report"):
+            with self.subTest(name=name):
+                self.assertIn(name, cli_module.READ_ONLY_COMMANDS)
 
 
 if __name__ == "__main__":

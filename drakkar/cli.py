@@ -141,7 +141,15 @@ apply_database_updates = _database_update.apply_database_updates
 run_database_update = _database_update.run_database_update
 
 get_modules_to_run = _run_metadata.get_modules_to_run
+LOGGING_DIRNAME = _run_metadata.LOGGING_DIRNAME
+BENCHMARK_DIRNAME = _run_metadata.BENCHMARK_DIRNAME
+LEGACY_LOG_DIRNAME = _run_metadata.LEGACY_LOG_DIRNAME
+logging_dir = _run_metadata.logging_dir
+benchmark_dir = _run_metadata.benchmark_dir
+build_metadata_path = _run_metadata.build_metadata_path
 build_snakemake_log_path = _run_metadata.build_snakemake_log_path
+find_snakemake_log = _run_metadata.find_snakemake_log
+uses_legacy_layout = _run_metadata.uses_legacy_layout
 build_benchmark_paths = _run_metadata.build_benchmark_paths
 load_metadata_file = _run_metadata.load_metadata_file
 update_launch_metadata = _run_metadata.update_launch_metadata
@@ -160,6 +168,7 @@ print_failure_report = _failures.print_failure_report
 
 workflow_run_sort_key = _run_logs.workflow_run_sort_key
 discover_run_metadata = _run_logs.discover_run_metadata
+discover_job_logs = _run_logs.discover_job_logs
 resolve_run_metadata = _run_logs.resolve_run_metadata
 discover_snakemake_fallback_logs = _run_logs.discover_snakemake_fallback_logs
 tail_file = _run_logs.tail_file

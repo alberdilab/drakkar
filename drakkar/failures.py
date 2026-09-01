@@ -8,7 +8,14 @@ from pathlib import Path
 from drakkar.benchmark import write_tsv
 from drakkar.cli_context import ERROR, INFO, RESET
 from drakkar.output import print, section
-from drakkar.run_metadata import build_snakemake_log_path, load_metadata_file, update_launch_metadata
+from drakkar.run_metadata import (
+    build_snakemake_log_path,
+    find_snakemake_log,
+    load_metadata_file,
+    logging_dir,
+    update_launch_metadata,
+    uses_legacy_layout,
+)
 
 FAILURE_REPORT_FIELDS = [
     "run_id",
@@ -160,8 +167,10 @@ OOM_HINT_RE = re.compile(
 TIMEOUT_HINT_RE = re.compile(r"due to time limit|time limit exceeded", re.IGNORECASE)
 STORAGE_HINT_RE = re.compile(r"no space left on device|disk quota exceeded", re.IGNORECASE)
 
-def build_failure_report_path(output_dir, run_id):
-    return Path(output_dir) / f"drakkar_{run_id}_failures.tsv"
+def build_failure_report_path(output_dir, run_id, legacy=False):
+    if legacy:
+        return Path(output_dir) / f"drakkar_{run_id}_failures.tsv"
+    return logging_dir(output_dir) / f"drakkar_{run_id}.failures.tsv"
 
 def clean_line(line):
     return ANSI_ESCAPE_RE.sub("", str(line or "")).replace("\r", "").rstrip("\n")
@@ -791,12 +800,18 @@ def generate_failure_report(output_dir, metadata_path=None, metadata=None, write
         return None
 
     output_dir = Path(output_dir)
+    legacy = uses_legacy_layout(output_dir, metadata_path)
     configured_log = metadata.get("snakemake_log")
-    log_path = Path(configured_log) if configured_log else build_snakemake_log_path(output_dir, run_id)
+    if configured_log:
+        log_path = Path(configured_log)
+    else:
+        log_path = find_snakemake_log(output_dir, run_id) or build_snakemake_log_path(
+            output_dir, run_id, legacy=legacy
+        )
     report = build_failure_report(log_path, run_id=run_id, read_job_logs=read_job_logs)
 
     if write and (report["rows"] or report["workflow_errors"]):
-        report_path = build_failure_report_path(output_dir, run_id)
+        report_path = build_failure_report_path(output_dir, run_id, legacy=legacy)
         try:
             write_tsv(report_path, FAILURE_REPORT_FIELDS, failure_report_rows_for_tsv(report))
             report["report_path"] = str(report_path)

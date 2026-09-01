@@ -353,8 +353,8 @@ Use ``--skip-database-check`` to launch without this validation.
 Cross-run consistency check
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Each run records the databases it used in its ``drakkar_<run_id>.yaml`` run
-metadata file:
+Each run records the databases it used in its
+``logging/drakkar_<run_id>.yaml`` run metadata file:
 
 .. code-block:: yaml
 
@@ -577,9 +577,11 @@ SLURM benchmarking
 After each workflow run, DRAKKAR queries ``sacct`` for the jobs submitted
 during that run and writes a resource-efficiency summary. This produces:
 
-- ``benchmark/``: per-job resource tables under the output directory.
-- ``drakkar_<run_id>_resources.yaml``: root-level summary of CPU time, memory
-  peaks, and efficiency ratios for the run.
+- ``logging/benchmark/drakkar_<run_id>.jobs.tsv`` and
+  ``logging/benchmark/drakkar_<run_id>.rules.tsv``: per-job and per-rule
+  resource tables.
+- ``logging/benchmark/drakkar_<run_id>.resources.yaml``: summary of CPU time,
+  memory peaks, and efficiency ratios for the run.
 
 The resource summary is also shown by ``drakkar logging`` alongside the
 workflow execution summary.
@@ -607,12 +609,12 @@ restarting Snakemake.
 
 .. code-block:: console
 
-   $ drakkar status drakkar_20260510-032711.yaml --samples
+   $ drakkar status logging/drakkar_20260510-032711.yaml --samples
 
 Options:
 
-- ``target``: optional output directory or ``drakkar_<run_id>.yaml`` metadata
-  file. If omitted, DRAKKAR inspects the current directory.
+- ``target``: optional output directory or ``logging/drakkar_<run_id>.yaml``
+  metadata file. If omitted, DRAKKAR inspects the current directory.
 - ``-d/--directory`` or ``-o/--output``: output directory to inspect.
 - ``--run``: specific run ID or ``drakkar_<run_id>.yaml`` file name.
 - ``--rules``: show rule-focused progress only.
@@ -624,9 +626,40 @@ Behavior:
 - The default view shows overall progress, rule progress for main rules, and
   sample-stage progress.
 - Rule totals are parsed from the captured Snakemake job stats and completion
-  lines in ``log/drakkar_<run_id>.snakemake.log``.
+  lines in ``logging/drakkar_<run_id>.snakemake.log``.
 - Sample stages are inferred from observed sample or assembly wildcards and the
   workflow sample dictionaries under ``data/``.
+
+.. _logging-directory:
+
+The logging directory
+---------------------
+
+Everything a workflow run records about itself is written to ``logging/`` in
+the output directory, keyed by the run id::
+
+   <output_dir>/logging/
+   ├── drakkar_<run_id>.yaml              run metadata
+   ├── drakkar_<run_id>.snakemake.log     captured Snakemake stdout/stderr
+   ├── drakkar_<run_id>.failures.tsv      failed jobs, only when a run fails
+   ├── benchmark/
+   │   ├── drakkar_<run_id>.resources.yaml   SLURM resource-efficiency summary
+   │   ├── drakkar_<run_id>.jobs.tsv         per-job resource table
+   │   └── drakkar_<run_id>.rules.tsv        per-rule resource table
+   └── <module>/<rule>/<target>.log       per-rule job logs
+
+The benchmark artifacts are written only for runs launched with
+``--profile slurm``; a local run leaves no ``benchmark/`` directory.
+
+.. note::
+
+   Output directories written by DRAKKAR 2.4.5 and earlier kept these files in
+   the output root, in ``log/`` and in ``benchmark/``, with
+   ``drakkar_<run_id>_resources.yaml`` and ``drakkar_<run_id>_failures.tsv``
+   joined by an underscore. Both layouts are still read, so ``drakkar
+   logging``, ``drakkar status`` and ``drakkar report`` keep working on an
+   existing output directory, and anything regenerated for such a run is
+   written beside the files it already has. There is nothing to migrate.
 
 Logging
 -------
@@ -666,10 +699,10 @@ Options:
 
 Behavior:
 
-- Workflow runs write root metadata files such as
-  ``drakkar_20260503-101530.yaml``.
+- Workflow runs write their metadata to the logging directory, as
+  ``logging/drakkar_20260503-101530.yaml``.
 - Snakemake stdout/stderr is captured persistently in
-  ``log/drakkar_20260503-101530.snakemake.log``.
+  ``logging/drakkar_20260503-101530.snakemake.log``.
 - The default logging view includes a parsed execution summary with planned
   jobs, observed rule executions, workflow progress, and detected error types.
 - If failures are detected, the failure report described below is printed as
@@ -684,10 +717,9 @@ Failure report
 
 When Snakemake stops after failures, DRAKKAR prints a tabular failure report
 before exiting, and writes the same information to
-``drakkar_<run_id>_failures.tsv`` in the root of the output directory, next to
-``drakkar_<run_id>.yaml`` and ``drakkar_<run_id>_resources.yaml``. The report
-can be printed again at any time with
-``drakkar logging -o <output_dir> --failures``.
+``logging/drakkar_<run_id>.failures.tsv``, next to the run's
+``drakkar_<run_id>.yaml`` metadata and its Snakemake log. The report can be
+printed again at any time with ``drakkar logging -o <output_dir> --failures``.
 
 .. code-block:: text
 
@@ -802,14 +834,9 @@ Key output locations:
   :doc:`annotation_tables` for the gene-table schema and 1.x migration guide.
 - ``expressing/``: expression outputs.
 - ``dereplicating/``: dereplicated genomes in dereplication-only mode.
-- ``benchmark/``: per-SLURM-job resource tables written after each workflow run.
-- ``drakkar_<run_id>.yaml``: workflow run metadata.
-- ``drakkar_<run_id>_resources.yaml``: root-level SLURM resource-efficiency
-  summary for the run (CPU time, memory peaks, and efficiency ratios).
-- ``drakkar_<run_id>_failures.tsv``: root-level table of failed jobs, written
-  only when a run fails (see :ref:`failure-report`).
-- ``log/drakkar_<run_id>.snakemake.log``: persistent Snakemake stdout/stderr
-  capture for a workflow run.
+- ``logging/``: everything each run records about itself (see
+  :ref:`logging-directory`).
+- ``reporting/``: the report database and the rendered HTML reports.
 - ``<directory>/<version>/database_versions.yaml``: installation log for a
   managed database release.
 

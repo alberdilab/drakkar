@@ -5,7 +5,7 @@ import sqlite3
 import tempfile
 import textwrap
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from drakkar.report import command as report_command
@@ -266,6 +266,98 @@ def seed_benchmark(connection, run_id="20260825-101500", status="generated"):
     log(connection, "benchmark_rule", "resources", len(rules))
 
 
+def seed_amr(connection):
+    # Two assemblies: one where both callers agreed on most loci and geNomad
+    # put some of them on a plasmid, one single-caller assembly with a hit the
+    # caller reported without coordinates.
+    connection.executemany(
+        "INSERT INTO amr_assembly VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [("A1", "metagenome", "", 1200, 5_000_000, 5, 4, 2, 6, 2, 3, 0, 1, 3),
+         ("A2", "isolate", "Escherichia coli", 80, 4_800_000, 3, 0, 0, 3, 0, 0, 1, 0, 0)],
+    )
+    loci = [
+        ("A1", "L1", "c1", 100, 900, "+", "blaTEM", "blaTEM", "", "", "beta-lactam",
+         "", "antibiotic inactivation", "amrfinderplus;rgi", 2, 2,
+         "amrfinder_and_rgi", "gene_match"),
+        ("A1", "L2", "c1", 2000, 2600, "-", "tetA", "tetA", "", "", "tetracycline",
+         "", "antibiotic efflux", "amrfinderplus;rgi", 2, 2,
+         "amrfinder_and_rgi", "drug_class_match"),
+        ("A1", "L3", "c2", 50, 700, "+", "sul1", "sul1", "", "", "sulfonamide",
+         "", "target replacement", "amrfinderplus", 1, 1,
+         "amrfinder_only", "single_source"),
+        ("A1", "L4", "c2", 3000, 3500, "+", "qnrS", "qnrS", "", "", "quinolone",
+         "", "target protection", "rgi", 1, 1, "rgi_only", "single_source"),
+        ("A1", "L5", "c3", 10, 400, "+", "blaTEM", "blaTEM", "", "", "beta-lactam",
+         "", "antibiotic inactivation", "rgi", 1, 1, "rgi_only", "single_source"),
+        ("A1", "L6", "c3", 900, 1400, "+", "mphA", "mphA", "", "", "macrolide",
+         "", "antibiotic inactivation", "amrfinderplus", 1, 1,
+         "amrfinder_only", "single_source"),
+        ("A2", "L7", "d1", 100, 800, "+", "blaTEM", "blaTEM", "", "", "beta-lactam",
+         "", "antibiotic inactivation", "amrfinderplus", 1, 1,
+         "amrfinder_only", "single_source"),
+        ("A2", "L8", "d1", 2000, 2400, "+", "aac(6')-Ib", "aac(6')-Ib", "", "",
+         "aminoglycoside", "", "antibiotic inactivation", "amrfinderplus", 1, 1,
+         "amrfinder_only", "single_source"),
+        ("A2", "L9", "d2", 60, 500, "-", "ermB", "ermB", "", "", "macrolide",
+         "", "target alteration", "amrfinderplus", 1, 1,
+         "amrfinder_only", "single_source"),
+    ]
+    connection.executemany(
+        "INSERT INTO amr_locus VALUES (" + ", ".join(["?"] * 18) + ")", loci
+    )
+    hits = [
+        ("A1", "H1", "L1", "amrfinderplus", "c1", 100, 900, "+", "blaTEM",
+         "beta-lactamase TEM", "", "beta-lactam", "antibiotic inactivation",
+         "blaTEM", "EXACTX", "EXACTX", 100.0, 100.0, 540.0, 0),
+        ("A1", "H2", "L1", "rgi", "c1", 105, 900, "+", "blaTEM", "TEM-1",
+         "ARO:3000873", "beta-lactam", "antibiotic inactivation", "blaTEM",
+         "Perfect", "DIAMOND", 99.6, 98.0, 530.0, 0),
+        ("A2", "H3", "L7", "amrfinderplus", "d1", 100, 800, "+", "blaTEM",
+         "beta-lactamase TEM", "", "beta-lactam", "antibiotic inactivation",
+         "blaTEM", "BLASTX", "BLASTX", 97.2, 92.0, 480.0, 1),
+    ]
+    connection.executemany(
+        "INSERT INTO amr_hit VALUES (" + ", ".join(["?"] * 20) + ")", hits
+    )
+    drugs = [
+        ("A1", "H1", "beta-lactam", "L1", "amrfinderplus", "", "antibiotic inactivation", "blaTEM", ""),
+        ("A1", "H2", "beta-lactam", "L1", "rgi", "", "antibiotic inactivation", "blaTEM", "ARO:3000873"),
+        ("A1", "H4", "tetracycline", "L2", "amrfinderplus", "", "antibiotic efflux", "tetA", ""),
+        ("A1", "H5", "sulfonamide", "L3", "amrfinderplus", "", "target replacement", "sul1", ""),
+        ("A1", "H6", "quinolone", "L4", "rgi", "", "target protection", "qnr", ""),
+        ("A2", "H3", "beta-lactam", "L7", "amrfinderplus", "", "antibiotic inactivation", "blaTEM", ""),
+        ("A2", "H7", "macrolide", "L9", "amrfinderplus", "", "target alteration", "ermB", ""),
+    ]
+    connection.executemany(
+        "INSERT INTO amr_drug_class VALUES (" + ", ".join(["?"] * 9) + ")", drugs
+    )
+    regions = [
+        ("A1", "R1", "c1", 1, 40_000, "plasmid", "c1", 40_000, "circular", 0.94,
+         0.01, 2.4, 6, 45, "traB;traC", ""),
+        ("A1", "R2", "c3", 1, 22_000, "provirus", "c3", 22_000, "linear", 0.81,
+         0.04, 1.2, 3, 28, "", "Caudoviricetes"),
+    ]
+    connection.executemany(
+        "INSERT INTO amr_mobility_region VALUES (" + ", ".join(["?"] * 16) + ")",
+        regions,
+    )
+    # L1 sits inside the plasmid, L5 inside the provirus; L2 overlaps both.
+    links = [
+        ("A1", "L1", "R1", "plasmid", "c1", 800, 1.0, 0.94),
+        ("A1", "L2", "R1", "plasmid", "c1", 600, 1.0, 0.94),
+        ("A1", "L5", "R2", "provirus", "c3", 390, 1.0, 0.81),
+    ]
+    connection.executemany(
+        "INSERT INTO amr_mobility VALUES (" + ", ".join(["?"] * 8) + ")", links
+    )
+    log(connection, "amr_assembly", "amr", 2)
+    log(connection, "amr_locus", "amr", len(loci))
+    log(connection, "amr_hit", "amr", len(hits))
+    log(connection, "amr_drug_class", "amr", len(drugs))
+    log(connection, "amr_mobility_region", "amr", len(regions))
+    log(connection, "amr_mobility", "amr", len(links))
+
+
 SEEDERS = {
     "preprocessing": seed_preprocessing,
     "cataloging": seed_cataloging,
@@ -274,6 +366,7 @@ SEEDERS = {
     "taxonomy": seed_taxonomy,
     "function": seed_function,
     "expression": seed_expression,
+    "amr": seed_amr,
     "resources": seed_resources,
 }
 
@@ -1123,6 +1216,99 @@ class PhylumColourTests(TemporaryRootMixin, unittest.TestCase):
         self.assertIn('"yref":"container"', composition)
 
 
+class AmrLayoutTests(TemporaryRootMixin, unittest.TestCase):
+    """The AMR section reports loci, not raw caller hits."""
+
+    def section(self):
+        root = self.temporary_root()
+        db_path = build_db(root / "drakkar.db", ("amr",))
+        html_path = root / "drakkar_report.html"
+        render_report(db_path, html_path, sections=("amr",))
+        text = html_path.read_text(encoding="utf-8")
+        start = text.index('id="section-amr"')
+        return text[start:text.index("</section>", start)]
+
+    def test_the_section_leads_with_the_reconciled_locus_count(self):
+        body = self.section()
+        self.assertIn("reconciled into 9 resistance loci", body)
+        self.assertIn("Resistance loci", body)
+
+    def test_loci_called_by_both_tools_are_counted_and_shared(self):
+        body = self.section()
+        self.assertIn("Called by both tools", body)
+        # L1 and L2 of the nine seeded loci.
+        self.assertIn('<span class="stat-value">2</span>', body)
+        self.assertIn("22.2%", body)
+
+    def test_mobile_loci_are_counted_once_per_locus_not_once_per_region(self):
+        body = self.section()
+        self.assertIn("On a mobile element", body)
+        # Three links, three distinct loci; nothing double-counted.
+        self.assertIn('<span class="stat-value">3</span>', body)
+
+    def test_caller_support_is_shown_before_the_agreement_between_callers(self):
+        body = self.section()
+        self.assertIn("<h3>Caller support</h3>", body)
+        self.assertLess(
+            body.index("<h3>Caller support</h3>"),
+            body.index("Agreement on the loci both callers found"),
+        )
+
+    def test_the_agreement_labels_are_written_out_not_left_as_slugs(self):
+        body = self.section()
+        agreement = body[body.index("Agreement on the loci both callers found"):]
+        self.assertIn("<td>Same gene</td>", agreement)
+        self.assertIn("<td>Same drug class only</td>", agreement)
+        self.assertNotIn("gene_match", agreement)
+
+    def test_drug_classes_are_listed_with_the_loci_behind_them(self):
+        body = self.section()
+        classes = body[body.index("<h3>Drug classes</h3>"):]
+        self.assertIn("<td>beta-lactam</td>", classes)
+        self.assertIn("<td>macrolide</td>", classes)
+
+    def test_genes_are_ranked_and_carry_their_mobile_count(self):
+        body = self.section()
+        genes = body[body.index("<h3>Resistance genes</h3>"):]
+        self.assertIn("<th>Mobile loci</th>", genes)
+        # blaTEM appears in three loci across both assemblies, more than any other.
+        first_row = genes[genes.index("<tbody>"):genes.index("</tr>", genes.index("<tbody>"))]
+        self.assertIn("blaTEM", first_row)
+
+    def test_the_context_chart_names_the_loci_on_no_mobile_element(self):
+        body = self.section()
+        context = body[body.index("Mobile-element context"):]
+        self.assertIn("Plasmid", context)
+        self.assertIn("Provirus", context)
+        self.assertIn("No mobile-element call", context)
+
+    def test_hits_without_coordinates_are_reported_rather_than_dropped(self):
+        body = self.section()
+        self.assertIn("<h3>Hits without coordinates</h3>", body)
+        qc = body[body.index("<h3>Hits without coordinates</h3>"):]
+        self.assertIn("<td>A1</td>", qc)
+        self.assertIn("<td>A2</td>", qc)
+
+    def test_a_run_that_called_nothing_still_reports_what_was_screened(self):
+        root = self.temporary_root()
+        db_path = root / "drakkar.db"
+        connection = connect(db_path)
+        create_schema(connection, drakkar_version="2.1.0")
+        connection.execute(
+            "INSERT INTO amr_assembly VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("A1", "isolate", "", 40, 4_000_000, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+        )
+        log(connection, "amr_assembly", "amr", 1)
+        connection.commit()
+        connection.close()
+        html_path = root / "drakkar_report.html"
+        outcome = render_report(db_path, html_path, sections=("amr",))
+        self.assertEqual(outcome["rendered"], ["amr"])
+        text = html_path.read_text(encoding="utf-8")
+        self.assertIn("screened 1 assembly", text)
+        self.assertIn("0 resistance loci", text)
+
+
 class ResourceBenchmarkTests(TemporaryRootMixin, unittest.TestCase):
     """The resources section: job outcomes and requested versus used figures."""
 
@@ -1301,16 +1487,56 @@ class ReportCommandRenderTests(TemporaryRootMixin, unittest.TestCase):
         )
         return root
 
+    def only_report(self, root: Path) -> Path:
+        """The single rendered report in an output directory."""
+        reports = report_command.find_reports(root)
+        self.assertEqual(len(reports), 1, f"expected one report, found {reports}")
+        return reports[0]
+
     def test_a_normal_run_writes_both_artifacts(self):
         root = self.output_dir()
         self.assertEqual(report_command.run_report(root), 0)
-        self.assertTrue((root / "drakkar.db").exists())
-        self.assertTrue((root / "drakkar_report.html").exists())
+        self.assertTrue((root / "reporting" / "drakkar.db").exists())
+        self.assertTrue(self.only_report(root).exists())
+
+    def test_both_artifacts_land_in_the_reporting_directory(self):
+        root = self.output_dir()
+        self.assertEqual(report_command.run_report(root), 0)
+        self.assertEqual(self.only_report(root).parent, root / "reporting")
+        # Nothing is left at the output root, which is the point of the move.
+        self.assertFalse((root / "drakkar.db").exists())
+        self.assertEqual(list(root.glob(report_command.REPORT_GLOB)), [])
+
+    def test_the_report_name_carries_the_time_it_was_rendered(self):
+        root = self.output_dir()
+        self.assertEqual(report_command.run_report(root), 0)
+        self.assertRegex(
+            self.only_report(root).name, r"^drakkar_report_\d{8}-\d{6}\.html$"
+        )
+
+    def test_a_later_report_does_not_replace_an_earlier_one(self):
+        root = self.output_dir()
+        self.assertEqual(report_command.run_report(root), 0)
+        first = self.only_report(root)
+        # Two runs inside the same second would land on the same name, so the
+        # second render is stamped explicitly rather than raced against.
+        later = report_command.report_name(
+            datetime.now(timezone.utc) + timedelta(seconds=1)
+        )
+        render_report(
+            report_command.database_path(root),
+            report_command.reporting_dir(root) / later,
+            sections=("preprocessing",),
+        )
+        self.assertEqual(
+            [path.name for path in report_command.find_reports(root)],
+            sorted([first.name, later]),
+        )
 
     def test_db_only_still_skips_rendering(self):
         root = self.output_dir()
         self.assertEqual(report_command.run_report(root, db_only=True), 0)
-        self.assertFalse((root / "drakkar_report.html").exists())
+        self.assertEqual(report_command.find_reports(root), [])
 
     def test_html_only_renders_without_reading_the_source_tables(self):
         root = self.output_dir()
@@ -1318,13 +1544,13 @@ class ReportCommandRenderTests(TemporaryRootMixin, unittest.TestCase):
         # Removing the source table proves the renderer reads only the database.
         (root / "preprocessing.tsv").unlink()
         self.assertEqual(report_command.run_report(root, html_only=True), 0)
-        text = (root / "drakkar_report.html").read_text(encoding="utf-8")
+        text = self.only_report(root).read_text(encoding="utf-8")
         self.assertIn('id="section-preprocessing"', text)
 
     def test_html_only_without_a_database_fails(self):
         root = self.output_dir()
         self.assertEqual(report_command.run_report(root, html_only=True), 1)
-        self.assertFalse((root / "drakkar_report.html").exists())
+        self.assertEqual(report_command.find_reports(root), [])
 
     def test_db_only_and_html_only_are_mutually_exclusive(self):
         root = self.output_dir()
@@ -1335,25 +1561,25 @@ class ReportCommandRenderTests(TemporaryRootMixin, unittest.TestCase):
     def test_html_only_refuses_a_mismatched_schema(self):
         root = self.output_dir()
         self.assertEqual(report_command.run_report(root, db_only=True), 0)
-        connection = sqlite3.connect(root / "drakkar.db")
+        connection = sqlite3.connect(report_command.database_path(root))
         connection.execute("UPDATE schema_version SET version = 99")
         connection.commit()
         connection.close()
         self.assertEqual(report_command.run_report(root, html_only=True), 1)
 
-    def test_force_rebuilds_and_overwrites_the_report(self):
+    def test_force_rebuilds_the_database_and_renders_again(self):
         root = self.output_dir()
         self.assertEqual(report_command.run_report(root), 0)
-        first = (root / "drakkar_report.html").read_text(encoding="utf-8")
         self.assertEqual(report_command.run_report(root, force=True), 0)
-        second = (root / "drakkar_report.html").read_text(encoding="utf-8")
-        self.assertIn('id="section-preprocessing"', first)
-        self.assertIn('id="section-preprocessing"', second)
+        for report in report_command.find_reports(root):
+            self.assertIn(
+                'id="section-preprocessing"', report.read_text(encoding="utf-8")
+            )
 
     def test_section_selection_reaches_the_page(self):
         root = self.output_dir()
         self.assertEqual(report_command.run_report(root, sections="preprocessing"), 0)
-        text = (root / "drakkar_report.html").read_text(encoding="utf-8")
+        text = self.only_report(root).read_text(encoding="utf-8")
         self.assertIn('id="section-preprocessing"', text)
         self.assertIn("excluded by", text)
 

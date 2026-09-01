@@ -58,13 +58,14 @@ environments deployed in the environment directory and flags the ones no
 longer used by the installed DRAKKAR version; with ``--prune`` it removes
 them (dry run unless ``--yes`` is given).
 
-report
-^^^^^^
-Build ``drakkar.db`` from a finished run's output tables, and render the
-self-contained ``drakkar_report.html`` from it. Only the sections whose inputs
-are present are built; use ``--sections`` to narrow that further and ``--list``
-to see what an output directory can support. ``--db-only`` stops after the
-database, ``--html-only`` re-renders the report from an existing one. See
+reporting
+^^^^^^^^^
+Build ``reporting/drakkar.db`` from a finished run's output tables, and render
+the self-contained ``reporting/drakkar_report_<timestamp>.html`` from it. Only
+the sections whose inputs are present are built; use ``--sections`` to narrow
+that further and ``--list`` to see what an output directory can support.
+``--db-only`` stops after the database, ``--html-only`` renders a new report
+from an existing one. Also available under its original name, ``report``. See
 :doc:`report` for the database schema and the report contents.
 
 unlock

@@ -3,11 +3,15 @@
 Report database and HTML report
 ===============================
 
-``drakkar report`` does two things in one pass. It builds ``drakkar.db``, a
+``drakkar reporting`` does two things in one pass. It builds ``drakkar.db``, a
 SQLite projection of the tables found in a Drakkar output directory, and it
-renders ``drakkar_report.html`` from that database. The database is the single
-source of truth for the report, so the ``.tsv`` and ``.tsv.xz`` outputs are
-read exactly once, at ingest, and never again at render time.
+renders ``drakkar_report_<timestamp>.html`` from that database. Both land in a
+``reporting/`` subdirectory of the output directory. The database is the single
+source of truth for the report, so the ``.tsv`` and ``.tsv.xz`` outputs are read
+exactly once, at ingest, and never again at render time.
+
+The command was originally named ``drakkar report``, and that name still
+works as an alias.
 
 The database is deliberately **not** a lossless copy. It is optimized for
 querying and plotting; the source tables remain the archival record. In
@@ -18,9 +22,21 @@ Building the report
 
 .. code-block:: console
 
-   $ drakkar report -o drakkar_output
+   $ drakkar reporting -o drakkar_output
 
-This writes ``drakkar_output/drakkar.db`` and ``drakkar_output/drakkar_report.html``.
+This writes ``drakkar_output/reporting/drakkar.db`` and
+``drakkar_output/reporting/drakkar_report_20260901-101500.html``, where the
+stamp is the UTC time the page was rendered, in the same format as a run id.
+The database is rewritten in place on every run, but each render lands on its
+own file, so re-reporting a directory — after another workflow has finished, or
+with a different ``--sections`` selection — leaves the earlier report intact.
+Keeping both in ``reporting/`` is what stops a repeatedly reported directory
+from filling its root with rendered pages.
+
+A directory reported by an earlier Drakkar has its ``drakkar.db`` at the output
+root. The first ``drakkar reporting`` run moves it into ``reporting/`` rather
+than rebuilding a second copy beside it; reports already rendered at the root
+are left where they are and still listed.
 
 Because Drakkar is modular, a missing source file is the normal case rather
 than an error. The command screens the output directory first and builds only
@@ -29,7 +45,7 @@ skips:
 
 .. code-block:: console
 
-   $ drakkar report -o drakkar_output --list
+   $ drakkar reporting -o drakkar_output --list
 
 Options
 -------
@@ -38,27 +54,29 @@ Options
   directory.
 - ``--sections``: comma-separated list of sections to include. Valid values are
   ``preprocessing``, ``cataloging``, ``dereplication``, ``profiling``,
-  ``taxonomy``, ``function``, ``expression``, ``resources``, and ``all``.
+  ``taxonomy``, ``function``, ``expression``, ``amr``, ``resources``, and
+  ``all``.
   Requesting a section whose inputs are absent warns and names the missing
   file rather than silently producing an empty section.
 - ``--db-only``: build the database without rendering the HTML report.
-- ``--html-only``: re-render ``drakkar_report.html`` from an existing
-  ``drakkar.db`` without re-ingesting the source tables. Useful after
-  upgrading Drakkar, or when the source directory is no longer at hand.
-  Mutually exclusive with ``--db-only``.
+- ``--html-only``: render a new ``reporting/drakkar_report_<timestamp>.html``
+  from an existing ``reporting/drakkar.db`` without re-ingesting the source
+  tables. Useful after upgrading Drakkar, or when the source directory is no
+  longer at hand. Mutually exclusive with ``--db-only``.
 - ``--primary-hits-only``: keep only rank-1 annotation hits. This roughly
   halves the largest table, at the cost of the secondary evidence that the 2.0
   annotation schema was designed to preserve. Leave it off if you intend to
   query ambiguous assignments.
 - ``--list``: report which sections the output directory can support, without
   building anything.
-- ``--force``: delete and rebuild an existing ``drakkar.db``. The HTML report
-  is a derived artifact and is always overwritten, so it needs no flag.
+- ``--force``: delete and rebuild an existing ``reporting/drakkar.db``. The
+  HTML report is a derived artifact stamped with its render time, so it never
+  collides with an earlier one and needs no flag.
 
 The HTML report
 ---------------
 
-``drakkar_report.html`` is a single self-contained file. The stylesheet and a
+Each rendered report is a single self-contained file. The stylesheet and a
 small navigation script are inlined and the Plotly bundle is embedded once, in
 the first figure, so the report opens on a laptop with no network connection
 and can be emailed or archived as-is. Nothing is fetched when the page loads.
@@ -126,6 +144,11 @@ gene count.
    * - Expression
      - Per-sample assigned counts and detected genes, and the length
        distribution of the quantified genes.
+   * - Antimicrobial resistance
+     - Per-assembly AMRFinderPlus and RGI hit counts against the reconciled
+       locus count, which callers backed each locus and how well they agreed,
+       loci per drug class and per gene, and the plasmid and (pro)virus
+       context geNomad placed them in.
    * - Runs and resources
      - One row per recorded Drakkar run, with its command, modules, wall-clock
        duration and status; and, for benchmarked runs, how many submitted jobs
@@ -174,10 +197,16 @@ Sections and their inputs
        ``annotating/annotation_qc.tsv``
    * - ``expression``
      - ``expressing/gene_counts.tsv.xz``
+   * - ``amr``
+     - ``amr/assembly_summary.tsv``, ``amr/amr_qc.tsv``,
+       ``amr/amr_hits.tsv.xz``, ``amr/amr_loci.tsv.xz``,
+       ``amr/amr_drug_classes.tsv.xz``, ``amr/mobility_regions.tsv.xz``,
+       ``amr/amr_mobility.tsv.xz``
    * - ``resources``
-     - ``drakkar_<run_id>.yaml``, ``drakkar_<run_id>_resources.yaml``,
-       ``benchmark/drakkar_<run_id>.jobs.tsv``,
-       ``benchmark/drakkar_<run_id>.rules.tsv``
+     - ``logging/drakkar_<run_id>.yaml``,
+       ``logging/benchmark/drakkar_<run_id>.resources.yaml``,
+       ``logging/benchmark/drakkar_<run_id>.jobs.tsv``,
+       ``logging/benchmark/drakkar_<run_id>.rules.tsv``
 
 Resource benchmarks
 -------------------
@@ -201,7 +230,7 @@ The per-rule table is the one to tune a resource profile against; it is sorted
 by CPU time consumed, and the accompanying figure shows how much of each
 requested resource the heaviest rules really used. The per-job table lists the
 longest-running launches; the complete listing stays in
-``benchmark/drakkar_<run_id>.jobs.tsv``.
+``logging/benchmark/drakkar_<run_id>.jobs.tsv``.
 
 Two limits are worth knowing. Benchmarking currently covers only runs launched
 with ``--profile slurm``, and it needs ``sacct`` to be reachable when the
@@ -256,6 +285,35 @@ its phylum, size, completeness and contamination. Both files are optional: a
 catalogue with no archaea has no archaeal tree, and a taxonomy section without
 either is rendered without the figure.
 
+Antimicrobial resistance
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The AMR workflow runs on assembled contigs rather than on the dereplicated
+catalogue, so its tables key on ``assembly_id`` and are never joined to
+``genome``. Three counts in the section mean different things and are kept
+apart on the page:
+
+- **Hits** are what one caller reported on its own. An occurrence both
+  AMRFinderPlus and RGI found is counted once by each of them, so the two hit
+  columns overlap and must not be added together.
+- **Loci** are the reconciliation unit: overlapping calls on the same contig
+  and strand, from different callers, collapsed into one gene occurrence.
+  ``support_status`` records which callers backed a locus, and ``concordance``
+  whether they named the same gene, only agreed on the drug class, or
+  disagreed on both.
+- **Mobile loci** are loci overlapping a plasmid or (pro)virus region geNomad
+  called. A locus can overlap more than one region, so the per-context counts
+  can exceed the number of mobile loci; the section counts distinct loci, not
+  overlaps.
+
+Hits a caller reported without coordinates cannot be reconciled or placed in a
+mobile element, so they are excluded from every locus figure and reported
+separately at the end of the section.
+
+The per-hit ``raw_details`` JSON and the per-locus ``details`` JSON are not
+carried into the database; ``amr/amr_hits.tsv.xz`` and ``amr/amr_loci.tsv.xz``
+remain the archival record of what each caller reported.
+
 Schema
 ------
 
@@ -267,7 +325,7 @@ the database. ``ingest_log`` records, per table, the source file, its size and
 modification time, the number of rows ingested, and when.
 
 If the stored schema version does not match the running Drakkar build,
-``drakkar report`` refuses to touch the database and asks for ``--force``.
+``drakkar reporting`` refuses to touch the database and asks for ``--force``.
 Rebuilding from the source tables is cheap, so no migration path is provided.
 
 Tables
@@ -342,6 +400,26 @@ Tables
    * - ``gene_expression``
      - ``(gene_id, sample_id)``
      - Long-form expression counts.
+   * - ``amr_assembly``
+     - ``assembly_id``
+     - Per-assembly AMR summary and QC counts, merged into one row.
+   * - ``amr_hit``
+     - ``(assembly_id, hit_id)``
+     - One row per raw AMRFinderPlus or RGI call, without its ``raw_details``.
+   * - ``amr_locus``
+     - ``(assembly_id, locus_id)``
+     - One row per reconciled gene occurrence, with the callers that backed it
+       and their agreement.
+   * - ``amr_drug_class``
+     - —
+     - One row per hit and drug class, unpacked from the ``drug_classes``
+       column.
+   * - ``amr_mobility_region``
+     - ``(assembly_id, region_id)``
+     - The plasmid and (pro)virus regions geNomad called.
+   * - ``amr_mobility``
+     - ``(assembly_id, locus_id, region_id)``
+     - Which loci overlap which mobile-element region, and by how much.
 
 Expression identifiers come straight from featureCounts, which derives them
 from the ``ID`` attribute of ``expressing/reference/metagenome.gff``. Drakkar
@@ -356,8 +434,8 @@ Python, or from R without Drakkar installed.
 
 .. code-block:: console
 
-   $ sqlite3 drakkar_output/drakkar.db '.tables'
-   $ sqlite3 drakkar_output/drakkar.db 'SELECT phylum, COUNT(*) FROM genome_taxonomy GROUP BY phylum'
+   $ sqlite3 drakkar_output/reporting/drakkar.db '.tables'
+   $ sqlite3 drakkar_output/reporting/drakkar.db 'SELECT phylum, COUNT(*) FROM genome_taxonomy GROUP BY phylum'
 
 Genome abundance joined to taxonomy:
 
@@ -387,7 +465,7 @@ From R:
 .. code-block:: r
 
    library(RSQLite)
-   con <- dbConnect(SQLite(), "drakkar_output/drakkar.db")
+   con <- dbConnect(SQLite(), "drakkar_output/reporting/drakkar.db")
    counts <- dbGetQuery(con, "SELECT * FROM genome_count")
    taxonomy <- dbGetQuery(con, "SELECT * FROM genome_taxonomy")
    dbDisconnect(con)
@@ -399,7 +477,7 @@ From Python:
    import sqlite3
    import pandas as pd
 
-   with sqlite3.connect("drakkar_output/drakkar.db") as connection:
+   with sqlite3.connect("drakkar_output/reporting/drakkar.db") as connection:
        counts = pd.read_sql("SELECT * FROM genome_count", connection)
 
 For evidence that the database does not retain — the ``details`` JSON, native

@@ -92,6 +92,11 @@ MIN_COMPLETENESS: 70
 MAX_CONTAMINATION: 10
 MIN_BIN_LENGTH: 200000
 MAX_BIN_LENGTH: 10000000
+# Assemblies smaller than this (megabytes of FASTA) are not binned: every binner
+# is skipped for them and exports an empty contig-to-bin table, so they yield no
+# bins. COMEBin in particular aborts on such assemblies, because its marker-gene
+# stage finds no single-copy markers to seed the clustering.
+MIN_BINNING_ASSEMBLY_MB: 10
 ANNOTATION_EVALUE: 1e-10
 ANNOTATION_IDENTITY: 50.0
 ANNOTATION_QUERY_COVERAGE: 0.5

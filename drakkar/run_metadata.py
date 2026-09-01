@@ -17,18 +17,80 @@ def get_modules_to_run(command):
         return [command]
     return []
 
-def build_snakemake_log_path(output_dir, run_id):
-    return Path(output_dir) / "log" / f"drakkar_{run_id}.snakemake.log"
+# Everything a workflow run leaves behind about itself — its metadata, its
+# Snakemake log, its failure table and its benchmark roll-up — shares one
+# directory, named after the `drakkar logging` command that reads them and
+# after the gerund convention the workflow output directories already follow.
+# The benchmark artefacts nest one level deeper: only SLURM runs produce them,
+# and keeping the roll-up with the tables it summarizes leaves `drakkar_*.yaml`
+# in the logging directory matching run metadata and nothing else.
+LOGGING_DIRNAME = "logging"
+BENCHMARK_DIRNAME = "benchmark"
 
-def build_benchmark_paths(output_dir, run_id):
-    benchmark_dir = Path(output_dir) / "benchmark"
+# Runs launched before the logging directory existed wrote their metadata,
+# failure table and benchmark roll-up flat into the output root, their
+# Snakemake log into `log/` and their benchmark tables into `benchmark/`, with
+# `_resources`/`_failures` joined by an underscore rather than a dot. Those
+# directories are still read, so every path builder takes a `legacy` flag and
+# every discovery helper searches both layouts.
+LEGACY_LOG_DIRNAME = "log"
+
+
+def logging_dir(output_dir):
+    """Return the directory holding one output directory's run artefacts."""
+    return Path(output_dir) / LOGGING_DIRNAME
+
+def benchmark_dir(output_dir, legacy=False):
+    """Return the directory holding the per-run benchmark artefacts."""
+    if legacy:
+        return Path(output_dir) / BENCHMARK_DIRNAME
+    return logging_dir(output_dir) / BENCHMARK_DIRNAME
+
+def build_metadata_path(output_dir, run_id, legacy=False):
+    name = f"drakkar_{run_id}.yaml"
+    if legacy:
+        return Path(output_dir) / name
+    return logging_dir(output_dir) / name
+
+def build_snakemake_log_path(output_dir, run_id, legacy=False):
+    name = f"drakkar_{run_id}.snakemake.log"
+    if legacy:
+        return Path(output_dir) / LEGACY_LOG_DIRNAME / name
+    return logging_dir(output_dir) / name
+
+def build_benchmark_paths(output_dir, run_id, legacy=False):
+    directory = benchmark_dir(output_dir, legacy=legacy)
     base_name = f"drakkar_{run_id}"
+    summary_name = f"{base_name}_resources.yaml" if legacy else f"{base_name}.resources.yaml"
     return {
-        "dir": benchmark_dir,
-        "jobs": benchmark_dir / f"{base_name}.jobs.tsv",
-        "rules": benchmark_dir / f"{base_name}.rules.tsv",
-        "summary": Path(output_dir) / f"{base_name}_resources.yaml",
+        "dir": directory,
+        "jobs": directory / f"{base_name}.jobs.tsv",
+        "rules": directory / f"{base_name}.rules.tsv",
+        "summary": (Path(output_dir) / summary_name) if legacy else (directory / summary_name),
     }
+
+def uses_legacy_layout(output_dir, metadata_path):
+    """True when a run's metadata sits outside the logging directory.
+
+    A run's artefacts follow its metadata file, so regenerating a benchmark or
+    a failure report for a run that predates the logging directory rewrites the
+    files beside the ones it already has instead of scattering the set across
+    both layouts.
+    """
+    if not metadata_path:
+        return False
+    try:
+        return Path(metadata_path).resolve().parent != logging_dir(output_dir).resolve()
+    except OSError:
+        return True
+
+def find_snakemake_log(output_dir, run_id):
+    """Return a run's Snakemake log from either layout, or None if absent."""
+    for legacy in (False, True):
+        candidate = build_snakemake_log_path(output_dir, run_id, legacy=legacy)
+        if candidate.exists():
+            return candidate
+    return None
 
 def load_metadata_file(metadata_path):
     if not metadata_path:
@@ -51,16 +113,17 @@ def write_launch_metadata(args, output_dir, env_path=None, databases=None):
         return None
     timestamp = datetime.now(timezone.utc)
     run_id = timestamp.strftime("%Y%m%d-%H%M%S")
+    run_logging_dir = logging_dir(output_path)
+    try:
+        run_logging_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        print(f"{ERROR}ERROR:{RESET} Cannot create logging directory for Drakkar run metadata: {run_logging_dir}")
+        print(f"{exc.__class__.__name__}: {exc}")
+        return None
     snakemake_log_path = None
     if args.command in WORKFLOW_RUN_COMMANDS:
         snakemake_log_path = build_snakemake_log_path(output_path, run_id)
         benchmark_paths = build_benchmark_paths(output_path, run_id)
-        try:
-            snakemake_log_path.parent.mkdir(parents=True, exist_ok=True)
-        except OSError as exc:
-            print(f"{ERROR}ERROR:{RESET} Cannot create log directory for Drakkar run metadata: {snakemake_log_path.parent}")
-            print(f"{exc.__class__.__name__}: {exc}")
-            return None
     else:
         benchmark_paths = None
     metadata = {
@@ -87,7 +150,7 @@ def write_launch_metadata(args, output_dir, env_path=None, databases=None):
         metadata["benchmark_rules"] = str(benchmark_paths["rules"].resolve())
         metadata["benchmark_summary"] = str(benchmark_paths["summary"].resolve())
         metadata["benchmark_status"] = "pending"
-    metadata_path = output_path / f"drakkar_{run_id}.yaml"
+    metadata_path = build_metadata_path(output_path, run_id)
     try:
         with open(metadata_path, "w") as f:
             yaml.safe_dump(metadata, f, sort_keys=False)

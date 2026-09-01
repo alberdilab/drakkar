@@ -15,7 +15,7 @@ from drakkar.run_logs import (
     resolve_run_metadata,
     run_id_from_metadata_name,
 )
-from drakkar.run_metadata import build_snakemake_log_path, load_metadata_file
+from drakkar.run_metadata import LOGGING_DIRNAME, find_snakemake_log, load_metadata_file
 
 
 HELPER_RULES = {
@@ -90,6 +90,19 @@ def _looks_like_metadata_file(value):
     )
 
 
+def _output_dir_for_metadata(metadata_path):
+    """Return the output directory a run metadata file belongs to.
+
+    Runs keep their metadata in ``<output_dir>/logging/``, so the output
+    directory is that directory's parent. Runs written before it existed kept
+    their metadata in the output root, where the parent is the directory itself.
+    """
+    parent = metadata_path.parent
+    if parent.name == LOGGING_DIRNAME:
+        return parent.parent
+    return parent
+
+
 def resolve_status_target(target=None, output_dir=None, run_id=None):
     output_path = Path(output_dir).expanduser() if output_dir else Path.cwd()
     run_selector = run_id
@@ -102,7 +115,7 @@ def resolve_status_target(target=None, output_dir=None, run_id=None):
                 cwd_candidate = Path.cwd() / metadata_path
                 output_candidate = output_path / metadata_path
                 metadata_path = cwd_candidate if cwd_candidate.exists() else output_candidate
-            output_path = metadata_path.parent
+            output_path = _output_dir_for_metadata(metadata_path)
             run_selector = metadata_path.name
         else:
             output_path = target_path
@@ -114,7 +127,7 @@ def resolve_status_target(target=None, output_dir=None, run_id=None):
             cwd_candidate = Path.cwd() / metadata_path
             output_candidate = output_path / metadata_path
             metadata_path = cwd_candidate if cwd_candidate.exists() else output_candidate
-        output_path = metadata_path.parent
+        output_path = _output_dir_for_metadata(metadata_path)
         run_selector = metadata_path.name
 
     return output_path.resolve(), run_selector
@@ -195,9 +208,7 @@ def resolve_status_log(output_path, metadata):
         if configured_log:
             snakemake_log_path = Path(configured_log)
         elif metadata.get("run_id"):
-            candidate = build_snakemake_log_path(output_path, metadata["run_id"])
-            if candidate.exists():
-                snakemake_log_path = candidate
+            snakemake_log_path = find_snakemake_log(output_path, metadata["run_id"])
     if snakemake_log_path is None and fallback_logs:
         snakemake_log_path = fallback_logs[0]
     return snakemake_log_path

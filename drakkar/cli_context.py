@@ -35,7 +35,7 @@ WORKFLOW_RUN_COMMANDS = {
     "environments",
 }
 
-READ_ONLY_COMMANDS = {"config", "logging", "status", "report"}
+READ_ONLY_COMMANDS = {"config", "logging", "status", "reporting", "report"}
 CATALOGING_BINNER_ORDER = ("metabat", "maxbin", "semibin", "comebin")
 DEFAULT_CATALOGING_BINNERS = ",".join(CATALOGING_BINNER_ORDER)
 CATALOGING_BINNER_ALIASES = {

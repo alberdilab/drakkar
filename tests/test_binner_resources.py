@@ -12,8 +12,8 @@ RULES = ROOT / "drakkar" / "workflow" / "rules" / "cataloging.smk"
 def load_helpers() -> dict:
     """Exec the deep-binner resource helpers out of the Snakemake rule file."""
     text = RULES.read_text(encoding="utf-8")
-    block = text.split("def _file_size_mb(path):", 1)[1].split("rule semibin2:", 1)[0]
-    namespace: dict = {"Path": Path}
+    block = text.split("def _file_size_mb(path):", 1)[1].split("\nrule ", 1)[0]
+    namespace: dict = {"Path": Path, "MIN_BINNING_ASSEMBLY_MB": 10}
     exec("def _file_size_mb(path):" + block, namespace)
     return namespace
 

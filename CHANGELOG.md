@@ -8,6 +8,99 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.5.0] - 2026-09-01
+
+### Fixed
+
+- `comebin` no longer aborts a run on assemblies it cannot bin. COMEBin seeds
+  its clustering with single-copy marker genes found by FragGeneScan and
+  HMMsearch; on a small or marker-poor assembly that stage fails, and the whole
+  workflow died with it. Assemblies below `MIN_BINNING_ASSEMBLY_MB` are now
+  skipped before the job starts, exactly as `maxbin2` and `semibin2` already
+  did, and a marker-stage failure in a larger assembly exports an empty
+  contig-to-bin table so `binette` proceeds with the remaining binners. Both
+  COMEBin failure shapes are covered: aborting outright (1.1.0) and logging the
+  failed marker step before exiting 0 with no result file (1.0.4, which left
+  snakemake to die on the missing output). Every other failure — OOM, GPU,
+  walltime — still propagates so retries escalate resources as before, and a
+  missing result with no marker failure in the log now fails with an explicit
+  message instead of an opaque `MissingOutputException`.
+- `comebin` deletes empty FragGeneScan, HMMsearch and seed byproducts left next
+  to the assembly by a previous failed attempt. COMEBin reuses them without
+  checking they hold anything, so a stale empty file made every retry fail
+  identically.
+
+### Added
+
+- `drakkar reporting` now renders an `amr` section from the AMR workflow's output.
+  It reports what each assembly was screened for, the reconciled locus count
+  against the raw AMRFinderPlus and RGI hit counts, which callers backed each
+  locus and how well they agreed, the loci behind each drug class and each
+  gene, and the plasmid and (pro)virus context geNomad placed them in. Hits a
+  caller reported without coordinates cannot be reconciled or placed, so they
+  are reported separately instead of being silently dropped. Six tables —
+  `amr_assembly`, `amr_hit`, `amr_locus`, `amr_drug_class`,
+  `amr_mobility_region` and `amr_mobility` — carry it in `drakkar.db`, and the
+  report schema version is now 5, so an existing database needs
+  `drakkar reporting --force`.
+- `MIN_BINNING_ASSEMBLY_MB` (default `10`) in `config.yaml` sets the minimum
+  assembly size, in megabytes of FASTA, that the cataloging binners will bin.
+  It now applies to all four: `maxbin2` and `semibin2` hardcoded the same 10 MB
+  threshold, `comebin` did not apply it at all, and `metabat2` was ungated.
+  Assemblies below it export an empty contig-to-bin table from every binner and
+  therefore produce no bins.
+
+### Changed
+
+- The report database and the rendered HTML reports are written to a
+  `reporting/` subdirectory of the output directory instead of to its root, so
+  a repeatedly reported directory no longer fills up with `drakkar.db` and one
+  timestamped page per render. `reporting/` sits alongside `preprocessing/`,
+  `cataloging/` and the other workflow output directories. A `drakkar.db` left
+  at the root by an earlier version is moved into `reporting/` on the next run
+  rather than rebuilt, and reports already rendered at the root are still
+  listed.
+- Everything a workflow run records about itself now shares a `logging/`
+  directory in the output directory, keyed by run id: the run metadata
+  (`drakkar_<run_id>.yaml`), the captured Snakemake log
+  (`drakkar_<run_id>.snakemake.log`), the failure table
+  (`drakkar_<run_id>.failures.tsv`) and, under `logging/benchmark/`, the
+  resource roll-up (`drakkar_<run_id>.resources.yaml`) with the per-job and
+  per-rule tables it summarizes. Those files were previously spread across the
+  output root, `log/` and `benchmark/`, mixing run bookkeeping with the result
+  tables users actually browse and sync. `logging/` is named after the
+  `drakkar logging` command that reads it, following `reporting/` and the
+  gerund convention of the workflow output directories. Per-rule job logs move
+  with it, into module subdirectories such as `logging/annotating/prodigal/`.
+- Nesting the benchmark artifacts removes the name collision that made
+  `drakkar_<run_id>_resources.yaml` match the run metadata glob: `.yaml` files
+  directly in `logging/` are run metadata and nothing else. The roll-up is also
+  named `.resources.yaml` rather than `_resources.yaml`, so the whole set now
+  reads as a run id followed by an extension chain.
+- Output directories written by earlier versions are read unchanged. `drakkar
+  logging`, `drakkar status`, `drakkar reporting` and `drakkar transfer` search
+  both layouts, and a benchmark or failure report regenerated for an older run
+  is written beside the files that run already has rather than split across the
+  two. There is nothing to migrate.
+- The command is now `drakkar reporting`, matching the gerund naming of the
+  workflow commands and of the directory it writes. `drakkar report` remains as
+  an alias, so existing scripts and habits keep working.
+- The HTML report is written as `drakkar_report_<timestamp>.html` rather than
+  always as `drakkar_report.html`, stamped with the UTC time it was rendered in
+  the same format as a run id. Re-reporting an output directory — after a
+  further workflow has finished, or with a different `--sections` selection —
+  now keeps the earlier report instead of overwriting it.
+- One `binning_skip_reason` helper now decides which assemblies the binners
+  skip, instead of each rule repeating the same size arithmetic in its shell.
+  All four binners read the decision from a `skip_reason` param and report it
+  verbatim, so the threshold, the empty-assembly case and the messages have a
+  single definition. It is evaluated per job rather than as a rule of its own
+  because the assembly does not exist when the DAG is built, so no upstream rule
+  can gate the binners statically without a checkpoint.
+- `metabat2` now honours `MIN_BINNING_ASSEMBLY_MB` as well. It previously ran on
+  any non-empty assembly, so assemblies below the threshold could still yield
+  bins through `metabat2` alone; they now yield none.
+
 ## [2.4.5] - 2026-08-31
 
 ### Fixed

@@ -5,6 +5,7 @@ from pathlib import Path, PurePosixPath
 
 from drakkar.cli_context import ERROR, INFO, RESET
 from drakkar.output import print
+from drakkar.run_metadata import logging_dir
 
 def list_files_recursive(base_dir, exclude_snakemake=False):
     for root, dirs, files in os.walk(base_dir):
@@ -41,7 +42,13 @@ def collect_transfer_files(base_dir, args):
         add_dir(Path("cataloging/final"))
 
     def add_runner_logs():
-        log_files = sorted(base_dir.glob("drakkar_*.yaml"))
+        # The logging directory holds the run metadata; the output root is
+        # searched too, for directories written before that directory existed.
+        log_files = sorted(
+            path
+            for directory in (logging_dir(base_dir), base_dir)
+            for path in directory.glob("drakkar_*.yaml")
+        )
         if log_files:
             selected_files.update(log_files)
         else:

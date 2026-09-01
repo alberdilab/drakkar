@@ -27,7 +27,7 @@ class LoggingCommandTests(unittest.TestCase):
             self.assertEqual(metadata_path.name, f"drakkar_{run_info['run_id']}.yaml")
             self.assertEqual(
                 Path(run_info["snakemake_log_path"]),
-                Path(tmpdir) / "log" / f"drakkar_{run_info['run_id']}.snakemake.log",
+                Path(tmpdir) / "logging" / f"drakkar_{run_info['run_id']}.snakemake.log",
             )
 
             metadata = yaml.safe_load(metadata_path.read_text(encoding="utf-8"))
@@ -40,7 +40,9 @@ class LoggingCommandTests(unittest.TestCase):
             self.assertIn("benchmark_summary", metadata)
             self.assertEqual(
                 Path(metadata["benchmark_summary"]).resolve(),
-                (Path(tmpdir) / f"drakkar_{run_info['run_id']}_resources.yaml").resolve(),
+                (
+                    Path(tmpdir) / "logging" / "benchmark" / f"drakkar_{run_info['run_id']}.resources.yaml"
+                ).resolve(),
             )
 
     def test_run_subprocess_with_logging_updates_metadata_and_writes_log(self) -> None:
@@ -555,7 +557,10 @@ class LoggingCommandTests(unittest.TestCase):
             self.assertTrue(jobs_path.exists())
             self.assertTrue(rules_path.exists())
             self.assertTrue(summary_path.exists())
-            self.assertEqual(summary_path, Path(tmpdir) / f"drakkar_{run_info['run_id']}_resources.yaml")
+            self.assertEqual(
+                summary_path,
+                Path(tmpdir) / "logging" / "benchmark" / f"drakkar_{run_info['run_id']}.resources.yaml",
+            )
 
             jobs_text = jobs_path.read_text(encoding="utf-8")
             self.assertIn("attempt", jobs_text)
@@ -603,7 +608,10 @@ class LoggingCommandTests(unittest.TestCase):
             self.assertEqual(result["status"], "unsupported_profile")
             summary_path = Path(result["paths"]["summary"])
             self.assertTrue(summary_path.exists())
-            self.assertEqual(summary_path, Path(tmpdir) / f"drakkar_{run_info['run_id']}_resources.yaml")
+            self.assertEqual(
+                summary_path,
+                Path(tmpdir) / "logging" / "benchmark" / f"drakkar_{run_info['run_id']}.resources.yaml",
+            )
 
             summary = yaml.safe_load(summary_path.read_text(encoding="utf-8"))
             self.assertEqual(summary["status"], "unsupported_profile")
@@ -681,6 +689,161 @@ class LoggingCommandTests(unittest.TestCase):
             self.assertIn("Benchmarked launches: 1", output)
             self.assertIn("Relaunches detected: 0", output)
             self.assertIn("Weighted CPU efficiency: 75.0%", output)
+
+
+class LegacyLayoutTests(unittest.TestCase):
+    """Output directories written before the `logging/` directory existed.
+
+    Their run metadata sits in the output root, their Snakemake log in `log/`,
+    and their benchmark roll-up and failure table use an underscore before
+    `resources`/`failures`. Those directories are still read, and anything
+    regenerated for such a run is written beside the files it already has
+    rather than split across both layouts.
+    """
+
+    def legacy_run(self, root: Path, run_id: str = "20260503-101530") -> Path:
+        """Write a legacy-layout run and return its metadata path."""
+        metadata_path = root / f"drakkar_{run_id}.yaml"
+        metadata_path.write_text(
+            yaml.safe_dump(
+                {
+                    "run_id": run_id,
+                    "command": "cataloging",
+                    "status": "success",
+                    "profile": "local",
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+        log_path = root / "log" / f"drakkar_{run_id}.snakemake.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text("Building DAG of jobs...\n", encoding="utf-8")
+        return metadata_path
+
+    def test_discover_run_metadata_finds_runs_in_the_output_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            metadata_path = self.legacy_run(root)
+
+            runs = cli_module.discover_run_metadata(root)
+
+            self.assertEqual([path for path, _ in runs], [metadata_path])
+
+    def test_discover_run_metadata_prefers_the_logging_directory(self) -> None:
+        # The same run id in both layouts is one run, reported once, from the
+        # current location.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            self.legacy_run(root)
+            current = root / "logging" / "drakkar_20260503-101530.yaml"
+            current.parent.mkdir(parents=True, exist_ok=True)
+            current.write_text(
+                yaml.safe_dump({"run_id": "20260503-101530", "command": "cataloging"}),
+                encoding="utf-8",
+            )
+
+            runs = cli_module.discover_run_metadata(root)
+
+            self.assertEqual([path for path, _ in runs], [current])
+
+    def test_discover_run_metadata_reports_both_layouts_newest_first(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            older = self.legacy_run(root, run_id="20260503-101530")
+            newer = root / "logging" / "drakkar_20260829-034907.yaml"
+            newer.parent.mkdir(parents=True, exist_ok=True)
+            newer.write_text(
+                yaml.safe_dump({"run_id": "20260829-034907", "command": "profiling"}),
+                encoding="utf-8",
+            )
+
+            runs = cli_module.discover_run_metadata(root)
+
+            self.assertEqual([path for path, _ in runs], [newer, older])
+
+    def test_find_snakemake_log_falls_back_to_the_log_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            self.legacy_run(root)
+
+            found = cli_module.find_snakemake_log(root, "20260503-101530")
+
+            self.assertEqual(found, root / "log" / "drakkar_20260503-101530.snakemake.log")
+
+    def test_benchmark_for_a_legacy_run_stays_in_the_legacy_layout(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            metadata_path = self.legacy_run(root)
+
+            result = cli_module.generate_run_benchmark(root, metadata_path=metadata_path, quiet=True)
+
+            self.assertEqual(result["status"], "unsupported_profile")
+            summary_path = Path(result["paths"]["summary"])
+            self.assertEqual(summary_path, root / "drakkar_20260503-101530_resources.yaml")
+            self.assertTrue(summary_path.exists())
+            self.assertFalse((root / "logging").exists())
+
+    def test_failure_report_for_a_legacy_run_stays_in_the_legacy_layout(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            metadata_path = self.legacy_run(root)
+            (root / "log" / "drakkar_20260503-101530.snakemake.log").write_text(
+                "\n".join(
+                    [
+                        "[Mon May  3 10:15:30 2026]",
+                        "rule assemble:",
+                        "    jobid: 1",
+                        "    wildcards: assembly=A",
+                        "Error in rule assemble:",
+                        "    jobid: 1",
+                        "    output: cataloging/assembly/A.fna",
+                        "Exiting because a job execution failed.",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            report = cli_module.generate_failure_report(root, metadata_path=metadata_path)
+
+            self.assertIsNotNone(report)
+            self.assertEqual(
+                Path(report["report_path"]), root / "drakkar_20260503-101530_failures.tsv"
+            )
+            self.assertTrue(Path(report["report_path"]).exists())
+            self.assertFalse((root / "logging").exists())
+
+    def test_job_logs_are_found_in_both_layouts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            self.legacy_run(root)
+            legacy_job_log = root / "log" / "annotating" / "prodigal" / "mag1.log"
+            legacy_job_log.parent.mkdir(parents=True, exist_ok=True)
+            legacy_job_log.write_text("legacy\n", encoding="utf-8")
+            current_job_log = root / "logging" / "annotating" / "prodigal" / "mag2.log"
+            current_job_log.parent.mkdir(parents=True, exist_ok=True)
+            current_job_log.write_text("current\n", encoding="utf-8")
+
+            found = cli_module.discover_job_logs(root)
+
+            self.assertIn(legacy_job_log, found)
+            self.assertIn(current_job_log, found)
+
+    def test_run_artefacts_are_not_reported_as_job_logs(self) -> None:
+        # The metadata, log, failure table and benchmark files sit at the top of
+        # the logging directory and under `benchmark/`; only module
+        # subdirectories hold per-rule job logs.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            args = argparse.Namespace(command="cataloging", output=str(root))
+            run_info = cli_module.write_launch_metadata(args, str(root))
+            Path(run_info["snakemake_log_path"]).write_text("log\n", encoding="utf-8")
+            benchmark_table = root / "logging" / "benchmark" / "drakkar_x.jobs.tsv"
+            benchmark_table.parent.mkdir(parents=True, exist_ok=True)
+            benchmark_table.write_text("rule\n", encoding="utf-8")
+
+            self.assertEqual(cli_module.discover_job_logs(root), [])
 
 
 if __name__ == "__main__":

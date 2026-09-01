@@ -72,6 +72,7 @@ SECTION_LABELS = {
     "taxonomy": "Taxonomy",
     "function": "Functional annotation",
     "expression": "Expression",
+    "amr": "Antimicrobial resistance",
     "resources": "Runs and resources",
 }
 
@@ -120,6 +121,13 @@ SECTION_INTROS = {
         "counts say how much each gene was transcribed, not whether it is "
         "present. A gene can be present in the catalogue and still have zero "
         "counts in a sample."
+    ),
+    "amr": (
+        "Antimicrobial resistance genes called on assembled contigs by "
+        "AMRFinderPlus and RGI, reconciled into one locus per gene occurrence "
+        "and placed against the plasmids and viruses geNomad found. This "
+        "section runs on assemblies rather than on the catalogue genomes, so "
+        "its counts do not line up with the genome tables above."
     ),
     "resources": (
         "How the workflow itself ran: which commands were executed and what "
@@ -3264,6 +3272,448 @@ def _render_expression(connection):
     return blocks
 
 
+# ---------------------------------------------------------------------------
+# Antimicrobial resistance
+# ---------------------------------------------------------------------------
+
+# How the reconciler labels a locus by the callers that backed it, and the
+# order the labels are stacked in: the strongest support first.
+AMR_SUPPORT_LABELS = (
+    ("amrfinder_and_rgi", "AMRFinderPlus and RGI"),
+    ("amrfinder_only", "AMRFinderPlus only"),
+    ("rgi_only", "RGI only"),
+    ("other", "Other"),
+)
+
+# How two callers that both hit a locus agreed, weakest agreement last.
+AMR_CONCORDANCE_LABELS = {
+    "gene_match": "Same gene",
+    "drug_class_match": "Same drug class only",
+    "unresolved": "No shared gene or drug class",
+    "single_source": "Only one caller",
+}
+
+# geNomad's mobile-element calls, plus the label for a locus none of them hit.
+AMR_CONTEXT_LABELS = {
+    "plasmid": "Plasmid",
+    "virus": "Virus",
+    "provirus": "Provirus",
+}
+AMR_CHROMOSOMAL = "No mobile-element call"
+
+
+def _render_amr(connection):
+    assemblies = _query(connection, """
+        SELECT assembly_id, assembly_type, organism, contig_count, total_length,
+               amrfinder_hits, rgi_hits, mobility_regions, amr_loci,
+               multi_tool_loci, mobile_loci,
+               amrfinder_hits_without_coordinates,
+               rgi_hits_without_coordinates
+        FROM amr_assembly
+        ORDER BY assembly_id
+    """)
+    if not assemblies:
+        return []
+
+    blocks = _amr_overview_blocks(connection, assemblies)
+    blocks.extend(_amr_support_blocks(connection))
+    blocks.extend(_amr_drug_class_blocks(connection))
+    blocks.extend(_amr_gene_blocks(connection))
+    blocks.extend(_amr_context_blocks(connection))
+    blocks.extend(_amr_qc_blocks(assemblies))
+    return blocks
+
+
+def _amr_overview_blocks(connection, assemblies):
+    """What was screened, and how much resistance came out of it."""
+    loci = _scalar(connection, "SELECT COUNT(*) FROM amr_locus", default=0) or sum(
+        row["amr_loci"] or 0 for row in assemblies
+    )
+    both_tools = _scalar(
+        connection,
+        "SELECT COUNT(*) FROM amr_locus WHERE support_status = 'amrfinder_and_rgi'",
+        default=0,
+    ) or sum(row["multi_tool_loci"] or 0 for row in assemblies)
+    mobile = _scalar(connection, """
+        SELECT COUNT(*) FROM (
+            SELECT DISTINCT assembly_id, locus_id FROM amr_mobility
+        )
+    """, default=0) or sum(row["mobile_loci"] or 0 for row in assemblies)
+    genes = _scalar(connection, """
+        SELECT COUNT(DISTINCT primary_gene) FROM amr_locus
+        WHERE primary_gene IS NOT NULL AND primary_gene <> ''
+    """, default=0)
+    drug_classes = _scalar(
+        connection, "SELECT COUNT(DISTINCT drug_class) FROM amr_drug_class", default=0
+    )
+
+    blocks = [_paragraph(
+        f"AMRFinderPlus and RGI screened {_quantity(len(assemblies), 'assembly', 'assemblies')}, "
+        f"and their calls were reconciled into {_quantity(loci, 'resistance locus', 'resistance loci')}."
+    )]
+    blocks.append(_highlights([
+        ("Assemblies screened", _integer(len(assemblies))),
+        ("Resistance loci", _integer(loci)),
+        ("Called by both tools", _integer(both_tools),
+         _cards_percent(_ratio(both_tools, loci))),
+        ("On a mobile element", _integer(mobile),
+         _cards_percent(_ratio(mobile, loci))),
+        ("Distinct genes", _integer(genes) if genes else None),
+        ("Drug classes", _integer(drug_classes) if drug_classes else None),
+    ]))
+
+    blocks.append(_heading(
+        "Resistance per assembly",
+        "AMRFinderPlus hits and RGI hits are what each caller reported on its "
+        "own, so an occurrence both of them found is counted twice between "
+        "them; Loci is the reconciled count, one per gene occurrence. Both "
+        "tools % is the share of loci that survived as agreement between the "
+        "two callers rather than as a single-caller call, and Mobile % the "
+        "share sitting inside a plasmid or a (pro)virus geNomad called."
+    ))
+    blocks.append(_table(
+        [
+            ("Assembly", _text),
+            ("Type", _text),
+            ("Organism", _text),
+            ("Contigs", _integer),
+            ("Length", _integer),
+            ("AMRFinderPlus hits", _integer),
+            ("RGI hits", _integer),
+            ("Mobile regions", _integer),
+            ("Loci", _integer),
+            ("Both tools", _integer),
+            ("Mobile loci", _integer),
+            ("Both tools %", _ONE),
+            ("Mobile %", _ONE),
+        ],
+        [
+            (
+                row["assembly_id"], row["assembly_type"], row["organism"],
+                row["contig_count"], row["total_length"], row["amrfinder_hits"],
+                row["rgi_hits"], row["mobility_regions"], row["amr_loci"],
+                row["multi_tool_loci"], row["mobile_loci"],
+                _ratio(row["multi_tool_loci"], row["amr_loci"]),
+                _ratio(row["mobile_loci"], row["amr_loci"]),
+            )
+            for row in assemblies
+        ],
+        stats=[
+            ("Mean loci per assembly", 8),
+            ("Mean both tools %", 11),
+            ("Mean mobile %", 12),
+        ],
+    ))
+    return blocks
+
+
+def _amr_support_blocks(connection):
+    """Which callers backed each locus, and how well they agreed."""
+    import plotly.graph_objects as go
+
+    rows = _query(connection, """
+        SELECT assembly_id, support_status, COUNT(*) AS loci
+        FROM amr_locus
+        GROUP BY assembly_id, support_status
+    """)
+    if not rows:
+        return []
+
+    totals = {}
+    for row in rows:
+        totals.setdefault(row["assembly_id"], {})[row["support_status"]] = row["loci"]
+    assemblies = sorted(totals, key=lambda name: -sum(totals[name].values()))[:TOP_GENOMES]
+
+    blocks = [_heading(
+        "Caller support",
+        "AMRFinderPlus and RGI use different reference databases and different "
+        "acceptance thresholds, so neither is a subset of the other. A locus "
+        "both of them called is the most defensible; a single-caller locus is "
+        "not wrong, but rests on one database alone."
+    )]
+    figure = go.Figure()
+    for index, (status, label) in enumerate(AMR_SUPPORT_LABELS):
+        values = [totals[name].get(status, 0) for name in assemblies]
+        if not any(values):
+            continue
+        figure.add_bar(
+            name=label, x=assemblies, y=values, marker_color=PALETTE[index]
+        )
+    figure.update_layout(
+        barmode="stack",
+        xaxis_title="Assembly",
+        yaxis_title="Resistance loci",
+        legend_title_text="",
+    )
+    blocks.append(figure)
+    if len(totals) > len(assemblies):
+        blocks.append(_note(
+            f"The {len(assemblies)} assemblies with the most loci are shown; "
+            f"{len(totals) - len(assemblies)} more are in the table above."
+        ))
+
+    concordance = _query(connection, """
+        SELECT concordance, COUNT(*) AS loci
+        FROM amr_locus
+        WHERE support_status = 'amrfinder_and_rgi'
+        GROUP BY concordance
+        ORDER BY loci DESC
+    """)
+    if concordance:
+        total = sum(row["loci"] for row in concordance)
+        blocks.append(_heading(
+            "Agreement on the loci both callers found",
+            "Overlapping calls are merged on coordinates, so two callers can "
+            "land on the same locus and still name different genes. Same gene "
+            "is full agreement; same drug class only means they disagree on "
+            "the gene but agree on what it confers resistance to; no shared "
+            "gene or drug class marks a locus worth inspecting by hand."
+        ))
+        blocks.append(_table(
+            [("Agreement", _text), ("Loci", _integer), ("Share %", _ONE)],
+            [
+                (
+                    AMR_CONCORDANCE_LABELS.get(row["concordance"], row["concordance"]),
+                    row["loci"],
+                    _ratio(row["loci"], total),
+                )
+                for row in concordance
+            ],
+        ))
+    return blocks
+
+
+def _amr_drug_class_blocks(connection):
+    """Which drug classes the catalogue of loci confers resistance to."""
+    import plotly.graph_objects as go
+
+    rows = _query(connection, """
+        SELECT drug_class,
+               COUNT(DISTINCT assembly_id || char(31) || COALESCE(locus_id, hit_id)) AS loci,
+               COUNT(DISTINCT assembly_id) AS assemblies
+        FROM amr_drug_class
+        WHERE drug_class IS NOT NULL AND drug_class <> ''
+        GROUP BY drug_class
+        ORDER BY loci DESC
+    """)
+    if not rows:
+        return []
+
+    blocks = [_heading(
+        "Drug classes",
+        "A locus that confers resistance to several drug classes is counted "
+        "once under each of them, so these counts add up to more than the "
+        "number of loci. Read them as how often each class is covered, not as "
+        "a partition of the loci."
+    )]
+    shown = rows[:TOP_CATEGORIES]
+    figure = go.Figure()
+    figure.add_bar(
+        x=[row["loci"] for row in reversed(shown)],
+        y=[row["drug_class"] for row in reversed(shown)],
+        orientation="h",
+        marker_color=PALETTE[0],
+    )
+    figure.update_layout(
+        xaxis_title="Resistance loci",
+        yaxis_title="",
+        height=max(FIGURE_HEIGHT, 24 * len(shown) + 120),
+        margin=dict(l=260),
+    )
+    blocks.append(figure)
+    if len(rows) > len(shown):
+        blocks.append(_note(
+            f"The {len(shown)} most frequent of {len(rows)} drug classes are "
+            "drawn; the table below carries all of them."
+        ))
+    blocks.append(_table(
+        [("Drug class", _text), ("Loci", _integer), ("Assemblies", _integer)],
+        [(row["drug_class"], row["loci"], row["assemblies"]) for row in rows],
+    ))
+    return blocks
+
+
+def _amr_gene_blocks(connection):
+    """The genes behind the loci, ranked by how often they were recovered."""
+    rows = _query(connection, """
+        SELECT l.primary_gene AS gene,
+               COUNT(*) AS loci,
+               COUNT(DISTINCT l.assembly_id) AS assemblies,
+               SUM(CASE WHEN l.support_status = 'amrfinder_and_rgi' THEN 1 ELSE 0 END)
+                   AS both_tools,
+               SUM(CASE WHEN m.locus_id IS NOT NULL THEN 1 ELSE 0 END) AS mobile_loci,
+               MAX(l.drug_classes) AS drug_classes
+        FROM amr_locus AS l
+        LEFT JOIN (
+            SELECT DISTINCT assembly_id, locus_id FROM amr_mobility
+        ) AS m ON m.assembly_id = l.assembly_id AND m.locus_id = l.locus_id
+        WHERE l.primary_gene IS NOT NULL AND l.primary_gene <> ''
+        GROUP BY l.primary_gene
+        ORDER BY loci DESC, gene
+    """)
+    if not rows:
+        return []
+
+    return [
+        _heading(
+            "Resistance genes",
+            "One row per gene, counting the loci it was recovered from. A gene "
+            "in many assemblies is either widespread in the sample set or "
+            "sitting on something that moves between them, which is what the "
+            "mobile count next to it is for. Drug classes lists every class "
+            "the gene was annotated with across its loci."
+        ),
+        _table(
+            [
+                ("Gene", _text),
+                ("Loci", _integer),
+                ("Assemblies", _integer),
+                ("Both tools", _integer),
+                ("Mobile loci", _integer),
+                ("Drug classes", _text),
+            ],
+            [
+                (row["gene"], row["loci"], row["assemblies"], row["both_tools"],
+                 row["mobile_loci"], row["drug_classes"])
+                for row in rows
+            ],
+        ),
+    ]
+
+
+def _amr_context_blocks(connection):
+    """Where the loci sit: on a plasmid, in a (pro)virus, or on neither."""
+    import plotly.graph_objects as go
+
+    regions = _query(connection, """
+        SELECT context_type,
+               COUNT(*) AS regions,
+               AVG(length) AS mean_length,
+               AVG(score) AS mean_score
+        FROM amr_mobility_region
+        GROUP BY context_type
+        ORDER BY regions DESC
+    """)
+    contexts = _query(connection, """
+        SELECT context_type,
+               COUNT(DISTINCT assembly_id || char(31) || locus_id) AS loci
+        FROM amr_mobility
+        GROUP BY context_type
+        ORDER BY loci DESC
+    """)
+    if not regions and not contexts:
+        return []
+
+    total_loci = _scalar(connection, "SELECT COUNT(*) FROM amr_locus", default=0)
+    mobile = _scalar(connection, """
+        SELECT COUNT(*) FROM (
+            SELECT DISTINCT assembly_id, locus_id FROM amr_mobility
+        )
+    """, default=0)
+
+    blocks = [_heading(
+        "Mobile-element context",
+        "geNomad calls plasmids and viruses on the same contigs, and a locus "
+        "is called mobile when it overlaps one of those calls. A locus can "
+        "overlap both a plasmid and a provirus, so the per-context counts can "
+        "exceed the number of mobile loci. This is positional evidence, not "
+        "proof of transfer: it says the gene sits inside a region that looks "
+        "mobile, not that it has moved."
+    )]
+
+    if total_loci:
+        labels = [
+            AMR_CONTEXT_LABELS.get(row["context_type"], row["context_type"])
+            for row in contexts
+        ]
+        values = [row["loci"] for row in contexts]
+        colours = [PALETTE[index % len(PALETTE)] for index in range(len(contexts))]
+        labels.append(AMR_CHROMOSOMAL)
+        values.append(max(total_loci - mobile, 0))
+        colours.append(OTHER_COLOUR)
+        figure = go.Figure()
+        figure.add_bar(x=labels, y=values, marker_color=colours)
+        figure.update_layout(xaxis_title="", yaxis_title="Resistance loci")
+        blocks.append(figure)
+
+    if contexts:
+        blocks.append(_table(
+            [("Context", _text), ("Resistance loci", _integer), ("Share of loci %", _ONE)],
+            [
+                (
+                    AMR_CONTEXT_LABELS.get(row["context_type"], row["context_type"]),
+                    row["loci"],
+                    _ratio(row["loci"], total_loci),
+                )
+                for row in contexts
+            ],
+        ))
+
+    if regions:
+        blocks.append(_heading(
+            "Mobile elements found",
+            "Every plasmid and (pro)virus geNomad called, whether or not a "
+            "resistance gene landed in it. The score is geNomad's own "
+            "confidence in the call; a low-scoring region carrying a locus is "
+            "the one to check before calling that locus mobile."
+        ))
+        blocks.append(_table(
+            [
+                ("Context", _text),
+                ("Regions", _integer),
+                ("Mean length", _integer),
+                ("Mean score", _TWO),
+            ],
+            [
+                (
+                    AMR_CONTEXT_LABELS.get(row["context_type"], row["context_type"]),
+                    row["regions"], row["mean_length"], row["mean_score"],
+                )
+                for row in regions
+            ],
+        ))
+    return blocks
+
+
+def _amr_qc_blocks(assemblies):
+    """Hits the callers reported without usable coordinates.
+
+    A hit with no contig and no start/end cannot be reconciled against the
+    other caller or placed inside a mobile element, so it is counted here
+    rather than silently dropped from the locus figures above.
+    """
+    rows = [
+        (
+            row["assembly_id"],
+            row["amrfinder_hits_without_coordinates"],
+            row["rgi_hits_without_coordinates"],
+        )
+        for row in assemblies
+        if (row["amrfinder_hits_without_coordinates"] or 0)
+        or (row["rgi_hits_without_coordinates"] or 0)
+    ]
+    if not rows:
+        return []
+    return [
+        _heading(
+            "Hits without coordinates",
+            "These hits were reported by a caller but carry no position on a "
+            "contig, so they could not be merged into a locus or tested "
+            "against a mobile element. They are excluded from every count "
+            "above; a large number here means the locus figures understate "
+            "what the callers found."
+        ),
+        _table(
+            [
+                ("Assembly", _text),
+                ("AMRFinderPlus", _integer),
+                ("RGI", _integer),
+            ],
+            rows,
+        ),
+    ]
+
+
 def _render_resources(connection):
     blocks = _run_blocks(connection)
     blocks.extend(_benchmark_blocks(connection))
@@ -3307,7 +3757,7 @@ def _run_blocks(connection):
 
 
 # Why a run carries no usage figures. Keyed by the status drakkar.benchmark
-# stamps into drakkar_<run_id>_resources.yaml.
+# stamps into drakkar_<run_id>.resources.yaml.
 BENCHMARK_STATUS_NOTES = {
     "skipped": "Resource benchmarking was skipped for this run (--skip-benchmark).",
     "unsupported_profile": (
@@ -3981,6 +4431,7 @@ SECTION_RENDERERS = {
     "taxonomy": _render_taxonomy,
     "function": _render_function,
     "expression": _render_expression,
+    "amr": _render_amr,
     "resources": _render_resources,
 }
 

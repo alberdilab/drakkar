@@ -318,7 +318,8 @@ def main():
             view=view,
         )
 
-    elif args.command == "report":
+    # `report` is the command's original name, kept as a parser alias.
+    elif args.command in ("reporting", "report"):
         if args.list_sections:
             return run_report_probe(args.output)
         return run_report(

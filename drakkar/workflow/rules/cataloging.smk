@@ -20,6 +20,11 @@ MIN_COMPLETENESS = int(config.get("MIN_COMPLETENESS", 70))
 MAX_CONTAMINATION = int(config.get("MAX_CONTAMINATION", 10))
 MIN_BIN_LENGTH = int(config.get("MIN_BIN_LENGTH", 200000))
 MAX_BIN_LENGTH = int(config.get("MAX_BIN_LENGTH", 10000000))
+# Assemblies below this size (MB of FASTA) are not worth binning with the
+# heavier binners, and COMEBin cannot bin them at all: its marker-gene stage
+# aborts when FragGeneScan/HMMsearch find no single-copy markers to seed the
+# clustering. Such assemblies export an empty contig-to-bin table instead.
+MIN_BINNING_ASSEMBLY_MB = int(config.get("MIN_BINNING_ASSEMBLY_MB", 10))
 
 # Binette >=1.2 names the selected bins <prefix>_bin<n> and writes both the
 # quality report and the bin FASTA files using that name.
@@ -265,6 +270,47 @@ rule assembly_map_depth:
         fi
         """
 
+# SemiBin2 and COMEBin keep contig features in memory and read every coverage
+# BAM to build the depth profiles used for training, so their footprint is
+# driven by the mapping data as much as by the assembly. Sizing on the assembly
+# alone under-requests badly for deeply sequenced samples (a 186 MB assembly
+# with a 1.8 GB BAM was OOM-killed while training at the previous 16 GB floor).
+def _file_size_mb(path):
+    try:
+        return Path(path).stat().st_size / (1024*1024)
+    except OSError:
+        return 0
+
+
+def deep_binner_mem_mb(assembly, bams, attempt):
+    """Memory estimate (MB) for the deep-learning binners, scaled by assembly and BAM sizes."""
+    bam_mb = [_file_size_mb(bam) for bam in bams] or [0]
+    estimate = _file_size_mb(assembly) * 60 + max(bam_mb) * 12 + len(bam_mb) * 1024
+    # Scale after the floor so a job that was OOM-killed at the floor actually
+    # grows on retry instead of asking for the same memory again.
+    return min(1000*1024, max(32*1024, int(estimate)) * 2 ** (attempt - 1))
+
+
+def deep_binner_runtime(assembly, bams, attempt):
+    """Runtime estimate (min) for the deep-learning binners, scaled by assembly and BAM sizes."""
+    estimate = _file_size_mb(assembly) * 2 + sum(_file_size_mb(bam) for bam in bams) / 10
+    return min(20000, max(120, int(estimate)) * 2 ** (attempt - 1))
+
+
+def binning_skip_reason(assembly):
+    """Why an assembly should not be binned, or an empty string when it should.
+
+    The binners share one policy, evaluated per job rather than at DAG time
+    because the assembly does not exist yet when the DAG is built.
+    """
+    size_mb = _file_size_mb(assembly)
+    if size_mb <= 0:
+        return "Assembly is empty"
+    if size_mb < MIN_BINNING_ASSEMBLY_MB:
+        return f"Assembly is smaller than {MIN_BINNING_ASSEMBLY_MB} MB"
+    return ""
+
+
 rule metabat2:
     input:
         assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}.fna",
@@ -273,7 +319,8 @@ rule metabat2:
         f"{OUTPUT_DIR}/cataloging/metabat2/{{assembly}}/{{assembly}}.tsv"
     params:
         metabat2_module={METABAT2_MODULE},
-        raw_cls=f"{OUTPUT_DIR}/cataloging/metabat2/{{assembly}}/{{assembly}}.raw.tsv"
+        raw_cls=f"{OUTPUT_DIR}/cataloging/metabat2/{{assembly}}/{{assembly}}.raw.tsv",
+        skip_reason=lambda wildcards, input: binning_skip_reason(input.assembly)
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 50)) * 2 ** (attempt - 1)),
@@ -281,8 +328,8 @@ rule metabat2:
     message: "Binning contigs from assembly {wildcards.assembly} using metabat2..."
     shell:
         """
-        if [ ! -s {input.assembly} ]; then
-            echo "Assembly is empty, skipping metabat2..."
+        if [ -n "{params.skip_reason}" ]; then
+            echo "{params.skip_reason}, skipping metabat2..."
             mkdir -p $(dirname {output})
             touch {output}
         else
@@ -311,7 +358,7 @@ rule maxbin2:
         maxbin2_module={MAXBIN2_MODULE},
         hmmer_module={HMMER_MODULE},
         basename=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}",
-        assembly_size_mb=lambda wildcards, input: int(Path(input.assembly).stat().st_size / (1024*1024))
+        skip_reason=lambda wildcards, input: binning_skip_reason(input.assembly)
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 50)) * 2 ** (attempt - 1)),
@@ -319,8 +366,8 @@ rule maxbin2:
     message: "Binning contigs from assembly {wildcards.assembly} using maxbin2..."
     shell:
         """
-        if (( {params.assembly_size_mb} < 10 )); then
-            echo "Assembly is smaller than 10 MB, skipping maxbin2..."
+        if [ -n "{params.skip_reason}" ]; then
+            echo "{params.skip_reason}, skipping maxbin2..."
             mkdir -p $(dirname {output})
             touch {output}
         else
@@ -353,32 +400,6 @@ rule maxbin2_table:
         fi
         """
 
-# SemiBin2 and COMEBin keep contig features in memory and read every coverage
-# BAM to build the depth profiles used for training, so their footprint is
-# driven by the mapping data as much as by the assembly. Sizing on the assembly
-# alone under-requests badly for deeply sequenced samples (a 186 MB assembly
-# with a 1.8 GB BAM was OOM-killed while training at the previous 16 GB floor).
-def _file_size_mb(path):
-    try:
-        return Path(path).stat().st_size / (1024*1024)
-    except OSError:
-        return 0
-
-
-def deep_binner_mem_mb(assembly, bams, attempt):
-    """Memory estimate (MB) for the deep-learning binners, scaled by assembly and BAM sizes."""
-    bam_mb = [_file_size_mb(bam) for bam in bams] or [0]
-    estimate = _file_size_mb(assembly) * 60 + max(bam_mb) * 12 + len(bam_mb) * 1024
-    # Scale after the floor so a job that was OOM-killed at the floor actually
-    # grows on retry instead of asking for the same memory again.
-    return min(1000*1024, max(32*1024, int(estimate)) * 2 ** (attempt - 1))
-
-
-def deep_binner_runtime(assembly, bams, attempt):
-    """Runtime estimate (min) for the deep-learning binners, scaled by assembly and BAM sizes."""
-    estimate = _file_size_mb(assembly) * 2 + sum(_file_size_mb(bam) for bam in bams) / 10
-    return min(20000, max(120, int(estimate)) * 2 ** (attempt - 1))
-
 
 rule semibin2:
     input:
@@ -391,7 +412,7 @@ rule semibin2:
         f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}/contig_bins.tsv"
     params:
         outdir=f"{OUTPUT_DIR}/cataloging/semibin2/{{assembly}}",
-        assembly_size_mb=lambda wildcards, input: int(Path(input.assembly).stat().st_size / (1024*1024))
+        skip_reason=lambda wildcards, input: binning_skip_reason(input.assembly)
     threads: 8
     conda:
         f"{PACKAGE_DIR}/workflow/envs/semibin.yaml"
@@ -408,8 +429,8 @@ rule semibin2:
         # scikit-learn >= 1.9 cannot import.
         unset PYTHONPATH
         export PYTHONNOUSERSITE=1
-        if (( {params.assembly_size_mb} < 10 )); then
-            echo "Assembly is smaller than 10 MB, skipping semibin2..."
+        if [ -n "{params.skip_reason}" ]; then
+            echo "{params.skip_reason}, skipping semibin2..."
             mkdir -p {params.outdir}
             touch {output}
         else
@@ -449,7 +470,8 @@ rule comebin:
         f"{OUTPUT_DIR}/cataloging/comebin/{{assembly}}/comebin_res/comebin_res.tsv"
     params:
         bamdir=f"{OUTPUT_DIR}/cataloging/comebin/{{assembly}}_bams",
-        outdir=f"{OUTPUT_DIR}/cataloging/comebin/{{assembly}}"
+        outdir=f"{OUTPUT_DIR}/cataloging/comebin/{{assembly}}",
+        skip_reason=lambda wildcards, input: binning_skip_reason(input.assembly)
     threads: 8
     conda:
         f"{PACKAGE_DIR}/workflow/envs/comebin.yaml"
@@ -474,21 +496,72 @@ rule comebin:
         if [ -n "${{CONDA_PREFIX:-}}" ]; then
             export PATH="$CONDA_PREFIX/bin:$PATH"
         fi
-        if [ ! -s {input.assembly} ]; then
-            echo "Assembly is empty, skipping comebin..."
+        # COMEBin seeds its clustering with single-copy marker genes found by
+        # FragGeneScan and HMMsearch. Assemblies too small to carry those markers
+        # make that stage abort ("produced no proteins", "zero marker hits",
+        # "empty seed set"), which used to kill the whole workflow. Skip them up
+        # front instead of spending GPU hours on a run that cannot finish.
+        if [ -n "{params.skip_reason}" ]; then
+            echo "{params.skip_reason}, skipping comebin..."
             mkdir -p $(dirname {output})
             touch {output}
         else
             rm -rf {params.outdir} {params.bamdir}
-            mkdir -p {params.bamdir}
+            mkdir -p {params.bamdir} {params.outdir}
             for bam in {input.bam}; do
                 ln -s "$(realpath "$bam")" "{params.bamdir}/$(basename "$bam")"
             done
+
+            # COMEBin writes its marker byproducts next to the assembly and reuses
+            # them without checking that they hold anything. An empty one left by a
+            # previous failed attempt would make every retry fail the same way, so
+            # drop the empties and let COMEBin regenerate them.
+            COMEBIN_SEED="{input.assembly}.bacar_marker.2quarter_lencutoff_1001.seed"
+            for byproduct in "{input.assembly}.frag.faa" "{input.assembly}.bacar_marker.hmmout" "$COMEBIN_SEED"; do
+                if [ -f "$byproduct" ] && [ ! -s "$byproduct" ]; then
+                    rm -f "$byproduct"
+                fi
+            done
+
+            COMEBIN_LOG="{params.outdir}/comebin.log"
+            set +e
             run_comebin.sh \
                 -a {input.assembly} \
                 -p {params.bamdir} \
                 -t {threads} \
-                -o {params.outdir}
+                -o {params.outdir} 2>&1 | tee "$COMEBIN_LOG"
+            COMEBIN_STATUS=${{PIPESTATUS[0]}}
+            set -e
+
+            # The size threshold cannot catch every marker-poor assembly: a large
+            # but heavily fragmented one can still carry no single-copy markers.
+            # COMEBin signals that either by aborting outright (1.1.0) or by
+            # logging the failed marker step and walking away without a result
+            # (1.0.4, which exits 0 and leaves snakemake to die on the missing
+            # output). Detect both, and treat only that specific failure as
+            # "nothing to bin": every other failure (OOM, GPU, walltime) still
+            # propagates so snakemake can retry it with more resources.
+            MARKER_FAILURE=0
+            if grep -qE "FragGeneScan failed|Hmmsearch failed|markerCmd failed|produced no proteins|zero marker hits|empty seed set|no usable seeds" "$COMEBIN_LOG"; then
+                MARKER_FAILURE=1
+            fi
+            if [ -f "$COMEBIN_SEED" ] && [ ! -s "$COMEBIN_SEED" ]; then
+                MARKER_FAILURE=1
+            fi
+
+            if [ "$COMEBIN_STATUS" -ne 0 ] || [ ! -f {output} ]; then
+                if [ "$MARKER_FAILURE" -eq 1 ]; then
+                    echo "COMEBin found no marker genes in assembly {wildcards.assembly}, exporting an empty comebin_res.tsv..."
+                    mkdir -p $(dirname {output})
+                    touch {output}
+                    exit 0
+                fi
+                if [ "$COMEBIN_STATUS" -ne 0 ]; then
+                    exit "$COMEBIN_STATUS"
+                fi
+                echo "COMEBin reported success but wrote no {output}. See $COMEBIN_LOG." >&2
+                exit 1
+            fi
         fi
         """
 

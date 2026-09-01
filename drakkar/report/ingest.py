@@ -289,7 +289,7 @@ BENCHMARK_RULE_COLUMNS = (
     ("weighted_cpu_efficiency", _float),
 )
 
-# Run-level roll-up keys of drakkar_<run_id>_resources.yaml, after run_id.
+# Run-level roll-up keys of drakkar_<run_id>.resources.yaml, after run_id.
 BENCHMARK_SUMMARY_KEYS = (
     ("status", _text),
     ("profile", _text),
@@ -418,7 +418,7 @@ def _ingest_benchmark_summaries(connection, output_path):
 
 
 def _ingest_benchmark_table(connection, output_path, kind, table, columns):
-    """Load every ``benchmark/drakkar_<run_id>.<kind>.tsv`` into one table."""
+    """Load every ``logging/benchmark/drakkar_<run_id>.<kind>.tsv`` into one table."""
     sources = find_benchmark_tables(output_path, kind)
     if not sources:
         return 0
@@ -1276,6 +1276,265 @@ def _bound(value, selector):
     return selector(numbers) if numbers else None
 
 
+# ---------------------------------------------------------------------------
+# Antimicrobial resistance
+# ---------------------------------------------------------------------------
+
+def ingest_amr(connection, output_dir):
+    """Load the assembly-level AMR tables written by `aggregate_amr`.
+
+    The per-assembly counts arrive as two files keyed on `assembly_id` — the
+    summary and the QC roll-up — and are folded into one row, because every QC
+    figure is the denominator of a summary figure. The larger per-hit and
+    per-locus tables are streamed, and the verbose `raw_details` / `details`
+    JSON columns are left in the source files.
+    """
+    summary_source = _existing(output_dir, "amr/assembly_summary.tsv")
+    qc_source = _existing(output_dir, "amr/amr_qc.tsv")
+    if summary_source is None and qc_source is None:
+        return None
+
+    written = _ingest_amr_assemblies(connection, summary_source, qc_source)
+    written += _ingest_amr_hits(connection, output_dir)
+    written += _ingest_amr_loci(connection, output_dir)
+    written += _ingest_amr_drug_classes(connection, output_dir)
+    written += _ingest_amr_mobility(connection, output_dir)
+    connection.commit()
+    return written
+
+
+def _ingest_amr_assemblies(connection, summary_source, qc_source):
+    """Merge assembly_summary.tsv and amr_qc.tsv into one row per assembly."""
+    merged = {}
+    for source, columns in (
+        (summary_source, ("assembly_type", "organism", "contig_count",
+                          "total_length", "amrfinder_hits", "rgi_hits",
+                          "mobility_regions", "amr_loci", "multi_tool_loci",
+                          "mobile_loci")),
+        (qc_source, ("amrfinder_hits", "rgi_hits", "mobility_regions",
+                     "amr_loci", "multi_tool_loci", "mobile_loci",
+                     "amrfinder_hits_without_coordinates",
+                     "rgi_hits_without_coordinates", "mobility_links")),
+    ):
+        if source is None:
+            continue
+        for row in _read_table(source).to_dict("records"):
+            assembly_id = _get(row, "assembly_id")
+            if assembly_id is None:
+                continue
+            record = merged.setdefault(assembly_id, {})
+            for column in columns:
+                value = _get(row, column, _text if column in {"assembly_type", "organism"} else _int)
+                if value is not None:
+                    record[column] = value
+
+    rows = [
+        (
+            assembly_id,
+            record.get("assembly_type"),
+            record.get("organism"),
+            record.get("contig_count"),
+            record.get("total_length"),
+            record.get("amrfinder_hits"),
+            record.get("rgi_hits"),
+            record.get("mobility_regions"),
+            record.get("amr_loci"),
+            record.get("multi_tool_loci"),
+            record.get("mobile_loci"),
+            record.get("amrfinder_hits_without_coordinates"),
+            record.get("rgi_hits_without_coordinates"),
+            record.get("mobility_links"),
+        )
+        for assembly_id, record in sorted(merged.items())
+    ]
+    written = _executemany(
+        connection,
+        "INSERT OR REPLACE INTO amr_assembly VALUES "
+        "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        rows,
+    )
+    record_ingest(
+        connection, "amr_assembly", "amr", summary_source or qc_source, written
+    )
+    return written
+
+
+def _stream_amr_table(connection, output_dir, relative, table, statement, build):
+    """Stream one AMR table into the database, `build` mapping row -> tuple."""
+    source = _existing(output_dir, relative)
+    if source is None:
+        return 0
+    written = 0
+    with _open_text(source) as handle:
+        for chunk in pd.read_csv(handle, sep="\t", dtype=str, chunksize=CHUNK_SIZE):
+            rows = [
+                tuple_ for tuple_ in (build(row) for row in chunk.to_dict("records"))
+                if tuple_ is not None
+            ]
+            written += _executemany(connection, statement, rows)
+            connection.commit()
+    record_ingest(connection, table, "amr", source, written)
+    return written
+
+
+def _ingest_amr_hits(connection, output_dir):
+    def build(row):
+        assembly_id = _get(row, "assembly_id")
+        hit_id = _get(row, "hit_id")
+        if assembly_id is None or hit_id is None:
+            return None
+        return (
+            assembly_id,
+            hit_id,
+            _get(row, "locus_id"),
+            _get(row, "source"),
+            _get(row, "contig"),
+            _get(row, "start", _int),
+            _get(row, "end", _int),
+            _get(row, "strand"),
+            _get(row, "gene_symbol"),
+            _get(row, "gene_name"),
+            _get(row, "ontology_id"),
+            _get(row, "drug_class"),
+            _get(row, "resistance_mechanism"),
+            _get(row, "gene_family"),
+            _get(row, "detection_grade"),
+            _get(row, "method"),
+            _get(row, "identity", _float),
+            _get(row, "reference_coverage", _float),
+            _get(row, "bitscore", _float),
+            _get(row, "is_partial", _bool),
+        )
+
+    return _stream_amr_table(
+        connection, output_dir, "amr/amr_hits.tsv.xz", "amr_hit",
+        "INSERT OR REPLACE INTO amr_hit VALUES "
+        "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        build,
+    )
+
+
+def _ingest_amr_loci(connection, output_dir):
+    def build(row):
+        assembly_id = _get(row, "assembly_id")
+        locus_id = _get(row, "locus_id")
+        if assembly_id is None or locus_id is None:
+            return None
+        return (
+            assembly_id,
+            locus_id,
+            _get(row, "contig"),
+            _get(row, "start", _int),
+            _get(row, "end", _int),
+            _get(row, "strand"),
+            _get(row, "primary_gene"),
+            _get(row, "gene_symbols"),
+            _get(row, "gene_families"),
+            _get(row, "ontology_ids"),
+            _get(row, "drug_classes"),
+            _get(row, "drug_subclasses"),
+            _get(row, "resistance_mechanisms"),
+            _get(row, "sources"),
+            _get(row, "source_count", _int),
+            _get(row, "hit_count", _int),
+            _get(row, "support_status"),
+            _get(row, "concordance"),
+        )
+
+    return _stream_amr_table(
+        connection, output_dir, "amr/amr_loci.tsv.xz", "amr_locus",
+        "INSERT OR REPLACE INTO amr_locus VALUES "
+        "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        build,
+    )
+
+
+def _ingest_amr_drug_classes(connection, output_dir):
+    def build(row):
+        assembly_id = _get(row, "assembly_id")
+        hit_id = _get(row, "hit_id")
+        # A hit whose caller named no drug class still gets a row in the source
+        # table, with an empty class. It says nothing this table is for, and
+        # its mechanism and gene family are already on `amr_hit`, so it is left
+        # out rather than stored under a null class.
+        drug_class = _get(row, "drug_class")
+        if assembly_id is None or hit_id is None or drug_class is None:
+            return None
+        return (
+            assembly_id,
+            hit_id,
+            drug_class,
+            _get(row, "locus_id"),
+            _get(row, "source"),
+            _get(row, "drug_subclass"),
+            _get(row, "resistance_mechanism"),
+            _get(row, "gene_family"),
+            _get(row, "ontology_id"),
+        )
+
+    return _stream_amr_table(
+        connection, output_dir, "amr/amr_drug_classes.tsv.xz", "amr_drug_class",
+        "INSERT OR REPLACE INTO amr_drug_class VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        build,
+    )
+
+
+def _ingest_amr_mobility(connection, output_dir):
+    def build_region(row):
+        assembly_id = _get(row, "assembly_id")
+        region_id = _get(row, "region_id")
+        if assembly_id is None or region_id is None:
+            return None
+        return (
+            assembly_id,
+            region_id,
+            _get(row, "contig"),
+            _get(row, "start", _int),
+            _get(row, "end", _int),
+            _get(row, "context_type"),
+            _get(row, "seq_name"),
+            _get(row, "length", _int),
+            _get(row, "topology"),
+            _get(row, "score", _float),
+            _get(row, "fdr", _float),
+            _get(row, "marker_enrichment", _float),
+            _get(row, "hallmark_count", _int),
+            _get(row, "gene_count", _int),
+            _get(row, "conjugation_genes"),
+            _get(row, "taxonomy"),
+        )
+
+    def build_link(row):
+        assembly_id = _get(row, "assembly_id")
+        locus_id = _get(row, "locus_id")
+        region_id = _get(row, "region_id")
+        if assembly_id is None or locus_id is None or region_id is None:
+            return None
+        return (
+            assembly_id,
+            locus_id,
+            region_id,
+            _get(row, "context_type"),
+            _get(row, "contig"),
+            _get(row, "overlap_bp", _int),
+            _get(row, "locus_overlap_fraction", _float),
+            _get(row, "region_score", _float),
+        )
+
+    written = _stream_amr_table(
+        connection, output_dir, "amr/mobility_regions.tsv.xz", "amr_mobility_region",
+        "INSERT OR REPLACE INTO amr_mobility_region VALUES "
+        "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        build_region,
+    )
+    written += _stream_amr_table(
+        connection, output_dir, "amr/amr_mobility.tsv.xz", "amr_mobility",
+        "INSERT OR REPLACE INTO amr_mobility VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        build_link,
+    )
+    return written
+
+
 # Section name -> loader. `resources` is handled first so that run provenance
 # is present even when every data section is missing.
 SECTION_LOADERS = {
@@ -1287,4 +1546,5 @@ SECTION_LOADERS = {
     "taxonomy": ingest_taxonomy,
     "function": ingest_function,
     "expression": ingest_expression,
+    "amr": ingest_amr,
 }

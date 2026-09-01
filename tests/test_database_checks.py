@@ -34,13 +34,20 @@ def install_kegg_release(release_dir, *, skip=()):
     return release_dir
 
 
-def write_run_metadata(output_dir, run_id, databases):
+def write_run_metadata(output_dir, run_id, databases, legacy=False):
+    """Record a run's database provenance.
+
+    ``legacy`` puts the metadata in the output root, where runs predating the
+    logging directory wrote it.
+    """
     payload = {
         "run_id": run_id,
         "command": "annotating",
         "databases": databases,
     }
-    path = Path(output_dir) / f"drakkar_{run_id}.yaml"
+    directory = Path(output_dir) if legacy else Path(output_dir) / "logging"
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"drakkar_{run_id}.yaml"
     path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
     return path
 
@@ -191,6 +198,35 @@ class ProvenanceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             write_run_metadata(tmpdir, "20260101-000000", {"KEGG_DB": {"configured": "/db/a", "release": "a"}})
             write_run_metadata(tmpdir, "20260201-000000", {"KEGG_DB": {"configured": "/db/b", "release": "b"}})
+            source, previous = previous_database_provenance(tmpdir)
+            self.assertIn("20260201-000000", source)
+            self.assertEqual(previous["KEGG_DB"]["release"], "b")
+
+    def test_previous_provenance_reads_runs_from_the_output_root(self) -> None:
+        # A directory written before the logging directory existed still guards
+        # against mixing database releases.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            write_run_metadata(
+                tmpdir,
+                "20260101-000000",
+                {"KEGG_DB": {"configured": "/db/a", "release": "a"}},
+                legacy=True,
+            )
+            source, previous = previous_database_provenance(tmpdir)
+            self.assertIn("20260101-000000", source)
+            self.assertEqual(previous["KEGG_DB"]["release"], "a")
+
+    def test_previous_provenance_spans_both_layouts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            write_run_metadata(
+                tmpdir,
+                "20260101-000000",
+                {"KEGG_DB": {"configured": "/db/a", "release": "a"}},
+                legacy=True,
+            )
+            write_run_metadata(
+                tmpdir, "20260201-000000", {"KEGG_DB": {"configured": "/db/b", "release": "b"}}
+            )
             source, previous = previous_database_provenance(tmpdir)
             self.assertIn("20260201-000000", source)
             self.assertEqual(previous["KEGG_DB"]["release"], "b")

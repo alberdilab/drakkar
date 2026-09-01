@@ -14,6 +14,7 @@ htmlcov/
 build/
 dist/
 *.egg-info/
+*.whl
 
 # Documentation builds
 docs/_build/

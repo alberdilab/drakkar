@@ -29,7 +29,7 @@ rule prodigal:
         faa=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa",
         gff=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.gff"
     log:
-        f"{OUTPUT_DIR}/log/annotating/prodigal/{{mag}}.log"
+        f"{OUTPUT_DIR}/logging/annotating/prodigal/{{mag}}.log"
     params:
          prodigal_module={PRODIGAL_MODULE}
     resources:

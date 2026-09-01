@@ -464,14 +464,15 @@ def build_parser():
     status_view_group.add_argument("--samples", action="store_true", help="Show sample-focused progress only")
     status_view_group.add_argument("--rules", action="store_true", help="Show rule-focused progress only")
 
-    subparser_report = subparsers.add_parser("report", help="Build the report database and HTML summary from a Drakkar output directory")
-    subparser_report.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory to report on. Default is the directory from which drakkar is called.")
-    subparser_report.add_argument("--sections", required=False, default=None, help="Comma-separated sections to include: preprocessing, cataloging, dereplication, profiling, taxonomy, function, expression, resources, or all. Default: every section with available inputs.")
-    subparser_report.add_argument("--db-only", dest="db_only", action="store_true", help="Build drakkar.db without rendering the HTML report")
-    subparser_report.add_argument("--html-only", dest="html_only", action="store_true", help="Re-render drakkar_report.html from an existing drakkar.db without re-ingesting the source tables")
-    subparser_report.add_argument("--primary-hits-only", dest="primary_hits_only", action="store_true", help="Keep only rank-1 annotation hits, producing a smaller database at the cost of secondary evidence")
-    subparser_report.add_argument("--list", dest="list_sections", action="store_true", help="List which report sections the output directory can support, without building anything")
-    subparser_report.add_argument("--force", action="store_true", help="Delete and rebuild an existing drakkar.db")
+    # `report` stays as an alias so the name the command shipped under keeps working.
+    subparser_reporting = subparsers.add_parser("reporting", aliases=["report"], help="Build the report database and HTML summary from a Drakkar output directory")
+    subparser_reporting.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory to report on. Default is the directory from which drakkar is called.")
+    subparser_reporting.add_argument("--sections", required=False, default=None, help="Comma-separated sections to include: preprocessing, cataloging, dereplication, profiling, taxonomy, function, expression, amr, resources, or all. Default: every section with available inputs.")
+    subparser_reporting.add_argument("--db-only", dest="db_only", action="store_true", help="Build reporting/drakkar.db without rendering the HTML report")
+    subparser_reporting.add_argument("--html-only", dest="html_only", action="store_true", help="Render a new reporting/drakkar_report_<timestamp>.html from an existing reporting/drakkar.db without re-ingesting the source tables")
+    subparser_reporting.add_argument("--primary-hits-only", dest="primary_hits_only", action="store_true", help="Keep only rank-1 annotation hits, producing a smaller database at the cost of secondary evidence")
+    subparser_reporting.add_argument("--list", dest="list_sections", action="store_true", help="List which report sections the output directory can support, without building anything")
+    subparser_reporting.add_argument("--force", action="store_true", help="Delete and rebuild an existing reporting/drakkar.db")
     
     parser.description = "Genome-resolved metagenomics workflows, database setup, and run management."
     _set_help_metadata(
@@ -485,7 +486,7 @@ def build_parser():
         ],
         command_groups=[
             ("Data Generation and Analysis", ["complete", "preprocessing", "cataloging", "profiling", "dereplicating", "annotating", "amr", "inspecting", "expressing"]),
-            ("Operations and Management", ["database", "environments", "status", "report", "logging", "transfer", "config", "unlock", "update"]),
+            ("Operations and Management", ["database", "environments", "status", "reporting", "logging", "transfer", "config", "unlock", "update"]),
         ],
         sections=[
             ("General", ["help", "--version"]),

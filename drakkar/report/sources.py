@@ -8,6 +8,11 @@ and what the user asked for.
 
 from pathlib import Path
 
+from drakkar.run_metadata import (
+    benchmark_dir,
+    logging_dir,
+)
+
 # Section -> ordered source files. A section is available when at least one of
 # its `required` files exists and is non-empty; `optional` files enrich it.
 SECTION_SOURCES = {
@@ -63,6 +68,22 @@ SECTION_SOURCES = {
         "required": ["expressing/gene_counts.tsv.xz"],
         "optional": [],
     },
+    # The assembly-level AMR workflow. `assembly_summary.tsv` is the anchor
+    # because `aggregate_amr` always writes it, even for a run in which no
+    # resistance gene was called; the reconciled loci and their mobile-element
+    # context are what turn those counts into a picture.
+    "amr": {
+        "label": "Antimicrobial resistance",
+        "required": ["amr/assembly_summary.tsv"],
+        "optional": [
+            "amr/amr_qc.tsv",
+            "amr/amr_hits.tsv.xz",
+            "amr/amr_loci.tsv.xz",
+            "amr/amr_drug_classes.tsv.xz",
+            "amr/mobility_regions.tsv.xz",
+            "amr/amr_mobility.tsv.xz",
+        ],
+    },
     # The resources section has no fixed file names: run metadata and the
     # benchmark artefacts are all stamped with a run id, so they are discovered
     # by glob in `probe_section` rather than listed here.
@@ -76,10 +97,12 @@ SECTION_SOURCES = {
 # Per-assembly Binette reports, one ``<assembly>.tsv`` per assembly.
 BIN_REPORT_DIRECTORY = "cataloging/final"
 
-# Written by drakkar.benchmark next to the run metadata; absent for runs that
-# were not launched on SLURM.
-BENCHMARK_DIRECTORY = "benchmark"
-BENCHMARK_SUMMARY_SUFFIX = "_resources.yaml"
+# Written by drakkar.benchmark under the logging directory, beside the run
+# metadata; absent for runs that were not launched on SLURM. Runs predating the
+# logging directory put the tables in `benchmark/` and the roll-up in the output
+# root, joining `resources` with an underscore instead of a dot.
+BENCHMARK_SUMMARY_SUFFIX = ".resources.yaml"
+LEGACY_BENCHMARK_SUMMARY_SUFFIX = "_resources.yaml"
 
 SECTION_ORDER = (
     "preprocessing",
@@ -89,6 +112,7 @@ SECTION_ORDER = (
     "taxonomy",
     "function",
     "expression",
+    "amr",
     "resources",
 )
 
@@ -134,19 +158,24 @@ def _is_usable(path):
 def find_run_metadata(output_dir):
     """Return the run metadata YAML files in an output directory, oldest first.
 
-    The benchmark roll-ups live beside them and match the same glob, so they
-    are excluded here by suffix: they describe a run's resource usage, not the
-    run itself, and would otherwise overwrite its provenance row.
+    They sit in the logging directory, and in the output root for runs that
+    predate it. In that root the benchmark roll-up matches the same glob, so it
+    is excluded by suffix: it describes a run's resource usage, not the run
+    itself, and would otherwise overwrite its provenance row. A run found in
+    both layouts is taken from the logging directory.
     """
     output_path = Path(output_dir)
-    try:
-        candidates = sorted(output_path.glob("drakkar_*.yaml"))
-    except OSError:
-        return []
-    return [
-        path for path in candidates
-        if not path.name.endswith(BENCHMARK_SUMMARY_SUFFIX)
-    ]
+    found = {}
+    for directory in (logging_dir(output_path), output_path):
+        try:
+            candidates = sorted(directory.glob("drakkar_*.yaml"))
+        except OSError:
+            continue
+        for path in candidates:
+            if path.name.endswith(LEGACY_BENCHMARK_SUMMARY_SUFFIX):
+                continue
+            found.setdefault(path.name, path)
+    return [found[name] for name in sorted(found)]
 
 
 def find_bin_reports(output_dir):
@@ -165,22 +194,50 @@ def find_bin_reports(output_dir):
         return []
 
 
+def _collect_across_layouts(sources, key=lambda path: path.name):
+    """Glob each ``(directory, pattern)`` in turn, keeping one file per key.
+
+    The sources are given current layout first, so a run present in both is
+    taken from the logging directory. Keys sort chronologically, since both a
+    run id and a file name carrying one begin with its timestamp.
+    """
+    found = {}
+    for directory, pattern in sources:
+        try:
+            candidates = sorted(directory.glob(pattern))
+        except OSError:
+            continue
+        for path in candidates:
+            found.setdefault(key(path), path)
+    return [found[value] for value in sorted(found)]
+
+
 def find_benchmark_summaries(output_dir):
-    """Return the per-run benchmark roll-up YAMLs, oldest first."""
+    """Return the per-run benchmark roll-up YAMLs, oldest first.
+
+    The two layouts spell the suffix differently, so they are keyed by run id
+    rather than by file name.
+    """
     output_path = Path(output_dir)
-    try:
-        return sorted(output_path.glob(f"drakkar_*{BENCHMARK_SUMMARY_SUFFIX}"))
-    except OSError:
-        return []
+    return _collect_across_layouts(
+        [
+            (benchmark_dir(output_path), f"drakkar_*{BENCHMARK_SUMMARY_SUFFIX}"),
+            (output_path, f"drakkar_*{LEGACY_BENCHMARK_SUMMARY_SUFFIX}"),
+        ],
+        key=benchmark_run_id,
+    )
 
 
 def find_benchmark_tables(output_dir, kind):
     """Return the per-run ``jobs`` or ``rules`` benchmark TSVs, oldest first."""
-    output_path = Path(output_dir) / BENCHMARK_DIRECTORY
-    try:
-        return sorted(output_path.glob(f"drakkar_*.{kind}.tsv"))
-    except OSError:
-        return []
+    output_path = Path(output_dir)
+    pattern = f"drakkar_*.{kind}.tsv"
+    return _collect_across_layouts(
+        [
+            (benchmark_dir(output_path), pattern),
+            (benchmark_dir(output_path, legacy=True), pattern),
+        ]
+    )
 
 
 def benchmark_run_id(path, kind=None):
@@ -190,6 +247,8 @@ def benchmark_run_id(path, kind=None):
         stem = name[: -len(f".{kind}.tsv")] if name.endswith(f".{kind}.tsv") else name
     elif name.endswith(BENCHMARK_SUMMARY_SUFFIX):
         stem = name[: -len(BENCHMARK_SUMMARY_SUFFIX)]
+    elif name.endswith(LEGACY_BENCHMARK_SUMMARY_SUFFIX):
+        stem = name[: -len(LEGACY_BENCHMARK_SUMMARY_SUFFIX)]
     else:
         stem = Path(name).stem
     return stem[len("drakkar_"):] if stem.startswith("drakkar_") else stem

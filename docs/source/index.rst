@@ -34,8 +34,8 @@ Find what you need
    * - Manage databases, logs, config, transfers, outputs, or troubleshooting
      - See :doc:`operations` for operational commands and maintenance tasks.
    * - Summarize a finished run, or query its results as a database
-     - See :doc:`report` for the ``drakkar report`` command and the schema of
-       the report database.
+     - See :doc:`report` for the ``drakkar reporting`` command and the schema
+       of the report database.
    * - Check the command-line command list at a glance
      - See :doc:`api` for the CLI reference.
 

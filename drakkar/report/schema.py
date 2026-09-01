@@ -19,7 +19,7 @@ import sqlite3
 from datetime import datetime, timezone
 
 # Bump when the layout below changes in a way that invalidates existing files.
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 TAXONOMIC_RANKS = ("domain", "phylum", "class", "order", "family", "genus", "species")
 
@@ -429,6 +429,144 @@ SCHEMA_STATEMENTS = [
         PRIMARY KEY (gene_id, sample_id)
     )
     """,
+    # -- Antimicrobial resistance -----------------------------------------
+    # The AMR workflow runs on assemblies rather than on catalogue genomes, so
+    # its tables key on `assembly_id` and never join the `genome` side. The
+    # per-assembly counts and the QC counts arrive as two files keyed the same
+    # way and are folded into one row here, because every QC figure is a
+    # denominator for a summary figure.
+    """
+    CREATE TABLE IF NOT EXISTS amr_assembly (
+        assembly_id TEXT PRIMARY KEY,
+        assembly_type TEXT,
+        organism TEXT,
+        contig_count INTEGER,
+        total_length INTEGER,
+        amrfinder_hits INTEGER,
+        rgi_hits INTEGER,
+        mobility_regions INTEGER,
+        amr_loci INTEGER,
+        multi_tool_loci INTEGER,
+        mobile_loci INTEGER,
+        amrfinder_hits_without_coordinates INTEGER,
+        rgi_hits_without_coordinates INTEGER,
+        mobility_links INTEGER
+    )
+    """,
+    # One row per raw caller hit. The verbose `raw_details` JSON stays in
+    # `amr_hits.tsv.xz`, which remains the archival record of what each caller
+    # reported.
+    """
+    CREATE TABLE IF NOT EXISTS amr_hit (
+        assembly_id TEXT NOT NULL,
+        hit_id TEXT NOT NULL,
+        locus_id TEXT,
+        source TEXT,
+        contig TEXT,
+        start INTEGER,
+        end INTEGER,
+        strand TEXT,
+        gene_symbol TEXT,
+        gene_name TEXT,
+        ontology_id TEXT,
+        drug_class TEXT,
+        resistance_mechanism TEXT,
+        gene_family TEXT,
+        detection_grade TEXT,
+        method TEXT,
+        identity REAL,
+        reference_coverage REAL,
+        bitscore REAL,
+        is_partial INTEGER,
+        PRIMARY KEY (assembly_id, hit_id)
+    )
+    """,
+    # A locus is the reconciliation unit: overlapping calls from AMRFinderPlus
+    # and RGI collapsed into one gene occurrence. `support_status` says which
+    # callers backed it and `concordance` how well they agreed, which is what
+    # separates a confident call from a single-tool one.
+    """
+    CREATE TABLE IF NOT EXISTS amr_locus (
+        assembly_id TEXT NOT NULL,
+        locus_id TEXT NOT NULL,
+        contig TEXT,
+        start INTEGER,
+        end INTEGER,
+        strand TEXT,
+        primary_gene TEXT,
+        gene_symbols TEXT,
+        gene_families TEXT,
+        ontology_ids TEXT,
+        drug_classes TEXT,
+        drug_subclasses TEXT,
+        resistance_mechanisms TEXT,
+        sources TEXT,
+        source_count INTEGER,
+        hit_count INTEGER,
+        support_status TEXT,
+        concordance TEXT,
+        PRIMARY KEY (assembly_id, locus_id)
+    )
+    """,
+    # Normalized from the ';'-packed `drug_classes` column: one row per
+    # (hit, drug class) pair, so drug classes can be counted in SQL without
+    # re-splitting strings. A hit conferring resistance to several classes
+    # carries one row per class, so these rows do not sum to a hit count. The
+    # rest of a row is fixed by the hit it came from, which is what makes
+    # (assembly, hit, class) a key rather than only a distinct combination.
+    """
+    CREATE TABLE IF NOT EXISTS amr_drug_class (
+        assembly_id TEXT NOT NULL,
+        hit_id TEXT NOT NULL,
+        drug_class TEXT NOT NULL,
+        locus_id TEXT,
+        source TEXT,
+        drug_subclass TEXT,
+        resistance_mechanism TEXT,
+        gene_family TEXT,
+        ontology_id TEXT,
+        PRIMARY KEY (assembly_id, hit_id, drug_class)
+    )
+    """,
+    # geNomad plasmid and (pro)virus calls, the mobile-element context an AMR
+    # locus may sit inside.
+    """
+    CREATE TABLE IF NOT EXISTS amr_mobility_region (
+        assembly_id TEXT NOT NULL,
+        region_id TEXT NOT NULL,
+        contig TEXT,
+        start INTEGER,
+        end INTEGER,
+        context_type TEXT,
+        seq_name TEXT,
+        length INTEGER,
+        topology TEXT,
+        score REAL,
+        fdr REAL,
+        marker_enrichment REAL,
+        hallmark_count INTEGER,
+        gene_count INTEGER,
+        conjugation_genes TEXT,
+        taxonomy TEXT,
+        PRIMARY KEY (assembly_id, region_id)
+    )
+    """,
+    # The locus-to-region overlaps. A locus overlapping both a plasmid and a
+    # provirus call carries one row per region, so mobile loci are counted as
+    # distinct `locus_id` values rather than as rows.
+    """
+    CREATE TABLE IF NOT EXISTS amr_mobility (
+        assembly_id TEXT NOT NULL,
+        locus_id TEXT NOT NULL,
+        region_id TEXT NOT NULL,
+        context_type TEXT,
+        contig TEXT,
+        overlap_bp INTEGER,
+        locus_overlap_fraction REAL,
+        region_score REAL,
+        PRIMARY KEY (assembly_id, locus_id, region_id)
+    )
+    """,
 ]
 
 INDEX_STATEMENTS = [
@@ -445,6 +583,12 @@ INDEX_STATEMENTS = [
     "CREATE INDEX IF NOT EXISTS idx_assembly_bin_origin_binner ON assembly_bin_origin (binner)",
     "CREATE INDEX IF NOT EXISTS idx_genome_cluster_secondary ON genome_cluster (secondary_cluster)",
     "CREATE INDEX IF NOT EXISTS idx_genome_comparison_ani ON genome_comparison (ani)",
+    "CREATE INDEX IF NOT EXISTS idx_amr_hit_locus ON amr_hit (assembly_id, locus_id)",
+    "CREATE INDEX IF NOT EXISTS idx_amr_hit_source ON amr_hit (source)",
+    "CREATE INDEX IF NOT EXISTS idx_amr_locus_support ON amr_locus (support_status)",
+    "CREATE INDEX IF NOT EXISTS idx_amr_drug_class_name ON amr_drug_class (drug_class)",
+    "CREATE INDEX IF NOT EXISTS idx_amr_mobility_locus ON amr_mobility (assembly_id, locus_id)",
+    "CREATE INDEX IF NOT EXISTS idx_amr_mobility_region_context ON amr_mobility_region (context_type)",
 ]
 
 

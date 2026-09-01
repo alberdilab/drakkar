@@ -280,7 +280,9 @@ class FailureReportTests(unittest.TestCase):
             self.assertIn("FAILURE REPORT", output)
             self.assertIn("fastp", output)
             self.assertIn("Verdict:", output)
-            self.assertTrue((Path(tmpdir) / f"drakkar_{run_info['run_id']}_failures.tsv").exists())
+            self.assertTrue(
+                (Path(tmpdir) / "logging" / f"drakkar_{run_info['run_id']}.failures.tsv").exists()
+            )
 
 
 if __name__ == "__main__":

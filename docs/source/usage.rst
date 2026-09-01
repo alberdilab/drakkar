@@ -33,8 +33,9 @@ Core concepts
 - **Environments**: use ``-e/--env_path`` to select a shared Conda environment
   directory.
 - **Run logs**: every workflow run writes a metadata file
-  ``drakkar_YYYYMMDD-HHMMSS.yaml`` and captures Snakemake stdout/stderr in
-  ``log/drakkar_<run_id>.snakemake.log``.
+  ``logging/drakkar_YYYYMMDD-HHMMSS.yaml`` and captures Snakemake stdout/stderr
+  in ``logging/drakkar_<run_id>.snakemake.log``. See
+  :ref:`logging-directory` for everything a run records about itself.
 - **Locked runs**: output-writing workflows support ``--overwrite`` to delete a
   locked output directory and rerun after a broken Snakemake session.
 
@@ -135,6 +136,13 @@ Input notes
 - ``-b/--binners`` selects the binners used in cataloging. Use a comma-separated
   list of ``metabat``, ``maxbin``, ``semibin``, and ``comebin``; the default is
   all four.
+- Assemblies smaller than ``MIN_BINNING_ASSEMBLY_MB`` megabytes (``10`` by
+  default, set in ``config.yaml``) are not binned: every binner exports an empty
+  contig-to-bin table for them, so they produce no bins. COMEBin cannot bin such
+  assemblies at all — it seeds its clustering with single-copy marker genes, and
+  a marker-poor assembly makes that stage fail. If COMEBin still finds no
+  markers in a larger assembly, it likewise contributes an empty table and the
+  run continues with the remaining binners.
 - ``--multicoverage`` maps samples sharing the same coverage label to each
   other's individual assemblies.
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import lzma
+import shutil
 import sqlite3
 import tempfile
 import textwrap
@@ -169,7 +170,8 @@ class ReportFixtureMixin:
             MAG_A_c1_1\tc1;c1\t1;400\t300;900\t+;+\t800\t120\t340
             MAG_A_c1_2\tc1\t1000\t1600\t-\t600\t45\t0
             """)
-        write(root / "drakkar_20260825-101500.yaml", """
+        self.write_amr(root)
+        write(root / "logging" / "drakkar_20260825-101500.yaml", """
             run_id: '20260825-101500'
             drakkar_version: 2.0.0
             started_at: '2026-08-25T10:15:00+00:00'
@@ -187,9 +189,74 @@ class ReportFixtureMixin:
         self.write_benchmark(root, "20260825-101500")
         return root
 
-    def write_benchmark(self, root: Path, run_id: str) -> None:
-        """The artefacts drakkar.benchmark writes after a SLURM run."""
-        write(root / f"drakkar_{run_id}_resources.yaml", f"""
+    def build_legacy_output_dir(self, root: Path) -> Path:
+        """The same directory in the layout used before ``logging/`` existed."""
+        self.build_output_dir(root)
+        logging_root = root / "logging"
+        (logging_root / "drakkar_20260825-101500.yaml").rename(
+            root / "drakkar_20260825-101500.yaml"
+        )
+        shutil.rmtree(logging_root)
+        self.write_benchmark(root, "20260825-101500", legacy=True)
+        return root
+
+    def write_amr(self, root: Path) -> None:
+        """The tables aggregate_amr writes, in the column order it writes them."""
+        write(root / "amr/assembly_summary.tsv", """
+            assembly_id\tassembly_type\torganism\tinput_path\tinput_sha256\tinput_size_bytes\tcontig_count\ttotal_length\tamrfinder_hits\trgi_hits\tmobility_regions\tamr_loci\tmulti_tool_loci\tmobile_loci
+            A1\tmetagenome\t\t/scratch/A1.fna\tabc123\t5200000\t1200\t5000000\t3\t2\t2\t3\t1\t2
+            A2\tisolate\tEscherichia coli\t/scratch/A2.fna\tdef456\t4900000\t80\t4800000\t1\t0\t0\t1\t0\t0
+            """)
+        write(root / "amr/amr_qc.tsv", """
+            assembly_id\tamrfinder_hits\tamrfinder_hits_without_coordinates\trgi_hits\trgi_hits_without_coordinates\tmobility_regions\tamr_loci\tmulti_tool_loci\tmobility_links\tmobile_loci
+            A1\t3\t0\t2\t1\t2\t3\t1\t2\t2
+            A2\t1\t1\t0\t0\t0\t1\t0\t0\t0
+            """)
+        write_xz(root / "amr/amr_hits.tsv.xz", """
+            assembly_id\thit_id\tlocus_id\tsource\tsource_hit_id\tgene_id\tcontig\tstart\tend\tstrand\tgene_symbol\tgene_name\tontology_id\tdrug_class\tdrug_subclass\tresistance_mechanism\tgene_family\tmodel_type\tdetection_grade\tmethod\tmutation\tidentity\treference_coverage\tbitscore\tthreshold\tis_partial\traw_details
+            A1\tH1\tL1\tamrfinderplus\t1\tc1_1\tc1\t100\t900\t+\tblaTEM\tbeta-lactamase TEM\t\tbeta-lactam\t\tantibiotic inactivation\tblaTEM\t\tEXACTX\tEXACTX\t\t100.0\t100.0\t540.0\t\tfalse\t{"native": "blob"}
+            A1\tH2\tL1\trgi\t2\tc1_1\tc1\t105\t900\t+\tblaTEM\tTEM-1\tARO:3000873\tbeta-lactam\t\tantibiotic inactivation\tblaTEM\tprotein homolog\tPerfect\tDIAMOND\t\t99.6\t98.0\t530.0\t500\tfalse\t{"native": "blob"}
+            A1\tH3\tL2\tamrfinderplus\t3\tc2_4\tc2\t50\t700\t+\tsul1\tsulfonamide resistance\t\tsulfonamide\t\ttarget replacement\tsul1\t\tBLASTX\tBLASTX\t\t96.4\t91.0\t410.0\t\ttrue\t{"native": "blob"}
+            A2\tH4\tL4\tamrfinderplus\t1\td1_2\td1\t100\t800\t+\tblaTEM\tbeta-lactamase TEM\t\tbeta-lactam\t\tantibiotic inactivation\tblaTEM\t\tBLASTX\tBLASTX\t\t97.2\t92.0\t480.0\t\tfalse\t{"native": "blob"}
+            """)
+        write_xz(root / "amr/amr_loci.tsv.xz", """
+            assembly_id\tlocus_id\tcontig\tstart\tend\tstrand\tprimary_gene\tgene_symbols\tgene_families\tontology_ids\tdrug_classes\tdrug_subclasses\tresistance_mechanisms\tsources\tsource_count\thit_count\tsupport_status\tconcordance\tdetails
+            A1\tL1\tc1\t100\t900\t+\tblaTEM\tblaTEM\tblaTEM\tARO:3000873\tbeta-lactam\t\tantibiotic inactivation\tamrfinderplus;rgi\t2\t2\tamrfinder_and_rgi\tgene_match\t{"hit_ids": ["H1", "H2"]}
+            A1\tL2\tc2\t50\t700\t+\tsul1\tsul1\tsul1\t\tsulfonamide\t\ttarget replacement\tamrfinderplus\t1\t1\tamrfinder_only\tsingle_source\t{"hit_ids": ["H3"]}
+            A1\tL3\tc3\t10\t400\t-\tqnrS\tqnrS\tqnr\t\tquinolone\t\ttarget protection\trgi\t1\t1\trgi_only\tsingle_source\t{"hit_ids": ["H5"]}
+            A2\tL4\td1\t100\t800\t+\tblaTEM\tblaTEM\tblaTEM\t\tbeta-lactam\t\tantibiotic inactivation\tamrfinderplus\t1\t1\tamrfinder_only\tsingle_source\t{"hit_ids": ["H4"]}
+            """)
+        write_xz(root / "amr/amr_drug_classes.tsv.xz", """
+            assembly_id\tlocus_id\thit_id\tsource\tdrug_class\tdrug_subclass\tresistance_mechanism\tgene_family\tontology_id
+            A1\tL1\tH1\tamrfinderplus\tbeta-lactam\t\tantibiotic inactivation\tblaTEM\t
+            A1\tL1\tH2\trgi\tbeta-lactam\t\tantibiotic inactivation\tblaTEM\tARO:3000873
+            A1\tL2\tH3\tamrfinderplus\tsulfonamide\t\ttarget replacement\tsul1\t
+            A1\tL3\tH5\trgi\tquinolone\t\ttarget protection\tqnr\t
+            A2\tL4\tH4\tamrfinderplus\tbeta-lactam\t\tantibiotic inactivation\tblaTEM\t
+            """)
+        write_xz(root / "amr/mobility_regions.tsv.xz", """
+            assembly_id\tregion_id\tcontig\tstart\tend\tcontext_type\tseq_name\tlength\ttopology\tscore\tfdr\tmarker_enrichment\thallmark_count\tgene_count\tconjugation_genes\tamr_accessions\ttaxonomy
+            A1\tR1\tc1\t1\t40000\tplasmid\tc1\t40000\tcircular\t0.94\t0.01\t2.4\t6\t45\ttraB;traC\tARO:3000873\t
+            A1\tR2\tc3\t1\t22000\tprovirus\tc3\t22000\tlinear\t0.81\t0.04\t1.2\t3\t28\t\t\tCaudoviricetes
+            """)
+        write_xz(root / "amr/amr_mobility.tsv.xz", """
+            assembly_id\tlocus_id\tregion_id\tcontext_type\tcontig\toverlap_bp\tlocus_overlap_fraction\tregion_score
+            A1\tL1\tR1\tplasmid\tc1\t801\t1.0\t0.94
+            A1\tL3\tR2\tprovirus\tc3\t391\t1.0\t0.81
+            """)
+
+    def write_benchmark(self, root: Path, run_id: str, legacy: bool = False) -> None:
+        """The artefacts drakkar.benchmark writes after a SLURM run.
+
+        ``legacy`` writes them where runs predating the logging directory put
+        them: the roll-up in the output root, the tables in ``benchmark/``.
+        """
+        benchmark_dir = root / "benchmark" if legacy else root / "logging" / "benchmark"
+        summary_name = (
+            f"drakkar_{run_id}_resources.yaml" if legacy else f"drakkar_{run_id}.resources.yaml"
+        )
+        summary_path = root / summary_name if legacy else benchmark_dir / summary_name
+        write(summary_path, f"""
             run_id: '{run_id}'
             command: complete
             profile: slurm
@@ -209,13 +276,13 @@ class ReportFixtureMixin:
             used_cpu_sec: 43200
             weighted_cpu_efficiency: 0.75
             """)
-        write(root / "benchmark" / f"drakkar_{run_id}.jobs.tsv", """
+        write(benchmark_dir / f"drakkar_{run_id}.jobs.tsv", """
             launch_index	rule	attempt	logical_job_key	internal_jobid	external_jobid	wildcards	requested_cpus	requested_mem_mb	requested_runtime_min	state	exit_code	alloc_cpus	elapsed_sec	cpu_time_sec	max_rss_mb	cpu_efficiency	memory_efficiency	runtime_efficiency	oom	timeout
             1	assembly	1	assembly|wildcards|assembly=A1	12	9001	assembly=A1	8	65536	720	OUT_OF_MEMORY	0:125	8	1800	12000	65000.0	0.833	0.9918	0.0417	True	False
             2	assembly	2	assembly|wildcards|assembly=A1	12	9002	assembly=A1	8	131072	720	COMPLETED	0:0	8	5400	38000	98000.0	0.8796	0.7477	0.125	False	False
             3	binning	1	binning|wildcards|assembly=A1	14	9003	assembly=A1	4	16384	240	COMPLETED	0:0	4	3600	9000	8000.0	0.625	0.4883	0.25	False	False
             """)
-        write(root / "benchmark" / f"drakkar_{run_id}.rules.tsv", """
+        write(benchmark_dir / f"drakkar_{run_id}.rules.tsv", """
             rule	launches	logical_jobs	retries	failed_launches	oom_launches	timeout_launches	median_requested_cpus	median_alloc_cpus	median_requested_mem_mb	median_max_rss_mb	median_memory_efficiency	median_requested_runtime_min	median_elapsed_sec	median_runtime_efficiency	allocated_cpu_sec	used_cpu_sec	weighted_cpu_efficiency
             assembly	2	1	1	1	1	0	8	8	98304	81500.0	0.8697	720	3600	0.0833	57600	50000	0.868
             binning	1	1	0	0	0	0	4	4	16384	8000.0	0.4883	240	3600	0.25	14400	9000	0.625
@@ -268,10 +335,15 @@ class ProbeTests(ReportFixtureMixin, unittest.TestCase):
             root = self.build_output_dir(Path(tmp))
             entry = {item["section"]: item for item in probe(root)}["resources"]
             self.assertTrue(entry["available"])
-            self.assertIn("drakkar_20260825-101500.yaml", entry["present"])
-            self.assertIn("drakkar_20260825-101500_resources.yaml", entry["present"])
             self.assertIn(
-                str(Path("benchmark") / "drakkar_20260825-101500.jobs.tsv"),
+                str(Path("logging") / "drakkar_20260825-101500.yaml"), entry["present"]
+            )
+            self.assertIn(
+                str(Path("logging") / "benchmark" / "drakkar_20260825-101500.resources.yaml"),
+                entry["present"],
+            )
+            self.assertIn(
+                str(Path("logging") / "benchmark" / "drakkar_20260825-101500.jobs.tsv"),
                 entry["present"],
             )
             self.assertEqual(entry["missing"], [])
@@ -281,10 +353,10 @@ class ProbeTests(ReportFixtureMixin, unittest.TestCase):
         # and the absence is named rather than hidden.
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            write(root / "drakkar_20260825-101500.yaml", "run_id: '20260825-101500'\n")
+            write(root / "logging" / "drakkar_20260825-101500.yaml", "run_id: '20260825-101500'\n")
             entry = {item["section"]: item for item in probe(root)}["resources"]
             self.assertTrue(entry["available"])
-            self.assertEqual(entry["missing"], ["drakkar_<run_id>_resources.yaml"])
+            self.assertEqual(entry["missing"], ["drakkar_<run_id>.resources.yaml"])
 
     def test_empty_file_does_not_count_as_available(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -518,18 +590,6 @@ class DatabaseBuildTests(ReportFixtureMixin, unittest.TestCase):
             self.assertEqual(row["status"], "completed")
             connection.close()
 
-    def test_benchmark_summary_does_not_overwrite_the_run_row(self):
-        # drakkar_<run_id>_resources.yaml matches the run metadata glob and
-        # carries the same run_id, so it must not be read as a run itself.
-        with tempfile.TemporaryDirectory() as tmp:
-            root = self.build_output_dir(Path(tmp))
-            connection = self.build(root)
-            rows = connection.execute("SELECT * FROM run").fetchall()
-            self.assertEqual(len(rows), 1)
-            self.assertEqual(rows[0]["status"], "completed")
-            self.assertEqual(rows[0]["drakkar_version"], "2.0.0")
-            connection.close()
-
     def test_benchmark_rollup_is_recorded_per_run(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.build_output_dir(Path(tmp))
@@ -642,6 +702,206 @@ class DatabaseBuildTests(ReportFixtureMixin, unittest.TestCase):
                 connection.close()
         finally:
             report_ingest.CHUNK_SIZE = original
+
+
+class LegacyLayoutIngestTests(ReportFixtureMixin, unittest.TestCase):
+    """Output directories written before the ``logging/`` directory existed.
+
+    Their run metadata sits in the output root, their benchmark roll-up beside
+    it and their benchmark tables in ``benchmark/``. The report still finds all
+    of it, so re-reporting an older directory does not lose its runs.
+    """
+
+    def build(self, root, sections=None):
+        db_path = Path(root) / "drakkar.db"
+        report_command.build_database(root, sections or ("resources",), db_path)
+        return connect(db_path)
+
+    def test_run_metadata_in_the_output_root_is_ingested(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_legacy_output_dir(Path(tmp))
+            connection = self.build(root)
+            row = connection.execute("SELECT * FROM run").fetchone()
+            self.assertEqual(row["run_id"], "20260825-101500")
+            self.assertEqual(row["status"], "completed")
+            self.assertEqual(row["drakkar_version"], "2.0.0")
+            connection.close()
+
+    def test_legacy_benchmark_artefacts_are_ingested(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_legacy_output_dir(Path(tmp))
+            connection = self.build(root)
+            row = connection.execute("SELECT * FROM run_benchmark").fetchone()
+            self.assertEqual(row["run_id"], "20260825-101500")
+            self.assertEqual(row["benchmarked_launches"], 3)
+            self.assertEqual(
+                connection.execute("SELECT COUNT(*) FROM benchmark_job").fetchone()[0], 3
+            )
+            self.assertEqual(
+                connection.execute("SELECT COUNT(*) FROM benchmark_rule").fetchone()[0], 2
+            )
+            connection.close()
+
+    def test_benchmark_summary_does_not_overwrite_the_run_row(self):
+        # In this layout drakkar_<run_id>_resources.yaml sits in the output root
+        # and matches the run metadata glob, carrying the same run_id, so it
+        # must not be read as a run itself. The current layout nests it under
+        # logging/benchmark/, where the glob cannot reach it.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_legacy_output_dir(Path(tmp))
+            connection = self.build(root)
+            rows = connection.execute("SELECT * FROM run").fetchall()
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["status"], "completed")
+            self.assertEqual(rows[0]["drakkar_version"], "2.0.0")
+            connection.close()
+
+    def test_probe_finds_the_legacy_resources_section(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_legacy_output_dir(Path(tmp))
+            entry = {item["section"]: item for item in probe(root)}["resources"]
+            self.assertTrue(entry["available"])
+            self.assertEqual(entry["missing"], [])
+            self.assertIn("drakkar_20260825-101500.yaml", entry["present"])
+            self.assertIn("drakkar_20260825-101500_resources.yaml", entry["present"])
+
+
+class AmrIngestTests(ReportFixtureMixin, unittest.TestCase):
+    """The assembly-level AMR tables written by `aggregate_amr`."""
+
+    def build(self, root):
+        db_path = Path(root) / "drakkar.db"
+        report_command.build_database(root, parse_sections(None), db_path)
+        connection = sqlite3.connect(db_path)
+        connection.row_factory = sqlite3.Row
+        self.addCleanup(connection.close)
+        return connection
+
+    def test_the_summary_and_the_qc_roll_up_land_in_one_row(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            row = self.build(root).execute(
+                "SELECT * FROM amr_assembly WHERE assembly_id = 'A1'"
+            ).fetchone()
+            # From assembly_summary.tsv.
+            self.assertEqual(row["assembly_type"], "metagenome")
+            self.assertEqual(row["contig_count"], 1200)
+            self.assertEqual(row["amr_loci"], 3)
+            # From amr_qc.tsv, which the summary does not carry.
+            self.assertEqual(row["rgi_hits_without_coordinates"], 1)
+            self.assertEqual(row["mobility_links"], 2)
+
+    def test_loci_keep_the_caller_support_and_the_agreement_between_them(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            rows = self.build(root).execute(
+                "SELECT locus_id, support_status, concordance, source_count "
+                "FROM amr_locus WHERE assembly_id = 'A1' ORDER BY locus_id"
+            ).fetchall()
+            self.assertEqual(
+                [(row["locus_id"], row["support_status"], row["concordance"])
+                 for row in rows],
+                [("L1", "amrfinder_and_rgi", "gene_match"),
+                 ("L2", "amrfinder_only", "single_source"),
+                 ("L3", "rgi_only", "single_source")],
+            )
+            self.assertEqual(rows[0]["source_count"], 2)
+
+    def test_hits_keep_their_caller_and_drop_the_raw_details_blob(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            connection = self.build(root)
+            row = connection.execute(
+                "SELECT source, identity, detection_grade, is_partial "
+                "FROM amr_hit WHERE hit_id = 'H2'"
+            ).fetchone()
+            self.assertEqual(row["source"], "rgi")
+            self.assertAlmostEqual(row["identity"], 99.6)
+            self.assertEqual(row["detection_grade"], "Perfect")
+            self.assertEqual(row["is_partial"], 0)
+            columns = {
+                item[1] for item in
+                connection.execute("PRAGMA table_info(amr_hit)").fetchall()
+            }
+            self.assertNotIn("raw_details", columns)
+
+    def test_a_partial_hit_is_stored_as_a_flag_not_as_its_text(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            row = self.build(root).execute(
+                "SELECT is_partial FROM amr_hit WHERE hit_id = 'H3'"
+            ).fetchone()
+            self.assertEqual(row["is_partial"], 1)
+
+    def test_drug_classes_carry_one_row_per_hit_and_class(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            rows = self.build(root).execute(
+                "SELECT drug_class, COUNT(*) AS hits FROM amr_drug_class "
+                "GROUP BY drug_class ORDER BY drug_class"
+            ).fetchall()
+            self.assertEqual(
+                [(row["drug_class"], row["hits"]) for row in rows],
+                [("beta-lactam", 3), ("quinolone", 1), ("sulfonamide", 1)],
+            )
+
+    def test_mobility_links_the_loci_to_the_regions_they_sit_in(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            rows = self.build(root).execute(
+                "SELECT m.locus_id, m.context_type, r.topology, r.score "
+                "FROM amr_mobility AS m "
+                "JOIN amr_mobility_region AS r "
+                "  ON r.assembly_id = m.assembly_id AND r.region_id = m.region_id "
+                "ORDER BY m.locus_id"
+            ).fetchall()
+            self.assertEqual(
+                [(row["locus_id"], row["context_type"], row["topology"])
+                 for row in rows],
+                [("L1", "plasmid", "circular"), ("L3", "provirus", "linear")],
+            )
+            self.assertAlmostEqual(rows[0]["score"], 0.94)
+
+    def test_re_ingesting_the_same_directory_does_not_duplicate_rows(self):
+        # `drakkar reporting` reuses a matching database rather than rebuilding
+        # it, so every AMR loader has to be safe to run over its own output.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            db_path = root / "drakkar.db"
+            report_command.build_database(root, parse_sections(None), db_path)
+            connection = sqlite3.connect(db_path)
+            self.addCleanup(connection.close)
+            tables = ("amr_assembly", "amr_hit", "amr_locus", "amr_drug_class",
+                      "amr_mobility_region", "amr_mobility")
+            first = {
+                table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                for table in tables
+            }
+            report_command.build_database(root, parse_sections(None), db_path)
+            for table in tables:
+                with self.subTest(table=table):
+                    self.assertEqual(
+                        connection.execute(
+                            f"SELECT COUNT(*) FROM {table}"
+                        ).fetchone()[0],
+                        first[table],
+                    )
+
+    def test_an_output_directory_without_amr_leaves_the_tables_empty(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root / "preprocessing.tsv",
+                  "sample\treads_pre_fastp\nS1\t1000\n")
+            connection = self.build(root)
+            self.assertEqual(
+                connection.execute("SELECT COUNT(*) FROM amr_assembly").fetchone()[0], 0
+            )
+            self.assertEqual(
+                connection.execute(
+                    "SELECT COUNT(*) FROM ingest_log WHERE section = 'amr'"
+                ).fetchone()[0],
+                0,
+            )
 
 
 class BinOriginTests(ReportFixtureMixin, unittest.TestCase):
@@ -943,7 +1203,7 @@ class ReportCommandTests(ReportFixtureMixin, unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.build_output_dir(Path(tmp))
             self.assertEqual(report_command.run_report(root, sections="bogus"), 1)
-            self.assertFalse((root / "drakkar.db").exists())
+            self.assertFalse(report_command.database_path(root).exists())
 
     def test_empty_directory_fails_with_no_sections(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -953,13 +1213,13 @@ class ReportCommandTests(ReportFixtureMixin, unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.build_output_dir(Path(tmp))
             self.assertEqual(report_command.run_report(root, db_only=True), 0)
-            self.assertTrue((root / "drakkar.db").exists())
+            self.assertTrue(report_command.database_path(root).exists())
 
     def test_schema_mismatch_blocks_until_forced(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.build_output_dir(Path(tmp))
             self.assertEqual(report_command.run_report(root, db_only=True), 0)
-            connection = sqlite3.connect(root / "drakkar.db")
+            connection = sqlite3.connect(report_command.database_path(root))
             connection.execute("UPDATE schema_version SET version = 99")
             connection.commit()
             connection.close()
@@ -968,12 +1228,35 @@ class ReportCommandTests(ReportFixtureMixin, unittest.TestCase):
                 report_command.run_report(root, db_only=True, force=True), 0
             )
 
+    def test_a_database_at_the_output_root_is_moved_into_reporting(self):
+        # Directories built before the reporting directory existed keep their
+        # database at the root; it is moved rather than rebuilt beside itself.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            self.assertEqual(report_command.run_report(root, db_only=True), 0)
+            legacy = report_command.legacy_database_path(root)
+            report_command.database_path(root).replace(legacy)
+            (root / report_command.REPORTING_DIRNAME).rmdir()
+
+            self.assertEqual(report_command.run_report(root, db_only=True), 0)
+            self.assertFalse(legacy.exists())
+            self.assertTrue(report_command.database_path(root).exists())
+
+    def test_a_report_at_the_output_root_is_still_found(self):
+        # Moving where reports are written must not hide the ones already
+        # rendered next to the source tables.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            older = root / report_command.report_name()
+            older.write_text("<html></html>", encoding="utf-8")
+            self.assertIn(older, report_command.find_reports(root))
+
     def test_rebuild_is_idempotent(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.build_output_dir(Path(tmp))
             report_command.run_report(root, db_only=True)
             report_command.run_report(root, db_only=True, force=True)
-            connection = sqlite3.connect(root / "drakkar.db")
+            connection = sqlite3.connect(report_command.database_path(root))
             count = connection.execute("SELECT COUNT(*) FROM gene_annotation").fetchone()[0]
             self.assertEqual(count, 3)
             connection.close()

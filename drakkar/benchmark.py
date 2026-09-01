@@ -10,7 +10,14 @@ import yaml
 
 from drakkar.cli_context import INFO, RESET
 from drakkar.output import print
-from drakkar.run_metadata import build_benchmark_paths, build_snakemake_log_path, load_metadata_file, update_launch_metadata
+from drakkar.run_metadata import (
+    build_benchmark_paths,
+    build_snakemake_log_path,
+    find_snakemake_log,
+    load_metadata_file,
+    update_launch_metadata,
+    uses_legacy_layout,
+)
 
 def get_run_profile(metadata):
     arguments = (metadata or {}).get("arguments") or {}
@@ -655,8 +662,8 @@ def write_benchmark_tables(paths, job_rows, rule_rows):
     write_tsv(paths["jobs"], BENCHMARK_JOB_FIELDS, job_rows)
     write_tsv(paths["rules"], BENCHMARK_RULE_FIELDS, rule_rows)
 
-def generate_benchmark_reports(output_dir, run_id, job_rows):
-    paths = build_benchmark_paths(output_dir, run_id)
+def generate_benchmark_reports(output_dir, run_id, job_rows, legacy=False):
+    paths = build_benchmark_paths(output_dir, run_id, legacy=legacy)
     summary = summarize_benchmark_rows(job_rows)
     rule_rows = summarize_benchmark_rules(job_rows)
 
@@ -687,7 +694,8 @@ def generate_run_benchmark(output_dir, metadata_path=None, metadata=None, quiet=
         return None
 
     output_dir = Path(output_dir)
-    paths = build_benchmark_paths(output_dir, run_id)
+    legacy = uses_legacy_layout(output_dir, metadata_path)
+    paths = build_benchmark_paths(output_dir, run_id, legacy=legacy)
     base_summary = {
         "run_id": run_id,
         "command": metadata.get("command"),
@@ -741,7 +749,9 @@ def generate_run_benchmark(output_dir, metadata_path=None, metadata=None, quiet=
     if configured_log:
         snakemake_log_path = Path(configured_log)
     else:
-        snakemake_log_path = build_snakemake_log_path(output_dir, run_id)
+        snakemake_log_path = find_snakemake_log(output_dir, run_id) or build_snakemake_log_path(
+            output_dir, run_id, legacy=legacy
+        )
     if not snakemake_log_path.exists():
         payload = {
             **base_summary,
@@ -821,7 +831,7 @@ def generate_run_benchmark(output_dir, metadata_path=None, metadata=None, quiet=
         return result
 
     job_rows = [benchmark_job_row(launch, sacct_rows.get(launch["external_jobid"])) for launch in launches]
-    result = generate_benchmark_reports(output_dir, run_id, job_rows)
+    result = generate_benchmark_reports(output_dir, run_id, job_rows, legacy=legacy)
     result["status"] = "generated"
     update_launch_metadata(
         metadata_path,

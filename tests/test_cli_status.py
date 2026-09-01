@@ -85,8 +85,9 @@ class StatusCommandTests(unittest.TestCase):
 
     def write_preprocessing_run(self, output_dir: str, run_id: str, status: str = "running") -> Path:
         output_path = Path(output_dir)
-        metadata_path = output_path / f"drakkar_{run_id}.yaml"
-        log_path = output_path / "log" / f"drakkar_{run_id}.snakemake.log"
+        metadata_path = output_path / "logging" / f"drakkar_{run_id}.yaml"
+        log_path = output_path / "logging" / f"drakkar_{run_id}.snakemake.log"
+        metadata_path.parent.mkdir(parents=True, exist_ok=True)
         metadata_path.write_text(
             "\n".join(
                 [
@@ -165,6 +166,27 @@ class StatusCommandTests(unittest.TestCase):
             self.assertIn(f"Metadata file: {Path(run_info['metadata_path']).resolve()}", output)
             self.assertIn("RULE STATUS", output)
             self.assertNotIn("SAMPLE STATUS", output)
+
+    def test_run_status_accepts_a_metadata_path_inside_the_logging_directory(self) -> None:
+        # The output directory is the logging directory's parent, so passing the
+        # metadata file by path must not leave `logging/` treated as the output.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_info = self.prepare_run(tmpdir)
+            metadata_path = Path(run_info["metadata_path"])
+            self.assertEqual(metadata_path.parent.name, "logging")
+
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                exit_code = cli_module.run_status(
+                    target=str(metadata_path),
+                    view="rules",
+                )
+
+            output = buffer.getvalue()
+            self.assertEqual(exit_code, 0)
+            self.assertIn(f"Output directory: {Path(tmpdir).resolve()}\n", output)
+            self.assertIn(f"Metadata file: {metadata_path.resolve()}", output)
+            self.assertIn("RULE STATUS", output)
 
     def test_run_status_prompts_for_run_when_multiple_runs_are_available(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
