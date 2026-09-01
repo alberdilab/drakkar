@@ -187,7 +187,7 @@ rule genomad_amr_context:
         preset=genomad_preset_flag()
     threads: 8
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(16 * 1024, int(input.size_mb * 1024 * 50)) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(16 * 1024, int(input.size_mb * 8)) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: cap_runtime(max(3, int(input.size_mb * 2)) * 2 ** (attempt - 1))
     shell:
         r"""

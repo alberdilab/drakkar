@@ -737,7 +737,7 @@ rule genomad:
     threads:
         1
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(16*1024, int(input.size_mb * 1024 * 50)) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(16*1024, int(input.size_mb * 8)) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 20)) * 2 ** (attempt - 1))
     shell:
         """

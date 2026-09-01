@@ -8,6 +8,18 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.5.2] - 2026-09-01
+
+### Fixed
+
+- The geNomad rules requested roughly a thousand times more memory than they
+  need: both `genomad_amr_context` (AMR workflow) and `genomad` (annotation
+  workflow) scaled their request as `input.size_mb * 1024 * 50`, treating the
+  already-in-megabytes input size as if it were gigabytes. Any assembly above
+  ~20 MB therefore hit the 1 TB `SNAKEMAKE_MAX_GB` cap while real usage stayed
+  around 4 GB. Both rules now scale at 8 MB of memory per MB of input over a
+  16 GB floor, with the usual per-attempt doubling on retry.
+
 ## [2.5.1] - 2026-09-01
 
 ### Added
