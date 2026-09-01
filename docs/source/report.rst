@@ -151,9 +151,11 @@ gene count.
        context geNomad placed them in.
    * - Runs and resources
      - One row per recorded Drakkar run, with its command, modules, wall-clock
-       duration and status; and, for benchmarked runs, how many submitted jobs
-       succeeded or failed and what each of them requested against what it
-       actually used.
+       duration and status; a table of the errors a run hit, grouped by rule
+       and wildcards, saying how many attempts each cost and whether a retry
+       recovered it, with the recommended action per kind of problem; and, for
+       benchmarked runs, how many submitted jobs succeeded or failed and what
+       each of them requested against what it actually used.
    * - Provenance
      - The ingest log: every table, the file it came from, its row count and
        when it was ingested.
@@ -204,6 +206,7 @@ Sections and their inputs
        ``amr/amr_mobility.tsv.xz``
    * - ``resources``
      - ``logging/drakkar_<run_id>.yaml``,
+       ``logging/drakkar_<run_id>.failures.tsv``,
        ``logging/benchmark/drakkar_<run_id>.resources.yaml``,
        ``logging/benchmark/drakkar_<run_id>.jobs.tsv``,
        ``logging/benchmark/drakkar_<run_id>.rules.tsv``
@@ -211,10 +214,23 @@ Sections and their inputs
 Resource benchmarks
 -------------------
 
-The resources section reports two different things. The run metadata is always
-there: one row per Drakkar invocation. The resource figures come from the
-benchmark artifacts Drakkar writes after a run, and exist only when that run
-was benchmarked, so the section renders with or without them.
+The resources section reports three different things. The run metadata is
+always there: one row per Drakkar invocation. The errors come from the failure
+table Drakkar writes after a run that lost a job, and the resource figures from
+the benchmark artifacts it writes for a benchmarked run; either can be absent,
+and the section renders with or without them.
+
+**Errors.** One row per rule and per set of wildcards that failed, read back
+out of ``logging/drakkar_<run_id>.failures.tsv`` — the same table
+``drakkar logging --failures`` prints. Snakemake resubmits a failed job, so the
+rows are grouped rather than one per attempt: each says how many attempts the
+job cost, whether a retry eventually recovered it, what kind of problem it was,
+the scheduler state it ended in, and the job log to read. Workflow-level errors
+— a missing input, a locked output directory — carry ``workflow`` as their
+target, since they belong to no single job. A second table gives the
+recommended action once per kind of problem still outstanding; the failures a
+retry already settled need none. A run in which nothing failed writes no
+failure table, so an absent subsection means a clean run.
 
 **Job outcomes.** How many jobs were submitted, for how many distinct workflow
 jobs, and how they ended: the count and percentage that completed, the count

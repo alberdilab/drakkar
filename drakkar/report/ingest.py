@@ -17,9 +17,11 @@ from drakkar.report.newick import count_tips
 from drakkar.report.schema import TAXONOMIC_RANKS, record_ingest
 from drakkar.report.sources import (
     benchmark_run_id,
+    failure_run_id,
     find_benchmark_summaries,
     find_benchmark_tables,
     find_bin_reports,
+    find_failure_reports,
     find_run_metadata,
 )
 
@@ -289,6 +291,26 @@ BENCHMARK_RULE_COLUMNS = (
     ("weighted_cpu_efficiency", _float),
 )
 
+# Columns of the failure TSV drakkar.failures writes, in file order. The file
+# also carries the run id in a column of its own, which is read separately so a
+# table renamed away from its run still lands under the run that produced it.
+FAILURE_COLUMNS = (
+    ("rule", _text),
+    ("target", _text),
+    ("attempts", _int),
+    ("status", _text),
+    ("category", _text),
+    ("reason", _text),
+    ("slurm_state", _text),
+    ("internal_jobid", _text),
+    ("external_jobid", _text),
+    ("detail", _text),
+    ("action", _text),
+    ("job_log", _text),
+    ("output", _text),
+    ("last_failure_at", _text),
+)
+
 # Run-level roll-up keys of drakkar_<run_id>.resources.yaml, after run_id.
 BENCHMARK_SUMMARY_KEYS = (
     ("status", _text),
@@ -327,6 +349,8 @@ def ingest_resources(connection, output_dir):
     figures come from the artefacts ``drakkar.benchmark`` writes for SLURM
     runs — a roll-up YAML per run and the per-launch / per-rule TSVs under
     ``benchmark/`` — and are simply absent for runs that were not benchmarked.
+    The failure tables ``drakkar.failures`` writes are loaded alongside them,
+    and are absent for a run in which nothing failed.
     """
     output_path = Path(output_dir)
     metadata_files = find_run_metadata(output_path)
@@ -334,10 +358,11 @@ def ingest_resources(connection, output_dir):
     if metadata_files:
         written = _ingest_runs(connection, output_path, metadata_files)
     benchmark_rows = _ingest_benchmark(connection, output_path)
-    if not metadata_files and not benchmark_rows:
+    failure_rows = _ingest_failures(connection, output_path)
+    if not metadata_files and not benchmark_rows and not failure_rows:
         return None
     connection.commit()
-    return written + benchmark_rows
+    return written + benchmark_rows + failure_rows
 
 
 def _ingest_runs(connection, output_path, metadata_files):
@@ -440,6 +465,45 @@ def _ingest_benchmark_table(connection, output_path, kind, table, columns):
         rows,
     )
     record_ingest(connection, table, "resources", output_path / "benchmark", written)
+    return written
+
+
+def _ingest_failures(connection, output_path):
+    """Load every ``logging/drakkar_<run_id>.failures.tsv`` into ``run_failure``.
+
+    The rows are already one per rule and wildcard combination, carrying how
+    many attempts that combination cost and whether a retry eventually
+    recovered it, so they are stored as written rather than regrouped here.
+    Their position in the file is kept as the key: two workflow-level errors of
+    the same rule are distinct rows, and nothing else distinguishes them.
+    """
+    sources = find_failure_reports(output_path)
+    if not sources:
+        return 0
+
+    rows = []
+    for path in sources:
+        run_id = failure_run_id(path)
+        try:
+            frame = _read_table(path)
+        except (OSError, ValueError, pd.errors.ParserError):
+            continue
+        for index, record in enumerate(frame.to_dict("records"), start=1):
+            rows.append(
+                (
+                    _get(record, "run_id") or run_id,
+                    index,
+                    *(_get(record, name, cast) for name, cast in FAILURE_COLUMNS),
+                )
+            )
+
+    placeholders = ", ".join(["?"] * (len(FAILURE_COLUMNS) + 2))
+    written = _executemany(
+        connection,
+        f"INSERT OR REPLACE INTO run_failure VALUES ({placeholders})",
+        rows,
+    )
+    record_ingest(connection, "run_failure", "resources", output_path, written)
     return written
 
 

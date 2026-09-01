@@ -19,7 +19,7 @@ import sqlite3
 from datetime import datetime, timezone
 
 # Bump when the layout below changes in a way that invalidates existing files.
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 TAXONOMIC_RANKS = ("domain", "phylum", "class", "order", "family", "genus", "species")
 
@@ -136,6 +136,33 @@ SCHEMA_STATEMENTS = [
         used_cpu_sec REAL,
         weighted_cpu_efficiency REAL,
         PRIMARY KEY (run_id, rule)
+    )
+    """,
+    # The failures drakkar.failures reads back out of the Snakemake log, one
+    # row per rule and wildcard combination rather than one per failed attempt:
+    # a job Snakemake retried until it succeeded is a single row carrying its
+    # attempt count and a `recovered` status. Workflow-level errors — a missing
+    # input, a locked directory — are stored here too, with `workflow` as their
+    # target, since they belong to no single job.
+    """
+    CREATE TABLE IF NOT EXISTS run_failure (
+        run_id TEXT NOT NULL,
+        failure_index INTEGER NOT NULL,
+        rule TEXT,
+        target TEXT,
+        attempts INTEGER,
+        status TEXT,
+        category TEXT,
+        reason TEXT,
+        slurm_state TEXT,
+        internal_jobid TEXT,
+        external_jobid TEXT,
+        detail TEXT,
+        action TEXT,
+        job_log TEXT,
+        output TEXT,
+        last_failure_at TEXT,
+        PRIMARY KEY (run_id, failure_index)
     )
     """,
     # -- Preprocessing -----------------------------------------------------
@@ -572,6 +599,7 @@ SCHEMA_STATEMENTS = [
 INDEX_STATEMENTS = [
     "CREATE INDEX IF NOT EXISTS idx_benchmark_job_rule ON benchmark_job (rule)",
     "CREATE INDEX IF NOT EXISTS idx_benchmark_job_state ON benchmark_job (state)",
+    "CREATE INDEX IF NOT EXISTS idx_run_failure_rule ON run_failure (rule, target)",
     "CREATE INDEX IF NOT EXISTS idx_genome_count_sample ON genome_count (sample_id)",
     "CREATE INDEX IF NOT EXISTS idx_genome_taxonomy_phylum ON genome_taxonomy (phylum)",
     "CREATE INDEX IF NOT EXISTS idx_genome_taxonomy_genus ON genome_taxonomy (genus)",

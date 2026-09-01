@@ -403,7 +403,17 @@ def _sacct_field(parts, index):
     return parts[index].strip() if index < len(parts) else ""
 
 def _parse_sacct_output(stdout):
+    """Fold sacct's allocation and step lines into one row per job.
+
+    SLURM only ever records ``MaxRSS`` against a job's steps -- ``.batch``,
+    ``.extern`` and any ``srun`` steps -- never against the allocation line
+    that carries the state, the elapsed time and the request. Asking for the
+    allocation alone therefore returns an empty memory column for every job,
+    so the steps are read too and a job's peak memory is the largest figure
+    any of its steps reached.
+    """
     rows = {}
+    step_max_rss_mb = {}
     for raw_line in stdout.splitlines():
         if not raw_line.strip():
             continue
@@ -412,6 +422,13 @@ def _parse_sacct_output(stdout):
             continue
         job_id = parts[0].strip()
         if not job_id:
+            continue
+        max_rss_mb = parse_slurm_memory_to_mb(_sacct_field(parts, 6))
+        if "." in job_id:
+            parent_id = job_id.split(".", 1)[0]
+            previous = step_max_rss_mb.get(parent_id)
+            if max_rss_mb is not None and (previous is None or max_rss_mb > previous):
+                step_max_rss_mb[parent_id] = max_rss_mb
             continue
         req_cpus = parse_int_or_none(_sacct_field(parts, 8))
         rows[job_id] = {
@@ -425,7 +442,7 @@ def _parse_sacct_output(stdout):
             # plus system time the job's steps actually burned.
             "cpu_time_sec": parse_slurm_duration_to_seconds(parts[4]),
             "alloc_cpus": parse_int_or_none(parts[5]),
-            "max_rss_mb": parse_slurm_memory_to_mb(parts[6]),
+            "max_rss_mb": max_rss_mb,
             "timelimit_raw_min": parse_int_or_none(parts[7]),
             "req_cpus": req_cpus,
             "req_mem_mb": parse_slurm_requested_memory_to_mb(
@@ -433,6 +450,13 @@ def _parse_sacct_output(stdout):
                 req_cpus or parse_int_or_none(parts[5]),
             ),
         }
+
+    for job_id, max_rss_mb in step_max_rss_mb.items():
+        row = rows.get(job_id)
+        if row is None:
+            continue
+        if row["max_rss_mb"] is None or max_rss_mb > row["max_rss_mb"]:
+            row["max_rss_mb"] = max_rss_mb
     return rows
 
 def query_sacct_for_jobs(job_ids, chunk_size=500):
@@ -445,7 +469,8 @@ def query_sacct_for_jobs(job_ids, chunk_size=500):
         chunk = job_ids[i : i + chunk_size]
         command = [
             "sacct",
-            "-X",
+            # No ``-X``: the allocation lines it would restrict the output to
+            # carry no MaxRSS, which is only ever recorded per job step.
             "-P",
             "-n",
             "--units=M",

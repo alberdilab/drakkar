@@ -3716,6 +3716,7 @@ def _amr_qc_blocks(assemblies):
 
 def _render_resources(connection):
     blocks = _run_blocks(connection)
+    blocks.extend(_failure_blocks(connection))
     blocks.extend(_benchmark_blocks(connection))
     return blocks
 
@@ -3754,6 +3755,142 @@ def _run_blocks(connection):
         ],
     ))
     return blocks
+
+
+# What the two statuses drakkar.failures records read as on the page. A job
+# Snakemake resubmitted until it succeeded left the run's results complete, so
+# it is named for what happened rather than for the failure it started as.
+FAILURE_OUTCOMES = {
+    "recovered": "Recovered on retry",
+    "failed": "Never succeeded",
+}
+
+
+def _failure_outcome(status):
+    return FAILURE_OUTCOMES.get(str(status or "").lower(), status or "")
+
+
+def _failure_blocks(connection):
+    """Every rule that lost a job, grouped by the rule and the failing wildcards.
+
+    The rows come from the failure table ``drakkar.failures`` writes after a
+    run, which already groups the log's individual error events by rule and
+    wildcards, so a job that failed twice and then succeeded is one row here
+    carrying both facts: how many attempts it cost, and that a retry recovered
+    it. A run in which nothing failed writes no such table, so an absent
+    subsection means a clean run rather than a missing file.
+    """
+    rows = _query(connection, """
+        SELECT run_id, rule, target, attempts, status, category, reason,
+               slurm_state, detail, action, job_log
+        FROM run_failure
+        ORDER BY CASE WHEN LOWER(COALESCE(status, '')) = 'recovered'
+                      THEN 1 ELSE 0 END,
+                 COALESCE(attempts, 0) DESC, rule, target, run_id
+    """)
+    if not rows:
+        return []
+
+    unresolved = [row for row in rows if str(row["status"] or "").lower() != "recovered"]
+    recovered = [row for row in rows if str(row["status"] or "").lower() == "recovered"]
+
+    blocks = [
+        _heading(
+            "Errors",
+            "One row per rule and per set of wildcards that failed, not per "
+            "failed attempt: Snakemake resubmits a failed job, so a rule that "
+            "failed on one sample and succeeded on the retry appears once, "
+            "with the number of attempts it cost. The target is the wildcards "
+            "the failing job carried — usually the sample or assembly it was "
+            "running on. Attempts counts the failed ones: a recovered row "
+            "succeeded on the attempt after those and left the run's results "
+            "complete, while a row that never succeeded is one whose outputs, "
+            "and everything downstream of them, are missing."
+        ),
+        _highlights([
+            ("Errors recorded", _integer(len(rows))),
+            ("Recovered on retry", _integer(len(recovered))),
+            ("Never succeeded", _integer(len(unresolved))),
+            ("Rules affected", _integer(len({row["rule"] for row in rows}))),
+            ("Failed attempts", _integer(sum(row["attempts"] or 0 for row in rows))),
+        ]),
+        _table(
+            [
+                ("Run", _text),
+                ("Rule", _text),
+                ("Target", _text),
+                ("Attempts", _integer),
+                ("Outcome", _text),
+                ("Problem", _text),
+                ("Scheduler state", _text),
+                ("What went wrong", _text),
+                ("Job log", _text),
+            ],
+            [
+                (
+                    row["run_id"], row["rule"], row["target"], row["attempts"],
+                    _failure_outcome(row["status"]), row["category"],
+                    row["slurm_state"], row["detail"], row["job_log"],
+                )
+                for row in rows
+            ],
+        ),
+    ]
+    blocks.extend(_failure_action_blocks(unresolved, len(recovered)))
+    return blocks
+
+
+def _failure_action_blocks(unresolved, recovered):
+    """What to do about the failures that a retry did not settle.
+
+    The advice is one line per kind of problem rather than one per row: every
+    out-of-memory job in a run is answered by the same larger multiplier, and
+    repeating that sentence down a column of a hundred rows hides it.
+    """
+    if not unresolved:
+        if not recovered:
+            return []
+        return [_note(
+            f"Every failure above was recovered by a retry: "
+            f"{_quantity(recovered, 'job')} cost more attempts than it should "
+            "have, but the run's results are complete and nothing needs "
+            "rerunning."
+        )]
+
+    grouped = {}
+    for row in unresolved:
+        key = row["category"] or "unknown"
+        entry = grouped.setdefault(
+            key, {"jobs": 0, "reason": row["reason"], "action": row["action"]}
+        )
+        entry["jobs"] += 1
+        # An older run may have stored one of the two texts and not the other.
+        entry["reason"] = entry["reason"] or row["reason"]
+        entry["action"] = entry["action"] or row["action"]
+
+    return [
+        _heading(
+            "What to do next",
+            "One line per kind of problem still outstanding, with the "
+            "recommendation Drakkar made when the run finished. Rerunning the "
+            "same command resumes where the workflow stopped: what already "
+            "completed is not recomputed."
+        ),
+        _table(
+            [
+                ("Problem", _text),
+                ("Jobs", _integer),
+                ("What it means", _text),
+                ("Suggested action", _text),
+            ],
+            [
+                (name, entry["jobs"], entry["reason"], entry["action"])
+                for name, entry in sorted(
+                    grouped.items(), key=lambda item: (-item[1]["jobs"], item[0])
+                )
+            ],
+        ),
+    ]
 
 
 # Why a run carries no usage figures. Keyed by the status drakkar.benchmark

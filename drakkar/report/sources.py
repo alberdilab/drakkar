@@ -104,6 +104,13 @@ BIN_REPORT_DIRECTORY = "cataloging/final"
 BENCHMARK_SUMMARY_SUFFIX = ".resources.yaml"
 LEGACY_BENCHMARK_SUMMARY_SUFFIX = "_resources.yaml"
 
+# Written by drakkar.failures for a run that lost at least one job, beside the
+# run metadata; absent — and that is the good case — for a run in which nothing
+# failed. Runs predating the logging directory put it in the output root and
+# joined `failures` with an underscore instead of a dot.
+FAILURE_REPORT_SUFFIX = ".failures.tsv"
+LEGACY_FAILURE_REPORT_SUFFIX = "_failures.tsv"
+
 SECTION_ORDER = (
     "preprocessing",
     "cataloging",
@@ -254,6 +261,34 @@ def benchmark_run_id(path, kind=None):
     return stem[len("drakkar_"):] if stem.startswith("drakkar_") else stem
 
 
+def find_failure_reports(output_dir):
+    """Return the per-run failure tables, oldest first.
+
+    The two layouts spell the suffix differently, so they are keyed by run id
+    rather than by file name.
+    """
+    output_path = Path(output_dir)
+    return _collect_across_layouts(
+        [
+            (logging_dir(output_path), f"drakkar_*{FAILURE_REPORT_SUFFIX}"),
+            (output_path, f"drakkar_*{LEGACY_FAILURE_REPORT_SUFFIX}"),
+        ],
+        key=failure_run_id,
+    )
+
+
+def failure_run_id(path):
+    """Recover the run id a failure table belongs to from its name."""
+    name = Path(path).name
+    for suffix in (FAILURE_REPORT_SUFFIX, LEGACY_FAILURE_REPORT_SUFFIX):
+        if name.endswith(suffix):
+            stem = name[: -len(suffix)]
+            break
+    else:
+        stem = Path(name).stem
+    return stem[len("drakkar_"):] if stem.startswith("drakkar_") else stem
+
+
 def probe_section(output_dir, section):
     """Return availability details for one section."""
     output_path = Path(output_dir)
@@ -270,7 +305,10 @@ def probe_section(output_dir, section):
             )
             for path in group
         ]
-        present = runs + benchmarks
+        # A run that lost no job writes no failure table, so these are listed
+        # when present and never named as missing.
+        failures = find_failure_reports(output_path)
+        present = runs + benchmarks + failures
         missing = [] if runs else ["drakkar_<run_id>.yaml"]
         if runs and not benchmarks:
             # Not an error: only SLURM runs are benchmarked, so this names what

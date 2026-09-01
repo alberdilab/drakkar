@@ -187,6 +187,7 @@ class ReportFixtureMixin:
             - complete
             """)
         self.write_benchmark(root, "20260825-101500")
+        self.write_failures(root, "20260825-101500")
         return root
 
     def build_legacy_output_dir(self, root: Path) -> Path:
@@ -198,6 +199,7 @@ class ReportFixtureMixin:
         )
         shutil.rmtree(logging_root)
         self.write_benchmark(root, "20260825-101500", legacy=True)
+        self.write_failures(root, "20260825-101500", legacy=True)
         return root
 
     def write_amr(self, root: Path) -> None:
@@ -289,6 +291,26 @@ class ReportFixtureMixin:
             """)
 
 
+    def write_failures(self, root: Path, run_id: str, legacy: bool = False) -> None:
+        """The failure table drakkar.failures writes after a run that lost a job.
+
+        One row per rule and target: an assembly that ran out of memory twice
+        before a retry got it through, a sample whose rule never succeeded, and
+        a workflow-level error, which carries ``workflow`` as its target.
+        """
+        name = (
+            f"drakkar_{run_id}_failures.tsv" if legacy
+            else f"drakkar_{run_id}.failures.tsv"
+        )
+        path = root / name if legacy else root / "logging" / name
+        write(path, f"""
+            run_id	rule	target	attempts	status	category	reason	slurm_state	internal_jobid	external_jobid	detail	action	job_log	output	last_failure_at
+            {run_id}	assembly	A1	2	recovered	out-of-memory	the job was killed after exceeding its memory allocation	OUT_OF_MEMORY	12	9001	exceeded its memory allocation (65536 MB requested)	Relaunch the same drakkar command with a larger --memory-multiplier (e.g. --memory-multiplier 2).	logging/slurm/9001.log	cataloging/assembly/A1.fna	2026-08-25T11:40:00+00:00
+            {run_id}	singlem	S2	1	failed	timeout	the job hit its SLURM wall-time limit	TIMEOUT	41	9010	hit the SLURM time limit (72 min requested)	Relaunch the same drakkar command with a larger --time-multiplier (e.g. --time-multiplier 2).	logging/slurm/9010.log	preprocessing/singlem/S2_cond.tsv	2026-08-25T12:05:00+00:00
+            {run_id}	bowtie2	workflow	1	failed	missing-input	required input files were not found				MissingInputException in rule bowtie2 reference/host.fna.gz	Check the sample information file, input directory, and database paths before relaunching.			
+            """)
+
+
 class SectionParsingTests(unittest.TestCase):
     def test_none_selects_every_section(self):
         self.assertEqual(parse_sections(None)[0], "preprocessing")
@@ -346,6 +368,25 @@ class ProbeTests(ReportFixtureMixin, unittest.TestCase):
                 str(Path("logging") / "benchmark" / "drakkar_20260825-101500.jobs.tsv"),
                 entry["present"],
             )
+            self.assertEqual(entry["missing"], [])
+
+    def test_resources_lists_the_failure_table_of_a_run_that_lost_jobs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            entry = {item["section"]: item for item in probe(root)}["resources"]
+            self.assertIn(
+                str(Path("logging") / "drakkar_20260825-101500.failures.tsv"),
+                entry["present"],
+            )
+
+    def test_a_run_without_failures_is_not_asked_for_a_failure_table(self):
+        # No file is written when nothing failed, so its absence is the good
+        # case and must not be reported as something the section is missing.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            (root / "logging" / "drakkar_20260825-101500.failures.tsv").unlink()
+            entry = {item["section"]: item for item in probe(root)}["resources"]
+            self.assertTrue(entry["available"])
             self.assertEqual(entry["missing"], [])
 
     def test_resources_names_the_benchmark_a_run_never_produced(self):
@@ -639,6 +680,36 @@ class DatabaseBuildTests(ReportFixtureMixin, unittest.TestCase):
             self.assertEqual(rows["binning"]["failed_launches"], 0)
             connection.close()
 
+    def test_failures_are_recorded_once_per_rule_and_target(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            connection = self.build(root, sections=("resources",))
+            rows = {
+                (row["rule"], row["target"]): row
+                for row in connection.execute("SELECT * FROM run_failure")
+            }
+            self.assertEqual(len(rows), 3)
+            recovered = rows[("assembly", "A1")]
+            self.assertEqual(recovered["run_id"], "20260825-101500")
+            self.assertEqual(recovered["attempts"], 2)
+            self.assertEqual(recovered["status"], "recovered")
+            self.assertEqual(recovered["category"], "out-of-memory")
+            self.assertIn("--memory-multiplier", recovered["action"])
+            self.assertEqual(rows[("singlem", "S2")]["status"], "failed")
+            # A workflow-level error belongs to no job, and keeps its own row.
+            self.assertEqual(rows[("bowtie2", "workflow")]["category"], "missing-input")
+            connection.close()
+
+    def test_a_run_that_lost_no_job_leaves_the_failure_table_empty(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_output_dir(Path(tmp))
+            (root / "logging" / "drakkar_20260825-101500.failures.tsv").unlink()
+            connection = self.build(root, sections=("resources",))
+            self.assertEqual(
+                connection.execute("SELECT COUNT(*) FROM run_failure").fetchone()[0], 0
+            )
+            connection.close()
+
     def test_a_run_without_benchmark_files_still_ingests(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -754,6 +825,19 @@ class LegacyLayoutIngestTests(ReportFixtureMixin, unittest.TestCase):
             self.assertEqual(len(rows), 1)
             self.assertEqual(rows[0]["status"], "completed")
             self.assertEqual(rows[0]["drakkar_version"], "2.0.0")
+            connection.close()
+
+    def test_legacy_failure_table_is_ingested(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build_legacy_output_dir(Path(tmp))
+            connection = self.build(root)
+            rows = connection.execute(
+                "SELECT run_id, rule, attempts FROM run_failure ORDER BY rule"
+            ).fetchall()
+            self.assertEqual([row["rule"] for row in rows],
+                             ["assembly", "bowtie2", "singlem"])
+            self.assertEqual(rows[0]["run_id"], "20260825-101500")
+            self.assertEqual(rows[0]["attempts"], 2)
             connection.close()
 
     def test_probe_finds_the_legacy_resources_section(self):

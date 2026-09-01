@@ -396,6 +396,48 @@ class LoggingCommandTests(unittest.TestCase):
         self.assertEqual(rows["901"]["elapsed_sec"], 600)
         self.assertEqual(rows["901"]["alloc_cpus"], 8)
 
+    def test_parse_sacct_output_reads_peak_memory_from_the_job_steps(self) -> None:
+        # This is the shape sacct really answers with: the allocation line has
+        # an empty MaxRSS column, and the figure lives on the steps.
+        rows = cli_module._benchmark._parse_sacct_output(
+            "901|COMPLETED|0:0|600|01:20:00|8||30|8|8000M\n"
+            "901.batch|COMPLETED|0:0|600|01:19:00|8|4000M|||\n"
+            "901.extern|COMPLETED|0:0|600|00:00:00|8|1.50M|||\n"
+        )
+
+        self.assertEqual(set(rows), {"901"})
+        self.assertEqual(rows["901"]["max_rss_mb"], 4000.0)
+        self.assertEqual(rows["901"]["state"], "COMPLETED")
+        self.assertEqual(rows["901"]["alloc_cpus"], 8)
+        self.assertEqual(rows["901"]["req_mem_mb"], 8000.0)
+
+    def test_parse_sacct_output_takes_the_largest_step_as_the_jobs_peak(self) -> None:
+        rows = cli_module._benchmark._parse_sacct_output(
+            "901|COMPLETED|0:0|600|01:20:00|8||30|8|8000M\n"
+            "901.extern|COMPLETED|0:0|600|00:00:00|8|1.50M|||\n"
+            "901.0|COMPLETED|0:0|300|00:40:00|8|6500M|||\n"
+            "901.1|COMPLETED|0:0|300|00:40:00|8|2200M|||\n"
+        )
+
+        self.assertEqual(rows["901"]["max_rss_mb"], 6500.0)
+
+    def test_parse_sacct_output_keeps_steps_of_unknown_jobs_out_of_the_rows(self) -> None:
+        rows = cli_module._benchmark._parse_sacct_output(
+            "901.batch|COMPLETED|0:0|600|01:19:00|8|4000M|||\n"
+        )
+
+        self.assertEqual(rows, {})
+
+    def test_sacct_is_queried_without_restricting_output_to_allocations(self) -> None:
+        # ``-X`` hides the job steps, and with them every MaxRSS figure.
+        with patch.object(cli_module._benchmark.subprocess, "run") as run:
+            run.return_value = SimpleNamespace(returncode=0, stdout="")
+            cli_module._benchmark.query_sacct_for_jobs(["901"])
+
+        command = run.call_args[0][0]
+        self.assertNotIn("-X", command)
+        self.assertIn("MaxRSS", command[-1])
+
     def test_sacct_is_queried_for_total_cpu(self) -> None:
         with patch.object(cli_module._benchmark.subprocess, "run") as run:
             run.return_value = SimpleNamespace(returncode=0, stdout="")

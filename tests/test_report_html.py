@@ -207,7 +207,7 @@ def seed_expression(connection, genes=4, samples=("S1", "S2")):
     log(connection, "gene_expression", "expression", len(counts))
 
 
-def seed_resources(connection, benchmark=True):
+def seed_resources(connection, benchmark=True, failures=True):
     connection.execute(
         "INSERT INTO run VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         ("20260825-101500", "2.1.0", "complete", "preprocessing,cataloging",
@@ -215,8 +215,45 @@ def seed_resources(connection, benchmark=True):
          "/scratch/run", "drakkar complete"),
     )
     log(connection, "run", "resources", 1)
+    if failures:
+        seed_failures(connection)
     if benchmark:
         seed_benchmark(connection)
+
+
+def seed_failures(connection, run_id="20260825-101500"):
+    """The failure table: one row per rule and target, not per failed attempt.
+
+    Two attempts of the same assembly job, recovered by the retry; a sample
+    whose rule never succeeded; and a workflow-level error, which belongs to
+    no job and carries ``workflow`` as its target.
+    """
+    rows = [
+        # run, index, rule, target, attempts, status, category, reason,
+        # slurm state, internal, external, detail, action, job log, output, at
+        (run_id, 1, "singlem", "S2", 1, "failed", "timeout",
+         "the job hit its SLURM wall-time limit", "TIMEOUT", "41", "9010",
+         "hit the SLURM time limit (72 min requested)",
+         "Relaunch the same drakkar command with a larger --time-multiplier.",
+         "logging/slurm/9010.log", "preprocessing/singlem/S2_cond.tsv",
+         "2026-08-25T12:05:00+00:00"),
+        (run_id, 2, "bowtie2", "workflow", 1, "failed", "missing-input",
+         "required input files were not found", "", "", "",
+         "MissingInputException in rule bowtie2: reference/host.fna.gz",
+         "Check the sample information file, input directory, and database "
+         "paths before relaunching.", "", "", ""),
+        (run_id, 3, "assembly", "A1", 2, "recovered", "out-of-memory",
+         "the job was killed after exceeding its memory allocation",
+         "OUT_OF_MEMORY", "12", "9001",
+         "exceeded its memory allocation (65536 MB requested)",
+         "Relaunch the same drakkar command with a larger --memory-multiplier.",
+         "logging/slurm/9001.log", "cataloging/assembly/A1.fna",
+         "2026-08-25T11:40:00+00:00"),
+    ]
+    connection.executemany(
+        "INSERT INTO run_failure VALUES (" + ", ".join(["?"] * 16) + ")", rows
+    )
+    log(connection, "run_failure", "resources", len(rows))
 
 
 def seed_benchmark(connection, run_id="20260825-101500", status="generated"):
@@ -1430,6 +1467,73 @@ class ResourceBenchmarkTests(TemporaryRootMixin, unittest.TestCase):
         body = self.section(self.render(benchmark=False))
         self.assertIn("20260825-101500", body)
         self.assertNotIn("Job outcomes", body)
+
+    def test_errors_are_listed_once_per_rule_and_target(self):
+        body = self.section(self.render())
+        self.assertIn("<h3>Errors</h3>", body)
+        errors = body[body.index("<h3>Errors</h3>"):body.index("What to do next")]
+        for header in ("Rule", "Target", "Attempts", "Outcome", "Problem",
+                       "Scheduler state", "What went wrong", "Job log"):
+            self.assertIn(f"<th>{header}</th>", errors)
+        self.assertIn("<td>singlem</td>", errors)
+        self.assertIn("<td>S2</td>", errors)
+        self.assertIn("<td>assembly</td>", errors)
+        self.assertIn("<td>A1</td>", errors)
+        # The workflow-level error is a row of its own, not a job.
+        self.assertIn("<td>workflow</td>", errors)
+
+    def test_an_error_says_whether_a_retry_recovered_it_and_after_how_many(self):
+        body = self.section(self.render())
+        errors = body[body.index("<h3>Errors</h3>"):body.index("What to do next")]
+        # The assembly job failed twice and then succeeded; the singlem job
+        # failed once and never did.
+        self.assertIn('<td data-sort="2">2</td><td>Recovered on retry</td>', errors)
+        self.assertIn('<td data-sort="1">1</td><td>Never succeeded</td>', errors)
+        self.assertIn('<span class="stat-label">Recovered on retry</span>'
+                      '<span class="stat-value">1</span>', errors)
+        self.assertIn('<span class="stat-label">Never succeeded</span>'
+                      '<span class="stat-value">2</span>', errors)
+        self.assertIn('<span class="stat-label">Rules affected</span>'
+                      '<span class="stat-value">3</span>', errors)
+
+    def test_unresolved_errors_lead_and_recovered_ones_follow(self):
+        body = self.section(self.render())
+        errors = body[body.index("<h3>Errors</h3>"):body.index("What to do next")]
+        listing = errors[errors.index("<tbody>"):]
+        self.assertLess(
+            listing.index("Never succeeded"), listing.index("Recovered on retry")
+        )
+
+    def test_the_recommendation_is_given_once_per_kind_of_problem(self):
+        body = self.section(self.render())
+        actions = body[body.index("What to do next"):]
+        self.assertIn("<td>timeout</td>", actions)
+        self.assertIn("<td>missing-input</td>", actions)
+        self.assertIn("--time-multiplier", actions)
+        # The recovered failure needs no action, so its category is not listed.
+        self.assertNotIn("<td>out-of-memory</td>", actions)
+
+    def test_a_run_whose_retries_settled_everything_says_so(self):
+        def seeder(connection):
+            connection.executemany(
+                "INSERT INTO run_failure VALUES (" + ", ".join(["?"] * 16) + ")",
+                [("20260825-101500", 1, "assembly", "A1", 2, "recovered",
+                  "out-of-memory", "the job was killed after exceeding its "
+                  "memory allocation", "OUT_OF_MEMORY", "12", "9001",
+                  "exceeded its memory allocation", "Relaunch with more memory.",
+                  "", "", "")],
+            )
+            log(connection, "run_failure", "resources", 1)
+
+        body = self.section(self.render(seeder=seeder))
+        self.assertIn("<h3>Errors</h3>", body)
+        self.assertNotIn("What to do next", body)
+        self.assertIn("recovered by a retry", body)
+
+    def test_a_run_that_lost_no_job_gets_no_errors_subsection(self):
+        body = self.section(self.render(failures=False))
+        self.assertIn("20260825-101500", body)
+        self.assertNotIn("<h3>Errors</h3>", body)
 
 
 class RuntimeFloorTests(unittest.TestCase):

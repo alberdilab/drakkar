@@ -8,6 +8,51 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.5.1] - 2026-09-01
+
+### Added
+
+- The "Runs and resources" section of the HTML report now carries an **Errors**
+  subsection: every rule that lost a job, grouped by rule and by the wildcards
+  of the failing job, with how many attempts it cost, whether a retry recovered
+  it, the kind of problem, the scheduler state and the job log to read.
+  Workflow-level errors — a missing input, a locked output directory — are
+  listed alongside them with `workflow` as their target. A second table gives
+  the recommended action once per kind of problem still outstanding, so a run
+  that only needs a larger `--memory-multiplier` says so in the report rather
+  than only in the terminal. The rows are read from the failure table
+  `drakkar.failures` already writes (`logging/drakkar_<run_id>.failures.tsv`),
+  which is now ingested into a `run_failure` table of the report database; a
+  run in which nothing failed writes no such file, and the subsection is simply
+  absent. Report schema version bumped to 6, so an existing `drakkar.db` must
+  be rebuilt with `drakkar reporting --force`.
+
+### Changed
+
+- AMR walltime requests now match observed runtimes. A runtime efficiency
+  analysis of the AMR workflow showed every rule reserving far more time than
+  it used, so the requests were scaled down: `genomad_amr_context`,
+  `amrfinderplus` and `rgi_card` by 10x, `amr_prodigal` by 5x,
+  `aggregate_amr` by 15x, and `stage_amr_assembly` by 20x. Both the
+  size-dependent term and the floor were divided, with the floor held at a
+  minimum of two minutes so trivially small assemblies still get a usable
+  slot. Every AMR rule keeps its `attempt`-based doubling for both `mem_mb`
+  and `runtime`, so an underestimate is corrected by the retry rather than by
+  a permanently oversized reservation.
+
+### Fixed
+
+- Benchmarking now reports the memory jobs actually used. `sacct` was queried
+  with `-X`, which restricts the output to the allocation line of each job —
+  and SLURM never records `MaxRSS` there, only against a job's steps
+  (`.batch`, `.extern`, and any `srun` steps). The memory column therefore
+  came back empty for every job, leaving `max_rss_mb`, `memory_efficiency`,
+  `median_max_rss_mb`, `median_memory_efficiency` and `peak_max_rss_mb` unset
+  and every memory figure in the HTML report blank. The step lines are now
+  read as well, and a job's peak memory is the largest figure any of its steps
+  reached. CPU, runtime and requested-resource figures are unaffected: those
+  are recorded on the allocation line and were always correct.
+
 ## [2.5.0] - 2026-09-01
 
 ### Fixed
