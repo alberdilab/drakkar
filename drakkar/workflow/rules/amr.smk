@@ -186,9 +186,11 @@ rule genomad_amr_context:
         database=GENOMAD_DB,
         preset=genomad_preset_flag()
     threads: 8
+    # Sized for whole assemblies, typically 50-500 MB. Single MAGs are a very
+    # different regime -- see rule genomad in annotating_function.smk.
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(16 * 1024, int(input.size_mb * 8)) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(3, int(input.size_mb * 2)) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(16 * 1024, int(input.size_mb * 50)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(60, int(input.size_mb * 1)) * 2 ** (attempt - 1))
     shell:
         r"""
         module purge

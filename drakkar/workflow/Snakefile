@@ -273,6 +273,7 @@ if WORKFLOW == "cataloging":
         input:
             f"{OUTPUT_DIR}/cataloging/final/all_bin_paths.txt",
             f"{OUTPUT_DIR}/cataloging/final/all_bin_metadata.csv",
+            f"{OUTPUT_DIR}/cataloging/final/all_contig_to_bin.csv",
             f"{OUTPUT_DIR}/cataloging.tsv",
             #expand over multiple samples per assembly
             [f"{OUTPUT_DIR}/cataloging/bowtie2/{assembly}/{sample}.bam"

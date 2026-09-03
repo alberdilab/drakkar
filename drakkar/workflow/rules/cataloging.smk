@@ -719,6 +719,38 @@ rule move_metadata:
         cp {input} {output}
         """
 
+# The binette bins keep the contig names assigned by the `assembly` rule
+# (`<assembly>_<n>`), so the table below is the explicit link between every
+# final bin and the assembly contigs it is made of.
+def get_final_bin_fastas(wildcards):
+    checkpoint_output = checkpoints.binette.get(**wildcards).output[0]
+    bin_ids = get_bin_ids_from_tsv(checkpoint_output)
+    return expand(
+        f"{OUTPUT_DIR}/cataloging/final/{{assembly}}/{{assembly}}_bin_{{bin_id}}.fa",
+        assembly=wildcards.assembly,
+        bin_id=bin_ids
+    )
+
+rule contig_to_bin:
+    input:
+        bins=get_final_bin_fastas
+    output:
+        f"{OUTPUT_DIR}/cataloging/contig_to_bin/{{assembly}}.tsv"
+    params:
+        package_dir={PACKAGE_DIR}
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(1*1024, int(input.size_mb)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(5, int(input.size_mb / 10)) * 2 ** (attempt - 1))
+    message: "Mapping contigs to bins from assembly {wildcards.assembly}..."
+    shell:
+        """
+        python {params.package_dir}/workflow/scripts/contig_to_bin.py \
+            --assembly {wildcards.assembly:q} \
+            -o {output:q} \
+            {input.bins:q}
+        """
+
 rule all_bins:
     input:
         expand(f"{OUTPUT_DIR}/cataloging/final/{{assembly}}.tsv", assembly=assemblies)
@@ -736,6 +768,27 @@ rule all_bins:
         """
         python {params.package_dir}/workflow/scripts/all_bin_paths.py {input} -o {output.paths}
         python {params.package_dir}/workflow/scripts/all_bin_metadata.py {input} -o {output.metadata}
+        """
+
+rule all_contig_to_bin:
+    input:
+        expand(f"{OUTPUT_DIR}/cataloging/contig_to_bin/{{assembly}}.tsv", assembly=assemblies)
+    output:
+        f"{OUTPUT_DIR}/cataloging/final/all_contig_to_bin.csv"
+    localrule: True
+    params:
+        package_dir={PACKAGE_DIR}
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(1*1024 * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(10 * 2 ** (attempt - 1))
+    message: "Combining contig-to-bin tables..."
+    shell:
+        """
+        python {params.package_dir}/workflow/scripts/contig_to_bin.py \
+            --merge \
+            -o {output:q} \
+            {input:q}
         """
 
 rule cataloging_stats:

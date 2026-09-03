@@ -8,6 +8,46 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.5.3] - 2026-09-03
+
+### Added
+
+- The cataloging workflow now exports the contig-to-bin relationship of the
+  final binette bins: `cataloging/contig_to_bin/<assembly>.tsv` per assembly
+  and `cataloging/final/all_contig_to_bin.csv` across the run, each with
+  `contig`, `bin` and `assembly` columns. The contig names are the ones the
+  `assembly` rule assigns to the megahit output (`<assembly>_<n>`), which the
+  bins carry unchanged, so the table joins directly against
+  `cataloging/megahit/<assembly>/<assembly>.fna`. Until now the only
+  contig-to-bin tables written were the per-binner ones fed *into* binette,
+  which describe the candidate bins rather than the refined ones that ship.
+
+### Changed
+
+- The geNomad memory slope is back to the 50 MB per MB of input that 2.5.2's
+  unit fix replaced with 8. With assemblies typically between 50 and 500 MB,
+  a slope of 8 left the whole range sitting on the 16 GB floor — a 500 MB
+  assembly asked for exactly as much as a 5 MB one. At 50 the floor still
+  governs up to ~330 MB and the slope takes over above it (500 MB → 24 GB),
+  which is the curve the constant was written for before the `* 1024` bug
+  inflated it.
+
+### Fixed
+
+- `genomad_amr_context` also over-requested walltime. It asked for
+  `input.size_mb * 2` minutes over a 3-minute floor — a slope inherited from
+  the per-MAG annotation rules, applied to whole assemblies, so a 200 MB
+  assembly reserved close to seven hours for a job that finishes in under
+  twenty minutes. It now asks for 1 minute per MB of assembly over a 60-minute
+  floor, which covers geNomad's fixed start-up cost (module load, marker
+  database and model load) that dominates on small inputs, with the usual
+  per-attempt doubling behind it. This rule is calibrated for whole
+  assemblies, typically 50 to 500 MB on 8 threads; geNomad on a single MAG is
+  a very different regime, so the annotation workflow's per-MAG `genomad` rule
+  keeps its own runtime slope. Both rules now carry a comment saying which
+  input regime they were sized for — the walltime bug came from copying the
+  per-MAG slope onto assemblies.
+
 ## [2.5.2] - 2026-09-01
 
 ### Fixed

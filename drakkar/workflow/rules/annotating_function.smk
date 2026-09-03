@@ -736,8 +736,11 @@ rule genomad:
         db={GENOMAD_DB}
     threads:
         1
+    # Sized for single MAGs, a few MB on one thread, where geNomad's fixed
+    # start-up cost dominates. Whole assemblies are a very different regime --
+    # see rule genomad_amr_context in amr.smk.
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(16*1024, int(input.size_mb * 8)) * 2 ** (attempt - 1)),
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(16*1024, int(input.size_mb * 50)) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 20)) * 2 ** (attempt - 1))
     shell:
         """
