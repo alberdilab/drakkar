@@ -99,11 +99,16 @@ rule genomics_mark_duplicates:
         mkdir -p {params.tempdir}
         gatk --java-options "-Xmx$(({resources.mem_mb} * 8 / 10))m" MarkDuplicates \
             -I {input.cram} \
-            -O {output.cram} \
+            -O {params.tempdir}/markdup.cram \
             -M {output.metrics} \
             -R {input.reference} \
             --TMP_DIR {params.tempdir} \
             --CREATE_INDEX false
+        if ! samtools quickcheck -v {params.tempdir}/markdup.cram; then
+            echo "ERROR: duplicate marking of {wildcards.sample} produced a truncated CRAM." >&2
+            exit 1
+        fi
+        mv {params.tempdir}/markdup.cram {output.cram}
         samtools index -@ {threads} {output.cram}
         rm -rf {params.tempdir}
         """

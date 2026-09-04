@@ -50,7 +50,12 @@ rule subset_bam:
         """
         module purge
         module load {params.samtools_module}
-        samtools view -h {input} {wildcards.genome} | samtools sort -o {output.bam}
+        samtools view -h {input} {wildcards.genome} | samtools sort -O BAM -o {output.bam}.tmp
+        if ! samtools quickcheck -v {output.bam}.tmp; then
+            echo "ERROR: subsetting {wildcards.sample} to {wildcards.genome} produced a truncated BAM." >&2
+            exit 1
+        fi
+        mv {output.bam}.tmp {output.bam}
         samtools index {output.bam}
         """
 

@@ -212,7 +212,12 @@ rule assembly_map:
             module load {params.bowtie2_module} {params.samtools_module}
             R1_FILES=$(echo {input.r1} | tr ' ' ',')
             R2_FILES=$(echo {input.r2} | tr ' ' ',')
-            bowtie2 -x {params.basename} -1 $R1_FILES -2 $R2_FILES | samtools view -bS - | samtools sort -o {output}
+            bowtie2 -x {params.basename} -1 $R1_FILES -2 $R2_FILES | samtools view -bS - | samtools sort -O BAM -o {output}.tmp
+            if ! samtools quickcheck -v {output}.tmp; then
+                echo "ERROR: mapping of {wildcards.sample} against {wildcards.assembly} produced a truncated BAM." >&2
+                exit 1
+            fi
+            mv {output}.tmp {output}
         fi
         """
 
@@ -235,6 +240,10 @@ rule assembly_flagstat:
         else
             module purge
             module load {params.samtools_module}
+            if ! samtools quickcheck -v {input:q}; then
+                echo "ERROR: {input} is truncated or corrupt. Delete it and rerun the mapping step." >&2
+                exit 1
+            fi
             samtools flagstat -@ {threads} {input:q} > {output:q}
         fi
         """
@@ -320,6 +329,7 @@ rule metabat2:
     params:
         metabat2_module={METABAT2_MODULE},
         raw_cls=f"{OUTPUT_DIR}/cataloging/metabat2/{{assembly}}/{{assembly}}.raw.tsv",
+        runlog=f"{OUTPUT_DIR}/cataloging/metabat2/{{assembly}}/{{assembly}}.metabat2.log",
         skip_reason=lambda wildcards, input: binning_skip_reason(input.assembly)
     threads: 1
     resources:
@@ -335,6 +345,28 @@ rule metabat2:
         else
             module purge
             module load {params.metabat2_module}
+            # metabat2 exits non-zero with "There were no large target contigs"
+            # when no contig reaches -m, which is a legitimate nothing-to-bin
+            # outcome for a fragmented assembly rather than a tool failure: the
+            # other binners return what they can for the same assembly and
+            # binette carries on with that. Export the empty table the skip
+            # path writes instead, and let every other non-zero exit fail the
+            # rule so snakemake can retry it with more resources.
+            rm -f {params.runlog}
+            set +e
+            metabat2 -i {input.assembly} -a {input.depth} -o {params.raw_cls} -m 1500 --saveCls --noBinOut > {params.runlog} 2>&1
+            METABAT_STATUS=$?
+            set -e
+            cat {params.runlog}
+            if [ $METABAT_STATUS -ne 0 ]; then
+                if grep -q "no large target contigs" {params.runlog}; then
+                    echo "metabat2 found no contigs long enough to bin in {wildcards.assembly}, writing an empty table..."
+                    rm -f {params.raw_cls}
+                    touch {output}
+                    exit 0
+                fi
+                exit $METABAT_STATUS
+            fi
             # --saveCls writes one row per contig, including every contig
             # metabat2 left unbinned (cluster 0) and every contig below -m 1500.
             # Handing those to binette would turn them into a single junk bin
@@ -342,9 +374,8 @@ rule metabat2:
             # diamond, so keep only the contigs that were actually binned.
             # The header filter covers metabat2 > 2.17, which prepends a
             # "ContigName ClusterId" line to the membership matrix.
-            metabat2 -i {input.assembly} -a {input.depth} -o {params.raw_cls} -m 1500 --saveCls --noBinOut
             awk -F'\t' '$1 != "ContigName" && $2 != "0"' {params.raw_cls} > {output}
-            rm -f {params.raw_cls}
+            rm -f {params.raw_cls} {params.runlog}
         fi
         """
 
@@ -358,6 +389,7 @@ rule maxbin2:
         maxbin2_module={MAXBIN2_MODULE},
         hmmer_module={HMMER_MODULE},
         basename=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}",
+        runlog=f"{OUTPUT_DIR}/cataloging/maxbin2/{{assembly}}/{{assembly}}.run.log",
         skip_reason=lambda wildcards, input: binning_skip_reason(input.assembly)
     threads: 1
     resources:
@@ -375,7 +407,30 @@ rule maxbin2:
             module purge
             module load {params.maxbin2_module} {params.hmmer_module}
             rm -rf {params.basename}*
-            run_MaxBin.pl -contig {input.assembly} -abund {input.depth} -max_iteration 10 -out {params.basename} -min_contig_length 1500
+            # maxbin2 exits non-zero when the marker gene search finds too few
+            # marker genes to seed any bin ("the dataset cannot be binned").
+            # That is a legitimate no-bins outcome for a fragmented assembly,
+            # not a tool failure: the other binners return an empty result for
+            # the same assembly and binette carries on with what they found.
+            # Only that case is swallowed; every other non-zero exit is still
+            # a hard error.
+            set +e
+            run_MaxBin.pl -contig {input.assembly} -abund {input.depth} -max_iteration 10 -out {params.basename} -min_contig_length 1500 > {params.runlog} 2>&1
+            MAXBIN_STATUS=$?
+            set -e
+            cat {params.runlog}
+            if [ $MAXBIN_STATUS -ne 0 ]; then
+                if grep -q "dataset cannot be binned" {params.runlog}; then
+                    echo "maxbin2 found no binnable marker genes in {wildcards.assembly}, writing an empty summary..."
+                    rm -rf {params.basename}*
+                    mkdir -p $(dirname {output})
+                    touch {output}
+                else
+                    rm -f {params.runlog}
+                    exit $MAXBIN_STATUS
+                fi
+            fi
+            rm -f {params.runlog}
         fi
         """
 
@@ -434,7 +489,36 @@ rule semibin2:
             mkdir -p {params.outdir}
             touch {output}
         else
-            SemiBin2 single_easy_bin -i {input.assembly} -b {input.bam} -o {params.outdir} -m 1500 -t {threads} --compression none
+            mkdir -p {params.outdir}
+            SEMIBIN_LOG="{params.outdir}/semibin2.log"
+            set +e
+            SemiBin2 single_easy_bin -i {input.assembly} -b {input.bam} -o {params.outdir} -m 1500 -t {threads} --compression none 2>&1 | tee "$SEMIBIN_LOG"
+            SEMIBIN_STATUS=${{PIPESTATUS[0]}}
+            set -e
+
+            # The size threshold cannot catch every unbinnable assembly: a large
+            # but heavily fragmented one can still carry too few contigs above
+            # the minimum length. SemiBin2 refuses those outright (it needs at
+            # least four contigs of >= 1500 bp and exits 1), and it also walks
+            # away without writing contig_bins.tsv when the clustering yields no
+            # bin at all, which leaves snakemake to die on the missing output.
+            # Both are legitimate "nothing to bin" outcomes rather than tool
+            # failures, so export an empty table and let binette carry on with
+            # the other binners. Every other failure (OOM, GPU, walltime) still
+            # propagates so snakemake can retry it with more resources.
+            if [ "$SEMIBIN_STATUS" -ne 0 ] || [ ! -f {output} ]; then
+                if grep -qE "but all are shorter than|contain\(s\) at least|is empty. Please check inputs|No bins were created" "$SEMIBIN_LOG"; then
+                    echo "SemiBin2 found nothing to bin in assembly {wildcards.assembly}, exporting an empty contig_bins.tsv..."
+                    mkdir -p $(dirname {output})
+                    touch {output}
+                    exit 0
+                fi
+                if [ "$SEMIBIN_STATUS" -ne 0 ]; then
+                    exit "$SEMIBIN_STATUS"
+                fi
+                echo "SemiBin2 reported success but wrote no {output}. See $SEMIBIN_LOG." >&2
+                exit 1
+            fi
         fi
         """
 

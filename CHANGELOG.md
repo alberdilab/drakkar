@@ -8,6 +8,43 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.5.4] - 2026-09-04
+
+### Fixed
+
+- Alignment files are now written atomically and verified before they are
+  promoted to their final name. Every rule that sorts an alignment
+  (`assembly_map`, `map_to_catalogue`, `map_to_metagenome`, `subset_bam`,
+  `reference_map`, `split_reads`) and `genomics_mark_duplicates` now writes to
+  a temporary file, runs `samtools quickcheck` on it, and only then moves it
+  into place. Previously `samtools sort` wrote straight to the final path, so a
+  job killed by the scheduler (out of memory, walltime, cancellation) left a
+  truncated but non-empty BAM/CRAM behind. Snakemake only deletes the outputs
+  of jobs that exit non-zero under its control, so those partial files survived
+  and looked complete to every later run, which then failed downstream with an
+  opaque `[E::bgzf_read] Read block operation failed` instead of at the step
+  that produced them.
+- The binners no longer fail the whole run when an assembly cannot be binned.
+  A large but heavily fragmented assembly can carry too few long contigs or
+  marker genes for a binner to produce anything, and the tools report that by
+  exiting non-zero (or, for SemiBin2 and COMEBin, by finishing without writing
+  their output table). That is a legitimate no-bins outcome, not a tool
+  failure, yet it burned every retry and then took the run down even when the
+  other binners had returned bins for the same assembly. Each binner now
+  recognises its own no-bins signal, writes the empty table its skip path
+  already writes, and lets binette continue with the remaining binners:
+  `metabat2` on "There were no large target contigs", `maxbin2` on "the
+  dataset cannot be binned", and `semibin2` on the too-few/too-short contig
+  errors and on "No bins were created" (`comebin` already did this for its
+  marker stage). Every other non-zero exit still fails the rule so snakemake
+  can retry it with more resources.
+- `assembly_flagstat` validates its input BAM with `samtools quickcheck` before
+  running `samtools flagstat`. Its `[ ! -s ]` guard only distinguished the
+  zero-byte sentinel written for empty assemblies from everything else, so a
+  corrupt BAM reached samtools and failed with an htslib error that named
+  neither the cause nor the fix. The rule now reports that the file is
+  truncated and should be deleted and remapped.
+
 ## [2.5.3] - 2026-09-03
 
 ### Added

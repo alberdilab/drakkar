@@ -257,7 +257,12 @@ rule map_to_catalogue:
         """
         module purge
         module load {params.bowtie2_module} {params.samtools_module}
-        bowtie2 -x {params.basename} -1 {input.r1} -2 {input.r2} -p {threads} | samtools view -bS - | samtools sort -o {output}
+        bowtie2 -x {params.basename} -1 {input.r1} -2 {input.r2} -p {threads} | samtools view -bS - | samtools sort -O BAM -o {output}.tmp
+        if ! samtools quickcheck -v {output}.tmp; then
+            echo "ERROR: mapping of {wildcards.sample} against the genome catalogue produced a truncated BAM." >&2
+            exit 1
+        fi
+        mv {output}.tmp {output}
         """
 
 rule quantify_reads_catalogue:

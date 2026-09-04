@@ -92,7 +92,12 @@ rule reference_map:
         module purge
         module load {params.bowtie2_module} {params.samtools_module}
         bowtie2 -x {params.basename} -1 {input.r1} -2 {input.r2} -p {threads} \
-            | samtools sort -@ {threads} --output-fmt CRAM --reference {input.reference} -o {output}
+            | samtools sort -@ {threads} --output-fmt CRAM --reference {input.reference} -o {output}.tmp
+        if ! samtools quickcheck -v {output}.tmp; then
+            echo "ERROR: mapping of {wildcards.sample} against the reference produced a truncated CRAM." >&2
+            exit 1
+        fi
+        mv {output}.tmp {output}
         """
 
 # Generate alignment quality metrics for each CRAM file using samtools.
@@ -160,7 +165,12 @@ rule split_reads:
         samtools view -u -f12 -@ {threads} -T {input.reference} {input.cram} | samtools fastq -@ {threads} -1 {output.r1} -2 {output.r2} -
         samtools view -c -f12 -@ {threads} -T {input.reference} {input.cram} > {output.metareads}
         samtools view -f12 -@ {threads} -T {input.reference} {input.cram} | awk '{{sum += length($10)}} END {{print sum}}' > {output.metabases}
-        samtools view -u -F12 -@ {threads} -T {input.reference} {input.cram} | samtools sort -@ {threads} --output-fmt CRAM --reference {input.reference} -o {output.cram} -
+        samtools view -u -F12 -@ {threads} -T {input.reference} {input.cram} | samtools sort -@ {threads} --output-fmt CRAM --reference {input.reference} -o {output.cram}.tmp -
+        if ! samtools quickcheck -v {output.cram}.tmp; then
+            echo "ERROR: extracting host reads of {wildcards.sample} produced a truncated CRAM." >&2
+            exit 1
+        fi
+        mv {output.cram}.tmp {output.cram}
         samtools index -@ {threads} {output.cram}
         samtools view -c -F12 -@ {threads} -T {input.reference} {input.cram} > {output.hostreads}
         samtools view -F12 -@ {threads} -T {input.reference} {input.cram} | awk '{{sum += length($10)}} END {{print sum}}' > {output.hostbases}
