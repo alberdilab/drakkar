@@ -6,8 +6,8 @@ import sys
 import time
 import re
 from pathlib import Path
-from urllib.parse import urlencode, urlparse
-from urllib.request import urlopen
+from urllib.parse import urlencode, urlparse, urlunparse
+from urllib.request import Request, urlopen
 
 import pandas as pd
 
@@ -20,6 +20,13 @@ from drakkar.input_errors import (
 from drakkar.output import print
 
 REMOTE_URL_SCHEMES = {"http", "https", "ftp", "sftp"}
+
+HTTP_URL_SCHEMES = {"http", "https"}
+
+# ENA serves the same files over plain FTP and over HTTPS. Only the HTTPS
+# endpoints advertise Content-Length and Accept-Ranges, which is what lets a
+# truncated transfer be detected, so ftp:// links to these hosts are upgraded.
+ENA_FTP_HOSTNAMES = {"ftp.sra.ebi.ac.uk", "ftp.ebi.ac.uk"}
 
 DEFAULT_DOWNLOAD_RETRIES = 5
 DEFAULT_PAIRED_FASTQ_SIZE_TOLERANCE = 0.10
@@ -51,9 +58,85 @@ def _normalized_value(value):
 def _retry_delay(attempt):
     return 5 * (3 ** (attempt - 1))
 
+def _response_header(response, name):
+    """Read one header from a urlopen response, tolerating objects without headers."""
+    headers = getattr(response, "headers", None)
+    if headers is not None:
+        try:
+            value = headers.get(name)
+        except Exception:
+            value = None
+        if value is not None:
+            return value
+    getheader = getattr(response, "getheader", None)
+    if callable(getheader):
+        try:
+            return getheader(name)
+        except Exception:
+            return None
+    return None
+
+
+def _advertised_content_length(response):
+    """Byte count the server promised for this body, or None when it promised nothing.
+
+    Returns None when the body is content-encoded, because Content-Length then
+    describes the encoded stream rather than the bytes written to disk.
+    """
+    encoding = _normalized_value(_response_header(response, "Content-Encoding") or "").lower()
+    if encoding and encoding != "identity":
+        return None
+    raw = _response_header(response, "Content-Length")
+    if raw is None:
+        return None
+    try:
+        length = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return None
+    return length if length > 0 else None
+
+
+def _probe_remote_size(url, description):
+    """Best-effort exact size of a remote file, via a HEAD request.
+
+    Returns None whenever the size cannot be established -- a non-HTTP scheme, a
+    server that rejects HEAD, or a response without a usable Content-Length.
+    Callers must treat None as "unknown", never as "empty".
+    """
+    if urlparse(url).scheme not in HTTP_URL_SCHEMES:
+        return None
+    try:
+        with urlopen(Request(url, method="HEAD")) as response:
+            size = _advertised_content_length(response)
+    except Exception as exc:
+        print(
+            f"WARNING: Could not determine the expected size of {description} from {url}: {exc}. "
+            "The download will be verified against the response length instead.",
+            flush=True,
+        )
+        return None
+    if size is None:
+        print(
+            f"WARNING: {url} did not report a Content-Length for {description}. "
+            "The download will be verified against the response length instead.",
+            flush=True,
+        )
+    return size
+
+
 def _download_urlopen(url, tmp_path):
-    with urlopen(url) as response, open(tmp_path, "wb") as handle:
-        shutil.copyfileobj(response, handle)
+    with urlopen(url) as response:
+        advertised = _advertised_content_length(response)
+        with open(tmp_path, "wb") as handle:
+            shutil.copyfileobj(response, handle)
+            written = handle.tell()
+    # copyfileobj returns normally when the connection drops mid-stream, so the
+    # advertised length is the only universal signal that the body is complete.
+    if advertised is not None and written != advertised:
+        raise DownloadError(
+            f"the transfer was truncated: the server advertised {advertised} bytes "
+            f"but only {written} bytes were received"
+        )
 
 def _download_sftp(url, tmp_path):
     curl_path = shutil.which("curl")
@@ -130,7 +213,12 @@ def _remove_files(paths):
             pass
 
 
-def _validate_paired_fastq_size_balance(read_pairs, accession, tolerance=DEFAULT_PAIRED_FASTQ_SIZE_TOLERANCE):
+def _validate_paired_fastq_size_balance(read_pairs, label, tolerance=DEFAULT_PAIRED_FASTQ_SIZE_TOLERANCE):
+    """Fallback truncation guardrail for pairs whose exact size could not be established.
+
+    ``label`` describes the source in error messages, e.g. "accession ERR123"
+    or "sample sample1".
+    """
     for read1_path, read2_path in read_pairs:
         read1_size = os.path.getsize(read1_path)
         read2_size = os.path.getsize(read2_path)
@@ -138,13 +226,13 @@ def _validate_paired_fastq_size_balance(read_pairs, accession, tolerance=DEFAULT
         smaller = min(read1_size, read2_size)
         if larger == 0:
             raise DownloadError(
-                f"Downloaded FASTQ files for accession {accession} are empty: "
+                f"Downloaded FASTQ files for {label} are empty: "
                 f"{read1_path}, {read2_path}."
             )
         difference = (larger - smaller) / larger
         if difference > tolerance:
             raise DownloadError(
-                f"Downloaded paired FASTQ files for accession {accession} differ in size by "
+                f"Downloaded paired FASTQ files for {label} differ in size by "
                 f"{difference:.1%}, which exceeds the {tolerance:.0%} guardrail: "
                 f"{read1_path} ({read1_size} bytes), {read2_path} ({read2_size} bytes)."
             )
@@ -195,7 +283,7 @@ def download_to_cache(url, sample_name, column_name, output, cache_subdir="reads
         if cached_size > 0 and expected_size is not None and cached_size != expected_size:
             print(
                 f"WARNING: Cached {column_name} for {sample_name} has size {cached_size} bytes, "
-                f"but ENA reports {expected_size} bytes. Downloading again: {dest_path}",
+                f"but the source reports {expected_size} bytes. Downloading again: {dest_path}",
                 flush=True,
             )
             os.remove(dest_path)
@@ -210,6 +298,9 @@ def download_to_cache(url, sample_name, column_name, output, cache_subdir="reads
     tmp_path = f"{dest_path}.tmp"
     for attempt in range(1, max_retries + 1):
         try:
+            # Start every attempt from scratch: a partial file left behind by a
+            # killed process must never contribute to the promoted download.
+            _remove_files([tmp_path])
             _download_once(url, tmp_path)
             if not os.path.isfile(tmp_path) or os.path.getsize(tmp_path) == 0:
                 raise DownloadError("downloaded file is empty")
@@ -217,14 +308,14 @@ def download_to_cache(url, sample_name, column_name, output, cache_subdir="reads
             if expected_size is not None and downloaded_size != expected_size:
                 raise DownloadError(
                     f"downloaded file size is {downloaded_size} bytes, "
-                    f"but ENA reports {expected_size} bytes"
+                    f"but the source reports {expected_size} bytes"
                 )
+            # Only a fully verified temporary file is ever promoted.
             os.replace(tmp_path, dest_path)
             print(f"Saved {column_name} for {sample_name} to {dest_path}", flush=True)
             return dest_path
         except Exception as exc:
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
+            _remove_files([tmp_path])
             if attempt < max_retries:
                 delay = _retry_delay(attempt)
                 print(f"WARNING: Download attempt {attempt}/{max_retries} failed for {url}: {exc}. Retrying in {delay}s...", flush=True)
@@ -307,20 +398,54 @@ def resolve_input_manifest(manifest_path, output, cache_subdir="manifests_cache"
         )
     return manifest_path
 
-def _resolve_reads_path(read_value, sample_name, column_name, output, row_number):
+def _resolve_reads_path_with_expected_size(read_value, sample_name, column_name, output, row_number):
+    """Resolve a read column value to (path, expected_size).
+
+    ``expected_size`` is the exact byte count the remote server advertised, or
+    None for a local file and for a remote file whose size could not be
+    established. None means "unknown", and callers fall back to the paired
+    size-balance guardrail.
+    """
     if is_url(read_value):
-        return download_to_cache(read_value, sample_name, column_name, output)
+        url = _normalize_ena_fastq_url(read_value)
+        expected_size = _probe_remote_size(url, f"{column_name} for {sample_name}")
+        path = download_to_cache(
+            url,
+            sample_name,
+            column_name,
+            output,
+            expected_size=expected_size,
+        )
+        return path, expected_size
 
     resolved_path = str(Path(read_value).resolve())
     require_non_empty_file(resolved_path, f"{column_name} file on row {row_number}")
-    return resolved_path
+    return resolved_path, None
+
+def _resolve_reads_path(read_value, sample_name, column_name, output, row_number):
+    path, _ = _resolve_reads_path_with_expected_size(
+        read_value, sample_name, column_name, output, row_number
+    )
+    return path
+
+def _upgrade_ena_ftp_url(url):
+    """Rewrite an ENA ftp:// link as https://.
+
+    Plain FTP advertises no Content-Length and supports no ranges, so a
+    truncated transfer there is undetectable. The HTTPS endpoints serve the
+    identical files with both.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme == "ftp" and (parsed.hostname or "").lower() in ENA_FTP_HOSTNAMES:
+        return urlunparse(parsed._replace(scheme="https"))
+    return url
 
 def _normalize_ena_fastq_url(url):
     normalized = _normalized_value(url)
     if not normalized:
         return None
     if is_url(normalized):
-        return normalized
+        return _upgrade_ena_ftp_url(normalized)
     return f"https://{normalized.lstrip('/')}"
 
 def _split_paired_fastq_urls(urls, accession):
@@ -450,7 +575,9 @@ def resolve_accession_to_reads(accession, sample_name, output, row_number):
         if expected_size_by_url.get(forward_url) is None or expected_size_by_url.get(reverse_url) is None:
             read_pairs_without_complete_ena_sizes.append((read1_path, read2_path))
     try:
-        _validate_paired_fastq_size_balance(read_pairs_without_complete_ena_sizes, accession_value)
+        _validate_paired_fastq_size_balance(
+            read_pairs_without_complete_ena_sizes, f"accession {accession_value}"
+        )
     except DownloadError:
         _remove_files(reads1 + reads2)
         raise
@@ -487,9 +614,32 @@ def resolve_sample_read_lists(row, row_number, output):
             print(f"ERROR: Missing value in column '{column}' on row {row_number} of the sample info file.")
             sys.exit(1)
 
-    reads1 = [_resolve_reads_path(rawreads1_value, sample_name, "rawreads1", output, row_number)]
-    reads2 = [_resolve_reads_path(rawreads2_value, sample_name, "rawreads2", output, row_number)]
-    return sample_name, reads1, reads2
+    read1_path, read1_expected_size = _resolve_reads_path_with_expected_size(
+        rawreads1_value, sample_name, "rawreads1", output, row_number
+    )
+    read2_path, read2_expected_size = _resolve_reads_path_with_expected_size(
+        rawreads2_value, sample_name, "rawreads2", output, row_number
+    )
+
+    # Mirror the accession path: when an exact size was unavailable for either
+    # mate, fall back to the paired size-balance guardrail so a silently
+    # truncated URL download is still caught.
+    downloaded_paths = [
+        path
+        for path, value in ((read1_path, rawreads1_value), (read2_path, rawreads2_value))
+        if is_url(value)
+    ]
+    if downloaded_paths and (read1_expected_size is None or read2_expected_size is None):
+        try:
+            _validate_paired_fastq_size_balance(
+                [(read1_path, read2_path)], f"sample {sample_name}"
+            )
+        except DownloadError:
+            # Only remove what DRAKKAR downloaded; never a user's local file.
+            _remove_files(downloaded_paths)
+            raise
+
+    return sample_name, [read1_path], [read2_path]
 
 def resolve_preprocessed_read_lists(row, row_number, output):
     """Like resolve_sample_read_lists but honours preprocessedreads1/2 columns first.

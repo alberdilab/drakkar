@@ -8,6 +8,44 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.5.5] - 2026-09-05
+
+### Fixed
+
+- FASTQ files supplied as URLs in the `rawreads1`/`rawreads2` columns are no
+  longer accepted when the transfer was cut short. `shutil.copyfileobj` returns
+  normally when a connection drops mid-stream, so a dropped download produced a
+  truncated file, exit code 0 and no warning, and the pipeline ran on partial
+  reads. Downloads are now verified in four places:
+  - Every `urlopen` download compares the bytes written against the response's
+    `Content-Length` and fails the attempt when they disagree, so the existing
+    retry loop takes over. This backstop applies to every download path,
+    including callers that supply no expected size. The check is skipped for
+    content-encoded responses, where `Content-Length` describes the encoded
+    stream rather than the bytes on disk.
+  - URL values in the read columns now get an expected size from a `HEAD`
+    request before downloading, and pass it to the size check that until now
+    only ran for `accession` inputs. Servers that reject `HEAD` or report no
+    length degrade to the other guardrails instead of failing.
+  - `ftp://ftp.sra.ebi.ac.uk/...` and `ftp://ftp.ebi.ac.uk/...` links are
+    upgraded to `https://` before downloading. Plain FTP advertises no
+    `Content-Length` and supports no ranges, so truncation there is
+    undetectable; the HTTPS endpoints serve the identical files with both.
+    ENA FTP links that already carry a scheme are now upgraded too, not just
+    scheme-less ones.
+  - The paired size-balance guardrail now also covers read pairs resolved from
+    URLs whenever an exact size could not be established for either mate,
+    mirroring the `accession` path. Partial downloads are deleted when it
+    fires; a mate supplied as a local path is never deleted.
+- Downloads now start each attempt from a clean temporary file and only promote
+  it after every size check has passed, so a partial `.tmp` from an interrupted
+  run can never reach the destination.
+- The cluster annotation schema check now explains that a per-source table
+  missing `cluster_id` was written by a pre-2.0 Drakkar and that deleting the
+  table lets the workflow regenerate it without re-running the annotation tool.
+  The previous message told users to "regenerate this source with Drakkar 2.0",
+  which was confusing when the failing run was already on 2.x.
+
 ## [2.5.4] - 2026-09-04
 
 ### Fixed

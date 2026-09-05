@@ -176,14 +176,15 @@ class UrlGenomeInputTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
+            # One HEAD probe for the expected size, then every download attempt.
             with patch(
                 "drakkar.utils.urlopen",
-                side_effect=[FakeResponse(b"") for _ in range(DEFAULT_DOWNLOAD_RETRIES)],
+                side_effect=[FakeResponse(b"") for _ in range(DEFAULT_DOWNLOAD_RETRIES + 1)],
             ) as urlopen_mock, patch("drakkar.utils.time.sleep"):
                 with self.assertRaises(SystemExit):
                     file_samples_to_json(str(infofile), tmpdir)
 
-            self.assertEqual(urlopen_mock.call_count, DEFAULT_DOWNLOAD_RETRIES)
+            self.assertEqual(urlopen_mock.call_count, DEFAULT_DOWNLOAD_RETRIES + 1)
             self.assertFalse((Path(tmpdir) / "data" / "sample_to_reads1.json").exists())
 
     def test_file_transcriptome_to_json_downloads_reads_from_accession(self) -> None:

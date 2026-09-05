@@ -74,7 +74,10 @@ def validate_columns(path, fieldnames, required):
     if missing:
         raise ValueError(
             f"Cluster annotation input {path} is missing required columns: "
-            f"{', '.join(sorted(missing))}. Regenerate this source with Drakkar 2.0."
+            f"{', '.join(sorted(missing))}. This file was written by an older "
+            "Drakkar (the per-source cluster tables gained cluster_id in 2.0). "
+            "Delete it and re-run the workflow so the summarising rule "
+            "regenerates it; the underlying tool does not have to run again."
         )
 
 
