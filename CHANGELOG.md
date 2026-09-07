@@ -8,6 +8,54 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.5.7] - 2026-09-07
+
+### Added
+
+- `rawreads_unsplit`, an optional sample info column carrying the URL or path of
+  a single FASTQ that holds **both** mates of a paired-end run concatenated.
+  DRAKKAR downloads it and splits it into R1 and R2 before preprocessing, so the
+  sample then flows through every downstream stage exactly as an ordinary
+  `rawreads1`/`rawreads2` pair does.
+
+  Some runs archived as PAIRED are published as a single `<run>.fastq.gz` rather
+  than a `_1`/`_2` pair: when a submitter uploads reads that were already
+  quality-trimmed the two files no longer line up read-for-read, so the SRA
+  loader stores every read as its own single-read spot -- all of one file's
+  reads, then all of the other's. ENA mirrors that object and publishes no
+  per-mate URL, and NCBI keeps the original submitted files in a requester-pays
+  bucket, so the split can only happen after the download.
+
+  - **Records are routed on the `/1` or `/2` read index in their name**, not on
+    position. Which half comes first varies from run to run, so an assumed
+    ordering would silently reverse the mates for some runs.
+  - **The split is validated before use.** The two halves must hold the same
+    number of records, every record must carry a read index, and neither half
+    may be empty. A file that fails any of these fails that sample with a
+    message naming it, rather than producing a garbage library quietly.
+  - **Mates are renumbered per half** so record *k* of both outputs shares the
+    name `<stem>.<k>`, reproducing the naming an ordinary ENA `_1`/`_2` pair
+    carries. The archive gives every read of an unsplit run its own spot number,
+    which leaves the two halves with no name in common; without renumbering
+    `seqkit pair` under `--sanitize` matches nothing and the run fails.
+  - **A resumed run is cheap.** The two halves are cached beside every other
+    downloaded read file and reused untouched, so neither the download nor the
+    split runs twice. The downloaded flat file is removed once the halves are
+    written, since it is superseded by them and keeping both would double the
+    cache footprint of every unsplit sample. A local file given as
+    `rawreads_unsplit` is never removed.
+  - **The split streams.** Nothing is buffered beyond one record and nothing is
+    staged uncompressed on disk; the outputs are written gzipped. These files run
+    to 2-4 GB compressed each and a study can carry a hundred of them.
+  - **`DRAKKAR_TMPDIR`** redirects the in-progress split output off the output
+    filesystem when a study's worth of unsplit runs would not otherwise fit
+    alongside the finished halves.
+
+  A row carrying `rawreads_unsplit` must leave `rawreads1`, `rawreads2`, and
+  `accession` empty; combining them is reported as an error rather than resolved
+  by a silent precedence rule. Sheets without the column, and rows with an empty
+  cell, behave exactly as before, and a sheet may freely mix both kinds of row.
+
 ## [2.5.6] - 2026-09-07
 
 ### Added

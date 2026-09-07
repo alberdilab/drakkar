@@ -11,8 +11,10 @@ from urllib.request import Request, urlopen
 
 import pandas as pd
 
+from drakkar.fastq_split import configured_tmp_dir, split_unsplit_fastq
 from drakkar.input_errors import (
     DownloadError,
+    FastqSplitError,
     InputFileError,
     report_input_resolution_errors,
     require_non_empty_file,
@@ -38,6 +40,8 @@ READ2_BASENAME_PATTERN = re.compile(r"(?:^|[._-])(?:R?2)(?:[._-]|$)", re.IGNOREC
 NCBI_GENOMES_BASE_URL = "https://ftp.ncbi.nlm.nih.gov/genomes/all"
 
 NCBI_ASSEMBLY_ACCESSION_PATTERN = re.compile(r"^(GC[AF])_(\d{9})(?:\.(\d+))?$", re.IGNORECASE)
+
+FASTQ_BASENAME_SUFFIX_PATTERN = re.compile(r"\.(?:fastq|fq)(?:\.gz)?$", re.IGNORECASE)
 
 def is_url(value):
     parsed = urlparse(str(value))
@@ -584,11 +588,92 @@ def resolve_accession_to_reads(accession, sample_name, output, row_number):
 
     return reads1, reads2
 
+def _is_non_empty_file(path):
+    return os.path.isfile(path) and os.path.getsize(path) > 0
+
+def _unsplit_read_paths(unsplit_value, sample_name, output):
+    """Cache paths for the two halves recovered from an unsplit FASTQ.
+
+    The source basename is part of the name so that two rows sharing a sample
+    name but pointing at different unsplit runs cannot overwrite each other.
+    """
+    cache_dir = os.path.join(output, "data", "reads_cache")
+    basename = os.path.basename(urlparse(str(unsplit_value)).path)
+    stem = FASTQ_BASENAME_SUFFIX_PATTERN.sub("", basename) or "unsplit"
+    prefix = f"{sample_name}_{stem}" if sample_name else stem
+    return (
+        os.path.join(cache_dir, f"{prefix}_1.fq.gz"),
+        os.path.join(cache_dir, f"{prefix}_2.fq.gz"),
+    )
+
+def resolve_unsplit_reads(unsplit_value, sample_name, output, row_number):
+    """Resolve a rawreads_unsplit value to the (read1, read2) pair it contains.
+
+    The archive publishes one flat FASTQ holding both mates of a paired run and
+    offers no per-mate URL, so the pair is recovered by splitting the file after
+    it is downloaded. Both halves are cached beside every other downloaded read
+    file, and halves left by an earlier run are reused untouched, so a resumed
+    run neither downloads nor splits again.
+    """
+    read1_path, read2_path = _unsplit_read_paths(unsplit_value, sample_name, output)
+    if _is_non_empty_file(read1_path) and _is_non_empty_file(read2_path):
+        print(
+            f"Using cached split reads for {sample_name}: {read1_path}, {read2_path}",
+            flush=True,
+        )
+        return read1_path, read2_path
+
+    os.makedirs(os.path.dirname(read1_path), exist_ok=True)
+
+    downloaded = is_url(unsplit_value)
+    if downloaded:
+        url = _normalize_ena_fastq_url(unsplit_value)
+        expected_size = _probe_remote_size(url, f"rawreads_unsplit for {sample_name}")
+        source_path = download_to_cache(
+            url,
+            sample_name,
+            "rawreads_unsplit",
+            output,
+            expected_size=expected_size,
+        )
+    else:
+        source_path = str(Path(unsplit_value).resolve())
+        require_non_empty_file(source_path, f"rawreads_unsplit file on row {row_number}")
+
+    print(f"Splitting {source_path} into forward and reverse reads for {sample_name}", flush=True)
+    try:
+        record_count = split_unsplit_fastq(
+            source_path,
+            read1_path,
+            read2_path,
+            tmp_dir=configured_tmp_dir(),
+            fallback_stem=sample_name,
+        )
+    except FastqSplitError as exc:
+        raise FastqSplitError(
+            f"Could not split rawreads_unsplit for sample {sample_name} on row {row_number}: {exc}"
+        ) from exc
+
+    print(
+        f"Split {source_path} into {record_count} read pairs for {sample_name}: "
+        f"{read1_path}, {read2_path}",
+        flush=True,
+    )
+
+    if downloaded:
+        # The two halves supersede the flat file, and keeping both would double
+        # the cache footprint of every unsplit sample. A local file is never
+        # touched, and a failed split leaves the source in place to inspect.
+        _remove_files([source_path])
+
+    return read1_path, read2_path
+
 def resolve_sample_read_lists(row, row_number, output):
     sample = row.get("sample")
     rawreads1 = row.get("rawreads1")
     rawreads2 = row.get("rawreads2")
     accession = row.get("accession")
+    rawreads_unsplit = row.get("rawreads_unsplit")
 
     if not _has_value(sample):
         print(f"ERROR: Missing value in column 'sample' on row {row_number} of the sample info file.")
@@ -598,6 +683,32 @@ def resolve_sample_read_lists(row, row_number, output):
     accession_value = _normalized_value(accession)
     rawreads1_value = _normalized_value(rawreads1)
     rawreads2_value = _normalized_value(rawreads2)
+    rawreads_unsplit_value = _normalized_value(rawreads_unsplit)
+
+    if rawreads_unsplit_value:
+        # wmw only ever writes rawreads_unsplit on a row whose other read
+        # columns are empty, so a combination here means a hand-edited sheet and
+        # is reported rather than resolved by a silent precedence rule.
+        conflicting = [
+            column
+            for column, value in (
+                ("rawreads1", rawreads1_value),
+                ("rawreads2", rawreads2_value),
+                ("accession", accession_value),
+            )
+            if value
+        ]
+        if conflicting:
+            print(
+                f"ERROR: Row {row_number} of the sample info file combines 'rawreads_unsplit' with "
+                f"{', '.join(conflicting)}. A row carrying an unsplit FASTQ must leave the other "
+                "read columns empty."
+            )
+            sys.exit(1)
+        read1_path, read2_path = resolve_unsplit_reads(
+            rawreads_unsplit_value, sample_name, output, row_number
+        )
+        return sample_name, [read1_path], [read2_path]
 
     if accession_value:
         if rawreads1_value or rawreads2_value:

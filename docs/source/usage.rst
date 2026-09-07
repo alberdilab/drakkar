@@ -68,6 +68,10 @@ the chosen workflow are required.
 - ``accession``: ENA/SRA paired-end run accession such as ``ERR4303216`` or
   ``SRR12345678``. Use this instead of ``rawreads1`` and ``rawreads2`` when
   you want DRAKKAR to download the read pair automatically.
+- ``rawreads_unsplit``: path or URL of a single FASTQ holding **both** mates of
+  a paired-end run concatenated. DRAKKAR splits it into R1 and R2 before
+  preprocessing. Leave ``rawreads1``, ``rawreads2``, and ``accession`` empty on
+  such a row. See *Unsplit paired-end runs* below.
 - ``preprocessedreads1``: explicit path to quality-filtered R1 reads for use
   in cataloging. Takes priority over all other read columns. See
   *Cataloging read resolution* below.
@@ -112,6 +116,9 @@ Input notes
 - Sample tables can also use an ``accession`` column with ENA/SRA paired-end
   run accessions; DRAKKAR resolves and downloads the matching R1 and R2 FASTQ
   files automatically.
+- Sample tables can also use a ``rawreads_unsplit`` column for runs the archive
+  publishes as one flat FASTQ instead of a read pair. See *Unsplit paired-end
+  runs* below.
 - ``-r/--reference``, ``-x/--reference-index``, and ``reference_path`` values
   can be local files or remote URLs.
 - ``-r/--reference`` and ``reference_path`` also accept NCBI genome assembly
@@ -145,6 +152,52 @@ Input notes
   run continues with the remaining binners.
 - ``--multicoverage`` maps samples sharing the same coverage label to each
   other's individual assemblies.
+
+Unsplit paired-end runs
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Some runs archived as ``PAIRED`` are published as a single ``<run>.fastq.gz``
+rather than a ``_1``/``_2`` pair. When a submitter uploads reads that were
+already quality-trimmed the two files no longer line up read-for-read, so the
+SRA loader stores every read as its own single-read spot: all of one file's
+reads, then all of the other's. ENA mirrors that object and publishes no
+per-mate URL, so the mates can only be recovered after the file is downloaded.
+
+Put such a run's URL in ``rawreads_unsplit`` and leave ``rawreads1``,
+``rawreads2``, and ``accession`` empty:
+
+.. code-block:: text
+
+   sample\trawreads1\trawreads2\treference_name\treference_path\trawreads_unsplit
+   S001\tpath/S001_1.fq.gz\tpath/S001_2.fq.gz\tref\tpath/ref.fna\t
+   SRR9851002\t\t\tref\tpath/ref.fna\tftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR985/002/SRR9851002/SRR9851002.fastq.gz
+
+DRAKKAR downloads the file and splits it in one streaming pass, routing each
+record on the ``/1`` or ``/2`` read index in its name. Which half of the file
+comes first varies from run to run, so the index rather than the position
+decides where a record goes. The resulting pair is then preprocessed exactly as
+if it had arrived as ``rawreads1``/``rawreads2``, and a table may freely mix both
+kinds of row.
+
+Notes on the split:
+
+- The two halves must hold the same number of records, every record must carry a
+  read index, and neither half may be empty. A file failing any of these fails
+  that sample with a message naming it, because a mis-split silently produces a
+  garbage library.
+- Mates are renumbered per half, so record *k* of both outputs is named
+  ``<stem>.<k>``, matching the naming an ordinary ENA ``_1``/``_2`` pair
+  carries. The archive gives every read of an unsplit run its own spot number,
+  which leaves the two halves sharing no read name at all and would make
+  ``--sanitize`` discard every pair.
+- The halves are cached under ``<output>/data/reads_cache`` and reused as they
+  are, so a resumed run neither downloads nor splits again. The downloaded flat
+  file is removed once the halves are written; a local file given as
+  ``rawreads_unsplit`` is never removed.
+- Set ``DRAKKAR_TMPDIR`` to write the in-progress split output somewhere other
+  than beside the finished halves. These files run to 2-4 GB compressed each and
+  a study can carry a hundred of them.
+- ``--platform`` continues to apply to the whole run, not per sample.
 
 Cataloging read resolution
 ^^^^^^^^^^^^^^^^^^^^^^^^^^

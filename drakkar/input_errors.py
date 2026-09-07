@@ -9,6 +9,9 @@ class InputFileError(Exception):
 class DownloadError(InputFileError):
     pass
 
+class FastqSplitError(InputFileError):
+    pass
+
 def require_non_empty_file(file_path, description):
     if not os.path.isfile(file_path):
         raise InputFileError(f"{description} not found: {file_path}")

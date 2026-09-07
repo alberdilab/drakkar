@@ -27,6 +27,7 @@ from drakkar.output import Text as RichText, print, prompt
 
 from drakkar import display as _display
 from drakkar import downloads as _downloads
+from drakkar import fastq_split as _fastq_split
 from drakkar import input_errors as _input_errors
 from drakkar import input_manifests as _input_manifests
 from drakkar import input_tables as _input_tables
@@ -52,6 +53,7 @@ from drakkar.downloads import (
     DEFAULT_DOWNLOAD_RETRIES,
     DEFAULT_PAIRED_FASTQ_SIZE_TOLERANCE,
     ENA_FTP_HOSTNAMES,
+    FASTQ_BASENAME_SUFFIX_PATTERN,
     HTTP_URL_SCHEMES,
     NCBI_ASSEMBLY_ACCESSION_PATTERN,
     NCBI_GENOMES_BASE_URL,
@@ -64,6 +66,7 @@ from drakkar.downloads import (
     _advertised_content_length,
     _fetch_url_text,
     _has_value,
+    _is_non_empty_file,
     _normalize_ena_fastq_url,
     _normalize_expected_size,
     _normalized_value,
@@ -75,11 +78,25 @@ from drakkar.downloads import (
     _response_header,
     _retry_delay,
     _split_paired_fastq_urls,
+    _unsplit_read_paths,
     _upgrade_ena_ftp_url,
     _validate_paired_fastq_size_balance,
     _validate_paired_read_maps,
 )
-from drakkar.input_errors import DownloadError, InputFileError, require_non_empty_file
+from drakkar.fastq_split import (
+    DEFAULT_COMPRESS_LEVEL,
+    READ_INDEX_SUFFIX_PATTERN,
+    configured_tmp_dir,
+    read_index,
+    record_stem,
+    split_unsplit_fastq,
+)
+from drakkar.input_errors import (
+    DownloadError,
+    FastqSplitError,
+    InputFileError,
+    require_non_empty_file,
+)
 from drakkar.input_manifests import ASSEMBLY_COLUMN_CANDIDATES
 from drakkar.input_tables import DELIMITER_LABELS, INPUT_TABLE_DELIMITERS
 
@@ -151,6 +168,11 @@ def resolve_input_manifest(*args, **kwargs):
 def resolve_accession_to_reads(*args, **kwargs):
     _sync_download_dependencies()
     return _downloads.resolve_accession_to_reads(*args, **kwargs)
+
+
+def resolve_unsplit_reads(*args, **kwargs):
+    _sync_download_dependencies()
+    return _downloads.resolve_unsplit_reads(*args, **kwargs)
 
 
 def resolve_sample_read_lists(*args, **kwargs):
