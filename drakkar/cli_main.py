@@ -561,6 +561,7 @@ def main():
             args.fraction,
             args.nonpareil,
             args.sanitize,
+            args.platform,
             args.memory_multiplier,
             args.time_multiplier,
             run_info,

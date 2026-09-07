@@ -24,6 +24,7 @@ REFERENCE = config.get("reference", None)
 FRACTION = config.get("fraction", None)
 NONPAREIL = config.get("nonpareil", None)
 SANITIZE = config.get("sanitize", None)
+PLATFORM = str(config.get("platform", "illumina")).lower()
 PROFILING_TYPE = config["profiling_type"].split(",") if "profiling_type" in config else []
 ANNOTATING_TYPE = config["annotating_type"].split(",") if "annotating_type" in config else []
 DATABASE_NAME = config.get("database_name", None)

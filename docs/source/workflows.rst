@@ -88,6 +88,8 @@ Options:
 - ``-c/--multicoverage``: enable multicoverage mapping.
 - ``--fraction``: compute microbial fraction with SingleM.
 - ``--nonpareil``: estimate metagenomic coverage and diversity with Nonpareil.
+- ``--platform``: sequencing platform of the input reads, either ``illumina``
+  (default) or ``bgi``. See :ref:`sequencing-platforms`.
 - ``-a/--ani``: dRep ANI threshold (default: ``0.98``).
 - ``-e/--env_path``: shared Conda environment directory.
 - ``-p/--profile``: Snakemake profile (default: ``slurm``).
@@ -123,11 +125,62 @@ Options:
   reference FASTA and Bowtie2 index files; incompatible with ``-r/--reference``.
 - ``--fraction``: compute microbial fraction with SingleM after preprocessing.
 - ``--nonpareil``: estimate metagenomic coverage and diversity with Nonpareil.
+- ``--platform``: sequencing platform of the input reads, either ``illumina``
+  (default) or ``bgi``. See :ref:`sequencing-platforms`.
 - ``-e/--env_path``: shared Conda environment directory.
 - ``-p/--profile``: Snakemake profile.
 - ``--overwrite``: delete a locked output directory and rerun from scratch.
 - ``--skip-benchmark`` / ``--memory-multiplier`` / ``--time-multiplier`` /
   ``--snakemake-*`` / ``--slurm-*``: see :ref:`snakemake-slurm-management`.
+
+.. _sequencing-platforms:
+
+Sequencing platforms
+^^^^^^^^^^^^^^^^^^^^
+
+DRAKKAR reads paired-end short reads. Everything from assembly onwards is
+platform-agnostic, but two preprocessing steps are not, so the platform is
+declared with ``--platform`` on ``drakkar preprocessing`` and
+``drakkar complete``. The default, ``illumina``, preserves the behaviour of
+earlier releases.
+
+**Adapters.** fastp trims paired-end adapters mainly by per-read overlap
+analysis, and falls back to explicit sequences when no overlap is found.
+``--platform`` selects that fallback pair:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Platform
+     - R1 adapter
+     - R2 adapter
+   * - ``illumina``
+     - ``AGATCGGAAGAGCACACGTCTGAACTCCAGTCA``
+     - ``AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT``
+   * - ``bgi``
+     - ``AAGTCGGAGGCCAAGCGGTCTTAGGAAGACAA``
+     - ``AAGTCGGATCGTAGCCATGTCGTTCTGTGAGCCAAGGAGTTG``
+
+**polyG trimming.** polyG tails are an artefact of Illumina two-colour
+chemistry, where ``G`` means no signal. BGI/DNBSEQ uses four-colour cPAS and
+does not produce them, so ``--trim_poly_g`` is only requested for
+``--platform illumina``. Genuine homopolymer tails are clipped on both
+platforms by ``--trim_poly_x``.
+
+**Read names under** ``--sanitize``. ``seqkit pair`` matches mates on the
+leading non-space characters of the read name. Raw BGI/DNBSEQ headers contain
+no space and end in ``/1`` and ``/2``
+(``@V300026712L2C001R0010000372/1``), so the mate suffix becomes part of the
+identifier and no pair ever matches. With ``--platform bgi`` the suffix is
+stripped before pairing. If a sanitize step ever yields no pairs the run now
+stops with an explicit error rather than passing empty files downstream.
+
+Reads fetched through the ``accession`` column are renamed by ENA/SRA and are
+unaffected by the read-name issue, but still need the correct adapter setting.
+
+A run applies one platform to every sample, so sequencing runs from different
+platforms should be preprocessed separately and combined at the cataloging
+step.
 
 Cataloging
 ^^^^^^^^^^

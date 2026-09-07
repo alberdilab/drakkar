@@ -14,6 +14,41 @@ SINGLEM_DB = config["SINGLEM_DB"]
 MULTIQC_MODULE = config["MULTIQC_MODULE"]
 
 ####
+# Platform-dependent read handling
+####
+
+# fastp trims PE adapters mainly by per-read overlap analysis; these sequences
+# are the fallback it falls back on when no overlap is found (low-quality
+# tails, high error). Illumina TruSeq and BGI/DNBSEQ (MGI) adapters differ, so
+# the pair is chosen from the platform declared on the command line.
+PLATFORM = str(config.get("platform", "illumina")).lower()
+
+PLATFORM_ADAPTERS = {
+    "illumina": (
+        "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
+        "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT",
+    ),
+    "bgi": (
+        "AAGTCGGAGGCCAAGCGGTCTTAGGAAGACAA",
+        "AAGTCGGATCGTAGCCATGTCGTTCTGTGAGCCAAGGAGTTG",
+    ),
+}
+
+if PLATFORM not in PLATFORM_ADAPTERS:
+    raise ValueError(
+        f"Unknown sequencing platform '{PLATFORM}'. "
+        f"Supported platforms: {', '.join(sorted(PLATFORM_ADAPTERS))}."
+    )
+
+ADAPTER_R1, ADAPTER_R2 = PLATFORM_ADAPTERS[PLATFORM]
+
+# polyG tails are an artefact of Illumina two-colour chemistry, where G means
+# no signal. BGI/DNBSEQ uses four-colour cPAS and does not produce them, and
+# --trim_poly_x below already clips any genuine homopolymer tail, so polyG
+# trimming is only requested for Illumina.
+POLYG_FLAG = "--trim_poly_g" if PLATFORM == "illumina" else ""
+
+####
 # Workflow rules
 ####
 
@@ -30,7 +65,10 @@ rule fastp:
         html=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}.html",
         json=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}.json"
     params:
-        fastp_module={FASTP_MODULE}
+        fastp_module={FASTP_MODULE},
+        adapter_r1=ADAPTER_R1,
+        adapter_r2=ADAPTER_R2,
+        polyg_flag=POLYG_FLAG
     threads: 4
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 5)) * 2 ** (attempt - 1)),
@@ -43,7 +81,7 @@ rule fastp:
         fastp \
             --in1 {input.r1} --in2 {input.r2} \
             --out1 {output.r1} --out2 {output.r2} \
-            --trim_poly_g \
+            {params.polyg_flag} \
             --trim_poly_x \
             --low_complexity_filter \
             --n_base_limit 5 \
@@ -52,8 +90,9 @@ rule fastp:
             --thread {threads} \
             --html {output.html} \
             --json {output.json} \
-            --adapter_sequence AGATCGGAAGAGCACACGTCTGAACTCCAGTCA \
-            --adapter_sequence_r2 AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
+            --detect_adapter_for_pe \
+            --adapter_sequence {params.adapter_r1} \
+            --adapter_sequence_r2 {params.adapter_r2}
         """
 
 # Align quality-filtered paired-end reads to the corresponding reference genome using Bowtie2.

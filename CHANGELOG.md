@@ -8,6 +8,48 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.5.6] - 2026-09-07
+
+### Added
+
+- `--platform` on `drakkar preprocessing` and `drakkar complete`, accepting
+  `illumina` (default) or `bgi`, so BGI/DNBSEQ (MGI) reads can be preprocessed
+  correctly. The default reproduces the previous Illumina behaviour exactly,
+  apart from the `--detect_adapter_for_pe` addition below. The flag drives
+  three things:
+  - **Adapter fallback sequences.** fastp trims paired-end adapters mainly by
+    per-read overlap analysis and falls back to explicit sequences when no
+    overlap is found. Both fastp rules previously hardcoded Illumina TruSeq
+    (`AGATCGGAAGAGC...`), so on BGI data the fallback could never match and
+    pairs whose overlap detection failed kept their adapters. `--platform bgi`
+    selects `AAGTCGGAGGCCAAGCGGTCTTAGGAAGACAA` and
+    `AAGTCGGATCGTAGCCATGTCGTTCTGTGAGCCAAGGAGTTG` instead.
+  - **polyG trimming.** polyG tails are an artefact of Illumina two-colour
+    chemistry, where `G` means no signal. BGI/DNBSEQ uses four-colour cPAS and
+    does not produce them, so `--trim_poly_g` is now only passed for
+    `illumina`. `--trim_poly_x` still clips genuine homopolymer tails on both.
+  - **Read-name handling under `--sanitize`.** `seqkit pair` matches mates on
+    the leading non-space characters of the read name. Raw BGI/DNBSEQ headers
+    carry no space and end in `/1` and `/2`
+    (`@V300026712L2C001R0010000372/1`), so the mate suffix became part of the
+    identifier, no pair ever matched, and the step silently emitted empty
+    FASTQ files that failed confusingly further down the workflow.
+    `--platform bgi` passes `--id-regexp '^(\S+)\/[12]'` to strip it.
+
+### Changed
+
+- Both fastp rules now pass `--detect_adapter_for_pe`, enabling fastp's
+  paired-end adapter auto-detection as a second line of defence on top of
+  overlap analysis and the configured fallback sequences. This applies to
+  every platform.
+
+### Fixed
+
+- `seqkit pair` producing no read pairs during `--sanitize` now fails the run
+  with an explicit error naming the sample and pointing at `--platform bgi`,
+  instead of writing empty FASTQ files that broke a later rule with an
+  unrelated message.
+
 ## [2.5.5] - 2026-09-05
 
 ### Fixed
