@@ -14,8 +14,14 @@ import hashlib
 import json
 import math
 import re
+import sys
 from collections import defaultdict
 from pathlib import Path
+
+# See merge_gene_annotations.py for why sys.path is extended here.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from amr_columns import AMRFINDER_COLUMNS, RGI_COLUMNS
 
 
 HIT_COLUMNS = [
@@ -164,8 +170,9 @@ def parse_amrfinder(path, assembly_id):
     rows, fields = read_tsv_table(path)
     require_columns(
         path, fields, "AMRFinderPlus",
-        ("Contig id", "Contig"), ("Start",), ("Stop", "End"),
-        ("Element symbol", "Gene symbol"), ("Type", "Element type"),
+        AMRFINDER_COLUMNS["contig"], AMRFINDER_COLUMNS["start"],
+        AMRFINDER_COLUMNS["end"], AMRFINDER_COLUMNS["symbol"],
+        AMRFINDER_COLUMNS["type"],
     )
     for index, native in enumerate(rows, start=1):
         element_type = row_value(native, "Type", "Element type")
@@ -221,8 +228,9 @@ def parse_rgi(path, assembly_id):
     rows, fields = read_tsv_table(path)
     require_columns(
         path, fields, "RGI",
-        ("ORF_ID", "ORF ID"), ("Contig",), ("Start",), ("Stop", "End"),
-        ("Best_Hit_ARO", "Best Hit ARO"), ("ARO",), ("Cut_Off", "Cut Off"),
+        RGI_COLUMNS["gene"], RGI_COLUMNS["contig"], RGI_COLUMNS["start"],
+        RGI_COLUMNS["end"], RGI_COLUMNS["aro_name"], RGI_COLUMNS["aro"],
+        RGI_COLUMNS["cutoff"],
     )
     for index, native in enumerate(rows, start=1):
         start, end = normalize_interval(

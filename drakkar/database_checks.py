@@ -84,11 +84,18 @@ ANNOTATION_DATABASE_REQUIREMENTS = {
         "stale_outputs": ("annotating/vfdb/*.txt", *GENE_ANNOTATION_OUTPUTS),
     },
     "amr": {
-        "config_key": "AMR_DB",
-        "database": "amr",
-        "source": "amr",
-        "label": "NCBIfam-AMRFinder",
-        "stale_outputs": ("annotating/amr/*.tsv", *GENE_ANNOTATION_OUTPUTS),
+        "config_key": "AMRFINDER_DB",
+        "database": "amrfinderplus",
+        "source": "amrfinderplus",
+        "label": "AMRFinderPlus database",
+        "stale_outputs": ("annotating/amr/*", *GENE_ANNOTATION_OUTPUTS),
+    },
+    "card": {
+        "config_key": "CARD_DB",
+        "database": "card",
+        "source": "card",
+        "label": "CARD database loaded for local RGI use",
+        "stale_outputs": ("annotating/card/*", *GENE_ANNOTATION_OUTPUTS),
     },
     "defense": {
         "config_key": "DEFENSEFINDER_DB",

@@ -129,7 +129,7 @@ def build_parser():
         help=(
             "Comma-separated annotation targets. Options: taxonomy, function, genes, clusters, "
             "kegg, cazy, pfam, virulence (vfdb), amr, signalp, dbcan, antismash, "
-            "defense, mobile (genomad), network. Default: taxonomy,function"
+            "card (rgi), defense, mobile (genomad), network. Default: taxonomy,function"
         ),
     )
     subparser_complete.add_argument(
@@ -251,7 +251,7 @@ def build_parser():
         help=(
             "Comma-separated annotation targets. Options: taxonomy, function, genes, clusters, "
             "kegg, cazy, pfam, virulence (vfdb), amr, signalp, dbcan, antismash, "
-            "defense, mobile (genomad), network. Default: taxonomy,function"
+            "card (rgi), defense, mobile (genomad), network. Default: taxonomy,function"
         ),
     )
     subparser_annotating.add_argument(

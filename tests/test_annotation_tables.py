@@ -95,6 +95,18 @@ class AnnotationTableWorkflowTests(unittest.TestCase):
         self.assertIn("-E 10 --domE 10", kegg_rule)
         self.assertNotIn("-E 1e-10", kegg_rule)
 
+    def test_antismash_rule_removes_previous_per_mag_output(self) -> None:
+        rules = ANNOTATION_RULES.read_text(encoding="utf-8")
+        match = re.search(r"rule antismash:.*?(?=\nrule )", rules, re.DOTALL)
+
+        self.assertIsNotNone(match)
+        antismash_rule = match.group(0)
+        self.assertIn("rm -rf {params.out_dir:q}", antismash_rule)
+        self.assertLess(
+            antismash_rule.index("rm -rf {params.out_dir:q}"),
+            antismash_rule.index("--databases {params.db}"),
+        )
+
     def test_structure_annotation_is_work_in_progress_and_unavailable(self) -> None:
         for requested in ("structure", "foldseek", "kegg,structure"):
             with self.subTest(requested=requested):
@@ -117,6 +129,43 @@ class AnnotationTableWorkflowTests(unittest.TestCase):
         self.assertIn("- python=3.12", environment)
         self.assertIn("- dbcan=5.2.5", environment)
         self.assertIn("- pyhmmer=0.11.4", environment)
+
+    def test_amr_target_runs_amrfinderplus_not_the_hmm_library(self) -> None:
+        rules = ANNOTATION_RULES.read_text(encoding="utf-8")
+        # The gene-level AMR source is AMRFinderPlus in combined mode. The
+        # NCBIfam-AMR HMM library it used to scan is no longer read here.
+        self.assertIn("amrfinder \\", rules)
+        self.assertIn("--annotation_format standard", rules)
+        self.assertIn("--database {params.db:q}", rules)
+        self.assertNotIn("--cut_tc", rules)
+        self.assertNotIn("AMR_DB_TSV", rules)
+        self.assertIn('AMRFINDER_DB = config["AMRFINDER_DB"]', rules)
+        # Combined mode needs all three Prodigal products plus the contigs.
+        self.assertIn("prepare_amrfinder_gff.py", rules)
+        self.assertIn("--nucleotide {params.contigs:q}", rules)
+        self.assertIn("--protein {input.faa:q}", rules)
+        self.assertIn("--gff {input.gff:q}", rules)
+
+    def test_card_target_runs_rgi_in_protein_mode(self) -> None:
+        rules = ANNOTATION_RULES.read_text(encoding="utf-8")
+        self.assertIn('CARD_DB = config["CARD_DB"]', rules)
+        self.assertIn('RUN_CARD = "card" in ANNOTATING_TYPE_SET', rules)
+        # Protein mode is what keeps RGI's ORF_ID joinable to the gene table;
+        # contig mode would make RGI call its own ORFs.
+        self.assertIn("--input_type protein", rules)
+        self.assertNotIn("--input_type contig", rules)
+        # Loose hits stay off, so RGI emits only Perfect and Strict calls.
+        self.assertNotIn("--include_loose", rules)
+        self.assertIn('selected.append(f"{OUTPUT_DIR}/annotating/card/{wildcards.mag}.txt")', rules)
+        self.assertIn("-card {params.card}", rules)
+
+    def test_amr_and_card_are_registered_as_gene_sources(self) -> None:
+        rules = ANNOTATION_RULES.read_text(encoding="utf-8")
+        self.assertIn('("amr", RUN_AMR),', rules)
+        self.assertIn('("card", RUN_CARD),', rules)
+        self.assertIn('"card": "card",', rules)
+        self.assertIn('ANNOTATION_DATABASES["amrfinderplus"] = AMRFINDER_DB', rules)
+        self.assertIn('ANNOTATION_DATABASES["card"] = CARD_DB', rules)
 
 
 if __name__ == "__main__":

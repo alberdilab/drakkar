@@ -241,9 +241,14 @@ following table lists every source produced by the supported 2.0 CLI.
      - VFDB entry
    * - ``amr``
      - ``ncbi_amrfinder``
-     - ``hmmscan``
+     - ``amrfinderplus``
      - ``sequence_homology``
-     - NCBIfam-AMRFinder accession
+     - AMRFinderPlus element symbol, such as ``blaOXA-48``
+   * - ``card`` (alias: ``rgi``)
+     - ``card``
+     - ``rgi_main``
+     - ``sequence_homology``
+     - CARD ARO accession
    * - ``signalp``
      - ``signalp``
      - ``signalp6``
@@ -258,6 +263,362 @@ following table lists every source produced by the supported 2.0 CLI.
 Foldseek/ProstT5 structure annotation remains work in progress and is not an
 available annotation target in Drakkar 2.0. Do not expect a supported 2.0 CLI
 run to emit structure-hit rows.
+
+.. _annotation-thresholds:
+
+Acceptance thresholds and their evidence
+----------------------------------------
+
+Drakkar applies a two-tier acceptance policy. Where an annotation resource
+ships curated, model-specific cutoffs, Drakkar defers to them and does not
+layer a second global filter on top. Only where a resource provides no
+calibrated cutoff does Drakkar apply its own global thresholds, which are
+exposed as CLI options and recorded in ``annotation_manifest.yaml``.
+
+Which rule applies to which source
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :header-rows: 1
+   :widths: 16 44 20 20
+
+   * - ``source``
+     - Acceptance rule
+     - Applied by
+     - Tunable
+   * - ``kegg``
+     - Per-KO KOfam bit score cutoff from ``ko_list``, compared against the
+       full or domain score as the KO's ``score_type`` requires. KOs with no
+       published cutoff fall back to ``--annotation-evalue``.
+     - Drakkar, at merge
+     - Fallback only
+   * - ``pfam``
+     - Pfam per-family gathering threshold (``hmmscan --cut_ga``).
+     - Upstream, native
+     - No
+   * - ``cazy``
+     - dbCAN HMM E-value < ``1e-15`` and HMM coverage > ``0.35``.
+     - Upstream, native
+     - No, fixed in the rule
+   * - ``vfdb``
+     - E-value, percent identity, query coverage and target coverage, all four
+       required simultaneously.
+     - Drakkar, at merge
+     - Yes, all four
+   * - ``ncbi_amrfinder``
+     - AMRFinderPlus's own acceptance: per-gene curated identity and coverage
+       cutoffs on its BLASTP arm, NCBIfam trusted cutoffs on its HMM arm.
+     - Upstream, native
+     - No
+   * - ``card``
+     - RGI's per-model curated bit score cutoffs. Only Perfect and Strict
+       calls are emitted; Loose is off.
+     - Upstream, native
+     - No
+   * - ``signalp``
+     - SignalP 6 native model decision; every call it emits is retained.
+     - Upstream, native
+     - No
+   * - ``defensefinder``
+     - MacSyFinder profile GA scores plus system co-localisation rules.
+     - Upstream, native
+     - No
+   * - ``genomad`` (cluster)
+     - Virus score >= ``0.95`` and marker enrichment >= ``5``.
+     - Drakkar, post-processing
+     - No, fixed in the rule
+   * - ``antismash`` (cluster)
+     - antiSMASH native rule-based cluster detection.
+     - Upstream, native
+     - No
+   * - ``dbcan`` (cluster)
+     - ``run_dbcan`` CGC-finder defaults.
+     - Upstream, native
+     - No
+
+The ``filter_stage`` column of ``annotation_qc.tsv`` separates the two tiers:
+``upstream_native`` means the tool emitted only accepted calls, so Drakkar
+cannot report how many were rejected, and ``drakkar`` means Drakkar applied
+the filter during merging and counted both sides.
+
+Why per-model cutoffs are preferred over a global E-value
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The score that separates true from false members of a profile HMM family is
+family-specific. A broad, deeply sampled, highly conserved family and a short,
+shallow, divergent one do not share a usable cutoff, so a single E-value
+applied across a whole profile database is simultaneously too permissive for
+some families and too strict for others. Every profile database Drakkar uses
+publishes its own solution to this, and Drakkar uses it rather than
+substituting one number.
+
+**KOfam / KEGG.** Aramaki *et al.* (2020) derive one threshold per KO by
+maximising the F-measure against positive and negative training sets,
+repeating the split three times and averaging the result. Benchmarked on 20
+prokaryotic genomes, KofamScan reached F = 0.875, comparable to GhostKOALA
+(0.886) and BlastKOALA (0.846) and clearly above KAAS (0.786). The cutoff
+table also records *which* score to compare: in a recent ``ko_list`` release,
+8,722 of 26,530 thresholded KOs are ``domain``-scored rather than
+``full``-scored, and Drakkar selects the matching bit score per KO.
+
+Because acceptance is by bit score, Drakkar deliberately runs ``hmmscan`` with
+``-E 10 --domE 10`` for KEGG. That permissive *reporting* boundary exists so
+that no hit is discarded by HMMER before its KO-specific cutoff can be
+applied. It is not an acceptance threshold, and the raw
+``annotating/kegg/<mag>.tsv`` files are not filtered output.
+
+Per-KO reliability is not uniform, and the ``ko_list`` F-measure column makes
+that measurable. In the same release the median per-KO F-measure is 0.986, but
+9.4% of thresholded KOs score below 0.80 and 1.4% below 0.50. A KO assignment
+is therefore only as good as its model; the ``score`` and ``threshold``
+columns in the gene table let you re-filter on the margin above cutoff when a
+downstream claim depends on a specific KO.
+
+**Pfam.** Pfam curators set a gathering threshold (GA) per family, and every
+sequence region scoring above it enters the family's full alignment. Mistry
+*et al.* (2021) state that per-family gathering thresholds yield fewer false
+positive matches than a single E-value threshold applied across all Pfam HMMs.
+Drakkar uses ``--cut_ga`` and adds nothing.
+
+**AMRFinderPlus.** The ``amr`` target runs AMRFinderPlus itself in combined
+nucleotide/protein/GFF mode over the MAG's Prodigal calls, so both of its
+detection arms contribute. The BLASTP arm searches the Pathogen Detection
+Reference Gene Catalog under per-gene curated identity and coverage cutoffs,
+and the HMM arm applies the NCBIfam trusted cutoffs (``--cut_tc``) that NCBI
+maintains per model (Feldgarden *et al.*, 2021). Drakkar adds no threshold of
+its own and filters only on element type, keeping this source to ``AMR`` and
+leaving the stress and virulence "plus" genes out; the dropped rows are
+counted in ``annotation_qc.tsv``.
+
+The ``method`` value in ``details`` records which arm produced a call, and
+``hit_rank`` follows AMRFinderPlus's own evidence ranking rather than raw
+alignment score: ``ALLELE > EXACT > BLAST > INTERNAL_STOP > PARTIAL_CONTIG_END
+> PARTIAL > HMM``. An HMM-only call is the weakest tier, so a gene whose only
+evidence is ``method=HMM`` is a family-level assignment, not an allele call.
+
+Why both arms matter: in release ``2026-08-07.1`` the NCBIfam-AMR HMM library
+holds 784 models while the Reference Gene Catalog holds 10,078 proteins across
+8,214 hierarchy nodes, only 410 of which have a matching HMM node. The HMM
+library is family-level by design, so those counts are not a like-for-like
+ratio, but whole allele series — most ``aac(3)`` variants and many ``bla``,
+``tet``, ``erm``, ``sul``, ``dfr``, ``mcr`` and ``qnr`` alleles — are
+detectable only through the catalog. Drakkar releases before 2.6 searched the
+HMM library alone and recovered substantially fewer AMR genes as a result.
+
+.. note::
+
+   Point mutations are still out of scope for this target. AMRFinderPlus
+   detects resistance-conferring mutations, such as in ``gyrA`` or ``rpoB``,
+   only under ``--organism``, whose vocabulary is a short list of clinical
+   taxa. Deriving it from GTDB-Tk taxonomy would be unreliable for most MAGs,
+   so Drakkar omits the flag here and the ``amr`` source reports acquired
+   genes only. For point mutations, run the :ref:`amr module <amr-workflow>`,
+   whose manifest carries an explicit ``organism`` per assembly.
+
+**CARD / RGI.** The ``card`` target runs RGI in protein mode over the same
+Prodigal proteins, so its calls join the gene table on the same gene key. RGI
+decides acceptance with per-model curated bit score cutoffs and reports the
+tier it used in ``Cut_Off``: Perfect is an exact match to a curated reference
+and Strict is above the model's cutoff. Drakkar does not pass
+``--include_loose``, so sub-cutoff Loose calls are never emitted. The curated
+cutoff itself is kept in the ``threshold`` column alongside the observed
+``bitscore``, which makes the margin above cutoff directly auditable.
+
+CARD and the NCBI Reference Gene Catalog are independently curated and do not
+share an ontology, so the two sources are deliberately kept as separate rows
+rather than reconciled. Agreement between them is evidence; disagreement is
+informative, and collapsing them would destroy both signals. For coordinate-
+reconciled loci across the two callers, use the :ref:`amr module
+<amr-workflow>`.
+
+**dbCAN / CAZy.** ``E-value < 1e-15`` and ``coverage > 0.35`` are
+``run_dbcan``'s own defaults for the HMM method, established empirically in
+the dbCAN papers and used by the dbCAN web server as the general annotation
+standard. Note that dbCAN's organism-specific advice is stricter for bacteria
+(``E < 1e-18``); Drakkar keeps the general default, which favours recall.
+
+**DefenseFinder.** MacSyFinder v2 calls HMMER with ``--cut_ga`` when a profile
+carries a GA score, which supersedes the i-evalue and profile-coverage
+defaults, and defense systems must additionally satisfy the model's
+co-localisation and quorum rules. Drakkar retains every gene DefenseFinder
+reports and preserves the native record, including ``activity``, in
+``details``.
+
+**geNomad.** Drakkar keeps geNomad regions only at virus score >= 0.95 and
+marker enrichment >= 5. For comparison, geNomad's own defaults are a score of
+0.70 with no marker-enrichment requirement, and its ``--conservative`` preset
+uses 0.80 and 1.50. Drakkar is therefore stricter than geNomad's most
+stringent published preset. This is deliberate for MAG-level provirus calling,
+where a false provirus call contaminates the host genome's functional profile,
+but it is recall-limiting: expect Drakkar to miss proviruses that geNomad's
+defaults would report.
+
+Drakkar's own global thresholds
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+These apply only where no curated cutoff exists.
+
+``--annotation-evalue``, default ``1e-10``
+""""""""""""""""""""""""""""""""""""""""""
+
+Applied to VFDB hits, to KOfam hits whose KO has no published cutoff, to
+Foldseek structural hits, and to the HMMER hits that decide which genes are
+"orphans" for the structural-annotation step.
+
+Pearson (2013) reports that for protein-protein searches, expectation values
+below 0.001 can reliably be used to infer homology. Drakkar's ``1e-10`` is
+seven orders of magnitude more conservative than that boundary, which is
+appropriate given that these are exactly the cases with no curated cutoff to
+fall back on. It is also the value most commonly adopted in metagenomic
+annotation practice.
+
+The no-cutoff KO case is not marginal: in a recent ``ko_list`` release, 1,857
+of 28,387 KOs (6.5%) carry no published threshold. anvi'o excludes such
+"no-threshold KOs" from annotation entirely unless ``--include-nt-KOs`` is
+given, and its relaxation heuristic for below-threshold hits uses an E-value
+of ``1e-5``. Drakkar is therefore more inclusive than anvi'o for these KOs,
+but gates them five orders of magnitude more strictly than anvi'o's heuristic.
+These rows are identifiable and separable in the gene table: they carry
+``score_type = evalue``, ``threshold`` equal to the configured e-value, and
+``rank_score_type = negative_log10_evalue``, whereas cutoff-backed KO rows
+carry ``full_bitscore`` or ``domain_bitscore`` and
+``rank_score_type = bitscore_above_kofam_cutoff``.
+
+``--annotation-identity``, default ``50`` percent
+"""""""""""""""""""""""""""""""""""""""""""""""""
+
+Applied to VFDB hits only. Rost (1999) found that above roughly 30% identity,
+90% of aligned pairs are homologous, while below 25% fewer than 10% are, with
+20-35% constituting the twilight zone. A 50% cutoff therefore sits clearly in
+the safe zone for homology inference. For *function* transfer the requirement
+is higher: Tian and Skolnick (2003) report that 40% identity supports
+transferring the first three digits of an EC number, while all four digits
+need above 60% identity for at least 90% accuracy.
+
+Read the default accordingly. At 50% identity a ``vfdb`` row is well-supported
+evidence that the gene is homologous to a known virulence factor and belongs
+to that factor's class, and it is *not* sufficient evidence that the gene is
+that specific virulence gene.
+
+This is more permissive than common VFDB screening practice, which typically
+uses 80% identity: ABRicate's default is 80%, EFSA guidance uses >80% identity
+with >70% coverage, and many MAG studies use 80/80 or 90/80. Drakkar's
+default is deliberately recall-oriented, because the long-form table retains
+every accepted hit with its ``identity`` value, so tightening after the fact
+costs nothing. If a result depends on a specific virulence gene being present,
+either rerun with ``--annotation-identity 80`` or filter the table on
+``identity >= 80``.
+
+``--annotation-query-coverage`` and ``--annotation-target-coverage``, default ``0.5``
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+Applied to VFDB hits only, and both must be satisfied. Requiring coverage on
+both sides is stricter than the single-sided coverage most screening tools
+apply, and it targets the specific failure mode that a flat identity threshold
+cannot catch. Rost (1999) notes that whether sequence identity implies
+structural similarity depends crucially on alignment length: 10 identical
+residues in an alignment of 16 is above 60% identity and implies nothing.
+Requiring both coverages rejects a short conserved-motif match against a long
+virulence protein (low target coverage) and a query whose virulence-like
+region is a minority of its length (low query coverage), which is the usual
+source of spurious hits in multi-domain proteins.
+
+Note the two scales differ, and the gene table preserves both as reported:
+``query_coverage`` and ``target_coverage`` are fractions from 0 to 1 (MMseqs2
+``qcov``/``tcov``), while ``identity`` is a percentage from 0 to 100 (MMseqs2
+``pident``). The ``coverage`` column holds the minimum of the two coverages
+and is what ``vfdb`` rows are ranked on.
+
+Choosing different thresholds
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
+
+   * - Goal
+     - Setting
+   * - Claim a specific virulence gene is present in a MAG
+     - ``--annotation-identity 80 --annotation-query-coverage 0.8
+       --annotation-target-coverage 0.8``, or filter the table equivalently.
+   * - Survey virulence-factor classes across many MAGs
+     - Keep the defaults; the class assignment in ``annotation_type`` is
+       supported at 50% identity where the specific gene call is not.
+   * - Exclude KOs that have no curated KOfam cutoff
+     - Filter out ``source == "kegg" and score_type == "evalue"``, matching
+       anvi'o's default behaviour.
+   * - Restrict to high-confidence KO models
+     - Keep rows where ``score - threshold`` is comfortably positive; the
+       margin is already stored as ``rank_score`` for cutoff-backed KO rows.
+   * - Make VFDB acceptance stricter than the safe zone of homology
+     - Raise ``--annotation-evalue`` past ``1e-10`` only together with
+       identity and coverage; e-value alone does not constrain partial hits.
+
+Limitations to keep in mind
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+- **E-values are database-size dependent.** The same ``1e-10`` is not equally
+  strict against VFDB and against AlphaFold/Swiss-Prot, because expectation
+  values scale with the size of the searched database. Compare e-values within
+  a source, not across sources.
+- **Identity and coverage affect VFDB only.** Despite the general wording of
+  ``--annotation-identity``, no other enabled source is filtered on identity
+  or coverage by Drakkar. Foldseek rows carry an identity value but are gated
+  on e-value alone, and their identity is a fraction rather than a percentage.
+- **dbCAN and geNomad thresholds are not exposed.** They are fixed in the
+  workflow rules. Changing them requires editing
+  ``drakkar/workflow/rules/annotating_function.smk``, and the manifest will
+  then no longer describe what was actually run.
+- **AMR point mutations are not reported.** The ``amr`` and ``card`` targets
+  report acquired resistance genes. A MAG with no AMR rows may still carry
+  resistance-conferring mutations in core genes.
+- **Per-KO model quality varies.** Roughly one KO in ten has an F-measure
+  below 0.80 at its own optimal threshold. Passing the cutoff is a statement
+  about that model, not a uniform confidence level.
+- **MMseqs2 identity scale is version-dependent.** MMseqs2 changed ``pident``
+  from a fraction to a percentage. If ``MMSEQS2_MODULE`` resolves to a legacy
+  build that still emits fractions, every identity value would be at most 1.0
+  and the 50% filter would silently reject every VFDB hit. The signature in
+  ``annotation_qc.tsv`` is a ``vfdb`` row with a large ``reported_records``
+  and ``retained_records`` of 0; check the module version before concluding
+  that a MAG carries no virulence factors.
+- **Thresholds are provenance, not defaults to forget.** Every value actually
+  used, including ``kofam_acceptance: native_model_cutoffs``, is written to
+  ``annotating/annotation_manifest.yaml``. Report the manifest values rather
+  than the documented defaults.
+
+References for the thresholds
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+- Aramaki T. *et al.* (2020) KofamKOALA: KEGG Ortholog assignment based on
+  profile HMM and adaptive score threshold. *Bioinformatics* 36:2251-2252.
+  https://doi.org/10.1093/bioinformatics/btz859
+- Mistry J. *et al.* (2021) Pfam: The protein families database in 2021.
+  *Nucleic Acids Research* 49:D412-D419. https://doi.org/10.1093/nar/gkaa913
+- Feldgarden M. *et al.* (2021) AMRFinderPlus and the Reference Gene Catalog
+  facilitate examination of the genomic links among antimicrobial resistance,
+  stress response, and virulence. *Scientific Reports* 11:12728.
+  https://doi.org/10.1038/s41598-021-91456-0
+- Zhang H. *et al.* (2018) dbCAN2: a meta server for automated
+  carbohydrate-active enzyme annotation. *Nucleic Acids Research* 46:W95-W101.
+  https://doi.org/10.1093/nar/gky418
+- Abby S.S. *et al.* / Néron B. *et al.* (2023) MacSyFinder v2: Improved
+  modelling and search engine to identify molecular systems in genomes.
+  *Peer Community Journal* 3:e28. https://doi.org/10.24072/pcjournal.250
+- Camargo A.P. *et al.* (2023) Identification of mobile genetic elements with
+  geNomad. *Nature Biotechnology* 42:1303-1312.
+  https://doi.org/10.1038/s41587-023-01953-y
+- Pearson W.R. (2013) An introduction to sequence similarity ("homology")
+  searching. *Current Protocols in Bioinformatics* 42:3.1.1-3.1.8.
+  https://doi.org/10.1002/0471250953.bi0301s42
+- Rost B. (1999) Twilight zone of protein sequence alignments. *Protein
+  Engineering* 12:85-94. https://doi.org/10.1093/protein/12.2.85
+- Tian W. and Skolnick J. (2003) How well is enzyme function conserved as a
+  function of pairwise sequence identity? *Journal of Molecular Biology*
+  333:863-882. https://doi.org/10.1016/j.jmb.2003.08.057
+- Steinegger M. and Söding J. (2017) MMseqs2 enables sensitive protein
+  sequence searching for the analysis of massive data sets. *Nature
+  Biotechnology* 35:1026-1028. https://doi.org/10.1038/nbt.3988
 
 Source-specific ``details``
 ---------------------------
@@ -286,8 +647,14 @@ stable TSV columns. Important current keys include:
      - All mapping records, VFC, query/target lengths, mismatch/gap counts, and
        identity, coverage, and e-value filter thresholds.
    * - ``ncbi_amrfinder``
-     - All NCBIfam mapping records, HMM model metadata, domain bit score, and
-       trusted-cutoff provenance.
+     - The complete native AMRFinderPlus record, the detection ``method`` and
+       its evidence tier, drug class and subclass, hierarchy node, closest
+       reference accession and name, and HMM metadata when the HMM arm
+       produced the call.
+   * - ``card``
+     - The complete native RGI record, the ``Cut_Off`` tier (Perfect or
+       Strict), ARO accession, AMR gene family, resistance mechanism, drug
+       class, model type, and any SNPs RGI reported.
    * - ``signalp``
      - Currently ``{}``; the stable score and confidence columns contain the
        native confidence.
@@ -333,11 +700,12 @@ The 1.x columns map as follows:
        non-overlapping domains, including repeated families, can produce
        multiple rows.
    * - ``resistance_type``
-     - Filter ``source == "ncbi_amrfinder"``. The mapped subtype or type is in
-       ``annotation_type``.
+     - Filter ``source == "ncbi_amrfinder"``. The drug class is in
+       ``annotation_type`` and the gene symbol in ``annotation_id``.
    * - ``resistance_target``
-     - Read the mapped subclass from the records in ``details.mappings`` on
-       ``ncbi_amrfinder`` rows.
+     - Read ``details.drug_subclass`` on ``ncbi_amrfinder`` rows. Since 2.6
+       these values come from AMRFinderPlus directly rather than from a
+       mapping table keyed on HMM accession.
    * - ``vf``
      - Filter ``source == "vfdb"`` and read ``annotation``. ``annotation_id``
        contains the native VFDB entry.

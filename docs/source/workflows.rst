@@ -312,12 +312,13 @@ Options:
   - ``taxonomy``: run GTDB-Tk taxonomy.
   - ``function``: run all functional components below.
   - ``genes``: run only gene-level components
-    (``kegg,cazy,pfam,virulence,amr,signalp``).
+    (``kegg,cazy,pfam,virulence,amr,card,signalp``).
   - ``kegg``: KEGG ortholog HMM annotation.
   - ``cazy``: CAZy HMM annotation.
   - ``pfam``: PFAM HMM annotation.
   - ``virulence`` (alias: ``vfdb``): VFDB-based virulence annotation.
-  - ``amr``: AMR HMM annotation.
+  - ``amr``: AMRFinderPlus annotation of acquired resistance genes.
+  - ``card`` (alias: ``rgi``): CARD/RGI annotation of resistance determinants.
   - ``signalp``: signal peptide prediction.
   - ``dbcan``: dbCAN/CGC annotation.
   - ``antismash``: biosynthetic cluster annotation.
@@ -341,6 +342,14 @@ database preparation command is not exposed by the CLI.
   fraction from 0 to 1 (default: ``0.5``).
 - ``--annotation-target-coverage``: minimum VFDB/MMseqs target coverage as a
   fraction from 0 to 1 (default: ``0.5``).
+
+These four options only affect sources that publish no curated cutoff of their
+own, which in a supported run means VFDB and the small minority of KOs with no
+KOfam threshold. KEGG, Pfam, CAZy, AMRFinderPlus, CARD/RGI, SignalP and
+DefenseFinder keep their native, model-specific acceptance rules. See :ref:`annotation-thresholds` for
+each source's rule, the published evidence behind the defaults, and guidance on
+when to tighten them.
+
 - ``-e/--env_path``: shared Conda environment directory.
 - ``-p/--profile``: Snakemake profile.
 - ``--overwrite``: delete a locked output directory and rerun from scratch.
@@ -401,6 +410,8 @@ Regenerate the annotation outputs after upgrading; do not concatenate old and
 new tables. The complete migration procedure, including the required VFDB
 mapping rebuild, is documented under :ref:`migrating-gene-tables-2`.
 
+.. _amr-workflow:
+
 Assembly AMR and mobility context
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -410,6 +421,16 @@ mode, and geNomad for plasmid, virus, and provirus context. It is separate from
 ``drakkar annotating --annotation-type amr``: the latter retains the historical
 NCBIfam-AMRFinder HMM gene annotation, while this command preserves two native
 AMR callers and reconciles their coordinates for statistical analysis.
+
+Both commands now run the same two callers. They differ in scope and in what
+they produce. ``drakkar annotating --annotation-type amr,card`` works per MAG
+and emits gene-level rows into ``gene_annotations.tsv.xz``, keeping each
+caller's evidence as its own row. ``drakkar amr`` works per assembly, adds
+AMRFinderPlus point-mutation detection through a curated ``organism``,
+reconciles the two callers' coordinates into loci, and attaches geNomad
+mobility context. Use the annotation targets for per-MAG functional profiling,
+and this command when the resistome itself is the result. See
+:ref:`annotation-thresholds` for each caller's acceptance rule.
 
 Run it on a flat FASTA directory, one assembly folder per sample, or an
 existing Drakkar output containing ``cataloging/megahit``:

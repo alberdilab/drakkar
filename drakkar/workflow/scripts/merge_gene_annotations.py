@@ -2,11 +2,29 @@ import argparse
 import json
 import math
 import re
+import sys
 from collections import defaultdict
 from pathlib import Path
 
 import pandas as pd
 from Bio import SearchIO
+
+# The workflow scripts directory is not an installed package. Running this file
+# directly puts it on sys.path, but importlib-based loaders (the test suite) do
+# not, so add it explicitly before importing a sibling module.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from amr_columns import (
+    AMRFINDER_COLUMNS,
+    AMRFINDER_REQUIRED,
+    RGI_COLUMNS,
+    RGI_REQUIRED,
+    cutoff_rank,
+    field,
+    indexed_row,
+    method_rank,
+    missing_columns,
+)
 
 
 DEFAULT_EVALUE_THRESHOLD = 1e-10
@@ -44,6 +62,7 @@ SOURCE_ORDER = {
     "cazy": 30,
     "vfdb": 40,
     "ncbi_amrfinder": 50,
+    "card": 55,
     "signalp": 60,
     "defensefinder": 70,
     "uniprot_swissprot": 80,
@@ -57,7 +76,15 @@ SOURCE_RANKING = {
         ("coverage", False), ("identity", False), ("bitscore", False),
         ("evalue", True),
     ],
-    "ncbi_amrfinder": [("bitscore", False), ("evalue", True)],
+    # AMRFinderPlus and RGI both publish an evidence tier of their own, so a
+    # gene's competing calls are ranked the way each tool would rank them
+    # rather than by raw alignment score.
+    "ncbi_amrfinder": [
+        ("rank_score", False), ("identity", False), ("coverage", False),
+    ],
+    "card": [
+        ("rank_score", False), ("bitscore", False), ("identity", False),
+    ],
     "signalp": [("confidence", False)],
     "defensefinder": [("score", False), ("evalue", True)],
     "uniprot_swissprot": [
@@ -528,50 +555,194 @@ def load_vfdb_mapping(path):
     return grouped
 
 
-def parse_amr(amr_file, amrdb_file):
-    hits = parse_hmmer3_tab(amr_file)
-    if hits.empty:
+def read_native_tsv(path):
+    """Read one native tool table, returning its records and column names."""
+    if not has_content(path):
+        return [], []
+    frame = pd.read_csv(path, sep="\t", header=0, dtype=str, keep_default_na=False)
+    return frame.to_dict("records"), list(frame.columns)
+
+
+def first_token(value):
+    """Take the identifier out of a header-derived field.
+
+    Prodigal protein headers carry coordinates after the id, and RGI echoes the
+    header it was given, so both tools can hand back more than the bare gene id.
+    """
+    return str(value).split(None, 1)[0] if str(value).strip() else ""
+
+
+def parse_amr(amr_file):
+    """Normalize AMRFinderPlus's native report into gene-level hits.
+
+    Acceptance is entirely AMRFinderPlus's: its BLASTP arm applies per-gene
+    curated identity and coverage cutoffs and its HMM arm applies the NCBIfam
+    trusted cutoffs, so Drakkar adds no threshold of its own. Only the element
+    type is filtered, keeping this source to AMR and leaving the stress and
+    virulence "plus" genes to their own sources.
+    """
+    rows_native, fieldnames = read_native_tsv(amr_file)
+    if not rows_native:
         return attach_qc(
             empty_hits(), "ncbi_amrfinder", 0, None, filter_stage="upstream_native"
         )
-    reported_hits = len(hits)
-    for column in ["evalue", "bitscore", "bitscore_domain"]:
-        hits[column] = pd.to_numeric(hits[column], errors="coerce")
-    mappings = mapping_records(amrdb_file, "accession", {"#hmm_accession": "accession"})
+    missing = missing_columns(fieldnames, AMRFINDER_REQUIRED)
+    if missing:
+        raise ValueError(
+            "AMRFinderPlus output is missing required column(s): "
+            f"{', '.join(missing)}. Regenerate it with the AMRFinderPlus "
+            "version pinned in workflow/envs/amr_amrfinder.yaml."
+        )
+
+    reported_hits = len(rows_native)
     rows = []
-    for _, row in hits.iterrows():
-        accession = first_nonempty(row, ["accession", "id"])
-        mapped = mappings.get(str(accession), [])
-        primary = mapped[0] if mapped else {}
+    for native in rows_native:
+        indexed = indexed_row(native)
+        element_type = field(indexed, AMRFINDER_COLUMNS["type"])
+        if element_type and element_type.upper() != "AMR":
+            continue
+        method = field(indexed, AMRFINDER_COLUMNS["method"])
+        identity = pd.to_numeric(
+            field(indexed, AMRFINDER_COLUMNS["identity"]) or None, errors="coerce"
+        )
+        reference_coverage = pd.to_numeric(
+            field(indexed, AMRFINDER_COLUMNS["reference_coverage"]) or None,
+            errors="coerce",
+        )
+        # AMRFinderPlus reports coverage as a percentage; the table stores
+        # coverage as a fraction so that it is comparable across sources.
+        coverage = reference_coverage / 100.0 if pd.notna(reference_coverage) else pd.NA
         rows.append({
-            "gene": row["gene"],
-            "annotation_id": accession,
-            "annotation": first_nonempty(primary, ["gene_symbol", "gene_name", "name"], row.get("id", "")),
-            "annotation_type": first_nonempty(primary, ["subtype", "type"]),
-            "evalue": row["evalue"],
-            "bitscore": row["bitscore"],
-            "score": row["bitscore"],
-            "score_type": "full_bitscore",
-            "rank_score": row["bitscore"],
-            "rank_score_type": "full_bitscore",
+            "gene": first_token(field(indexed, AMRFINDER_COLUMNS["gene"])),
+            "annotation_id": field(indexed, AMRFINDER_COLUMNS["symbol"]),
+            "annotation": field(
+                indexed, AMRFINDER_COLUMNS["name"],
+                field(indexed, AMRFINDER_COLUMNS["symbol"]),
+            ),
+            "annotation_type": field(indexed, AMRFINDER_COLUMNS["drug_class"]),
+            "identity": identity,
+            "coverage": coverage,
+            "target_coverage": coverage,
+            "alignment_length": pd.to_numeric(
+                field(indexed, AMRFINDER_COLUMNS["alignment_length"]) or None,
+                errors="coerce",
+            ),
+            "score": identity,
+            "score_type": "percent_identity_to_reference",
+            "rank_score": method_rank(method),
+            "rank_score_type": "amrfinder_method_rank",
             "details": details_json({
-                "domain_bitscore": row.get("bitscore_domain"),
-                "hmm_description": row.get("description"),
-                "model_name": row.get("id"),
-                "mappings": mapped,
-                "overlap_num": row.get("overlap_num"),
-                "region_num": row.get("region_num"),
-                "threshold_rule": "trusted_cutoff",
+                "drug_class": field(indexed, AMRFINDER_COLUMNS["drug_class"]),
+                "drug_subclass": field(indexed, AMRFINDER_COLUMNS["drug_subclass"]),
+                "element_subtype": field(indexed, AMRFINDER_COLUMNS["subtype"]),
+                "element_type": element_type,
+                "hierarchy_node": field(indexed, AMRFINDER_COLUMNS["hierarchy_node"]),
+                "hmm_accession": field(indexed, AMRFINDER_COLUMNS["hmm_accession"]),
+                "hmm_description": field(indexed, AMRFINDER_COLUMNS["hmm_description"]),
+                "method": method,
+                "native": native,
+                "reference_accession": field(
+                    indexed, AMRFINDER_COLUMNS["reference_accession"]
+                ),
+                "reference_coverage_percent": field(
+                    indexed, AMRFINDER_COLUMNS["reference_coverage"]
+                ),
+                "reference_name": field(indexed, AMRFINDER_COLUMNS["reference_name"]),
+                "threshold_rule": "amrfinderplus_curated",
             }),
         })
-    unmapped = sum(not mappings.get(str(first_nonempty(row, ["accession", "id"]))) for _, row in hits.iterrows())
+    if not rows:
+        return attach_qc(
+            empty_hits(), "ncbi_amrfinder", reported_hits, reported_hits,
+            filter_stage="upstream_native",
+        )
     return finalize_hits(
         pd.DataFrame(rows),
         "ncbi_amrfinder",
-        "hmmscan",
+        "amrfinderplus",
         "sequence_homology",
         reported_hits=reported_hits,
-        unmapped_hits=unmapped,
+        rejected_hits=reported_hits - len(rows),
+        filter_stage="upstream_native",
+    )
+
+
+def parse_card(card_file):
+    """Normalize CARD/RGI's native report into gene-level hits.
+
+    RGI decides acceptance with its own per-model curated bit score cutoffs and
+    reports the tier it used in ``Cut_Off``. Without ``--include_loose`` it
+    emits only Perfect and Strict calls, so Drakkar adds no further filter and
+    keeps RGI's own cutoff in the ``threshold`` column.
+    """
+    rows_native, fieldnames = read_native_tsv(card_file)
+    if not rows_native:
+        return attach_qc(empty_hits(), "card", 0, None, filter_stage="upstream_native")
+    missing = missing_columns(fieldnames, RGI_REQUIRED)
+    if missing:
+        raise ValueError(
+            "CARD/RGI output is missing required column(s): "
+            f"{', '.join(missing)}. Regenerate it with the RGI version pinned "
+            "in workflow/envs/amr_rgi.yaml, run in protein mode."
+        )
+
+    reported_hits = len(rows_native)
+    rows = []
+    for native in rows_native:
+        indexed = indexed_row(native)
+        cutoff = field(indexed, RGI_COLUMNS["cutoff"])
+        reference_coverage = pd.to_numeric(
+            field(indexed, RGI_COLUMNS["reference_coverage"]) or None, errors="coerce"
+        )
+        coverage = reference_coverage / 100.0 if pd.notna(reference_coverage) else pd.NA
+        bitscore = pd.to_numeric(
+            field(indexed, RGI_COLUMNS["bitscore"]) or None, errors="coerce"
+        )
+        rows.append({
+            "gene": first_token(field(indexed, RGI_COLUMNS["gene"])),
+            "annotation_id": field(
+                indexed, RGI_COLUMNS["aro"], field(indexed, RGI_COLUMNS["aro_name"])
+            ),
+            "annotation": field(indexed, RGI_COLUMNS["aro_name"]),
+            "annotation_type": field(indexed, RGI_COLUMNS["drug_class"]),
+            "identity": pd.to_numeric(
+                field(indexed, RGI_COLUMNS["identity"]) or None, errors="coerce"
+            ),
+            "coverage": coverage,
+            "target_coverage": coverage,
+            "bitscore": bitscore,
+            "score": bitscore,
+            "score_type": "bitscore",
+            "threshold": pd.to_numeric(
+                field(indexed, RGI_COLUMNS["threshold"]) or None, errors="coerce"
+            ),
+            "rank_score": cutoff_rank(cutoff),
+            "rank_score_type": "rgi_cutoff_rank",
+            "details": details_json({
+                "amr_gene_family": field(indexed, RGI_COLUMNS["gene_family"]),
+                "aro": field(indexed, RGI_COLUMNS["aro"]),
+                "cut_off": cutoff,
+                "drug_class": field(indexed, RGI_COLUMNS["drug_class"]),
+                "drug_subclass": field(indexed, RGI_COLUMNS["drug_subclass"]),
+                "model_type": field(indexed, RGI_COLUMNS["model_type"]),
+                "native": native,
+                "note": field(indexed, RGI_COLUMNS["note"]),
+                "reference_coverage_percent": field(
+                    indexed, RGI_COLUMNS["reference_coverage"]
+                ),
+                "resistance_mechanism": field(
+                    indexed, RGI_COLUMNS["resistance_mechanism"]
+                ),
+                "snps": field(indexed, RGI_COLUMNS["snps"]),
+                "threshold_rule": "rgi_curated_bitscore",
+            }),
+        })
+    return finalize_hits(
+        pd.DataFrame(rows),
+        "card",
+        "rgi_main",
+        "sequence_homology",
+        reported_hits=reported_hits,
         filter_stage="upstream_native",
     )
 
@@ -911,6 +1082,7 @@ def validate_hit_gene_ids(hits, genes, mag):
 GENE_SOURCE_ALIASES = {
     "vfdb": "virulence",
     "foldseek": "structure",
+    "rgi": "card",
 }
 
 GENE_SOURCE_FACTORIES = {
@@ -919,6 +1091,7 @@ GENE_SOURCE_FACTORIES = {
     "pfam",
     "virulence",
     "amr",
+    "card",
     "signalp",
     "defense",
     "structure",
@@ -969,9 +1142,9 @@ def merge_annotations(
     vf_file,
     vfdb_file,
     amr_file,
-    amrdb_file,
     signalp_file,
     output_file,
+    card_file=None,
     defense_file=None,
     foldseek_file=None,
     foldseekdb_file=None,
@@ -1007,7 +1180,9 @@ def merge_annotations(
             )
         )
     if "amr" in selected:
-        frames.append(parse_amr(amr_file, amrdb_file))
+        frames.append(parse_amr(amr_file))
+    if "card" in selected:
+        frames.append(parse_card(card_file))
     if "signalp" in selected:
         frames.append(parse_signalp(signalp_file))
     if "defense" in selected:
@@ -1049,8 +1224,8 @@ def main():
     parser.add_argument("-cazy", required=False, type=str, help="Path to dbCAN's coverage-filtered HMM result table")
     parser.add_argument("-vf", required=False, type=str, help="Path to the VFDB alignment table")
     parser.add_argument("-vfdb", required=False, type=str, help="Path to the VFDB mapping table")
-    parser.add_argument("-amr", required=False, type=str, help="Path to the AMR HMMER table")
-    parser.add_argument("-amrdb", required=False, type=str, help="Path to the AMR mapping table")
+    parser.add_argument("-amr", required=False, type=str, help="Path to the AMRFinderPlus report")
+    parser.add_argument("-card", required=False, type=str, help="Path to the CARD/RGI protein-mode report")
     parser.add_argument("-signalp", required=False, type=str, help="Path to the SignalP table")
     parser.add_argument("-o", required=True, type=str, help="Path to the output TSV file")
     parser.add_argument("-defense", required=False, type=str, help="Path to DefenseFinder gene-level TSV")
@@ -1094,7 +1269,8 @@ def main():
 
     merge_annotations(
         args.gff, args.kegg, args.keggdb, args.keggcutoffs, args.pfam, args.ec,
-        args.cazy, args.vf, args.vfdb, args.amr, args.amrdb, args.signalp, args.o,
+        args.cazy, args.vf, args.vfdb, args.amr, args.signalp, args.o,
+        card_file=args.card,
         defense_file=args.defense,
         foldseek_file=args.foldseek,
         foldseekdb_file=args.foldseekdb,

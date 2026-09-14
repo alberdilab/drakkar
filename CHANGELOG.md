@@ -8,6 +8,71 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.6.0] - 2026-09-14
+
+### Changed
+
+- **Breaking: `drakkar annotating --annotation-type amr` now runs AMRFinderPlus
+  instead of scanning the NCBIfam-AMR HMM library with `hmmscan --cut_tc`.**
+  The `ncbi_amrfinder` rows in `gene_annotations.tsv.xz` therefore change
+  meaning, and tables written by earlier releases are not comparable with new
+  ones. Regenerate annotation outputs rather than concatenating across
+  versions.
+
+  The HMM library is one of AMRFinderPlus's two detection arms and the weaker
+  one. In release `2026-08-07.1` it holds 784 models against the Reference Gene
+  Catalog's 10,078 proteins, and whole allele series -- most `aac(3)` variants
+  and many `bla`, `tet`, `erm`, `sul`, `dfr`, `mcr` and `qnr` alleles -- have no
+  model of their own. NCBI documents the catalog as the primary detector and
+  the HMMs as a confirmation and remote-homolog aid, and ranks an HMM-only call
+  as its weakest evidence tier. Scanning the library alone recovered
+  substantially fewer AMR genes than AMRFinderPlus does.
+
+  - AMRFinderPlus runs in combined nucleotide/protein/GFF mode over the MAG's
+    existing Prodigal calls, so no new gene prediction is introduced.
+  - `hit_rank` now follows AMRFinderPlus's own evidence ranking (`ALLELE >
+    EXACT > BLAST > INTERNAL_STOP > PARTIAL_CONTIG_END > PARTIAL > HMM`), and
+    `details.method` records which arm produced each call.
+  - `identity` and `coverage` now carry AMRFinderPlus's per-gene values rather
+    than being empty; `coverage` is a fraction, matching the other sources.
+  - Only `AMR` element types are kept. Stress and virulence "plus" genes are
+    dropped and counted as rejected in `annotation_qc.tsv`.
+  - Point mutations remain out of scope: they require `--organism`, whose
+    vocabulary is a short list of clinical taxa that most MAGs do not match.
+    Use `drakkar amr` for those.
+  - The `amr` target now requires `AMRFINDER_DB` rather than `AMR_DB`. The
+    legacy `drakkar database amr` HMM release is no longer read by the
+    annotating module.
+
+### Added
+
+- `card` (alias `rgi`), a new gene-level annotation target that runs CARD's RGI
+  in protein mode over the same Prodigal proteins and emits `source=card` rows.
+  CARD and the NCBI Reference Gene Catalog are independently curated and do not
+  share an ontology, so the two callers are kept as separate rows rather than
+  reconciled; agreement between them is evidence and disagreement is
+  informative.
+
+  - RGI runs in protein mode, not contig mode, so its `ORF_ID` joins directly
+    to the gene table instead of referring to ORFs RGI called itself.
+  - Acceptance is RGI's own per-model curated bit score cutoff. `--include_loose`
+    is not passed, so only Perfect and Strict calls are emitted, and the curated
+    cutoff is preserved in the `threshold` column next to the observed
+    `bitscore`.
+  - `card` is included in the `genes` and `function` bundles, so a default
+    functional annotation run now also runs RGI.
+  - Requires `CARD_DB`, the same release the `drakkar amr` workflow uses.
+
+- `workflow/scripts/amr_columns.py`, a shared column vocabulary for the native
+  AMRFinderPlus and RGI reports, so `amr_digest.py` and
+  `merge_gene_annotations.py` cannot drift apart when either tool renames a
+  column.
+
+- Documentation of every annotation acceptance threshold and the published
+  evidence behind it, under "Acceptance thresholds and their evidence" in the
+  annotation table reference, cross-linked from the workflow guide and the
+  documentation index.
+
 ## [2.5.7] - 2026-09-07
 
 ### Added

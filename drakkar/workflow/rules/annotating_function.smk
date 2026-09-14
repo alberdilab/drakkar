@@ -29,10 +29,13 @@ KEGG_DB = str(database_registry.database_artifact_path("kegg", config["KEGG_DB"]
 KEGG_DB_JSON = str(database_registry.database_artifact_path("kegg", config["KEGG_DB"], ".json"))
 KEGG_DB_KOLIST = str(database_registry.database_artifact_path("kegg", config["KEGG_DB"], "_ko_list.tsv"))
 CAZY_DB = str(database_registry.database_artifact_path("cazy", config["CAZY_DB"]))
-AMR_DB = str(database_registry.database_artifact_path("amr", config["AMR_DB"]))
-AMR_DB_TSV = str(database_registry.database_artifact_path("amr", config["AMR_DB"], ".tsv"))
 PFAM_DB = str(database_registry.database_artifact_path("pfam", config["PFAM_DB"]))
 PFAM_DB_EC = str(database_registry.database_artifact_path("pfam", config["PFAM_DB"], "_ec.tsv"))
+# Gene-level AMR uses AMRFinderPlus itself, not the NCBIfam-AMR HMM library that
+# earlier releases searched with hmmscan. CARD/RGI is a second, independent
+# caller over the same Prodigal proteins.
+AMRFINDER_DB = config["AMRFINDER_DB"]
+CARD_DB = config["CARD_DB"]
 VFDB_DB = str(database_registry.database_artifact_path("vfdb", config["VFDB_DB"]))
 VFDB_DB_TSV = str(database_registry.database_artifact_path("vfdb", config["VFDB_DB"], ".tsv"))
 GENOMAD_DB = config["GENOMAD_DB"]
@@ -58,6 +61,7 @@ RUN_CAZY = "cazy" in ANNOTATING_TYPE_SET
 RUN_PFAM = "pfam" in ANNOTATING_TYPE_SET
 RUN_VIRULENCE = "virulence" in ANNOTATING_TYPE_SET
 RUN_AMR = "amr" in ANNOTATING_TYPE_SET
+RUN_CARD = "card" in ANNOTATING_TYPE_SET
 RUN_SIGNALP = "signalp" in ANNOTATING_TYPE_SET
 RUN_DBCAN = "dbcan" in ANNOTATING_TYPE_SET
 RUN_ANTISMASH = "antismash" in ANNOTATING_TYPE_SET
@@ -73,6 +77,7 @@ ENABLED_GENE_SOURCES = [
         ("pfam", RUN_PFAM),
         ("virulence", RUN_VIRULENCE),
         ("amr", RUN_AMR),
+        ("card", RUN_CARD),
         ("signalp", RUN_SIGNALP),
         ("defense", RUN_DEFENSE),
         ("structure", RUN_STRUCTURE),
@@ -93,6 +98,7 @@ ENABLED_CLUSTER_SOURCES = [
 REPORT_SOURCE_NAMES = {
     "virulence": "vfdb",
     "amr": "ncbi_amrfinder",
+    "card": "card",
     "defense": "defensefinder",
     "mobile": "genomad",
     "structure": "uniprot_swissprot",
@@ -112,7 +118,9 @@ if RUN_PFAM:
 if RUN_VIRULENCE:
     ANNOTATION_DATABASES["vfdb"] = config["VFDB_DB"]
 if RUN_AMR:
-    ANNOTATION_DATABASES["amr"] = config["AMR_DB"]
+    ANNOTATION_DATABASES["amrfinderplus"] = AMRFINDER_DB
+if RUN_CARD:
+    ANNOTATION_DATABASES["card"] = CARD_DB
 if RUN_DBCAN:
     ANNOTATION_DATABASES["dbcan"] = DBCAN_DB
 if RUN_ANTISMASH:
@@ -125,8 +133,12 @@ if RUN_STRUCTURE:
     ANNOTATION_DATABASES["foldseek"] = FOLDSEEK_DB
 
 ANNOTATION_TOOLS = {}
-if RUN_KEGG or RUN_PFAM or RUN_AMR:
+if RUN_KEGG or RUN_PFAM:
     ANNOTATION_TOOLS["hmmer"] = HMMER_MODULE
+if RUN_AMR:
+    ANNOTATION_TOOLS["amrfinderplus"] = "workflow/envs/amr_amrfinder.yaml"
+if RUN_CARD:
+    ANNOTATION_TOOLS["rgi"] = "workflow/envs/amr_rgi.yaml"
 if RUN_VIRULENCE:
     ANNOTATION_TOOLS["mmseqs2"] = MMSEQS2_MODULE
 if RUN_SIGNALP:
@@ -143,6 +155,12 @@ if RUN_CAZY or RUN_DBCAN:
     ANNOTATION_ENVIRONMENTS["dbcan"] = (
         f"{PACKAGE_DIR}/workflow/envs/annotating_function_dbcan.yaml"
     )
+if RUN_AMR:
+    ANNOTATION_ENVIRONMENTS["amrfinder"] = (
+        f"{PACKAGE_DIR}/workflow/envs/amr_amrfinder.yaml"
+    )
+if RUN_CARD:
+    ANNOTATION_ENVIRONMENTS["rgi"] = f"{PACKAGE_DIR}/workflow/envs/amr_rgi.yaml"
 
 
 def assignment_args(values):
@@ -161,6 +179,8 @@ def selected_gene_annotation_inputs(wildcards):
         selected.append(f"{OUTPUT_DIR}/annotating/vfdb/{wildcards.mag}.txt")
     if RUN_AMR:
         selected.append(f"{OUTPUT_DIR}/annotating/amr/{wildcards.mag}.tsv")
+    if RUN_CARD:
+        selected.append(f"{OUTPUT_DIR}/annotating/card/{wildcards.mag}.txt")
     if RUN_SIGNALP:
         selected.append(f"{OUTPUT_DIR}/annotating/signalp/{wildcards.mag}.txt")
     if RUN_DEFENSE:
@@ -350,26 +370,115 @@ rule vfdb:
             --format-output query,target,pident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,qlen,tlen,qcov,tcov
         """
 
+rule amr_gff:
+    input:
+        gff=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.gff",
+        faa=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
+    output:
+        f"{OUTPUT_DIR}/annotating/amr/{{mag}}.amrfinder.gff"
+    params:
+        package_dir={PACKAGE_DIR}
+    threads:
+        1
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
+    resources:
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(1024 * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(5, int(input.size_mb * 2)) * 2 ** (attempt - 1))
+    message: "Preparing the AMRFinderPlus GFF of MAG {wildcards.mag}..."
+    shell:
+        """
+        PYTHON_BIN="${{CONDA_PREFIX}}/bin/python"
+        $PYTHON_BIN {params.package_dir}/workflow/scripts/prepare_amrfinder_gff.py \
+            {input.gff:q} \
+            {output:q} \
+            --proteins {input.faa:q}
+        """
+
 rule amr:
+    input:
+        contigs=lambda wildcards: MAGS_TO_FILES[wildcards.mag],
+        faa=f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa",
+        gff=f"{OUTPUT_DIR}/annotating/amr/{{mag}}.amrfinder.gff"
+    output:
+        f"{OUTPUT_DIR}/annotating/amr/{{mag}}.tsv"
+    params:
+        db={AMRFINDER_DB},
+        contigs=f"{OUTPUT_DIR}/annotating/amr/{{mag}}.contigs.fna"
+    threads:
+        4
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/amr_amrfinder.yaml"
+    resources:
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(4*1024, int(input.size_mb * 1024 * 4)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 20)) * 2 ** (attempt - 1))
+    message: "Annotating AMR genes of MAG {wildcards.mag} with AMRFinderPlus..."
+    shell:
+        r"""
+        set -euo pipefail
+        # Combined mode needs the contigs uncompressed alongside the proteins
+        # and the GFF. --organism is deliberately omitted: its vocabulary is a
+        # short list of clinical taxa, so point mutations are out of scope here
+        # and stay with the dedicated `drakkar amr` workflow.
+        case {input.contigs:q} in
+            *.gz) gzip -dc {input.contigs:q} > {params.contigs:q} ;;
+            *) cp {input.contigs:q} {params.contigs:q} ;;
+        esac
+        amrfinder \
+            --nucleotide {params.contigs:q} \
+            --protein {input.faa:q} \
+            --gff {input.gff:q} \
+            --annotation_format standard \
+            --database {params.db:q} \
+            --threads {threads} \
+            --print_node \
+            --name {wildcards.mag:q} \
+            --output {output:q}
+        rm -f {params.contigs:q}
+        test -s {output:q}
+        """
+
+rule card:
     input:
         f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
     output:
-        txt=f"{OUTPUT_DIR}/annotating/amr/{{mag}}.txt",
-        tsv=f"{OUTPUT_DIR}/annotating/amr/{{mag}}.tsv"
+        txt=f"{OUTPUT_DIR}/annotating/card/{{mag}}.txt",
+        json=f"{OUTPUT_DIR}/annotating/card/{{mag}}.json"
     params:
-        hmmer_module={HMMER_MODULE},
-        db={AMR_DB}
+        card_root={CARD_DB},
+        output_base=lambda wildcards: str(
+            Path(f"{OUTPUT_DIR}/annotating/card/{wildcards.mag}").resolve()
+        ),
+        proteins=lambda wildcards, input: str(Path(input[0]).resolve())
     threads:
-        1
+        8
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/amr_rgi.yaml"
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 1024 * 4)) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10)) * 2 ** (attempt - 1))
-    message: "Annotating AMRs of MAG {wildcards.mag}..."
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 20)) * 2 ** (attempt - 1))
+    message: "Annotating CARD determinants of MAG {wildcards.mag} with RGI..."
     shell:
-        """
-        module purge
-        module load {params.hmmer_module}
-        hmmscan -o {output.txt} --tblout {output.tsv} --cut_tc --noali {params.db} {input}
+        r"""
+        set -euo pipefail
+        mkdir -p $(dirname {output.txt:q})
+        # Protein mode keeps RGI on the same Prodigal calls as every other gene
+        # source, so ORF_ID joins straight to the gene table. Contig mode would
+        # make RGI call its own ORFs, which would not match. --local requires
+        # CARD's localDB in the working directory.
+        cd {params.card_root:q}
+        rgi main \
+            --input_sequence {params.proteins:q} \
+            --output_file {params.output_base:q} \
+            --input_type protein \
+            --alignment_tool DIAMOND \
+            --threads {threads} \
+            --local \
+            --clean
+        # The outputs are checked by absolute path: this shell has cd'ed into
+        # the CARD root, so the rule-relative output paths no longer resolve.
+        test -s {params.output_base:q}.txt
+        test -s {params.output_base:q}.json
         """
 
 rule signalp:
@@ -467,7 +576,6 @@ rule merge_gene_annotations:
         kegg_cutoffs={KEGG_DB_KOLIST},
         ec_db={PFAM_DB_EC},
         vf_db={VFDB_DB_TSV},
-        amr_db={AMR_DB_TSV},
         foldseek_db={FOLDSEEK_MAP_DB},
         sources=",".join(ENABLED_GENE_SOURCES),
         evalue={ANNOTATION_EVALUE},
@@ -479,6 +587,7 @@ rule merge_gene_annotations:
         cazy=lambda wildcards: f"{OUTPUT_DIR}/annotating/cazy/{wildcards.mag}/dbCAN_hmm_results.tsv",
         vf=lambda wildcards: f"{OUTPUT_DIR}/annotating/vfdb/{wildcards.mag}.txt",
         amr=lambda wildcards: f"{OUTPUT_DIR}/annotating/amr/{wildcards.mag}.tsv",
+        card=lambda wildcards: f"{OUTPUT_DIR}/annotating/card/{wildcards.mag}.txt",
         signalp=lambda wildcards: f"{OUTPUT_DIR}/annotating/signalp/{wildcards.mag}.txt",
         defense=lambda wildcards: f"{OUTPUT_DIR}/annotating/defensefinder/{wildcards.mag}/{wildcards.mag}_defense_finder_genes.tsv",
         foldseek=lambda wildcards: f"{OUTPUT_DIR}/annotating/foldseek/{wildcards.mag}.tsv"
@@ -507,7 +616,7 @@ rule merge_gene_annotations:
             -vf {params.vf} \
             -vfdb {params.vf_db} \
             -amr {params.amr} \
-            -amrdb {params.amr_db} \
+            -card {params.card} \
             -signalp {params.signalp} \
             -defense {params.defense} \
             -foldseek {params.foldseek} \
@@ -667,6 +776,7 @@ rule antismash:
         f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
     shell:
         """
+        rm -rf {params.out_dir:q}
         antismash  \
             --databases {params.db} \
             --output-dir {params.out_dir} \

@@ -31,6 +31,9 @@ Find what you need
    * - Interpret annotation tables or migrate results from Drakkar 1.x
      - See :doc:`annotation_tables` for examples, schemas, source values,
        migration mappings, and analysis recipes.
+   * - Understand which threshold accepted an annotation, and why
+     - See :ref:`annotation-thresholds` for each source's acceptance rule, the
+       published evidence behind every default, and when to tighten them.
    * - Manage databases, logs, config, transfers, outputs, or troubleshooting
      - See :doc:`operations` for operational commands and maintenance tasks.
    * - Summarize a finished run, or query its results as a database

@@ -287,34 +287,95 @@ class MergeGeneAnnotationTests(unittest.TestCase):
         associations = json.loads(parsed.iloc[0]["details"])["ec_associations"]
         self.assertEqual([entry["ec"] for entry in associations], ["1.1.1.1", "2.2.2.2"])
 
-    def test_amr_parser_preserves_multiple_models_and_hash_prefixed_mapping_header(self) -> None:
+    def test_amr_parser_reads_amrfinderplus_and_ranks_by_its_own_evidence_tier(self) -> None:
         module = load_merge_module()
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            tmp = Path(tmpdir)
-            amr = tmp / "amr.tsv"
-            amr_map = tmp / "amr_map.tsv"
+            amr = Path(tmpdir) / "amr.tsv"
             amr.write_text(
-                "# columns\n"
-                + hmmer_row("ModelA", "gene1", "1e-30", "120", "ACC_A")
-                + "\n"
-                + hmmer_row("ModelB", "gene1", "1e-15", "90", "ACC_B")
-                + "\n",
+                "Protein identifier\tContig id\tStart\tStop\tStrand\tElement symbol\t"
+                "Element name\tType\tSubtype\tMethod\tClass\tSubclass\t"
+                "% Identity to reference\t% Coverage of reference\tHierarchy node\n"
+                # A weaker HMM call listed first, to prove ranking is not file order.
+                "gene1\tc1\t1\t900\t+\tblaOXA\tclass D beta-lactamase\tAMR\tAMR\t"
+                "HMM\tBETA-LACTAM\tCEPHALOSPORIN\t\t\tblaOXA\n"
+                "gene1\tc1\t1\t900\t+\tblaOXA-48\tcarbapenemase OXA-48\tAMR\tAMR\t"
+                "EXACTP\tBETA-LACTAM\tCARBAPENEM\t100.00\t100.00\tblaOXA-48\n"
+                # A "plus" stress gene, which this source deliberately drops.
+                "gene2\tc1\t1000\t1600\t-\tarsR\tarsenic repressor\tSTRESS\tMETAL\t"
+                "BLASTP\tARSENIC\t\t95.00\t99.00\tarsR\n",
                 encoding="utf-8",
             )
-            amr_map.write_text(
-                "#hmm_accession\tgene_symbol\tsubtype\tsubclass\n"
-                "ACC_A\tblaA\tbeta-lactamase\tbeta-lactam\n"
-                "ACC_B\ttetB\tefflux\ttetracycline\n",
-                encoding="utf-8",
-            )
+            parsed = module.parse_amr(amr)
 
-            parsed = module.parse_amr(amr, amr_map)
-
-        self.assertEqual(parsed["annotation_id"].tolist(), ["ACC_A", "ACC_B"])
-        self.assertEqual(parsed["annotation"].tolist(), ["blaA", "tetB"])
+        self.assertEqual(parsed["annotation_id"].tolist(), ["blaOXA-48", "blaOXA"])
         self.assertEqual(parsed["hit_rank"].tolist(), [1, 2])
-        self.assertEqual(json.loads(parsed.iloc[1]["details"])["mappings"][0]["subclass"], "tetracycline")
+        self.assertEqual(parsed["is_primary"].tolist(), [True, False])
+        self.assertEqual(parsed["method"].tolist(), ["amrfinderplus", "amrfinderplus"])
+        self.assertEqual(parsed["annotation_type"].tolist(), ["BETA-LACTAM", "BETA-LACTAM"])
+        primary = parsed.iloc[0]
+        self.assertEqual(primary["identity"], 100.0)
+        # Coverage is stored as a fraction even though AMRFinderPlus reports a percentage.
+        self.assertEqual(primary["coverage"], 1.0)
+        self.assertEqual(json.loads(primary["details"])["method"], "EXACTP")
+        self.assertEqual(
+            json.loads(primary["details"])["threshold_rule"], "amrfinderplus_curated"
+        )
+        # The STRESS row is excluded from this source but stays visible in QC.
+        self.assertNotIn("arsR", parsed["annotation_id"].tolist())
+        qc = parsed.attrs["annotation_qc"]
+        self.assertEqual(qc["source"], "ncbi_amrfinder")
+        self.assertEqual(qc["reported_records"], 3)
+        self.assertEqual(qc["retained_records"], 2)
+        self.assertEqual(qc["rejected_records"], 1)
+        self.assertEqual(qc["filter_stage"], "upstream_native")
+
+    def test_amr_parser_rejects_output_missing_required_columns(self) -> None:
+        module = load_merge_module()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            amr = Path(tmpdir) / "amr.tsv"
+            amr.write_text("Contig id\tStart\tStop\nc1\t1\t900\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "missing required column"):
+                module.parse_amr(amr)
+
+    def test_card_parser_keeps_rgi_cutoff_tier_and_curated_threshold(self) -> None:
+        module = load_merge_module()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            card = Path(tmpdir) / "card.txt"
+            card.write_text(
+                "ORF_ID\tContig\tCut_Off\tBest_Hit_ARO\tARO\tBest_Identities\t"
+                "Best_Hit_bit-score\tPass_bit-score\tDrug Class\tAMR Gene Family\t"
+                "Resistance Mechanism\tPercentage Length of Reference Sequence\tModel_type\n"
+                "gene1 # 1 # 900 # 1 # ID=1_1\tc1\tStrict\tOXA-48\t3001414\t88.5\t"
+                "410\t400\tcephalosporin\tOXA beta-lactamase\tantibiotic inactivation\t"
+                "97.5\tprotein homolog model\n"
+                "gene1 # 1 # 900 # 1 # ID=1_1\tc1\tPerfect\tOXA-181\t3002000\t100.0\t"
+                "520\t400\tcarbapenem\tOXA beta-lactamase\tantibiotic inactivation\t"
+                "100.0\tprotein homolog model\n",
+                encoding="utf-8",
+            )
+            parsed = module.parse_card(card)
+
+        # Perfect outranks Strict regardless of file order, and the Prodigal
+        # coordinates RGI echoes back are stripped from the gene id.
+        self.assertEqual(parsed["gene"].tolist(), ["gene1", "gene1"])
+        self.assertEqual(parsed["annotation"].tolist(), ["OXA-181", "OXA-48"])
+        self.assertEqual(parsed["annotation_id"].tolist(), ["3002000", "3001414"])
+        self.assertEqual(parsed["hit_rank"].tolist(), [1, 2])
+        primary = parsed.iloc[0]
+        self.assertEqual(primary["source"], "card")
+        self.assertEqual(primary["method"], "rgi_main")
+        self.assertEqual(primary["bitscore"], 520.0)
+        self.assertEqual(primary["threshold"], 400.0)
+        self.assertEqual(primary["coverage"], 1.0)
+        self.assertEqual(json.loads(primary["details"])["cut_off"], "Perfect")
+        self.assertEqual(
+            json.loads(primary["details"])["resistance_mechanism"],
+            "antibiotic inactivation",
+        )
+        self.assertEqual(parsed.attrs["annotation_qc"]["filter_stage"], "upstream_native")
 
     def test_signalp_and_defensefinder_keep_multiple_predictions(self) -> None:
         module = load_merge_module()
@@ -413,7 +474,7 @@ class MergeGeneAnnotationTests(unittest.TestCase):
             )
 
             result = module.merge_annotations(
-                str(gff), str(kegg), "", str(cutoffs), "", "", "", "", "", "", "", "",
+                str(gff), str(kegg), "", str(cutoffs), "", "", "", "", "", "", "",
                 str(out), foldseek_file=str(m8), foldseekdb_file=str(mapping), mag="MAG_A",
                 enabled_sources={"kegg", "structure"}, qc_output=qc,
             )
@@ -448,7 +509,7 @@ class MergeGeneAnnotationTests(unittest.TestCase):
             gff.write_text("", encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "MAG identity is required"):
                 module.merge_annotations(
-                    str(gff), "", "", "", "", "", "", "", "", "", "", "", str(tmp / "out.tsv")
+                    str(gff), "", "", "", "", "", "", "", "", "", "", str(tmp / "out.tsv")
                 )
 
     def test_duplicate_prodigal_gene_ids_are_rejected(self) -> None:
@@ -490,7 +551,7 @@ class MergeGeneAnnotationTests(unittest.TestCase):
                 "MAG 'MAG_A'.*kegg:foreign_gene.*this MAG's Prodigal protein FASTA",
             ):
                 module.merge_annotations(
-                    str(gff), str(kegg), "", str(cutoffs), "", "", "", "", "", "", "", "",
+                    str(gff), str(kegg), "", str(cutoffs), "", "", "", "", "", "", "",
                     str(output), mag="MAG_A", enabled_sources={"kegg"},
                 )
 
@@ -515,7 +576,7 @@ class MergeGeneAnnotationTests(unittest.TestCase):
             signalp.write_text("c1_1\tSP\t0.9\n", encoding="utf-8")
 
             result = module.merge_annotations(
-                str(gff), str(stale_kegg), "", "", "", "", "", "", "", "", "",
+                str(gff), str(stale_kegg), "", "", "", "", "", "", "", "",
                 str(signalp), str(output), mag="MAG_A", enabled_sources={"signalp"},
             )
 
