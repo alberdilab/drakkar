@@ -200,6 +200,12 @@ def add_database_check_arguments(parser):
         action="store_true",
         help="Continue even if the configured databases differ from the ones earlier runs in the output directory used.",
     )
+    parser.add_argument(
+        "--allow-annotation-change",
+        dest="allow_annotation_change",
+        action="store_true",
+        help="Continue even if the annotation sources or the Drakkar version differ from the ones that built the annotation tables already in the output directory.",
+    )
 
 def add_snakemake_override_arguments(parser):
     snakemake_group = parser.add_argument_group("Snakemake overrides")

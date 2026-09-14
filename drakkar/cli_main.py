@@ -3,6 +3,7 @@ import os
 import subprocess
 from pathlib import Path
 
+from drakkar import __version__
 from drakkar.cli_context import (
     ERROR,
     INFO,
@@ -26,6 +27,7 @@ from drakkar.database_latest import DEFAULT_TIMEOUT as DEFAULT_LATEST_TIMEOUT, r
 from drakkar.database_update import run_database_update
 from drakkar.database_checks import (
     check_database_artifacts,
+    check_annotation_provenance,
     check_database_provenance,
     collect_database_provenance,
     module_requirements,
@@ -262,6 +264,17 @@ def main():
             allow_change=getattr(args, "allow_database_change", False),
         ):
             return
+        # A source can change which database it uses, or how it parses one,
+        # without any database release changing. The annotation manifest is the
+        # only record of that, and mtime-based reruns cannot see it either.
+        if args.command in ("annotating", "complete"):
+            if not check_annotation_provenance(
+                output_dir,
+                args.annotation_type,
+                __version__,
+                allow_change=getattr(args, "allow_annotation_change", False),
+            ):
+                return
 
     run_info = None
     if args.command in WORKFLOW_RUN_COMMANDS and not environments_maintenance and not database_update_run:

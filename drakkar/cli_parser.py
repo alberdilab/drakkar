@@ -507,7 +507,7 @@ def build_parser():
         sections=[
             ("Input Sources", ["input", "file", "reference", "reference_index"]),
             ("Workflow Scope", ["mode", "binners", "type", "annotation_type", "gtdb_version", "gtdb_scratch", "annotation_evalue", "annotation_identity", "annotation_query_coverage", "annotation_target_coverage", "min_completeness", "max_contamination", "min_bin_length", "max_bin_length", "multicoverage", "fraction", "nonpareil", "sanitize", "ani"]),
-            ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark", "skip_database_check", "allow_database_change"]),
+            ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark", "skip_database_check", "allow_database_change", "allow_annotation_change"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
             ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
             ("SLURM Overrides", ["slurm_partition", "slurm_account", "slurm_constraint", "slurm_nodes", "slurm_nodelist", "slurm_qos", "slurm_extra"]),
@@ -526,7 +526,7 @@ def build_parser():
         sections=[
             ("Input Sources", ["input", "file", "reference", "reference_index"]),
             ("Optional Analyses", ["fraction", "nonpareil", "sanitize"]),
-            ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark", "skip_database_check", "allow_database_change"]),
+            ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark", "skip_database_check", "allow_database_change", "allow_annotation_change"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
             ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
             ("SLURM Overrides", ["slurm_partition", "slurm_account", "slurm_constraint", "slurm_nodes", "slurm_nodelist", "slurm_qos", "slurm_extra"]),
@@ -545,7 +545,7 @@ def build_parser():
             ("Input Sources", ["input", "file"]),
             ("Assembly Strategy", ["mode", "binners", "multicoverage"]),
             ("Bin Filtering", ["min_completeness", "max_contamination", "min_bin_length", "max_bin_length"]),
-            ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark", "skip_database_check", "allow_database_change"]),
+            ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark", "skip_database_check", "allow_database_change", "allow_annotation_change"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
             ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
             ("SLURM Overrides", ["slurm_partition", "slurm_account", "slurm_constraint", "slurm_nodes", "slurm_nodelist", "slurm_qos", "slurm_extra"]),
@@ -564,7 +564,7 @@ def build_parser():
         sections=[
             ("Input Sources", ["bins_dir", "bins_file", "reads_dir", "reads_file"]),
             ("Analysis Settings", ["type", "fraction", "ani", "ignore_quality", "quality"]),
-            ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark", "skip_database_check", "allow_database_change"]),
+            ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark", "skip_database_check", "allow_database_change", "allow_annotation_change"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
             ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
             ("SLURM Overrides", ["slurm_partition", "slurm_account", "slurm_constraint", "slurm_nodes", "slurm_nodelist", "slurm_qos", "slurm_extra"]),
@@ -582,7 +582,7 @@ def build_parser():
         sections=[
             ("Input Genomes", ["bins_dir", "bins_file"]),
             ("Dereplication Settings", ["ani", "ignore_quality", "quality"]),
-            ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark", "skip_database_check", "allow_database_change"]),
+            ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark", "skip_database_check", "allow_database_change", "allow_annotation_change"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
             ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
             ("SLURM Overrides", ["slurm_partition", "slurm_account", "slurm_constraint", "slurm_nodes", "slurm_nodelist", "slurm_qos", "slurm_extra"]),
@@ -600,7 +600,7 @@ def build_parser():
         sections=[
             ("Input Genomes", ["bins_dir", "bins_file"]),
             ("Annotation Scope", ["annotation_type", "gtdb_version", "gtdb_scratch", "annotation_evalue", "annotation_identity", "annotation_query_coverage", "annotation_target_coverage"]),
-            ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark", "skip_database_check", "allow_database_change"]),
+            ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark", "skip_database_check", "allow_database_change", "allow_annotation_change"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
             ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
             ("SLURM Overrides", ["slurm_partition", "slurm_account", "slurm_constraint", "slurm_nodes", "slurm_nodelist", "slurm_qos", "slurm_extra"]),
@@ -622,7 +622,7 @@ def build_parser():
         sections=[
             ("Input Assemblies", ["input", "file", "assembly_type"]),
             ("Calling and Reconciliation", ["rgi_alignment_tool", "rgi_include_loose", "rgi_include_nudge", "genomad_preset", "genomad_splits", "locus_overlap"]),
-            ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark", "skip_database_check", "allow_database_change"]),
+            ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark", "skip_database_check", "allow_database_change", "allow_annotation_change"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
             ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
             ("SLURM Overrides", ["slurm_partition", "slurm_account", "slurm_constraint", "slurm_nodes", "slurm_nodelist", "slurm_qos", "slurm_extra"]),

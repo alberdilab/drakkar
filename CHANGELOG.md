@@ -8,6 +8,50 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.6.1] - 2026-09-14
+
+### Fixed
+
+- **Reusing an annotation output directory after an upgrade no longer produces
+  silently stale tables.** `drakkar annotating` and `drakkar complete` now
+  compare `annotating/annotation_manifest.yaml` against the run about to start
+  and stop when the annotation sources or the Drakkar version differ while
+  tables built with the earlier setup are still present. Pass
+  `--allow-annotation-change` to keep them knowingly.
+
+  Upgrading to 2.6.0 exposed the gap. The `amr` source moved from `AMR_DB` to
+  `AMRFINDER_DB` and `card` appeared, but nothing detected it:
+
+  - The Snakemake profiles set `rerun-trigger: mtime`, which disables
+    Snakemake's own `params`, `code` and `software-env` triggers. A changed
+    `--sources` argument and a rewritten `merge_gene_annotations.py` were both
+    invisible.
+  - `compare_database_provenance` only compares config keys recorded by both
+    runs, so a source that switches to a *different* database registers as a
+    new key and was skipped entirely. The `stale_outputs` patterns added in
+    2.6.0 for the `amr` and `card` requirements could therefore never fire.
+
+  The practical symptom: deleting `annotating/amr/` and
+  `annotating/gene_annotations.tsv.xz` and rerunning planned only three jobs.
+  The per-MAG `annotating/final/*_genes.tsv` files still existed, and since
+  Snakemake reasons backwards from missing outputs, it never discovered that
+  the AMR source needed rebuilding.
+
+  The check reports which tables are affected rather than everything: a changed
+  gene source invalidates only the gene tables, a changed cluster source only
+  the cluster tables, `defense` both, and a Drakkar version change both, since
+  any parser may have changed between versions.
+
+### Added
+
+- `--allow-annotation-change`, to continue when the annotation sources or the
+  Drakkar version differ from the ones that built the tables already in the
+  output directory.
+
+- Documentation of how to rebuild gene annotations after an upgrade without
+  discarding cluster annotations or unchanged per-source searches, under
+  "Reusing an output directory after an upgrade" in the workflow guide.
+
 ## [2.6.0] - 2026-09-14
 
 ### Changed

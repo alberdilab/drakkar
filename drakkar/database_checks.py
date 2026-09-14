@@ -12,6 +12,13 @@ Two related checks run before a workflow is launched:
   Snakemake profiles use ``rerun-trigger: mtime``, so a database swap never
   invalidates existing outputs: results built with two different releases would
   otherwise be merged into one output directory without any trace.
+* ``check_annotation_provenance`` compares the annotation sources and the
+  Drakkar version recorded in an existing ``annotation_manifest.yaml`` against
+  the run about to start. Database provenance cannot see this class of change:
+  when a source starts using a different database entirely, or when the code
+  that produces a source changes, the config key or the parser changes rather
+  than a release version. ``rerun-trigger: mtime`` also hides Snakemake's own
+  ``params`` and ``code`` triggers, so nothing else would notice.
 """
 
 from __future__ import annotations
@@ -455,6 +462,168 @@ def _describe_record(record):
     version = record.get("requested_version") or record.get("release")
     configured = record.get("configured", "")
     return f"{version} ({configured})" if version else str(configured)
+
+
+# CLI annotation components, split by the table each one feeds. ``defense``
+# contributes to both. These mirror ENABLED_GENE_SOURCES and
+# ENABLED_CLUSTER_SOURCES in workflow/rules/annotating_function.smk, and
+# test_annotation_provenance keeps the two definitions in step.
+GENE_ANNOTATION_COMPONENTS = (
+    "kegg", "cazy", "pfam", "virulence", "amr", "card", "signalp", "defense",
+)
+CLUSTER_ANNOTATION_COMPONENTS = ("dbcan", "mobile", "antismash", "defense")
+
+# CLI component -> the name the annotation manifest records for it.
+ANNOTATION_REPORT_SOURCE_NAMES = {
+    "virulence": "vfdb",
+    "amr": "ncbi_amrfinder",
+    "card": "card",
+    "defense": "defensefinder",
+    "mobile": "genomad",
+}
+
+
+def _report_source(component):
+    return ANNOTATION_REPORT_SOURCE_NAMES.get(component, component)
+
+
+def annotation_report_sources(annotation_type):
+    """The manifest source names a run of these components would record."""
+    components = {
+        item.strip() for item in str(annotation_type or "").split(",") if item.strip()
+    }
+    return {
+        _report_source(component)
+        for component in components
+        if component in GENE_ANNOTATION_COMPONENTS
+        or component in CLUSTER_ANNOTATION_COMPONENTS
+    }
+
+
+# Manifest source name -> the annotation tables it contributes to.
+_SOURCE_LEVELS = {}
+for _component in GENE_ANNOTATION_COMPONENTS:
+    _SOURCE_LEVELS.setdefault(_report_source(_component), set()).add("gene")
+for _component in CLUSTER_ANNOTATION_COMPONENTS:
+    _SOURCE_LEVELS.setdefault(_report_source(_component), set()).add("cluster")
+
+_LEVEL_OUTPUTS = {
+    "gene": GENE_ANNOTATION_OUTPUTS,
+    "cluster": CLUSTER_ANNOTATION_OUTPUTS,
+}
+
+
+def read_annotation_manifest(output_dir):
+    """Load the annotation manifest an earlier run left in this directory."""
+    manifest_path = Path(output_dir) / "annotating" / "annotation_manifest.yaml"
+    if not manifest_path.is_file():
+        return None, {}
+    try:
+        manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        return None, {}
+    if not isinstance(manifest, dict):
+        return None, {}
+    return str(manifest_path), manifest
+
+
+def annotation_provenance_changes(manifest, annotation_type, version):
+    """Differences that make an existing annotation table stale.
+
+    Returns ``(changes, levels)``: the human-readable differences, and which
+    annotation tables they invalidate.
+    """
+    changes = []
+    levels = set()
+
+    previous_version = str(manifest.get("drakkar_version") or "").strip()
+    if previous_version and previous_version != str(version):
+        changes.append(("drakkar version", previous_version, str(version)))
+        # Any source's parser could have changed between two Drakkar versions,
+        # so neither table can be assumed to still match the current code.
+        levels.update(_LEVEL_OUTPUTS)
+
+    recorded = manifest.get("enabled_sources")
+    if isinstance(recorded, list):
+        previous_sources = {str(source) for source in recorded}
+        current_sources = annotation_report_sources(annotation_type)
+        added = sorted(current_sources - previous_sources)
+        removed = sorted(previous_sources - current_sources)
+        if added or removed:
+            changes.append((
+                "annotation sources",
+                ", ".join(sorted(previous_sources)) or "none",
+                ", ".join(sorted(current_sources)) or "none",
+            ))
+            for source in added + removed:
+                levels.update(_SOURCE_LEVELS.get(source, set()))
+
+    return changes, levels
+
+
+def stale_annotation_outputs(output_dir, levels):
+    """Existing annotation tables invalidated at the given levels."""
+    output_path = Path(output_dir)
+    matches = []
+    for level in sorted(levels):
+        for pattern in _LEVEL_OUTPUTS.get(level, ()):
+            matches.extend(sorted(str(match) for match in output_path.glob(pattern)))
+    return matches
+
+
+def check_annotation_provenance(output_dir, annotation_type, version, allow_change=False):
+    """Block a run that would leave stale annotation tables in place."""
+    manifest_path, manifest = read_annotation_manifest(output_dir)
+    if not manifest:
+        return True
+
+    changes, levels = annotation_provenance_changes(manifest, annotation_type, version)
+    if not changes:
+        return True
+
+    stale = stale_annotation_outputs(output_dir, levels)
+    if not stale:
+        print(
+            f"{INFO}INFO:{RESET} The annotation setup changed since "
+            f"{manifest_path}, but no affected outputs are present:"
+        )
+        for field, earlier, current in changes:
+            print(f"  {field}: {earlier} -> {current}")
+        return True
+
+    label = "WARNING" if allow_change else "ERROR"
+    colour = INFO if allow_change else ERROR
+    print(
+        f"{colour}{label}:{RESET} The annotation setup changed since "
+        f"{manifest_path}, and tables built with the earlier setup are still present:"
+    )
+    for field, earlier, current in changes:
+        print(f"  {field}: {earlier} -> {current}")
+    preview = stale[:5]
+    for path in preview:
+        print(f"    built with the earlier setup: {path}")
+    if len(stale) > len(preview):
+        print(f"    ... and {len(stale) - len(preview)} more")
+
+    if allow_change:
+        print(
+            f"{INFO}Continuing because --allow-annotation-change was given. "
+            f"The output directory will mix annotation setups.{RESET}"
+        )
+        return True
+
+    only_version = len(changes) == 1 and changes[0][0] == "drakkar version"
+    if only_version:
+        print(
+            "Only the Drakkar version differs. That still means these tables were "
+            "built by different code, because the Snakemake profiles rerun on file "
+            "timestamps only and cannot see a code change."
+        )
+    print("Snakemake reruns on file timestamps only, so these tables will not be rebuilt.")
+    print("Choose one of:")
+    print("  - delete the tables listed above so they are rebuilt with the current setup")
+    print("  - rerun with --allow-annotation-change to knowingly keep them as they are")
+    return False
 
 
 def check_database_provenance(output_dir, requirements, current, allow_change=False):

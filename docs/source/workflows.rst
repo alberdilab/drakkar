@@ -356,6 +356,38 @@ when to tighten them.
 - ``--skip-benchmark`` / ``--memory-multiplier`` / ``--time-multiplier`` /
   ``--snakemake-*`` / ``--slurm-*``: see :ref:`snakemake-slurm-management`.
 
+.. _annotation-staleness:
+
+Reusing an output directory after an upgrade
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The Snakemake profiles use ``rerun-trigger: mtime``, so Snakemake reruns a job
+only when an input file is newer than its output. It does not notice that the
+requested annotation sources changed, or that the code producing a source
+changed. Both would leave the per-MAG tables in ``annotating/final/`` in place,
+and because those tables are what the merged ``.xz`` files are built from,
+deleting only a source directory such as ``annotating/amr/`` changes nothing:
+Snakemake reasons backwards from missing outputs, so it never discovers that
+the source needs rebuilding.
+
+Drakkar therefore compares ``annotating/annotation_manifest.yaml`` against the
+run about to start and stops if the annotation sources or the Drakkar version
+differ while tables built with the earlier setup are still present. The message
+lists the affected tables. Either delete them so they are rebuilt, or pass
+``--allow-annotation-change`` to keep them as they are.
+
+To rebuild gene annotations without discarding cluster annotations or the
+per-source searches that have not changed:
+
+.. code-block:: console
+
+   $ rm -f drakkar_output/annotating/final/*_genes.tsv
+   $ rm -f drakkar_output/annotating/final/*_genes.qc.json
+   $ rm -f drakkar_output/annotating/gene_annotations.tsv.xz
+
+Existing KEGG, Pfam, CAZy, VFDB and SignalP outputs are reused, so only the
+sources that actually changed are recomputed.
+
 Output behavior for partial functional runs:
 
 - ``annotating/gene_annotations.tsv.xz`` is generated when any gene-level
