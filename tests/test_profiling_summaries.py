@@ -17,6 +17,7 @@ PROFILING_SCRIPT = REPO_ROOT / "drakkar" / "workflow" / "scripts" / "profiling_g
 DEREP_SCRIPT = REPO_ROOT / "drakkar" / "workflow" / "scripts" / "dereplicating_stats.py"
 MAG_METADATA_SCRIPT = REPO_ROOT / "drakkar" / "workflow" / "scripts" / "mag_metadata.py"
 SNAKEFILE = REPO_ROOT / "drakkar" / "workflow" / "Snakefile"
+PROFILING_RULES = REPO_ROOT / "drakkar" / "workflow" / "rules" / "profiling_genomes.smk"
 
 
 class ProfilingSummaryTests(unittest.TestCase):
@@ -249,6 +250,12 @@ class ProfilingSummaryTests(unittest.TestCase):
         self.assertIn('f"{OUTPUT_DIR}/profiling_genomes.tsv"', text)
         self.assertIn('f"{OUTPUT_DIR}/dereplicating.tsv"', text)
         self.assertIn('f"{OUTPUT_DIR}/profiling_genomes/final/mags.tsv"', text)
+
+    def test_catalogue_uses_declared_large_bowtie2_index(self) -> None:
+        text = PROFILING_RULES.read_text(encoding="utf-8")
+        self.assertEqual(text.count("genome_catalogue.rev.1.bt2l"), 2)
+        self.assertNotIn("genome_catalogue.rev.1.bt2\"", text)
+        self.assertIn("bowtie2-build --large-index {input} {params.basename}", text)
 
 
 if __name__ == "__main__":

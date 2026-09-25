@@ -222,7 +222,7 @@ rule index_catalogue:
     input:
         f"{OUTPUT_DIR}/profiling_genomes/catalogue/genome_catalogue.fna"
     output:
-        index=f"{OUTPUT_DIR}/profiling_genomes/catalogue/genome_catalogue.rev.1.bt2"
+        index=f"{OUTPUT_DIR}/profiling_genomes/catalogue/genome_catalogue.rev.1.bt2l"
     params:
         bowtie2_module={BOWTIE2_MODULE},
         basename=f"{OUTPUT_DIR}/profiling_genomes/catalogue/genome_catalogue"
@@ -234,12 +234,12 @@ rule index_catalogue:
         """
         module purge
         module load {params.bowtie2_module}
-        bowtie2-build {input} {params.basename}
+        bowtie2-build --large-index {input} {params.basename}
         """
 
 rule map_to_catalogue:
     input:
-        index=f"{OUTPUT_DIR}/profiling_genomes/catalogue/genome_catalogue.rev.1.bt2",
+        index=f"{OUTPUT_DIR}/profiling_genomes/catalogue/genome_catalogue.rev.1.bt2l",
         r1=lambda wildcards: PREPROCESSED_TO_READS1[wildcards.sample],
         r2=lambda wildcards: PREPROCESSED_TO_READS2[wildcards.sample]
     output:

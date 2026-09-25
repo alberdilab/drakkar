@@ -8,6 +8,15 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.6.2] - 2026-09-25
+
+### Fixed
+
+- Genome catalogues now use Bowtie2's large-index format explicitly. Catalogues
+  longer than the small-index limit previously made `bowtie2-build` emit
+  `.bt2l` files while the workflow waited for `.bt2`, causing a successful
+  multi-hour index build to end in a `MissingOutputException` and be retried.
+
 ## [2.6.1] - 2026-09-14
 
 ### Fixed
