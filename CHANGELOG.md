@@ -4,9 +4,11 @@ This project tracks release notes here from this point forward.
 
 ## [Unreleased]
 
-### Added
+### Changed
 
-- No unreleased changes yet.
+- The `gtdbtk` rule keeps a fixed 512 GB memory request on retries; only the
+  runtime doubles with each attempt, since failures are time-outs rather than
+  out-of-memory errors.
 
 ## [2.6.2] - 2026-09-25
 

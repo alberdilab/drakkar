@@ -71,7 +71,7 @@ rule gtdbtk:
         scratch_arg=f"--scratch_dir {OUTPUT_DIR}/annotating/tmp/" if GTDB_SCRATCH else ""
     threads: 8
     resources:
-        mem_mb=lambda wildcards, attempt: cap_mem_mb(512*1024 * 2 ** (attempt - 1)),
+        mem_mb=cap_mem_mb(512*1024),
         runtime=lambda wildcards, attempt: cap_runtime(360 * 2 ** (attempt - 1))
     message: "Annotating taxonomy using GTDBTK..."
     shell:
