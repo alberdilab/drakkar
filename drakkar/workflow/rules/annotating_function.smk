@@ -936,14 +936,16 @@ rule final_gene_annotation_table:
     output:
         f"{OUTPUT_DIR}/annotating/gene_annotations.tsv.xz"
     threads:
-        1
+        4
+    # awk and xz stream the tables through a fixed amount of memory, so only
+    # the runtime (bounded by xz throughput) scales with input size.
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 50)) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10)) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, attempt: cap_mem_mb(4*1024 * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(30, int(input.size_mb / 20)) * 2 ** (attempt - 1))
     message: "Generating final gene annotation file..."
     shell:
         """
-        awk 'FNR==1 && NR!=1 {{ next }} {{ print }}' {input} | xz -c > {output}
+        awk 'FNR==1 && NR!=1 {{ next }} {{ print }}' {input} | xz -T {threads} -c > {output}
         """
 
 rule final_cluster_annotation_table:
@@ -952,14 +954,16 @@ rule final_cluster_annotation_table:
     output:
         f"{OUTPUT_DIR}/annotating/cluster_annotations.tsv.xz"
     threads:
-        1
+        4
+    # awk and xz stream the tables through a fixed amount of memory, so only
+    # the runtime (bounded by xz throughput) scales with input size.
     resources:
-        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 50)) * 2 ** (attempt - 1)),
-        runtime=lambda wildcards, input, attempt: cap_runtime(max(10, int(input.size_mb * 10)) * 2 ** (attempt - 1))
+        mem_mb=lambda wildcards, attempt: cap_mem_mb(4*1024 * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(30, int(input.size_mb / 20)) * 2 ** (attempt - 1))
     message: "Generating final cluster annotation file..."
     shell:
         """
-        awk 'FNR==1 && NR!=1 {{ next }} {{ print }}' {input} | xz -c > {output}
+        awk 'FNR==1 && NR!=1 {{ next }} {{ print }}' {input} | xz -T {threads} -c > {output}
         """
 
 

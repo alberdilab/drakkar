@@ -8,6 +8,17 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.6.4] - 2026-09-29
+
+### Fixed
+
+- `final_gene_annotation_table` and `final_cluster_annotation_table` no longer
+  scale memory with input size. They only stream the per-MAG tables through
+  `awk` and `xz`, so they now request a fixed 4 GB and 4 threads (`xz -T`),
+  with runtime based on compression throughput. Before, a 505-MAG batch asked
+  for 126 GB and the 14-day time cap for a job that needs under 1 GB and under
+  an hour.
+
 ## [2.6.3] - 2026-09-28
 
 ### Changed
