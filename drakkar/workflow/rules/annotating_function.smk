@@ -36,6 +36,7 @@ NCBIFAM_RELEASE_DIR = database_registry.database_release_from_config(
     "ncbifam", config["NCBIFAM_DB"]
 )
 NCBIFAM_METADATA = str(NCBIFAM_RELEASE_DIR / "hmm_PGAP.tsv")
+TIGRFAM_DB = str(database_registry.database_artifact_path("tigrfam", config["TIGRFAM_DB"]))
 # Gene-level AMR uses AMRFinderPlus itself, not the NCBIfam-AMR HMM library that
 # earlier releases searched with hmmscan. CARD/RGI is a second, independent
 # caller over the same Prodigal proteins.
@@ -65,6 +66,7 @@ RUN_KEGG = "kegg" in ANNOTATING_TYPE_SET
 RUN_CAZY = "cazy" in ANNOTATING_TYPE_SET
 RUN_PFAM = "pfam" in ANNOTATING_TYPE_SET
 RUN_NCBIFAM = "ncbifam" in ANNOTATING_TYPE_SET
+RUN_TIGRFAM = "tigrfam" in ANNOTATING_TYPE_SET
 RUN_VIRULENCE = "virulence" in ANNOTATING_TYPE_SET
 RUN_AMR = "amr" in ANNOTATING_TYPE_SET
 RUN_CARD = "card" in ANNOTATING_TYPE_SET
@@ -82,6 +84,7 @@ ENABLED_GENE_SOURCES = [
         ("cazy", RUN_CAZY),
         ("pfam", RUN_PFAM),
         ("ncbifam", RUN_NCBIFAM),
+        ("tigrfam", RUN_TIGRFAM),
         ("virulence", RUN_VIRULENCE),
         ("amr", RUN_AMR),
         ("card", RUN_CARD),
@@ -124,6 +127,8 @@ if RUN_PFAM:
     ANNOTATION_DATABASES["pfam"] = config["PFAM_DB"]
 if RUN_NCBIFAM:
     ANNOTATION_DATABASES["ncbifam"] = config["NCBIFAM_DB"]
+if RUN_TIGRFAM:
+    ANNOTATION_DATABASES["tigrfam"] = config["TIGRFAM_DB"]
 if RUN_VIRULENCE:
     ANNOTATION_DATABASES["vfdb"] = config["VFDB_DB"]
 if RUN_AMR:
@@ -142,7 +147,7 @@ if RUN_STRUCTURE:
     ANNOTATION_DATABASES["foldseek"] = FOLDSEEK_DB
 
 ANNOTATION_TOOLS = {}
-if RUN_KEGG or RUN_PFAM or RUN_NCBIFAM:
+if RUN_KEGG or RUN_PFAM or RUN_NCBIFAM or RUN_TIGRFAM:
     ANNOTATION_TOOLS["hmmer"] = HMMER_MODULE
 if RUN_AMR:
     ANNOTATION_TOOLS["amrfinderplus"] = "workflow/envs/amr_amrfinder.yaml"
@@ -186,6 +191,8 @@ def selected_gene_annotation_inputs(wildcards):
         selected.append(f"{OUTPUT_DIR}/annotating/pfam/{wildcards.mag}.tsv")
     if RUN_NCBIFAM:
         selected.append(f"{OUTPUT_DIR}/annotating/ncbifam/{wildcards.mag}.tblout")
+    if RUN_TIGRFAM:
+        selected.append(f"{OUTPUT_DIR}/annotating/tigrfam/{wildcards.mag}.tblout")
     if RUN_VIRULENCE:
         selected.append(f"{OUTPUT_DIR}/annotating/vfdb/{wildcards.mag}.txt")
     if RUN_AMR:
@@ -213,6 +220,8 @@ def structure_gating_inputs(wildcards):
         gating.append(f"{OUTPUT_DIR}/annotating/cazy/{wildcards.mag}/dbCAN_hmm_results.tsv")
     if RUN_NCBIFAM:
         gating.append(f"{OUTPUT_DIR}/annotating/ncbifam/{wildcards.mag}.tblout")
+    if RUN_TIGRFAM:
+        gating.append(f"{OUTPUT_DIR}/annotating/tigrfam/{wildcards.mag}.tblout")
     return gating
 
 
@@ -383,6 +392,37 @@ rule ncbifam:
         # accepted sequence and domain must clear its model's native TC1/TC2.
         # A profile without TC values makes HMMER fail; there is deliberately
         # no generic E-value fallback.
+        hmmscan \
+            -o /dev/null \
+            --domtblout {output:q} \
+            --cut_tc \
+            --noali \
+            {params.db:q} \
+            {input:q}
+        """
+
+rule tigrfam:
+    input:
+        f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
+    output:
+        f"{OUTPUT_DIR}/annotating/tigrfam/{{mag}}.tblout"
+    params:
+        hmmer_module={HMMER_MODULE},
+        db={TIGRFAM_DB}
+    threads:
+        1
+    resources:
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(16*1024, int(input.size_mb * 1024 * 8)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(30, int(input.size_mb * 120)) * 2 ** (attempt - 1))
+    message: "Annotating legacy TIGRFAM families of MAG {wildcards.mag}..."
+    shell:
+        """
+        set -euo pipefail
+        module purge
+        module load {params.hmmer_module}
+        # Legacy TIGRFAM and versioned NCBIfam are separate identifier
+        # namespaces. Search the complete legacy library with its native TC1/TC2
+        # cutoffs and retain every accepted profile/gene pair for projection.
         hmmscan \
             -o /dev/null \
             --domtblout {output:q} \
@@ -621,6 +661,7 @@ rule merge_gene_annotations:
         kegg_cutoffs={KEGG_DB_KOLIST},
         ec_db={PFAM_DB_EC},
         ncbifam_metadata={NCBIFAM_METADATA},
+        tigrfam_db={TIGRFAM_DB},
         vf_db={VFDB_DB_TSV},
         foldseek_db={FOLDSEEK_MAP_DB},
         sources=",".join(ENABLED_GENE_SOURCES),
@@ -631,6 +672,7 @@ rule merge_gene_annotations:
         kegg=lambda wildcards: f"{OUTPUT_DIR}/annotating/kegg/{wildcards.mag}.tsv",
         pfam=lambda wildcards: f"{OUTPUT_DIR}/annotating/pfam/{wildcards.mag}.tsv",
         ncbifam=lambda wildcards: f"{OUTPUT_DIR}/annotating/ncbifam/{wildcards.mag}.tblout",
+        tigrfam=lambda wildcards: f"{OUTPUT_DIR}/annotating/tigrfam/{wildcards.mag}.tblout",
         cazy=lambda wildcards: f"{OUTPUT_DIR}/annotating/cazy/{wildcards.mag}/dbCAN_hmm_results.tsv",
         vf=lambda wildcards: f"{OUTPUT_DIR}/annotating/vfdb/{wildcards.mag}.txt",
         amr=lambda wildcards: f"{OUTPUT_DIR}/annotating/amr/{wildcards.mag}.tsv",
@@ -661,6 +703,8 @@ rule merge_gene_annotations:
             -ec {params.ec_db} \
             -ncbifam {params.ncbifam} \
             -ncbifam-metadata {params.ncbifam_metadata} \
+            -tigrfam {params.tigrfam} \
+            -tigrfam-db {params.tigrfam_db} \
             -cazy {params.cazy} \
             -vf {params.vf} \
             -vfdb {params.vf_db} \
@@ -997,6 +1041,29 @@ rule final_gene_annotation_table:
         awk 'FNR==1 && NR!=1 {{ next }} {{ print }}' {input} | xz -T {threads} -c > {output}
         """
 
+rule gifter_input:
+    input:
+        f"{OUTPUT_DIR}/annotating/gene_annotations.tsv.xz"
+    output:
+        f"{OUTPUT_DIR}/annotating/gifter_input.tsv.xz"
+    params:
+        package_dir={PACKAGE_DIR}
+    threads:
+        1
+    conda:
+        f"{PACKAGE_DIR}/workflow/envs/annotating_function.yaml"
+    resources:
+        mem_mb=lambda wildcards, attempt: cap_mem_mb(1024 * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 20)) * 2 ** (attempt - 1))
+    message: "Projecting generic gene-resolved evidence for gifter..."
+    shell:
+        """
+        PYTHON_BIN="${{CONDA_PREFIX}}/bin/python"
+        $PYTHON_BIN {params.package_dir}/workflow/scripts/project_gifter_input.py \
+            --input {input:q} \
+            --output {output:q}
+        """
+
 rule final_cluster_annotation_table:
     input:
         expand(f"{OUTPUT_DIR}/annotating/final/{{mag}}_clusters.tsv",mag=mags)
@@ -1037,6 +1104,10 @@ rule annotation_report:
                 [f"{OUTPUT_DIR}/annotating/cluster_annotations.tsv.xz"]
                 if RUN_CLUSTER_ANNOTATIONS else []
             ),
+            *(
+                [f"{OUTPUT_DIR}/annotating/gifter_input.tsv.xz"]
+                if RUN_GIFTER_INPUT else []
+            ),
         ]
     output:
         manifest=f"{OUTPUT_DIR}/annotating/annotation_manifest.yaml",
@@ -1051,6 +1122,7 @@ rule annotation_report:
             "annotation_target_coverage": ANNOTATION_TARGET_COVERAGE,
             "kofam_acceptance": "native_model_cutoffs",
             **({"ncbifam_acceptance": "native_trusted_cutoffs_no_fallback"} if RUN_NCBIFAM else {}),
+            **({"tigrfam_acceptance": "native_trusted_cutoffs_no_fallback"} if RUN_TIGRFAM else {}),
         }),
         databases=assignment_args(ANNOTATION_DATABASES),
         tools=assignment_args(ANNOTATION_TOOLS),
@@ -1063,6 +1135,10 @@ rule annotation_report:
             **(
                 {"cluster_annotations": f"{OUTPUT_DIR}/annotating/cluster_annotations.tsv.xz"}
                 if RUN_CLUSTER_ANNOTATIONS else {}
+            ),
+            **(
+                {"gifter_input": f"{OUTPUT_DIR}/annotating/gifter_input.tsv.xz"}
+                if RUN_GIFTER_INPUT else {}
             ),
         })
     threads:

@@ -84,6 +84,7 @@ class MergeGeneAnnotationTests(unittest.TestCase):
         self.assertEqual(module.DEFAULT_QUERY_COVERAGE_THRESHOLD, 0.5)
         self.assertEqual(module.DEFAULT_TARGET_COVERAGE_THRESHOLD, 0.5)
         self.assertNotIn("ncbifam", module.normalize_enabled_sources(None))
+        self.assertNotIn("tigrfam", module.normalize_enabled_sources(None))
 
     def test_kofam_hits_require_the_native_cutoff_table(self) -> None:
         module = load_merge_module()
@@ -161,6 +162,60 @@ class MergeGeneAnnotationTests(unittest.TestCase):
             ("c1_1", "NCBIFAM", "NF040708.3"),
             ("c1_1", "NCBIFAM", "TIGR04545.1"),
         ])
+
+    def test_tigrfam_preserves_unversioned_accessions_as_a_distinct_source(self) -> None:
+        module = load_merge_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            release = tmp / "tigrfam" / "15.0"
+            release.mkdir(parents=True)
+            database = release / "tigrfams"
+            database.write_text("HMM library fixture\n", encoding="utf-8")
+            (release / "database_versions.yaml").write_text(
+                yaml.safe_dump({
+                    "requested_version": "15.0",
+                    "source_version": "legacy TIGRFAM release 15.0",
+                    "sources": ["https://ftp.ncbi.nlm.nih.gov/hmm/TIGRFAMs/release_15.0/"],
+                    "files": [{"filename": "tigrfams", "sha256": "legacy-sha"}],
+                }),
+                encoding="utf-8",
+            )
+            raw = tmp / "MAG_A.tblout"
+            raw.write_text(
+                ncbifam_domtbl_row(
+                    "MerR", "TIGR02053", "c1_1",
+                    model_length=140, query_length=180, full_evalue="1e-35",
+                    full_bitscore=190, domain_bitscore=185,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            parsed = module.parse_tigrfam(raw, database)
+
+        self.assertEqual(parsed["annotation_id"].tolist(), ["TIGR02053"])
+        self.assertEqual(parsed["source"].tolist(), ["tigrfam"])
+        self.assertEqual(parsed["method"].tolist(), ["hmmscan"])
+        self.assertEqual(parsed.attrs["annotation_qc"]["database_release"], "15.0")
+        details = json.loads(parsed.iloc[0]["details"])
+        self.assertEqual(details["native_hmm"]["accession"], "TIGR02053")
+        self.assertEqual(details["source_release"], "15.0")
+
+    def test_tigrfam_refuses_versioned_ncbifam_identity(self) -> None:
+        module = load_merge_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            raw = Path(tmpdir) / "hits.tblout"
+            raw.write_text(
+                ncbifam_domtbl_row(
+                    "MerR", "TIGR02053.1", "c1_1",
+                    model_length=140, query_length=180, full_evalue="1e-35",
+                    full_bitscore=190, domain_bitscore=185,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "invalid or versioned accession"):
+                module.parse_tigrfam(raw)
 
     def test_ncbifam_rechecks_trusted_cutoffs_without_evalue_fallback(self) -> None:
         module = load_merge_module()

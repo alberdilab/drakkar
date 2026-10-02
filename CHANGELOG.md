@@ -8,6 +8,20 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.6.6] - 2026-10-02
+
+### Added
+
+- A ``gifter`` annotation bundle that runs only the generic KO, CAZy, Pfam,
+  NCBIfam and legacy TIGRFAM evidence sources required to cover gifter's input
+  namespaces, then writes a deterministic, gene-resolved
+  ``annotating/gifter_input.tsv.xz`` projection for
+  ``evaluate_gifts_community()``. The projection contains no GIFT IDs, marker
+  allowlist, route logic or trait definitions.
+- Managed installation and opt-in annotation for the legacy TIGRFAM 15.0 HMM
+  library. Exact unversioned TIGRFAM accessions remain distinct from versioned
+  NCBIfam TIGR accessions, and both use their native trusted cutoffs.
+
 ## [2.6.5] - 2026-10-02
 
 ### Added

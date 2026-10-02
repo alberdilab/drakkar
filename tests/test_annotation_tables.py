@@ -162,11 +162,41 @@ class AnnotationTableWorkflowTests(unittest.TestCase):
         self.assertIn("annotating/ncbifam/{{mag}}.tblout", ncbifam_rule)
         self.assertIn('RUN_NCBIFAM = "ncbifam" in ANNOTATING_TYPE_SET', rules)
         self.assertIn('("ncbifam", RUN_NCBIFAM),', rules)
-        self.assertIn('OPTIONAL_GENE_ANNOTATION_COMPONENTS = {"ncbifam"}', snakefile)
+        self.assertIn('OPTIONAL_GENE_ANNOTATION_COMPONENTS = {"ncbifam", "tigrfam"}', snakefile)
 
         self.assertEqual(normalize_annotation_type("ncbifam"), "ncbifam")
         self.assertNotIn("ncbifam", normalize_annotation_type("function").split(","))
         self.assertNotIn("ncbifam", normalize_annotation_type("genes").split(","))
+
+    def test_gifter_bundle_runs_only_marker_sources_and_writes_direct_input(self) -> None:
+        rules = ANNOTATION_RULES.read_text(encoding="utf-8")
+        snakefile = (ROOT / "drakkar" / "workflow" / "Snakefile").read_text(
+            encoding="utf-8"
+        )
+
+        normalized = normalize_annotation_type("gifter").split(",")
+        self.assertEqual(
+            normalized,
+            ["gifter", "kegg", "cazy", "pfam", "ncbifam", "tigrfam"],
+        )
+        self.assertNotIn("virulence", normalized)
+        self.assertNotIn("amr", normalized)
+        self.assertIn('RUN_GIFTER_INPUT = "gifter" in ANNOTATING_TYPE_SET', snakefile)
+        self.assertIn("rule gifter_input:", rules)
+        self.assertIn("annotating/gifter_input.tsv.xz", rules)
+        self.assertIn("project_gifter_input.py", rules)
+
+    def test_tigrfam_is_distinct_and_uses_native_trusted_cutoffs(self) -> None:
+        rules = ANNOTATION_RULES.read_text(encoding="utf-8")
+        match = re.search(r"rule tigrfam:.*?(?=\nrule )", rules, re.DOTALL)
+        self.assertIsNotNone(match)
+        tigrfam_rule = match.group(0)
+        self.assertIn("--cut_tc", tigrfam_rule)
+        self.assertIn("--domtblout {output:q}", tigrfam_rule)
+        self.assertIn("annotating/tigrfam/{{mag}}.tblout", tigrfam_rule)
+        self.assertEqual(normalize_annotation_type("tigrfam"), "tigrfam")
+        self.assertNotIn("tigrfam", normalize_annotation_type("function").split(","))
+        self.assertNotIn("tigrfam", normalize_annotation_type("genes").split(","))
 
     def test_card_target_runs_rgi_in_protein_mode(self) -> None:
         rules = ANNOTATION_RULES.read_text(encoding="utf-8")

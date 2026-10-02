@@ -61,6 +61,7 @@ SOURCE_ORDER = {
     "kegg": 10,
     "pfam": 20,
     "ncbifam": 25,
+    "tigrfam": 27,
     "cazy": 30,
     "vfdb": 40,
     "ncbi_amrfinder": 50,
@@ -76,6 +77,7 @@ SOURCE_RANKING = {
     "ncbifam": [
         ("rank_score", False), ("bitscore", False), ("evalue", True),
     ],
+    "tigrfam": [("bitscore", False), ("evalue", True)],
     "cazy": [("coverage", False), ("evalue", True)],
     "vfdb": [
         ("coverage", False), ("identity", False), ("bitscore", False),
@@ -350,19 +352,24 @@ def load_ncbifam_metadata(metadata_file):
     return metadata
 
 
-def ncbifam_database_provenance(metadata_file):
-    """Read the managed install manifest copied into annotation QC/details."""
-    metadata_path = Path(metadata_file)
-    manifest_path = metadata_path.parent / "database_versions.yaml"
+def database_provenance(database_file, *, database_name, default_source_version):
+    """Read one managed install manifest for annotation QC/details."""
+    database_path = Path(database_file) if database_file else None
+    manifest_path = (
+        database_path.parent / "database_versions.yaml" if database_path else None
+    )
     installed = {}
-    if manifest_path.is_file():
+    if manifest_path and manifest_path.is_file():
         try:
             installed = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
         except (OSError, yaml.YAMLError) as error:
             raise ValueError(
-                f"Unable to read NCBIfam installation manifest {manifest_path}: {error}"
+                f"Unable to read {database_name} installation manifest {manifest_path}: {error}"
             ) from error
-    release = str(installed.get("requested_version") or metadata_path.parent.name)
+    release = str(
+        installed.get("requested_version")
+        or (database_path.parent.name if database_path else "unknown")
+    )
     files = installed.get("files") if isinstance(installed.get("files"), list) else []
     checksums = {
         str(record.get("filename") or Path(str(record.get("path") or "")).name): record.get("sha256")
@@ -371,11 +378,22 @@ def ncbifam_database_provenance(metadata_file):
     }
     return {
         "release": release,
-        "source_version": installed.get("source_version") or f"NCBIfam/PGAP HMM release {release}",
+        "source_version": installed.get("source_version")
+        or default_source_version.format(release=release),
         "sources": installed.get("sources", []),
         "checksums": checksums,
-        "installation_manifest": str(manifest_path) if manifest_path.is_file() else None,
+        "installation_manifest": (
+            str(manifest_path) if manifest_path and manifest_path.is_file() else None
+        ),
     }
+
+
+def ncbifam_database_provenance(metadata_file):
+    return database_provenance(
+        metadata_file,
+        database_name="NCBIfam",
+        default_source_version="NCBIfam/PGAP HMM release {release}",
+    )
 
 
 def covered_fraction(intervals, length):
@@ -566,6 +584,135 @@ def parse_ncbifam(ncbifam_file, metadata_file):
         reported_hits=reported_hits,
         rejected_hits=reported_hits - len(rows),
         filter_stage="upstream_native_validated",
+    )
+    result.attrs["annotation_qc"].update({
+        "database_release": provenance["release"],
+        "database_source_version": provenance["source_version"],
+        "database_checksums": details_json(provenance["checksums"]),
+    })
+    return result
+
+
+def parse_tigrfam(tigrfam_file, database_file=None):
+    """Normalize exact legacy TIGRFAM hits accepted by native TC1/TC2."""
+    domains = parse_hmmer3_domtbl(tigrfam_file)
+    provenance = database_provenance(
+        database_file,
+        database_name="TIGRFAM",
+        default_source_version="legacy TIGRFAM release {release}",
+    )
+    if domains.empty:
+        result = attach_qc(
+            empty_hits(), "tigrfam", 0, None, filter_stage="upstream_native"
+        )
+        result.attrs["annotation_qc"].update({
+            "database_release": provenance["release"],
+            "database_source_version": provenance["source_version"],
+            "database_checksums": details_json(provenance["checksums"]),
+        })
+        return result
+
+    domains = domains.copy()
+    domains["_exact_accession"] = domains["model_accession"].where(
+        ~domains["model_accession"].isin(["", "-"]), domains["model_name"]
+    )
+    invalid = domains.loc[
+        ~domains["_exact_accession"].astype(str).str.fullmatch(r"TIGR\d{5}", na=False),
+        "_exact_accession",
+    ]
+    if not invalid.empty:
+        raise ValueError(
+            "Legacy TIGRFAM output contains an invalid or versioned accession: "
+            f"{invalid.iloc[0]!r}"
+        )
+
+    rows = []
+    for (gene, accession), group in domains.groupby(
+        ["gene", "_exact_accession"], sort=False, dropna=False
+    ):
+        group = group.sort_values(
+            ["domain_bitscore", "independent_evalue", "domain_number"],
+            ascending=[False, True, True],
+            kind="stable",
+        )
+        best = group.iloc[0]
+        query_coverage = covered_fraction(
+            zip(group["query_start"], group["query_end"]), best["query_length"]
+        )
+        hmm_coverage = covered_fraction(
+            zip(group["model_start"], group["model_end"]), best["model_length"]
+        )
+        coverage_values = [
+            value for value in (query_coverage, hmm_coverage) if pd.notna(value)
+        ]
+        native_domains = [
+            {
+                "accuracy": native.get("accuracy"),
+                "conditional_evalue": native.get("conditional_evalue"),
+                "domain_bias": native.get("domain_bias"),
+                "domain_bitscore": native.get("domain_bitscore"),
+                "domain_count": native.get("domain_count"),
+                "domain_number": native.get("domain_number"),
+                "envelope_end": native.get("envelope_end"),
+                "envelope_start": native.get("envelope_start"),
+                "independent_evalue": native.get("independent_evalue"),
+                "model_end": native.get("model_end"),
+                "model_start": native.get("model_start"),
+                "query_end": native.get("query_end"),
+                "query_start": native.get("query_start"),
+            }
+            for native in group.to_dict("records")
+        ]
+        rows.append({
+            "gene": gene,
+            "annotation_id": accession,
+            "annotation": best.get("model_description"),
+            "annotation_type": "protein_family",
+            "evalue": best["full_evalue"],
+            "bitscore": best["full_bitscore"],
+            "score": best["full_bitscore"],
+            "score_type": "full_bitscore",
+            "rank_score": best["full_bitscore"],
+            "rank_score_type": "full_bitscore",
+            "coverage": min(coverage_values) if coverage_values else pd.NA,
+            "query_coverage": query_coverage,
+            "target_coverage": hmm_coverage,
+            "alignment_length": (
+                int(best["query_end"] - best["query_start"] + 1)
+                if pd.notna(best["query_start"]) and pd.notna(best["query_end"])
+                else pd.NA
+            ),
+            "query_start": best["query_start"],
+            "query_end": best["query_end"],
+            "target_start": best["model_start"],
+            "target_end": best["model_end"],
+            "model_start": best["model_start"],
+            "model_end": best["model_end"],
+            "details": details_json({
+                "acceptance_rule": "hmmer_cut_tc_sequence_and_domain",
+                "acceptance_status": "accepted",
+                "database_checksums": provenance["checksums"],
+                "native_domains": native_domains,
+                "native_hmm": {
+                    "accession": accession,
+                    "description": best.get("model_description"),
+                    "length": best.get("model_length"),
+                    "name": best.get("model_name"),
+                },
+                "source_release": provenance["release"],
+                "source_urls": provenance["sources"],
+                "source_version": provenance["source_version"],
+                "threshold_type": "trusted_cutoff",
+            }),
+        })
+
+    result = finalize_hits(
+        pd.DataFrame(rows),
+        "tigrfam",
+        "hmmscan",
+        "sequence_homology",
+        reported_hits=len(rows),
+        filter_stage="upstream_native",
     )
     result.attrs["annotation_qc"].update({
         "database_release": provenance["release"],
@@ -1395,6 +1542,7 @@ GENE_SOURCE_FACTORIES = {
     "cazy",
     "pfam",
     "ncbifam",
+    "tigrfam",
     "virulence",
     "amr",
     "card",
@@ -1408,7 +1556,7 @@ def normalize_enabled_sources(enabled_sources):
     if enabled_sources is None:
         # NCBIfam is intentionally opt-in even for direct script/API callers;
         # the workflow always passes an explicit source list.
-        return set(GENE_SOURCE_FACTORIES).difference({"ncbifam"})
+        return set(GENE_SOURCE_FACTORIES).difference({"ncbifam", "tigrfam"})
     if isinstance(enabled_sources, str):
         enabled_sources = enabled_sources.split(",")
     normalized = {
@@ -1465,6 +1613,8 @@ def merge_annotations(
     qc_output=None,
     ncbifam_file=None,
     ncbifam_metadata_file=None,
+    tigrfam_file=None,
+    tigrfam_database_file=None,
 ):
     if not mag:
         raise ValueError("MAG identity is required for the gene annotation table")
@@ -1478,6 +1628,8 @@ def merge_annotations(
         frames.append(parse_pfam(pfam_file, ec_file))
     if "ncbifam" in selected:
         frames.append(parse_ncbifam(ncbifam_file, ncbifam_metadata_file))
+    if "tigrfam" in selected:
+        frames.append(parse_tigrfam(tigrfam_file, tigrfam_database_file))
     if "cazy" in selected:
         frames.append(parse_cazy(cazy_file))
     if "virulence" in selected:
@@ -1539,6 +1691,18 @@ def main():
         required=False,
         type=str,
         help="Path to the version-matched NCBIfam hmm_PGAP.tsv metadata",
+    )
+    parser.add_argument(
+        "-tigrfam",
+        required=False,
+        type=str,
+        help="Path to the legacy TIGRFAM HMMER domtblout",
+    )
+    parser.add_argument(
+        "-tigrfam-db",
+        required=False,
+        type=str,
+        help="Path to the installed legacy TIGRFAM HMM library for provenance",
     )
     parser.add_argument("-cazy", required=False, type=str, help="Path to dbCAN's coverage-filtered HMM result table")
     parser.add_argument("-vf", required=False, type=str, help="Path to the VFDB alignment table")
@@ -1602,6 +1766,8 @@ def main():
         qc_output=args.qc_output,
         ncbifam_file=args.ncbifam,
         ncbifam_metadata_file=args.ncbifam_metadata,
+        tigrfam_file=args.tigrfam,
+        tigrfam_database_file=args.tigrfam_db,
     )
 
 

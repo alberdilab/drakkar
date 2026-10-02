@@ -199,6 +199,51 @@ if DATABASE_NAME == "ncbifam":
             touch {output}
             """
 
+if DATABASE_NAME == "tigrfam":
+    rule prepare_database:
+        output:
+            touch(f"{OUTPUT_DIR}/tigrfam.done")
+        params:
+            db=str(TARGET_DB),
+            archive=f"{TARGET_DB}.gz",
+            release_notes=f"{OUTPUT_DIR}/RELEASE_NOTE_{DATABASE_VERSION}",
+            library_url=DATABASE_SOURCES[0],
+            release_notes_url=DATABASE_SOURCES[1],
+            expected_version=DATABASE_VERSION,
+            validator=f"{PACKAGE_DIR}/workflow/scripts/validate_tigrfam_database.py",
+            hmmer_module=HMMER_MODULE
+        threads: 1
+        resources:
+            runtime=lambda wildcards, attempt: cap_runtime(DOWNLOAD_RUNTIME * 2 ** (attempt - 1))
+        shell:
+            r"""
+            set -euo pipefail
+            mkdir -p {OUTPUT_DIR:q}
+            rm -f \
+                {params.db:q} {params.archive:q} \
+                {params.db:q}.h3f {params.db:q}.h3i {params.db:q}.h3m {params.db:q}.h3p \
+                {params.release_notes:q} {params.release_notes:q}.download
+
+            curl -L --fail --retry 5 --output {params.archive:q} {params.library_url:q}
+            curl -L --fail --retry 5 \
+                --output {params.release_notes:q}.download {params.release_notes_url:q}
+            gunzip -f {params.archive:q}
+            mv {params.release_notes:q}.download {params.release_notes:q}
+
+            # Archived TIGRFAM releases use the legacy, unversioned namespace.
+            # Native TC1/TC2 cutoffs are mandatory; versioned NCBIfam accessions
+            # are deliberately handled by the separate NCBIfam installation.
+            python {params.validator:q} \
+                --library {params.db:q} \
+                --release-notes {params.release_notes:q} \
+                --expect-release {params.expected_version:q}
+
+            module purge
+            module load {params.hmmer_module}
+            hmmpress -f {params.db:q}
+            touch {output}
+            """
+
 if DATABASE_NAME == "vfdb":
     rule prepare_database:
         output:
@@ -451,6 +496,11 @@ rule write_database_versions:
                 Path(f"{OUTPUT_DIR}/hmm_PGAP.tsv"),
                 Path(f"{OUTPUT_DIR}/RELEASE_NOTES.txt"),
             ]
+        elif DATABASE_NAME == "tigrfam":
+            checksums = [
+                Path(str(TARGET_DB)),
+                Path(f"{OUTPUT_DIR}/RELEASE_NOTE_{DATABASE_VERSION}"),
+            ]
         elif DATABASE_NAME == "vfdb":
             checksums = [Path(f"{TARGET_DB}.idx"), Path(f"{TARGET_DB}.tsv")]
         elif DATABASE_NAME == "amr":
@@ -471,16 +521,29 @@ rule write_database_versions:
         elif DATABASE_NAME == "foldseek":
             checksums = [Path(str(TARGET_DB)), Path(f"{OUTPUT_DIR}/foldseek_map.tsv")]
 
-        source_urls = {
-            "hmm_PGAP.LIB": DATABASE_SOURCES[0],
-            "hmm_PGAP.tsv": DATABASE_SOURCES[1],
-            "RELEASE_NOTES.txt": DATABASE_SOURCES[2],
-        } if DATABASE_NAME == "ncbifam" else {}
-        source_roles = {
-            "hmm_PGAP.LIB": "profile_library",
-            "hmm_PGAP.tsv": "profile_metadata",
-            "RELEASE_NOTES.txt": "release_metadata",
-        } if DATABASE_NAME == "ncbifam" else {}
+        if DATABASE_NAME == "ncbifam":
+            source_urls = {
+                "hmm_PGAP.LIB": DATABASE_SOURCES[0],
+                "hmm_PGAP.tsv": DATABASE_SOURCES[1],
+                "RELEASE_NOTES.txt": DATABASE_SOURCES[2],
+            }
+            source_roles = {
+                "hmm_PGAP.LIB": "profile_library",
+                "hmm_PGAP.tsv": "profile_metadata",
+                "RELEASE_NOTES.txt": "release_metadata",
+            }
+        elif DATABASE_NAME == "tigrfam":
+            source_urls = {
+                TARGET_DB.name: DATABASE_SOURCES[0],
+                f"RELEASE_NOTE_{DATABASE_VERSION}": DATABASE_SOURCES[1],
+            }
+            source_roles = {
+                TARGET_DB.name: "profile_library",
+                f"RELEASE_NOTE_{DATABASE_VERSION}": "release_metadata",
+            }
+        else:
+            source_urls = {}
+            source_roles = {}
 
         file_info = []
         for target in checksums:

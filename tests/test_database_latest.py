@@ -51,6 +51,12 @@ NCBIFAM_INDEX = """
 <a href="current/">current/</a>
 """
 
+TIGRFAM_INDEX = """
+<a href="release_14.0/">release_14.0/</a>
+<a href="release_15.0/">release_15.0/</a>
+<a href="README.txt">README.txt</a>
+"""
+
 CARD_INDEX = """
 <a href="/download/0/broadstreet-v3.3.0.tar.bz2">DOWNLOAD</a>
 <a href="/download/0/broadstreet-v4.0.1.tar.bz2">DOWNLOAD</a>
@@ -89,6 +95,11 @@ class IndexDiscoveryTests(unittest.TestCase):
         with patch.object(database_latest, "_fetch_text", return_value=NCBIFAM_INDEX):
             latest, _ = _latest_from_index(LATEST_SOURCES["ncbifam"], timeout=1)
         self.assertEqual(latest, "20.0")
+
+    def test_tigrfam_index_returns_the_latest_legacy_release(self) -> None:
+        with patch.object(database_latest, "_fetch_text", return_value=TIGRFAM_INDEX):
+            latest, _ = _latest_from_index(LATEST_SOURCES["tigrfam"], timeout=1)
+        self.assertEqual(latest, "15.0")
 
     def test_index_without_any_matching_release_raises(self) -> None:
         with patch.object(database_latest, "_fetch_text", return_value="<a href='none/'>none</a>"):

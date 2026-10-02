@@ -22,16 +22,18 @@ def normalize_annotation_type(annotation_type):
     gene_components = {"kegg", "cazy", "pfam", "virulence", "amr", "card", "signalp"}
     # NCBIfam is deliberately opt-in: accepting it as a target must not make
     # the established ``function`` or ``genes`` bundles run a multi-GB library.
-    optional_gene_components = {"ncbifam"}
+    optional_gene_components = {"ncbifam", "tigrfam"}
+    gifter_components = {"kegg", "cazy", "pfam", "ncbifam", "tigrfam"}
     clusters_only_components = {"dbcan", "antismash", "mobile"}
     aliases = {"vfdb": "virulence", "genomad": "mobile", "rgi": "card"}
     allowed = {
-        "taxonomy", "function", "genes", "clusters", "network",
+        "taxonomy", "function", "genes", "clusters", "gifter", "network",
         *functional_components, *optional_gene_components
     }
     option_order = [
-        "taxonomy", "function", "genes", "clusters", "network",
-        "kegg", "cazy", "pfam", "ncbifam", "virulence", "amr", "card", "signalp",
+        "taxonomy", "function", "genes", "clusters", "gifter", "network",
+        "kegg", "cazy", "pfam", "ncbifam", "tigrfam", "virulence", "amr",
+        "card", "signalp",
         "dbcan", "antismash", "defense", "mobile"
     ]
     requested = [item.strip().lower() for item in annotation_type.split(",") if item.strip()]
@@ -45,7 +47,12 @@ def normalize_annotation_type(annotation_type):
     items = [aliases.get(item, item) for item in requested]
     invalid = [item for item in items if item not in allowed]
     if not items or invalid:
-        print(f"{ERROR}ERROR:{RESET} --annotation-type must be a comma-separated list including taxonomy, function, genes, clusters, kegg, cazy, pfam, ncbifam, virulence, amr, card, signalp, dbcan, antismash, defense, mobile, and/or network.")
+        print(
+            f"{ERROR}ERROR:{RESET} --annotation-type must be a comma-separated "
+            "list including taxonomy, function, genes, clusters, gifter, kegg, "
+            "cazy, pfam, ncbifam, tigrfam, virulence, amr, card, signalp, dbcan, "
+            "antismash, defense, mobile, and/or network."
+        )
         return None
 
     expanded = set(items)
@@ -55,6 +62,8 @@ def normalize_annotation_type(annotation_type):
         expanded.update(gene_components)
     if "clusters" in expanded:
         expanded.update(clusters_only_components)
+    if "gifter" in expanded:
+        expanded.update(gifter_components)
 
     normalized = [opt for opt in option_order if opt in expanded]
     return ",".join(normalized)
@@ -409,6 +418,12 @@ def validate_managed_database_version(database_name, version):
         print(
             f"{ERROR}ERROR:{RESET} NCBIfam --version must use the upstream "
             "X.Y release format, e.g. 20.0"
+        )
+        return None
+    if database_name == "tigrfam" and not re.fullmatch(r"\d+\.\d+", version):
+        print(
+            f"{ERROR}ERROR:{RESET} TIGRFAM --version must use the upstream "
+            "X.Y release format, e.g. 15.0"
         )
         return None
     if database_name == "amrfinderplus" and not re.fullmatch(

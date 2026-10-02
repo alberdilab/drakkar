@@ -54,6 +54,7 @@ Supported database subcommands:
 - ``cazy``
 - ``pfam``
 - ``ncbifam``
+- ``tigrfam`` (alias: ``tigrfams``)
 - ``vfdb``
 - ``amr``
 - ``amrfinderplus`` (alias: ``amrfinder``)
@@ -98,6 +99,10 @@ Examples:
 
 .. code-block:: console
 
+   $ drakkar database tigrfam --directory /projects/alberdilab/data/databases/drakkar/tigrfam --version 15.0 --set-default
+
+.. code-block:: console
+
    $ drakkar database vfdb --directory /projects/alberdilab/data/databases/drakkar/vfdb --set-default
 
 .. code-block:: console
@@ -120,7 +125,8 @@ Options:
   use the KEGG archive date such as ``2026-02-01``. For ``cazy``, use the
   upstream dbCAN release label such as ``V14``. For ``pfam``, use the Pfam
   release directory name such as ``Pfam37.4``. For ``ncbifam``, use the NCBI
-  PGAP HMM release such as ``20.0``. For ``amr``, use the NCBI
+  PGAP HMM release such as ``20.0``. For ``tigrfam``, use the legacy release
+  number ``15.0``. For ``amr``, use the NCBI
   AMRFinder release directory name such as ``2025-07-16.1``. For ``vfdb``,
   you can omit ``--version`` and DRAKKAR will use the UTC download date. For
   ``amrfinderplus``, use the NCBI data release such as ``2026-08-07.1``; for
@@ -173,6 +179,13 @@ Database-specific rules:
   accessions, model descriptions, family type, naming flags, profile source,
   and TC1/TC2. A missing cutoff aborts installation; DRAKKAR never installs a
   generic E-value fallback for this source.
+- ``tigrfam`` (alias: ``tigrfams``): installs NCBI's archived legacy TIGRFAM
+  release 15.0 library from
+  ``https://ftp.ncbi.nlm.nih.gov/hmm/TIGRFAMs/release_15.0/``. DRAKKAR verifies
+  that every model has an exact unversioned ``TIGR`` accession and complete
+  native TC1/TC2 cutoffs, downloads the release note, and runs ``hmmpress``.
+  This database is intentionally separate from current NCBIfam: a legacy
+  ``TIGR02053`` and a versioned ``TIGR02053.1`` are different identifiers.
 - ``amr``: use the NCBI AMRFinder release directory name, such as
   ``2025-07-16.1``. DRAKKAR downloads both
   ``NCBIfam-AMRFinder.HMM.tar.gz`` and ``NCBIfam-AMRFinder.tsv`` from
@@ -235,7 +248,8 @@ release, so the reported version can be applied directly.
 
 Databases that can be checked:
 
-- ``kegg`` (alias: ``kofams``), ``cazy``, ``pfam``, ``ncbifam``, ``vfdb``, ``amr``,
+- ``kegg`` (alias: ``kofams``), ``cazy``, ``pfam``, ``ncbifam``, ``tigrfam``
+  (alias: ``tigrfams``), ``vfdb``, ``amr``,
   ``amrfinderplus`` (alias: ``amrfinder``), ``card`` and ``foldseek``, using
   the release directory recorded in ``config.yaml``.
 - ``gtdb``, read from the ``GTDB_DB`` entry. GTDB reference data is installed by
@@ -348,8 +362,10 @@ that none of its artifacts are missing or empty. For managed releases this
 covers every file the installer produces, including the pressed HMM indices,
 the KEGG hierarchy JSON, the KOfam ``ko_list`` cutoff table, and the Pfam EC
 mapping table. NCBIfam checks additionally require ``hmm_PGAP.tsv``, release
-notes, and the checksum manifest. Only the databases the run actually needs are checked, so
-``--annotation-type kegg`` does not require a Pfam release.
+notes, and the checksum manifest. TIGRFAM checks likewise require the legacy
+library, all pressed indexes, its release note, and checksum manifest. Only the
+databases the run actually needs are checked, so ``--annotation-type kegg`` does
+not require a Pfam release.
 
 If something is missing, DRAKKAR names the exact files and prints the command
 that reinstalls the release:

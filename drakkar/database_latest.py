@@ -114,6 +114,14 @@ LATEST_SOURCES = {
         "url": "https://ftp.ncbi.nlm.nih.gov/hmm/",
         "entry_pattern": r"^(\d+\.\d+)/$",
     },
+    "tigrfam": {
+        "label": "legacy TIGRFAM HMMs",
+        "config_key": "TIGRFAM_DB",
+        "managed": True,
+        "strategy": "index",
+        "url": "https://ftp.ncbi.nlm.nih.gov/hmm/TIGRFAMs/",
+        "entry_pattern": r"^release_(\d+\.\d+)/$",
+    },
     "vfdb": {
         "label": "VFDB",
         "config_key": "VFDB_DB",

@@ -46,6 +46,7 @@ HELPER_RULES = {
     "merge_gene_annotations",
     "merge_cluster_annotations",
     "final_gene_annotation_table",
+    "gifter_input",
     "final_cluster_annotation_table",
     "merge_metagenome_gff",
     "write_database_versions",

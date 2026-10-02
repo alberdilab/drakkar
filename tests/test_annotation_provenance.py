@@ -79,6 +79,7 @@ class AnnotationProvenanceTests(unittest.TestCase):
             {"kegg", "vfdb", "ncbi_amrfinder", "card", "genomad", "defensefinder"},
         )
         self.assertEqual(annotation_report_sources("ncbifam"), {"ncbifam"})
+        self.assertEqual(annotation_report_sources("tigrfam"), {"tigrfam"})
         # Bundle keywords and taxonomy are not annotation sources.
         self.assertEqual(annotation_report_sources("taxonomy,function,genes"), set())
 
@@ -186,6 +187,19 @@ class AnnotationProvenanceTests(unittest.TestCase):
             {"MAG_A_genes.tsv", "gene_annotations.tsv.xz"},
         )
         self.assertEqual({Path(path).name for path in cluster}, {"MAG_A_clusters.tsv"})
+
+    def test_gifter_projection_is_invalidated_with_gene_annotations(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            write_output_dir(
+                Path(tmpdir),
+                tables=("gene_annotations.tsv.xz", "gifter_input.tsv.xz"),
+            )
+            stale = stale_annotation_outputs(tmpdir, {"gene"})
+
+        self.assertEqual(
+            {Path(path).name for path in stale},
+            {"gene_annotations.tsv.xz", "gifter_input.tsv.xz"},
+        )
 
 
 if __name__ == "__main__":

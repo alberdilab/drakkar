@@ -308,6 +308,17 @@ The full NCBIfam library is selected explicitly:
 
    $ drakkar annotating -b /path/to/mags -o drakkar_output --annotation-type kegg,pfam,ncbifam
 
+To produce a complete, directly consumable input for gifter's multi-genome
+evaluator, select the dedicated bundle:
+
+.. code-block:: console
+
+   $ drakkar annotating -b /path/to/mags -o drakkar_output --annotation-type gifter
+
+This bundle runs only ``kegg,cazy,pfam,ncbifam,tigrfam`` and writes
+``annotating/gifter_input.tsv.xz`` after the lossless gene table. It does not
+contain gifter's marker list or any trait/route logic.
+
 Options:
 
 - ``-b/--bins_dir``: directory with MAG/bin FASTA files.
@@ -319,12 +330,18 @@ Options:
   - ``function``: run the established default functional components below.
   - ``genes``: run only gene-level components
     (``kegg,cazy,pfam,virulence,amr,card,signalp``).
+  - ``gifter``: run the generic evidence sources needed by gifter
+    (``kegg,cazy,pfam,ncbifam,tigrfam``) and create the gene-resolved gifter
+    input projection.
   - ``kegg``: KEGG ortholog HMM annotation.
   - ``cazy``: CAZy HMM annotation.
   - ``pfam``: PFAM HMM annotation.
   - ``ncbifam``: full NCBIfam/PGAP profile-HMM annotation using exact,
     versioned NCBI accessions. This large source is opt-in and is not added by
     either the ``function`` or ``genes`` bundle.
+  - ``tigrfam``: legacy release 15.0 TIGRFAM profile-HMM annotation using exact
+    unversioned accessions and native trusted cutoffs. This is distinct from
+    NCBIfam's versioned TIGR accessions and is opt-in outside ``gifter``.
   - ``virulence`` (alias: ``vfdb``): VFDB-based virulence annotation.
   - ``amr``: AMRFinderPlus annotation of acquired resistance genes.
   - ``card`` (alias: ``rgi``): CARD/RGI annotation of resistance determinants.
@@ -354,7 +371,7 @@ database preparation command is not exposed by the CLI.
 
 These four options only affect sources that publish no curated cutoff of their
 own, which in a supported run means VFDB and the small minority of KOs with no
-KOfam threshold. KEGG, Pfam, NCBIfam, CAZy, AMRFinderPlus, CARD/RGI, SignalP and
+KOfam threshold. KEGG, Pfam, NCBIfam, TIGRFAM, CAZy, AMRFinderPlus, CARD/RGI, SignalP and
 DefenseFinder keep their native, model-specific acceptance rules. See :ref:`annotation-thresholds` for
 each source's rule, the published evidence behind the defaults, and guidance on
 when to tighten them.
@@ -393,6 +410,7 @@ per-source searches that have not changed:
    $ rm -f drakkar_output/annotating/final/*_genes.tsv
    $ rm -f drakkar_output/annotating/final/*_genes.qc.json
    $ rm -f drakkar_output/annotating/gene_annotations.tsv.xz
+   $ rm -f drakkar_output/annotating/gifter_input.tsv.xz
 
 Existing KEGG, Pfam, CAZy, VFDB and SignalP outputs are reused, so only the
 sources that actually changed are recomputed.
@@ -401,7 +419,9 @@ Output behavior for partial functional runs:
 
 - ``annotating/gene_annotations.tsv.xz`` is generated when any gene-level
   source is selected
-  (``kegg,cazy,pfam,ncbifam,virulence,amr,card,signalp,defense``).
+  (``kegg,cazy,pfam,ncbifam,tigrfam,virulence,amr,card,signalp,defense``).
+- ``annotating/gifter_input.tsv.xz`` is generated only when the ``gifter``
+  bundle is selected.
 - ``annotating/cluster_annotations.tsv.xz`` is generated when any cluster-level
   source is selected (``dbcan,antismash,defense,mobile``).
 - Merged tables are still generated from the available sources when only a

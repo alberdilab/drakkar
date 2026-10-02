@@ -81,6 +81,14 @@ class RequirementSelectionTests(unittest.TestCase):
         self.assertEqual(requirements[0].config_key, "NCBIFAM_DB")
         self.assertEqual(requirements[0].database, "ncbifam")
 
+    def test_tigrfam_is_a_managed_annotation_requirement(self) -> None:
+        requirements = annotating_requirements(
+            "tigrfam", config={"TIGRFAM_DB": "/db/tigrfam/15.0"}
+        )
+        self.assertEqual(len(requirements), 1)
+        self.assertEqual(requirements[0].config_key, "TIGRFAM_DB")
+        self.assertEqual(requirements[0].database, "tigrfam")
+
     def test_module_requirements_include_singlem_only_with_fraction(self) -> None:
         config = {"SINGLEM_DB": "/db/singlem", "CHECKM2_DB": "/db/checkm2.dmnd"}
         args = types.SimpleNamespace(fraction=False)
@@ -132,6 +140,24 @@ class ArtifactCheckTests(unittest.TestCase):
             (release / "hmm_PGAP.tsv").unlink()
             self.assertEqual(
                 missing_artifacts(requirement), [str(release / "hmm_PGAP.tsv")]
+            )
+
+    def test_tigrfam_requires_library_indexes_release_notes_and_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            release = Path(tmpdir) / "tigrfam" / "15.0"
+            release.mkdir(parents=True)
+            for filename in (
+                "tigrfams", "tigrfams.h3f", "tigrfams.h3i", "tigrfams.h3m",
+                "tigrfams.h3p", "RELEASE_NOTE_15.0", "database_versions.yaml",
+            ):
+                (release / filename).write_text("content", encoding="utf-8")
+            requirement = annotating_requirements(
+                "tigrfam", config={"TIGRFAM_DB": str(release)}
+            )[0]
+            self.assertEqual(missing_artifacts(requirement), [])
+            (release / "RELEASE_NOTE_15.0").unlink()
+            self.assertEqual(
+                missing_artifacts(requirement), [str(release / "RELEASE_NOTE_15.0")]
             )
 
     def test_absent_release_directory_reports_the_directory(self) -> None:

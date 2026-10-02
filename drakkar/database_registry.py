@@ -52,6 +52,17 @@ MANAGED_DATABASES = {
             "https://ftp.ncbi.nlm.nih.gov/hmm/{version}/RELEASE_NOTES.txt",
         ],
     },
+    "tigrfam": {
+        "directory_name": "tigrfam",
+        "aliases": ["tigrfams"],
+        "config_key": "TIGRFAM_DB",
+        "basename": "tigrfams",
+        "version_label": "requested legacy TIGRFAM release",
+        "sources": [
+            "https://ftp.ncbi.nlm.nih.gov/hmm/TIGRFAMs/release_{version}/TIGRFAMs_{version}_HMM.LIB.gz",
+            "https://ftp.ncbi.nlm.nih.gov/hmm/TIGRFAMs/release_{version}/RELEASE_NOTE_{version}",
+        ],
+    },
     "vfdb": {
         "directory_name": "vfdb",
         "aliases": [],
@@ -202,6 +213,8 @@ def database_source_version_label(database_name: str, version: str | None = None
         return f"Pfam release {version}"
     if database_name == "ncbifam" and version:
         return f"NCBIfam/PGAP HMM release {version}"
+    if database_name == "tigrfam" and version:
+        return f"legacy TIGRFAM release {version}"
     if database_name == "vfdb" and version:
         return f"VFDB_setB downloaded {version}"
     if database_name == "amr" and version:

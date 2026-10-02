@@ -27,6 +27,63 @@ Inspect the compressed table without extracting it permanently:
 
    $ xz -dc annotating/gene_annotations.tsv.xz | head
 
+Gifter input projection
+-----------------------
+
+``--annotation-type gifter`` keeps this long-form table as the source of truth
+and additionally writes ``annotating/gifter_input.tsv.xz``. The projection is
+ready for gifter's multi-genome evaluator and has exactly four columns:
+
+.. code-block:: text
+
+   genome_id  gene_id  namespace  accession
+
+``genome_id`` comes from ``mag`` and ``gene_id`` from ``gene``. Exact duplicate
+evidence for one gene is collapsed, while distinct hits and multiple accessions
+on the same gene remain separate. Rows are emitted deterministically by gene,
+then by ``namespace`` and ``accession``.
+
+The projection is schema-driven, not marker-driven:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 24 24 52
+
+   * - Long-table evidence
+     - Gifter namespace
+     - Accession
+   * - ``source=kegg``
+     - ``KO``
+     - Exact ``annotation_id``
+   * - ``source=cazy``
+     - ``CAZY``
+     - Exact ``annotation_id``
+   * - ``source=pfam``
+     - ``PFAM``
+     - Exact ``annotation_id``
+   * - ``source=ncbifam``
+     - ``NCBIFAM``
+     - Exact versioned ``annotation_id``
+   * - ``source=tigrfam``
+     - ``TIGRFAM``
+     - Exact unversioned ``annotation_id``
+   * - Structured EC evidence in ``details``
+     - ``EC``
+     - Every EC retained from KEGG mappings, Pfam GOLD associations, or
+       NCBIfam profile metadata
+
+No GIFT IDs, marker allowlist, marker count, route definitions, or trait logic
+are present in the workflow or projection. Drakkar emits all qualifying native
+evidence in these source schemas; gifter decides which exact
+``namespace + accession`` pairs matter.
+
+In R, the compressed table can be passed without reshaping:
+
+.. code-block:: r
+
+   annotations <- read.delim(xzfile("annotating/gifter_input.tsv.xz"))
+   community <- gifter::evaluate_gifts_community(annotations)
+
 Why the table changed
 ---------------------
 
@@ -235,6 +292,11 @@ following table lists every source produced by the supported 2.0 CLI.
      - ``sequence_homology``
      - Exact versioned NCBIfam accession, for example ``NF040708.3`` or
        ``TIGR04545.1``
+   * - ``tigrfam``
+     - ``tigrfam``
+     - ``hmmscan``
+     - ``sequence_homology``
+     - Exact legacy unversioned TIGRFAM accession, for example ``TIGR02053``
    * - ``cazy``
      - ``cazy``
      - ``run_dbcan_hmm``
@@ -308,6 +370,12 @@ Which rule applies to which source
        profile without both values is a hard error; there is no E-value
        fallback.
      - Upstream, native and validated at merge
+     - No
+   * - ``tigrfam``
+     - Legacy TIGRFAM per-profile trusted sequence and domain cutoffs (TC1 and
+       TC2), applied by ``hmmscan --cut_tc``. Installation rejects a profile
+       without both values; there is no E-value fallback.
+     - Upstream, native
      - No
    * - ``cazy``
      - dbCAN HMM E-value < ``1e-15`` and HMM coverage > ``0.35``.
@@ -418,6 +486,15 @@ converts NCBIfam TIGR accessions into another namespace. A generic consumer can
 therefore project a row losslessly as ``gene_id=gene``,
 ``namespace="NCBIFAM"``, and ``accession=annotation_id`` and apply its own
 recognition or grade policy downstream.
+
+**TIGRFAM.** The opt-in ``tigrfam`` target scans the same proteins against the
+complete legacy release 15.0 library. It uses each model's native TC1/TC2
+trusted cutoffs and retains exact unversioned identities such as
+``TIGR02053`` under ``source=tigrfam``. These are the legacy ``TIGRFAM``
+namespace. They are not aliases for NCBIfam's versioned ``TIGR02053.1``
+identity, and Drakkar never converts between the two. Both scans are enabled by
+the ``gifter`` bundle because a generic evidence table must be capable of
+representing either namespace without knowing which accessions gifter curates.
 
 **AMRFinderPlus.** The ``amr`` target runs AMRFinderPlus itself in combined
 nucleotide/protein/GFF mode over the MAG's Prodigal calls, so both of its
@@ -858,9 +935,9 @@ Functional annotation runs also write:
 - ``annotating/annotation_qc.tsv``: per-MAG and per-source reported, retained,
   rejected, unmapped, and unique-entity counts plus the filtering stage. A
   blank rejected count means the upstream tool emitted only accepted calls,
-  so the number rejected upstream is unavailable. NCBIfam rows additionally
-  carry the database release, source-version label, and JSON checksums for the
-  installed profile library and metadata sidecar.
+  so the number rejected upstream is unavailable. NCBIfam and TIGRFAM rows
+  additionally carry the database release, source-version label, and JSON
+  checksums for the installed profile library and release metadata.
 
 Keep both sidecars with the annotation tables when archiving or transferring
 results. They provide the context needed to reproduce and audit the rows.

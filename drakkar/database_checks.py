@@ -48,6 +48,7 @@ MANAGED_REQUIRED_ARTIFACTS = {
     # NCBIfam preserves NCBI's native filenames rather than deriving the
     # metadata filename from the library basename.
     "ncbifam": ("", *HMM_PRESSED_SUFFIXES),
+    "tigrfam": ("", *HMM_PRESSED_SUFFIXES),
     "vfdb": ("", ".dbtype", ".index", ".tsv"),
     "amr": ("", *HMM_PRESSED_SUFFIXES, ".tsv"),
 }
@@ -55,6 +56,7 @@ MANAGED_REQUIRED_ARTIFACTS = {
 GENE_ANNOTATION_OUTPUTS = (
     "annotating/final/*_genes.tsv",
     "annotating/gene_annotations.tsv.xz",
+    "annotating/gifter_input.tsv.xz",
 )
 CLUSTER_ANNOTATION_OUTPUTS = (
     "annotating/final/*_clusters.tsv",
@@ -92,6 +94,13 @@ ANNOTATION_DATABASE_REQUIREMENTS = {
         "source": "ncbifam",
         "label": "NCBIfam/PGAP HMMs",
         "stale_outputs": ("annotating/ncbifam/*.tblout", *GENE_ANNOTATION_OUTPUTS),
+    },
+    "tigrfam": {
+        "config_key": "TIGRFAM_DB",
+        "database": "tigrfam",
+        "source": "tigrfam",
+        "label": "legacy TIGRFAM HMMs",
+        "stale_outputs": ("annotating/tigrfam/*.tblout", *GENE_ANNOTATION_OUTPUTS),
     },
     "virulence": {
         "config_key": "VFDB_DB",
@@ -324,6 +333,19 @@ def missing_artifacts(requirement):
             release_dir / "database_versions.yaml",
         )
         return [str(path) for path in required if not _is_populated(path)]
+    if requirement.database == "tigrfam":
+        release_dir = database_release_from_config(requirement.database, configured)
+        if not release_dir.is_dir():
+            return [str(release_dir)]
+        version = release_dir.name
+        library = database_artifact_path("tigrfam", configured)
+        required = (
+            library,
+            *(Path(f"{library}{suffix}") for suffix in HMM_PRESSED_SUFFIXES),
+            release_dir / f"RELEASE_NOTE_{version}",
+            release_dir / "database_versions.yaml",
+        )
+        return [str(path) for path in required if not _is_populated(path)]
     if requirement.database in MANAGED_REQUIRED_ARTIFACTS:
         release_dir = database_release_from_config(requirement.database, configured)
         if not release_dir.is_dir():
@@ -491,7 +513,8 @@ def _describe_record(record):
 # ENABLED_CLUSTER_SOURCES in workflow/rules/annotating_function.smk, and
 # test_annotation_provenance keeps the two definitions in step.
 GENE_ANNOTATION_COMPONENTS = (
-    "kegg", "cazy", "pfam", "ncbifam", "virulence", "amr", "card", "signalp", "defense",
+    "kegg", "cazy", "pfam", "ncbifam", "tigrfam", "virulence", "amr",
+    "card", "signalp", "defense",
 )
 CLUSTER_ANNOTATION_COMPONENTS = ("dbcan", "mobile", "antismash", "defense")
 

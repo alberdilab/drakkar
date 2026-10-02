@@ -128,8 +128,9 @@ def build_parser():
         default="taxonomy,function",
         help=(
             "Comma-separated annotation targets. Options: taxonomy, function, genes, clusters, "
-            "kegg, cazy, pfam, ncbifam, virulence (vfdb), amr, signalp, dbcan, antismash, "
-            "card (rgi), defense, mobile (genomad), network. Default: taxonomy,function"
+            "gifter, kegg, cazy, pfam, ncbifam, tigrfam, virulence (vfdb), amr, "
+            "signalp, dbcan, antismash, card (rgi), defense, mobile (genomad), "
+            "network. Default: taxonomy,function"
         ),
     )
     subparser_complete.add_argument(
@@ -250,8 +251,9 @@ def build_parser():
         default="taxonomy,function",
         help=(
             "Comma-separated annotation targets. Options: taxonomy, function, genes, clusters, "
-            "kegg, cazy, pfam, ncbifam, virulence (vfdb), amr, signalp, dbcan, antismash, "
-            "card (rgi), defense, mobile (genomad), network. Default: taxonomy,function"
+            "gifter, kegg, cazy, pfam, ncbifam, tigrfam, virulence (vfdb), amr, "
+            "signalp, dbcan, antismash, card (rgi), defense, mobile (genomad), "
+            "network. Default: taxonomy,function"
         ),
     )
     subparser_annotating.add_argument(
@@ -381,6 +383,12 @@ def build_parser():
         "ncbifam",
         parents=[database_parent],
         help="Install a versioned full NCBIfam/PGAP HMM release",
+    )
+    database_tigrfam = database_subparsers.add_parser(
+        "tigrfam",
+        parents=[database_parent],
+        aliases=["tigrfams"],
+        help="Install the legacy unversioned TIGRFAM HMM release",
     )
     database_vfdb = database_subparsers.add_parser("vfdb", parents=[database_parent], help="Install or update the VFDB database")
     database_amr = database_subparsers.add_parser("amr", parents=[database_parent], help="Install or update the legacy NCBIfam-AMRFinder HMM database")
@@ -680,7 +688,13 @@ def build_parser():
             "drakkar database vfdb --directory /db/vfdb --set-default",
         ],
         command_groups=[
-            ("Managed Databases", ["kegg", "cazy", "pfam", "ncbifam", "vfdb", "amr", "amrfinderplus", "card"]),
+            (
+                "Managed Databases",
+                [
+                    "kegg", "cazy", "pfam", "ncbifam", "tigrfam", "vfdb",
+                    "amr", "amrfinderplus", "card",
+                ],
+            ),
             ("Version Checks", ["latest", "update"]),
         ],
         sections=[
@@ -714,6 +728,13 @@ def build_parser():
             [
                 "drakkar database ncbifam --directory /db/ncbifam --version 20.0",
                 "drakkar database ncbifam --version 20.0 --set-default",
+            ],
+        ),
+        database_tigrfam: (
+            "Install the legacy unversioned TIGRFAM library with native trusted cutoffs.",
+            [
+                "drakkar database tigrfam --directory /db/tigrfam --version 15.0",
+                "drakkar database tigrfam --version 15.0 --set-default",
             ],
         ),
         database_vfdb: (
