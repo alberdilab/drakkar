@@ -7,6 +7,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import pandas as pd
+import yaml
 from Bio import SearchIO
 
 # The workflow scripts directory is not an installed package. Running this file
@@ -59,6 +60,7 @@ SOURCE_ORDER = {
     "prodigal": 0,
     "kegg": 10,
     "pfam": 20,
+    "ncbifam": 25,
     "cazy": 30,
     "vfdb": 40,
     "ncbi_amrfinder": 50,
@@ -71,6 +73,9 @@ SOURCE_ORDER = {
 SOURCE_RANKING = {
     "kegg": [("rank_score", False), ("score", False), ("evalue", True)],
     "pfam": [("bitscore", False), ("evalue", True)],
+    "ncbifam": [
+        ("rank_score", False), ("bitscore", False), ("evalue", True),
+    ],
     "cazy": [("coverage", False), ("evalue", True)],
     "vfdb": [
         ("coverage", False), ("identity", False), ("bitscore", False),
@@ -268,6 +273,306 @@ def parse_hmmer3_tab(path):
     data = pd.DataFrame.from_dict(hits)
     data["gene"] = query_ids
     return data
+
+
+NCBIFAM_METADATA_REQUIRED = {
+    "ncbi_accession",
+    "label",
+    "sequence_cutoff",
+    "domain_cutoff",
+    "hmm_length",
+    "family_type",
+    "source",
+}
+
+
+def parse_hmmer3_domtbl(path):
+    """Read hmmscan ``--domtblout`` without normalizing model accessions."""
+    columns = [
+        "model_name", "model_accession", "model_length", "gene",
+        "query_accession", "query_length", "full_evalue", "full_bitscore",
+        "full_bias", "domain_number", "domain_count", "conditional_evalue",
+        "independent_evalue", "domain_bitscore", "domain_bias", "model_start",
+        "model_end", "query_start", "query_end", "envelope_start",
+        "envelope_end", "accuracy", "model_description",
+    ]
+    if not has_content(path):
+        return pd.DataFrame(columns=columns)
+
+    records = []
+    with Path(path).open(encoding="utf-8") as handle:
+        for line_number, line in enumerate(handle, start=1):
+            if not line.strip() or line.startswith("#"):
+                continue
+            fields = line.rstrip("\n").split(maxsplit=22)
+            if len(fields) < 22:
+                raise ValueError(
+                    f"Malformed NCBIfam HMMER domtblout record at line {line_number}: "
+                    f"expected at least 22 fields, found {len(fields)}"
+                )
+            if len(fields) == 22:
+                fields.append("")
+            records.append(dict(zip(columns, fields)))
+    frame = pd.DataFrame(records, columns=columns)
+    for column in [
+        "model_length", "query_length", "full_evalue", "full_bitscore",
+        "full_bias", "domain_number", "domain_count", "conditional_evalue",
+        "independent_evalue", "domain_bitscore", "domain_bias", "model_start",
+        "model_end", "query_start", "query_end", "envelope_start",
+        "envelope_end", "accuracy",
+    ]:
+        frame[column] = pd.to_numeric(frame[column], errors="coerce")
+    return frame
+
+
+def load_ncbifam_metadata(metadata_file):
+    if not has_content(metadata_file):
+        raise ValueError(
+            "NCBIfam hits were found but hmm_PGAP.tsv is missing or empty. "
+            "Reinstall the configured NCBIfam release; Drakkar will not use an "
+            "E-value fallback."
+        )
+    metadata = pd.read_csv(
+        metadata_file, sep="\t", header=0, dtype=str, keep_default_na=False
+    )
+    metadata = metadata.rename(columns={column: column.lstrip("#") for column in metadata.columns})
+    missing = NCBIFAM_METADATA_REQUIRED.difference(metadata.columns)
+    if missing:
+        raise ValueError(
+            "NCBIfam metadata is missing required column(s): "
+            + ", ".join(sorted(missing))
+        )
+    if metadata["ncbi_accession"].duplicated().any():
+        duplicate = metadata.loc[
+            metadata["ncbi_accession"].duplicated(keep=False), "ncbi_accession"
+        ].iloc[0]
+        raise ValueError(f"NCBIfam metadata contains duplicate accession: {duplicate}")
+    return metadata
+
+
+def ncbifam_database_provenance(metadata_file):
+    """Read the managed install manifest copied into annotation QC/details."""
+    metadata_path = Path(metadata_file)
+    manifest_path = metadata_path.parent / "database_versions.yaml"
+    installed = {}
+    if manifest_path.is_file():
+        try:
+            installed = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+        except (OSError, yaml.YAMLError) as error:
+            raise ValueError(
+                f"Unable to read NCBIfam installation manifest {manifest_path}: {error}"
+            ) from error
+    release = str(installed.get("requested_version") or metadata_path.parent.name)
+    files = installed.get("files") if isinstance(installed.get("files"), list) else []
+    checksums = {
+        str(record.get("filename") or Path(str(record.get("path") or "")).name): record.get("sha256")
+        for record in files
+        if isinstance(record, dict) and record.get("sha256")
+    }
+    return {
+        "release": release,
+        "source_version": installed.get("source_version") or f"NCBIfam/PGAP HMM release {release}",
+        "sources": installed.get("sources", []),
+        "checksums": checksums,
+        "installation_manifest": str(manifest_path) if manifest_path.is_file() else None,
+    }
+
+
+def covered_fraction(intervals, length):
+    length = pd.to_numeric(length, errors="coerce")
+    if pd.isna(length) or length <= 0:
+        return pd.NA
+    normalized = sorted(
+        (min(int(start), int(end)), max(int(start), int(end)))
+        for start, end in intervals
+        if pd.notna(start) and pd.notna(end)
+    )
+    if not normalized:
+        return pd.NA
+    covered = 0
+    current_start, current_end = normalized[0]
+    for start, end in normalized[1:]:
+        if start <= current_end + 1:
+            current_end = max(current_end, end)
+        else:
+            covered += current_end - current_start + 1
+            current_start, current_end = start, end
+    covered += current_end - current_start + 1
+    return min(1.0, covered / float(length))
+
+
+def parse_ncbifam(ncbifam_file, metadata_file):
+    """Normalize exact, versioned NCBIfam hits accepted by native TC1/TC2."""
+    domains = parse_hmmer3_domtbl(ncbifam_file)
+    metadata = load_ncbifam_metadata(metadata_file)
+    provenance = ncbifam_database_provenance(metadata_file)
+    if domains.empty:
+        result = attach_qc(
+            empty_hits(), "ncbifam", 0, 0, filter_stage="upstream_native_validated"
+        )
+        result.attrs["annotation_qc"].update({
+            "database_release": provenance["release"],
+            "database_source_version": provenance["source_version"],
+            "database_checksums": details_json(provenance["checksums"]),
+        })
+        return result
+
+    by_accession = {
+        str(record["ncbi_accession"]): record for record in metadata.to_dict("records")
+    }
+    by_label = {
+        str(record["label"]): record for record in metadata.to_dict("records")
+        if str(record.get("label") or "")
+    }
+    # HMMER uses '-' for a missing accession. Installed NCBIfam profiles carry
+    # ACC, but resolving via NAME keeps malformed/custom files fail-closed
+    # without ever manufacturing an unversioned identifier.
+    def resolve_metadata(native):
+        accession = str(native.get("model_accession") or "").strip()
+        if accession in {"", "-"}:
+            record = by_label.get(str(native.get("model_name") or ""))
+        else:
+            record = by_accession.get(accession)
+        if record is None:
+            raise ValueError(
+                "NCBIfam HMMER output references a profile absent from "
+                f"hmm_PGAP.tsv: accession={accession!r}, name={native.get('model_name')!r}"
+            )
+        return record
+
+    domains = domains.copy()
+    domains["_metadata"] = [resolve_metadata(row) for row in domains.to_dict("records")]
+    domains["_exact_accession"] = [row["ncbi_accession"] for row in domains["_metadata"]]
+
+    rows = []
+    reported_hits = 0
+    for (gene, accession), group in domains.groupby(
+        ["gene", "_exact_accession"], sort=False, dropna=False
+    ):
+        reported_hits += 1
+        metadata_row = group.iloc[0]["_metadata"]
+        sequence_cutoff = pd.to_numeric(metadata_row.get("sequence_cutoff"), errors="coerce")
+        domain_cutoff = pd.to_numeric(metadata_row.get("domain_cutoff"), errors="coerce")
+        if pd.isna(sequence_cutoff) or pd.isna(domain_cutoff):
+            raise ValueError(
+                f"NCBIfam profile {accession} has no complete trusted cutoff; "
+                "Drakkar does not use an E-value fallback."
+            )
+
+        full_bitscore = pd.to_numeric(group.iloc[0]["full_bitscore"], errors="coerce")
+        accepted_domains = group[group["domain_bitscore"] >= domain_cutoff].copy()
+        if pd.isna(full_bitscore) or full_bitscore < sequence_cutoff or accepted_domains.empty:
+            # hmmscan --cut_tc should already have excluded these. Rechecking
+            # protects imported/raw tables and makes the contract testable.
+            continue
+
+        accepted_domains = accepted_domains.sort_values(
+            ["domain_bitscore", "independent_evalue", "domain_number"],
+            ascending=[False, True, True],
+            kind="stable",
+        )
+        best = accepted_domains.iloc[0]
+        query_coverage = covered_fraction(
+            zip(accepted_domains["query_start"], accepted_domains["query_end"]),
+            best["query_length"],
+        )
+        hmm_coverage = covered_fraction(
+            zip(accepted_domains["model_start"], accepted_domains["model_end"]),
+            best["model_length"],
+        )
+        coverage_values = [value for value in (query_coverage, hmm_coverage) if pd.notna(value)]
+
+        native_domains = []
+        for native in accepted_domains.to_dict("records"):
+            native_domains.append({
+                "accuracy": native.get("accuracy"),
+                "conditional_evalue": native.get("conditional_evalue"),
+                "domain_bias": native.get("domain_bias"),
+                "domain_bitscore": native.get("domain_bitscore"),
+                "domain_count": native.get("domain_count"),
+                "domain_number": native.get("domain_number"),
+                "envelope_end": native.get("envelope_end"),
+                "envelope_start": native.get("envelope_start"),
+                "independent_evalue": native.get("independent_evalue"),
+                "model_end": native.get("model_end"),
+                "model_start": native.get("model_start"),
+                "query_end": native.get("query_end"),
+                "query_start": native.get("query_start"),
+            })
+
+        rows.append({
+            "gene": gene,
+            "annotation_id": accession,
+            "annotation": first_nonempty(
+                metadata_row, ["product_name", "hmm_name", "name_orig", "label"]
+            ),
+            "annotation_type": "protein_family",
+            "evalue": best["full_evalue"],
+            "bitscore": full_bitscore,
+            "score": full_bitscore,
+            "score_type": "full_bitscore",
+            "threshold": sequence_cutoff,
+            "rank_score": full_bitscore - sequence_cutoff,
+            "rank_score_type": "bitscore_above_ncbifam_tc1",
+            "coverage": min(coverage_values) if coverage_values else pd.NA,
+            "query_coverage": query_coverage,
+            "target_coverage": hmm_coverage,
+            "alignment_length": (
+                int(best["query_end"] - best["query_start"] + 1)
+                if pd.notna(best["query_start"]) and pd.notna(best["query_end"])
+                else pd.NA
+            ),
+            "query_start": best["query_start"],
+            "query_end": best["query_end"],
+            "target_start": best["model_start"],
+            "target_end": best["model_end"],
+            "model_start": best["model_start"],
+            "model_end": best["model_end"],
+            "details": details_json({
+                "acceptance_rule": "hmmer_cut_tc_sequence_and_domain",
+                "acceptance_status": "accepted",
+                "domain_trusted_cutoff": domain_cutoff,
+                "database_checksums": provenance["checksums"],
+                "family_type": metadata_row.get("family_type"),
+                "for_naming": metadata_row.get("for_naming"),
+                "for_structural_annotation": metadata_row.get("for_structural_annotation"),
+                "model_description": first_nonempty(
+                    metadata_row, ["product_name", "hmm_name", "name_orig"]
+                ),
+                "native_domains": native_domains,
+                "native_hmm": {
+                    "accession": accession,
+                    "description": best.get("model_description"),
+                    "length": best.get("model_length"),
+                    "name": best.get("model_name"),
+                },
+                "profile_grade": first_nonempty(metadata_row, ["profile_grade", "grade"]),
+                "profile_metadata": metadata_row,
+                "profile_source": metadata_row.get("source"),
+                "profile_type": metadata_row.get("family_type"),
+                "sequence_trusted_cutoff": sequence_cutoff,
+                "source_release": provenance["release"],
+                "source_urls": provenance["sources"],
+                "source_version": provenance["source_version"],
+                "threshold_type": "trusted_cutoff",
+            }),
+        })
+
+    result = finalize_hits(
+        pd.DataFrame(rows),
+        "ncbifam",
+        "hmmer",
+        "sequence_homology",
+        reported_hits=reported_hits,
+        rejected_hits=reported_hits - len(rows),
+        filter_stage="upstream_native_validated",
+    )
+    result.attrs["annotation_qc"].update({
+        "database_release": provenance["release"],
+        "database_source_version": provenance["source_version"],
+        "database_checksums": details_json(provenance["checksums"]),
+    })
+    return result
 
 
 def load_kofam_thresholds(kolist_file):
@@ -1089,6 +1394,7 @@ GENE_SOURCE_FACTORIES = {
     "kegg",
     "cazy",
     "pfam",
+    "ncbifam",
     "virulence",
     "amr",
     "card",
@@ -1100,7 +1406,9 @@ GENE_SOURCE_FACTORIES = {
 
 def normalize_enabled_sources(enabled_sources):
     if enabled_sources is None:
-        return set(GENE_SOURCE_FACTORIES)
+        # NCBIfam is intentionally opt-in even for direct script/API callers;
+        # the workflow always passes an explicit source list.
+        return set(GENE_SOURCE_FACTORIES).difference({"ncbifam"})
     if isinstance(enabled_sources, str):
         enabled_sources = enabled_sources.split(",")
     normalized = {
@@ -1155,6 +1463,8 @@ def merge_annotations(
     target_coverage_threshold=DEFAULT_TARGET_COVERAGE_THRESHOLD,
     enabled_sources=None,
     qc_output=None,
+    ncbifam_file=None,
+    ncbifam_metadata_file=None,
 ):
     if not mag:
         raise ValueError("MAG identity is required for the gene annotation table")
@@ -1166,6 +1476,8 @@ def merge_annotations(
         frames.append(parse_kegg(kegg_file, keggdb_file, keggcutoffs_file, evalue_threshold))
     if "pfam" in selected:
         frames.append(parse_pfam(pfam_file, ec_file))
+    if "ncbifam" in selected:
+        frames.append(parse_ncbifam(ncbifam_file, ncbifam_metadata_file))
     if "cazy" in selected:
         frames.append(parse_cazy(cazy_file))
     if "virulence" in selected:
@@ -1221,6 +1533,13 @@ def main():
     parser.add_argument("-keggcutoffs", required=False, type=str, help="Path to the KOfam ko_list with per-KO thresholds")
     parser.add_argument("-pfam", required=False, type=str, help="Path to the PFAM HMMER table")
     parser.add_argument("-ec", required=False, type=str, help="Path to the PFAM-to-EC mapping table")
+    parser.add_argument("-ncbifam", required=False, type=str, help="Path to the NCBIfam HMMER domtblout")
+    parser.add_argument(
+        "-ncbifam-metadata",
+        required=False,
+        type=str,
+        help="Path to the version-matched NCBIfam hmm_PGAP.tsv metadata",
+    )
     parser.add_argument("-cazy", required=False, type=str, help="Path to dbCAN's coverage-filtered HMM result table")
     parser.add_argument("-vf", required=False, type=str, help="Path to the VFDB alignment table")
     parser.add_argument("-vfdb", required=False, type=str, help="Path to the VFDB mapping table")
@@ -1281,6 +1600,8 @@ def main():
         target_coverage_threshold=args.target_coverage,
         enabled_sources=args.sources,
         qc_output=args.qc_output,
+        ncbifam_file=args.ncbifam,
+        ncbifam_metadata_file=args.ncbifam_metadata,
     )
 
 

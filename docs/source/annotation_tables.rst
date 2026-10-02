@@ -229,6 +229,12 @@ following table lists every source produced by the supported 2.0 CLI.
      - ``hmmscan``
      - ``sequence_homology``
      - Unversioned Pfam accession
+   * - ``ncbifam``
+     - ``ncbifam``
+     - ``hmmer``
+     - ``sequence_homology``
+     - Exact versioned NCBIfam accession, for example ``NF040708.3`` or
+       ``TIGR04545.1``
    * - ``cazy``
      - ``cazy``
      - ``run_dbcan_hmm``
@@ -296,6 +302,13 @@ Which rule applies to which source
      - Pfam per-family gathering threshold (``hmmscan --cut_ga``).
      - Upstream, native
      - No
+   * - ``ncbifam``
+     - NCBI's per-profile trusted sequence and domain cutoffs (TC1 and TC2),
+       applied by ``hmmscan --cut_tc`` and validated again during merging. A
+       profile without both values is a hard error; there is no E-value
+       fallback.
+     - Upstream, native and validated at merge
+     - No
    * - ``cazy``
      - dbCAN HMM E-value < ``1e-15`` and HMM coverage > ``0.35``.
      - Upstream, native
@@ -339,7 +352,9 @@ Which rule applies to which source
 The ``filter_stage`` column of ``annotation_qc.tsv`` separates the two tiers:
 ``upstream_native`` means the tool emitted only accepted calls, so Drakkar
 cannot report how many were rejected, and ``drakkar`` means Drakkar applied
-the filter during merging and counted both sides.
+the filter during merging and counted both sides. ``upstream_native_validated``
+means HMMER applied a native cutoff and Drakkar rechecked the emitted scores
+against the version-matched metadata, as it does for NCBIfam.
 
 Why per-model cutoffs are preferred over a global E-value
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -379,6 +394,30 @@ sequence region scoring above it enters the family's full alignment. Mistry
 *et al.* (2021) state that per-family gathering thresholds yield fewer false
 positive matches than a single E-value threshold applied across all Pfam HMMs.
 Drakkar uses ``--cut_ga`` and adds nothing.
+
+**NCBIfam.** The opt-in ``ncbifam`` target scans the same Prodigal ``.faa``
+used by every other gene source against NCBI's complete versioned PGAP HMM
+library. HMMER's ``--cut_tc`` requires both the model's full-sequence trusted
+cutoff (TC1) and domain trusted cutoff (TC2). Drakkar then validates the raw
+``--domtblout`` scores against ``hmm_PGAP.tsv`` so imported or stale raw files
+cannot bypass the rule. If either cutoff is absent, database installation or
+merging fails explicitly; ``--annotation-evalue`` is never consulted.
+
+Every accepted profile/gene pair is retained. Multiple domains contributing to
+one pair are kept in ``details.native_domains``; their union supplies query and
+HMM coverage, and the highest-scoring domain supplies the stable coordinate
+columns. ``is_primary`` is only a deterministic within-gene ranking by margin
+above TC1. It does not discard lower-ranked profiles or apply a marker-grade
+policy.
+
+Identifier semantics are exact. ``NF040708.3`` remains ``NF040708.3`` and
+``TIGR04545.1`` remains ``TIGR04545.1``, both with ``source=ncbifam``. The
+latter is an NCBI-maintained, versioned NCBIfam accession and is not the legacy
+unversioned identity ``TIGRFAM:TIGR04545``. Drakkar neither strips versions nor
+converts NCBIfam TIGR accessions into another namespace. A generic consumer can
+therefore project a row losslessly as ``gene_id=gene``,
+``namespace="NCBIFAM"``, and ``accession=annotation_id`` and apply its own
+recognition or grade policy downstream.
 
 **AMRFinderPlus.** The ``amr`` target runs AMRFinderPlus itself in combined
 nucleotide/protein/GFF mode over the MAG's Prodigal calls, so both of its
@@ -641,6 +680,11 @@ stable TSV columns. Important current keys include:
    * - ``pfam``
      - All GOLD Pfam-to-EC associations, model name, original versioned
        accession, domain bit score, and the Pfam gathering-threshold rule.
+   * - ``ncbifam``
+     - Source release; exact native accession, name, length and description;
+       full profile metadata; family type and optional grade field; TC1/TC2 and
+       acceptance rule; naming/structural flags; profile source; and every
+       accepted native domain with scores, E-values and coordinates.
    * - ``cazy``
      - HMM and target lengths, HMM file, and dbCAN coverage/e-value thresholds.
    * - ``vfdb``
@@ -814,7 +858,9 @@ Functional annotation runs also write:
 - ``annotating/annotation_qc.tsv``: per-MAG and per-source reported, retained,
   rejected, unmapped, and unique-entity counts plus the filtering stage. A
   blank rejected count means the upstream tool emitted only accepted calls,
-  so the number rejected upstream is unavailable.
+  so the number rejected upstream is unavailable. NCBIfam rows additionally
+  carry the database release, source-version label, and JSON checksums for the
+  installed profile library and metadata sidecar.
 
 Keep both sidecars with the annotation tables when archiving or transferring
 results. They provide the context needed to reproduce and audit the rows.

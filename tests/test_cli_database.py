@@ -30,6 +30,9 @@ class DatabaseCommandTests(unittest.TestCase):
     def test_normalize_managed_database_name_accepts_database_name(self) -> None:
         self.assertEqual(normalize_managed_database_name("amr"), "amr")
 
+    def test_normalize_managed_database_name_accepts_ncbifam(self) -> None:
+        self.assertEqual(normalize_managed_database_name("ncbifam"), "ncbifam")
+
     def test_normalize_managed_database_name_accepts_kofams_alias(self) -> None:
         self.assertEqual(normalize_managed_database_name("kofams"), "kegg")
 
@@ -69,6 +72,11 @@ class DatabaseCommandTests(unittest.TestCase):
             )
             self.assertEqual(validate_managed_database_version("card", "4.0.2"), "4.0.2")
             self.assertIsNone(validate_managed_database_version("card", "August-2026"))
+
+    def test_validate_ncbifam_release_version(self) -> None:
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(validate_managed_database_version("ncbifam", "20.0"), "20.0")
+            self.assertIsNone(validate_managed_database_version("ncbifam", "release-20"))
 
     def test_database_release_dir_joins_base_and_version(self) -> None:
         release_dir = database_release_dir("amr", "/tmp/amr", "20260421")
@@ -120,6 +128,20 @@ class DatabaseCommandTests(unittest.TestCase):
 
     def test_pfam_database_source_version_label_uses_requested_version(self) -> None:
         self.assertEqual(database_source_version_label("pfam", "Pfam37.4"), "Pfam release Pfam37.4")
+
+    def test_ncbifam_database_sources_and_release_label_are_version_pinned(self) -> None:
+        self.assertEqual(
+            database_sources("ncbifam", "20.0"),
+            [
+                "https://ftp.ncbi.nlm.nih.gov/hmm/20.0/hmm_PGAP.LIB",
+                "https://ftp.ncbi.nlm.nih.gov/hmm/20.0/hmm_PGAP.tsv",
+                "https://ftp.ncbi.nlm.nih.gov/hmm/20.0/RELEASE_NOTES.txt",
+            ],
+        )
+        self.assertEqual(
+            database_source_version_label("ncbifam", "20.0"),
+            "NCBIfam/PGAP HMM release 20.0",
+        )
 
     def test_vfdb_database_source_version_label_uses_download_date(self) -> None:
         self.assertEqual(database_source_version_label("vfdb", "2026-04-24"), "VFDB_setB downloaded 2026-04-24")

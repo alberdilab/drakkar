@@ -6,6 +6,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "drakkar" / "workflow" / "scripts" / "merge_gene_annotations.py"
@@ -26,12 +28,62 @@ def hmmer_row(model: str, gene: str, evalue: str, bitscore: str, accession: str 
     )
 
 
+def ncbifam_domtbl_row(
+    model: str,
+    accession: str,
+    gene: str,
+    *,
+    model_length: int,
+    query_length: int,
+    full_evalue: str,
+    full_bitscore: float,
+    domain_bitscore: float,
+    model_start: int = 2,
+    model_end: int = 101,
+    query_start: int = 5,
+    query_end: int = 104,
+    description: str = "model description",
+) -> str:
+    return " ".join(map(str, [
+        model, accession, model_length, gene, "-", query_length,
+        full_evalue, full_bitscore, 0.0, 1, 1, full_evalue, full_evalue,
+        domain_bitscore, 0.0, model_start, model_end, query_start, query_end,
+        query_start, query_end, 0.98, description,
+    ]))
+
+
+def write_ncbifam_metadata(path: Path, *, missing_tigr_cutoff: bool = False) -> Path:
+    header = (
+        "#ncbi_accession\tsource_identifier\tlabel\tsequence_cutoff\t"
+        "domain_cutoff\thmm_length\tfamily_type\tfor_structural_annotation\t"
+        "for_naming\tfor_AMRFinder\tproduct_name\tgene_symbol\tgene_synonyms\t"
+        "ec_numbers\tgo_terms\tpmids\ttaxonomic_range\t"
+        "taxonomic_range_name\ttaxonomic_rank_name\tn_refseq_protein_hits\t"
+        "source\tname_orig\thmm_name\tcomment\n"
+    )
+    tigr_cutoff = "" if missing_tigr_cutoff else "500"
+    path.write_text(
+        header
+        + "NF040708.3\t\tSiroheme_Dcarb_AhbA\t140\t140\t144\tequivalog\tY\tY\tN\t"
+        "siroheme decarboxylase subunit alpha\tahbA\t\t4.1.1.111\tGO:0006783\t"
+        "21197080\t131567\tcellular organisms\tcellular root\t1773\tNCBIFAM\t\t"
+        "siroheme decarboxylase subunit alpha\talpha family\n"
+        + f"TIGR04545.1\tTIGR04545\trSAM_ahbD_hemeb\t{tigr_cutoff}\t{tigr_cutoff}\t"
+        "339\tequivalog\tY\tY\tN\theme b synthase\tahbD\t\t1.3.98.6\t"
+        "GO:0006785\t24713144\t131567\tcellular organisms\tcellular root\t622\t"
+        "JCVI\theme b synthase\tAdoMet-dependent heme b synthase\theeme family\n",
+        encoding="utf-8",
+    )
+    return path
+
+
 class MergeGeneAnnotationTests(unittest.TestCase):
     def test_default_identity_threshold_is_50(self) -> None:
         module = load_merge_module()
         self.assertEqual(module.DEFAULT_IDENTITY_THRESHOLD, 50.0)
         self.assertEqual(module.DEFAULT_QUERY_COVERAGE_THRESHOLD, 0.5)
         self.assertEqual(module.DEFAULT_TARGET_COVERAGE_THRESHOLD, 0.5)
+        self.assertNotIn("ncbifam", module.normalize_enabled_sources(None))
 
     def test_kofam_hits_require_the_native_cutoff_table(self) -> None:
         module = load_merge_module()
@@ -43,6 +95,203 @@ class MergeGeneAnnotationTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(ValueError, "native ko_list cutoff table is missing"):
                 module.parse_kegg(kegg, "", "", 1e-10)
+
+    def test_ncbifam_preserves_exact_nf_and_versioned_tigr_accessions(self) -> None:
+        module = load_merge_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            release = Path(tmpdir) / "ncbifam" / "20.0"
+            release.mkdir(parents=True)
+            metadata = write_ncbifam_metadata(release / "hmm_PGAP.tsv")
+            (release / "database_versions.yaml").write_text(
+                yaml.safe_dump({
+                    "requested_version": "20.0",
+                    "source_version": "NCBIfam/PGAP HMM release 20.0",
+                    "sources": ["https://ftp.ncbi.nlm.nih.gov/hmm/20.0/hmm_PGAP.LIB"],
+                    "files": [
+                        {"filename": "hmm_PGAP.LIB", "sha256": "library-sha"},
+                        {"filename": "hmm_PGAP.tsv", "sha256": "metadata-sha"},
+                    ],
+                }),
+                encoding="utf-8",
+            )
+            raw = Path(tmpdir) / "MAG_A.tblout"
+            raw.write_text(
+                "# hmmscan :: search sequence(s) against a profile database\n"
+                + ncbifam_domtbl_row(
+                    "Siroheme_Dcarb_AhbA", "NF040708.3", "c1_1",
+                    model_length=144, query_length=200, full_evalue="1e-40",
+                    full_bitscore=220, domain_bitscore=210,
+                )
+                + "\n"
+                + ncbifam_domtbl_row(
+                    "rSAM_ahbD_hemeb", "TIGR04545.1", "c1_1",
+                    model_length=339, query_length=400, full_evalue="1e-80",
+                    full_bitscore=560, domain_bitscore=550,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            parsed = module.parse_ncbifam(raw, metadata)
+
+        self.assertEqual(parsed["annotation_id"].tolist(), ["NF040708.3", "TIGR04545.1"])
+        self.assertEqual(parsed["source"].tolist(), ["ncbifam", "ncbifam"])
+        self.assertEqual(parsed["method"].tolist(), ["hmmer", "hmmer"])
+        self.assertEqual(parsed["gene"].tolist(), ["c1_1", "c1_1"])
+        self.assertEqual(parsed["hit_rank"].tolist(), [1, 2])
+        self.assertEqual(parsed["is_primary"].tolist(), [True, False])
+        self.assertNotIn("TIGRFAM", parsed["annotation_id"].tolist())
+        details = json.loads(parsed.iloc[1]["details"])
+        self.assertEqual(details["source_release"], "20.0")
+        self.assertEqual(details["family_type"], "equivalog")
+        self.assertEqual(details["profile_source"], "JCVI")
+        self.assertEqual(details["native_hmm"]["accession"], "TIGR04545.1")
+        self.assertEqual(details["threshold_type"], "trusted_cutoff")
+        self.assertEqual(parsed.attrs["annotation_qc"]["database_release"], "20.0")
+        self.assertEqual(
+            json.loads(parsed.attrs["annotation_qc"]["database_checksums"]),
+            {"hmm_PGAP.LIB": "library-sha", "hmm_PGAP.tsv": "metadata-sha"},
+        )
+
+        projected = [
+            (row.gene, "NCBIFAM", row.annotation_id)
+            for row in parsed.itertuples(index=False)
+        ]
+        self.assertEqual(projected, [
+            ("c1_1", "NCBIFAM", "NF040708.3"),
+            ("c1_1", "NCBIFAM", "TIGR04545.1"),
+        ])
+
+    def test_ncbifam_rechecks_trusted_cutoffs_without_evalue_fallback(self) -> None:
+        module = load_merge_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            metadata = write_ncbifam_metadata(tmp / "hmm_PGAP.tsv")
+            raw = tmp / "hits.tblout"
+            raw.write_text(
+                ncbifam_domtbl_row(
+                    "Siroheme_Dcarb_AhbA", "NF040708.3", "accepted",
+                    model_length=144, query_length=160, full_evalue="1e-20",
+                    full_bitscore=150, domain_bitscore=145,
+                )
+                + "\n"
+                + ncbifam_domtbl_row(
+                    "rSAM_ahbD_hemeb", "TIGR04545.1", "below_tc",
+                    model_length=339, query_length=350, full_evalue="1e-100",
+                    full_bitscore=499, domain_bitscore=499,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            parsed = module.parse_ncbifam(raw, metadata)
+
+        self.assertEqual(parsed["gene"].tolist(), ["accepted"])
+        self.assertEqual(parsed["threshold"].tolist(), [140])
+        self.assertEqual(parsed.attrs["annotation_qc"]["reported_records"], 2)
+        self.assertEqual(parsed.attrs["annotation_qc"]["rejected_records"], 1)
+
+    def test_ncbifam_profile_without_trusted_cutoff_is_a_hard_error(self) -> None:
+        module = load_merge_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            metadata = write_ncbifam_metadata(
+                tmp / "hmm_PGAP.tsv", missing_tigr_cutoff=True
+            )
+            raw = tmp / "hits.tblout"
+            raw.write_text(
+                ncbifam_domtbl_row(
+                    "rSAM_ahbD_hemeb", "TIGR04545.1", "gene1",
+                    model_length=339, query_length=350, full_evalue="1e-100",
+                    full_bitscore=550, domain_bitscore=540,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                ValueError, "no complete trusted cutoff.*does not use an E-value fallback"
+            ):
+                module.parse_ncbifam(raw, metadata)
+
+    def test_ncbifam_does_not_coerce_an_unversioned_tigr_accession(self) -> None:
+        module = load_merge_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            metadata = write_ncbifam_metadata(tmp / "hmm_PGAP.tsv")
+            raw = tmp / "hits.tblout"
+            raw.write_text(
+                ncbifam_domtbl_row(
+                    "rSAM_ahbD_hemeb", "TIGR04545", "gene1",
+                    model_length=339, query_length=350, full_evalue="1e-100",
+                    full_bitscore=550, domain_bitscore=540,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                ValueError, "absent from hmm_PGAP.tsv.*TIGR04545"
+            ):
+                module.parse_ncbifam(raw, metadata)
+
+    def test_ncbifam_rows_survive_the_full_gene_table_merge_losslessly(self) -> None:
+        module = load_merge_module()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            gff = tmp / "genes.gff"
+            gff.write_text(
+                "c1\tProdigal\tCDS\t1\t1200\t.\t+\t0\tID=1_1;partial=00\n",
+                encoding="utf-8",
+            )
+            metadata = write_ncbifam_metadata(tmp / "hmm_PGAP.tsv")
+            raw = tmp / "hits.tblout"
+            raw.write_text(
+                ncbifam_domtbl_row(
+                    "Siroheme_Dcarb_AhbA", "NF040708.3", "c1_1",
+                    model_length=144, query_length=400, full_evalue="1e-40",
+                    full_bitscore=220, domain_bitscore=210,
+                )
+                + "\n"
+                + ncbifam_domtbl_row(
+                    "rSAM_ahbD_hemeb", "TIGR04545.1", "c1_1",
+                    model_length=339, query_length=400, full_evalue="1e-80",
+                    full_bitscore=560, domain_bitscore=550,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            output = tmp / "genes.tsv"
+            qc = tmp / "genes.qc.json"
+
+            merged = module.merge_annotations(
+                str(gff), "", "", "", "", "", "", "", "", "", "",
+                str(output),
+                mag="MAG_A",
+                enabled_sources={"ncbifam"},
+                qc_output=qc,
+                ncbifam_file=raw,
+                ncbifam_metadata_file=metadata,
+            )
+            qc_payload = json.loads(qc.read_text(encoding="utf-8"))
+            expected_release = tmp.name
+
+        rows = merged[merged["source"] == "ncbifam"]
+        self.assertEqual(rows["annotation_id"].tolist(), ["NF040708.3", "TIGR04545.1"])
+        self.assertEqual(
+            [(row.gene, "NCBIFAM", row.annotation_id) for row in rows.itertuples()],
+            [
+                ("c1_1", "NCBIFAM", "NF040708.3"),
+                ("c1_1", "NCBIFAM", "TIGR04545.1"),
+            ],
+        )
+        self.assertEqual(
+            next(
+                record for record in qc_payload["sources"]
+                if record["source"] == "ncbifam"
+            )["database_release"],
+            expected_release,
+        )
 
     def test_kofam_native_score_cutoff_is_authoritative_over_fallback_evalue(self) -> None:
         module = load_merge_module()

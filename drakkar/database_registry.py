@@ -37,6 +37,21 @@ MANAGED_DATABASES = {
             "https://ecdm.loria.fr/data/EC-Pfam_calculated_associations_Extended.csv",
         ],
     },
+    "ncbifam": {
+        "directory_name": "ncbifam",
+        "aliases": [],
+        "config_key": "NCBIFAM_DB",
+        # Keep NCBI's upstream profile-library filename.  The sibling
+        # hmm_PGAP.tsv file is required at annotation time for exact accessions,
+        # both trusted cutoffs, family type, and the rest of the model metadata.
+        "basename": "hmm_PGAP.LIB",
+        "version_label": "requested NCBIfam/PGAP HMM release",
+        "sources": [
+            "https://ftp.ncbi.nlm.nih.gov/hmm/{version}/hmm_PGAP.LIB",
+            "https://ftp.ncbi.nlm.nih.gov/hmm/{version}/hmm_PGAP.tsv",
+            "https://ftp.ncbi.nlm.nih.gov/hmm/{version}/RELEASE_NOTES.txt",
+        ],
+    },
     "vfdb": {
         "directory_name": "vfdb",
         "aliases": [],
@@ -185,6 +200,8 @@ def database_source_version_label(database_name: str, version: str | None = None
         return f"dbCAN-HMMdb-{version}"
     if database_name == "pfam" and version:
         return f"Pfam release {version}"
+    if database_name == "ncbifam" and version:
+        return f"NCBIfam/PGAP HMM release {version}"
     if database_name == "vfdb" and version:
         return f"VFDB_setB downloaded {version}"
     if database_name == "amr" and version:

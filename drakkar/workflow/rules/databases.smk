@@ -27,7 +27,10 @@ FOLDSEEK_MODULE = config["FOLDSEEK_MODULE"]
 
 DATABASE_NAME = normalize_managed_database_name(config.get("database_name", ""))
 DATABASE_DIRECTORY = config.get("database_directory", "")
-DATABASE_VERSION = config.get("database_version", "")
+# Snakemake YAML-decodes --config values, so a release such as 20.0 arrives
+# as a float unless it is normalized here. Registry paths and source URLs must
+# always use the exact textual release label.
+DATABASE_VERSION = str(config.get("database_version", ""))
 DOWNLOAD_RUNTIME = int(config.get("database_download_runtime", 120))
 INSTALL_DIR = Path(OUTPUT_DIR)
 
@@ -145,6 +148,54 @@ if DATABASE_NAME == "pfam":
             module purge
             module load {params.hmmer_module}
             hmmpress -f "{params.db}"
+            touch {output}
+            """
+
+if DATABASE_NAME == "ncbifam":
+    rule prepare_database:
+        output:
+            touch(f"{OUTPUT_DIR}/ncbifam.done")
+        params:
+            db=str(TARGET_DB),
+            metadata=f"{OUTPUT_DIR}/hmm_PGAP.tsv",
+            release_notes=f"{OUTPUT_DIR}/RELEASE_NOTES.txt",
+            library_url=DATABASE_SOURCES[0],
+            metadata_url=DATABASE_SOURCES[1],
+            release_notes_url=DATABASE_SOURCES[2],
+            expected_version=DATABASE_VERSION,
+            validator=f"{PACKAGE_DIR}/workflow/scripts/validate_ncbifam_database.py",
+            hmmer_module=HMMER_MODULE
+        threads: 1
+        resources:
+            runtime=lambda wildcards, attempt: cap_runtime(DOWNLOAD_RUNTIME * 2 ** (attempt - 1))
+        shell:
+            r"""
+            set -euo pipefail
+            mkdir -p {OUTPUT_DIR:q}
+            rm -f \
+                {params.db:q} {params.db:q}.download \
+                {params.db:q}.h3f {params.db:q}.h3i {params.db:q}.h3m {params.db:q}.h3p \
+                {params.metadata:q} {params.metadata:q}.download \
+                {params.release_notes:q} {params.release_notes:q}.download
+
+            curl -L --fail --retry 5 --output {params.db:q}.download {params.library_url:q}
+            curl -L --fail --retry 5 --output {params.metadata:q}.download {params.metadata_url:q}
+            curl -L --fail --retry 5 --output {params.release_notes:q}.download {params.release_notes_url:q}
+            mv {params.db:q}.download {params.db:q}
+            mv {params.metadata:q}.download {params.metadata:q}
+            mv {params.release_notes:q}.download {params.release_notes:q}
+
+            # A missing TC in any installed model is fatal.  The annotation
+            # rule uses --cut_tc exclusively and never substitutes an E-value.
+            python {params.validator:q} \
+                --library {params.db:q} \
+                --metadata {params.metadata:q} \
+                --release-notes {params.release_notes:q} \
+                --expect-release {params.expected_version:q}
+
+            module purge
+            module load {params.hmmer_module}
+            hmmpress -f {params.db:q}
             touch {output}
             """
 
@@ -394,6 +445,12 @@ rule write_database_versions:
             checksums = [Path(str(TARGET_DB))]
         elif DATABASE_NAME == "pfam":
             checksums = [Path(str(TARGET_DB)), Path(f"{TARGET_DB}_ec.tsv")]
+        elif DATABASE_NAME == "ncbifam":
+            checksums = [
+                Path(str(TARGET_DB)),
+                Path(f"{OUTPUT_DIR}/hmm_PGAP.tsv"),
+                Path(f"{OUTPUT_DIR}/RELEASE_NOTES.txt"),
+            ]
         elif DATABASE_NAME == "vfdb":
             checksums = [Path(f"{TARGET_DB}.idx"), Path(f"{TARGET_DB}.tsv")]
         elif DATABASE_NAME == "amr":
@@ -414,19 +471,35 @@ rule write_database_versions:
         elif DATABASE_NAME == "foldseek":
             checksums = [Path(str(TARGET_DB)), Path(f"{OUTPUT_DIR}/foldseek_map.tsv")]
 
+        source_urls = {
+            "hmm_PGAP.LIB": DATABASE_SOURCES[0],
+            "hmm_PGAP.tsv": DATABASE_SOURCES[1],
+            "RELEASE_NOTES.txt": DATABASE_SOURCES[2],
+        } if DATABASE_NAME == "ncbifam" else {}
+        source_roles = {
+            "hmm_PGAP.LIB": "profile_library",
+            "hmm_PGAP.tsv": "profile_metadata",
+            "RELEASE_NOTES.txt": "release_metadata",
+        } if DATABASE_NAME == "ncbifam" else {}
+
         file_info = []
         for target in checksums:
             if target.exists():
-                file_info.append(
-                    {
-                        "path": str(target),
-                        "sha256": sha256sum(target),
-                        "size_bytes": target.stat().st_size,
-                    }
-                )
+                record = {
+                    "path": str(target),
+                    "filename": target.name,
+                    "sha256": sha256sum(target),
+                    "size_bytes": target.stat().st_size,
+                }
+                if target.name in source_urls:
+                    record["role"] = source_roles[target.name]
+                    record["source_url"] = source_urls[target.name]
+                file_info.append(record)
 
+        generated_at = datetime.now(timezone.utc).isoformat()
         version_info = {
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": generated_at,
+            "retrieved_at": generated_at,
             "database": DATABASE_NAME,
             "config_key": DATABASE_DEFINITION["config_key"],
             "base_directory": DATABASE_DIRECTORY,

@@ -43,6 +43,14 @@ AMR_INDEX = """
 <a href="latest/">latest/</a>
 """
 
+NCBIFAM_INDEX = """
+<a href="18.0/">18.0/</a>
+<a href="19.0/">19.0/</a>
+<a href="20.0/">20.0/</a>
+<a href="NCBIfam-AMRFinder/">NCBIfam-AMRFinder/</a>
+<a href="current/">current/</a>
+"""
+
 CARD_INDEX = """
 <a href="/download/0/broadstreet-v3.3.0.tar.bz2">DOWNLOAD</a>
 <a href="/download/0/broadstreet-v4.0.1.tar.bz2">DOWNLOAD</a>
@@ -76,6 +84,11 @@ class IndexDiscoveryTests(unittest.TestCase):
             latest, _ = _latest_from_index(LATEST_SOURCES["amr"], timeout=1)
         # The NCBI directory carries a "latest/" alias that is not a release name.
         self.assertEqual(latest, "2026-08-07.1")
+
+    def test_ncbifam_index_returns_the_latest_numbered_pgap_release(self) -> None:
+        with patch.object(database_latest, "_fetch_text", return_value=NCBIFAM_INDEX):
+            latest, _ = _latest_from_index(LATEST_SOURCES["ncbifam"], timeout=1)
+        self.assertEqual(latest, "20.0")
 
     def test_index_without_any_matching_release_raises(self) -> None:
         with patch.object(database_latest, "_fetch_text", return_value="<a href='none/'>none</a>"):

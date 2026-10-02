@@ -73,6 +73,14 @@ class RequirementSelectionTests(unittest.TestCase):
     def test_annotating_requirements_skip_unconfigured_databases(self) -> None:
         self.assertEqual(annotating_requirements("kegg", config={"KEGG_DB": ""}), [])
 
+    def test_ncbifam_is_a_managed_annotation_requirement(self) -> None:
+        requirements = annotating_requirements(
+            "ncbifam", config={"NCBIFAM_DB": "/db/ncbifam/20.0"}
+        )
+        self.assertEqual(len(requirements), 1)
+        self.assertEqual(requirements[0].config_key, "NCBIFAM_DB")
+        self.assertEqual(requirements[0].database, "ncbifam")
+
     def test_module_requirements_include_singlem_only_with_fraction(self) -> None:
         config = {"SINGLEM_DB": "/db/singlem", "CHECKM2_DB": "/db/checkm2.dmnd"}
         args = types.SimpleNamespace(fraction=False)
@@ -106,6 +114,25 @@ class ArtifactCheckTests(unittest.TestCase):
             (release / "kofams.json").write_text("", encoding="utf-8")
             requirement = annotating_requirements("kegg", config={"KEGG_DB": str(release)})[0]
             self.assertEqual(missing_artifacts(requirement), [str(release / "kofams.json")])
+
+    def test_ncbifam_requires_library_metadata_release_and_checksums_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            release = Path(tmpdir) / "ncbifam" / "20.0"
+            release.mkdir(parents=True)
+            for filename in (
+                "hmm_PGAP.LIB", "hmm_PGAP.LIB.h3f", "hmm_PGAP.LIB.h3i",
+                "hmm_PGAP.LIB.h3m", "hmm_PGAP.LIB.h3p", "hmm_PGAP.tsv",
+                "RELEASE_NOTES.txt", "database_versions.yaml",
+            ):
+                (release / filename).write_text("content", encoding="utf-8")
+            requirement = annotating_requirements(
+                "ncbifam", config={"NCBIFAM_DB": str(release)}
+            )[0]
+            self.assertEqual(missing_artifacts(requirement), [])
+            (release / "hmm_PGAP.tsv").unlink()
+            self.assertEqual(
+                missing_artifacts(requirement), [str(release / "hmm_PGAP.tsv")]
+            )
 
     def test_absent_release_directory_reports_the_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

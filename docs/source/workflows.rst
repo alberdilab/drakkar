@@ -302,6 +302,12 @@ input genomes only.
 
    $ drakkar annotating -b /path/to/mags -o drakkar_output --annotation-type genes
 
+The full NCBIfam library is selected explicitly:
+
+.. code-block:: console
+
+   $ drakkar annotating -b /path/to/mags -o drakkar_output --annotation-type kegg,pfam,ncbifam
+
 Options:
 
 - ``-b/--bins_dir``: directory with MAG/bin FASTA files.
@@ -310,12 +316,15 @@ Options:
 - ``--annotation-type``: comma-separated annotation targets:
 
   - ``taxonomy``: run GTDB-Tk taxonomy.
-  - ``function``: run all functional components below.
+  - ``function``: run the established default functional components below.
   - ``genes``: run only gene-level components
     (``kegg,cazy,pfam,virulence,amr,card,signalp``).
   - ``kegg``: KEGG ortholog HMM annotation.
   - ``cazy``: CAZy HMM annotation.
   - ``pfam``: PFAM HMM annotation.
+  - ``ncbifam``: full NCBIfam/PGAP profile-HMM annotation using exact,
+    versioned NCBI accessions. This large source is opt-in and is not added by
+    either the ``function`` or ``genes`` bundle.
   - ``virulence`` (alias: ``vfdb``): VFDB-based virulence annotation.
   - ``amr``: AMRFinderPlus annotation of acquired resistance genes.
   - ``card`` (alias: ``rgi``): CARD/RGI annotation of resistance determinants.
@@ -345,7 +354,7 @@ database preparation command is not exposed by the CLI.
 
 These four options only affect sources that publish no curated cutoff of their
 own, which in a supported run means VFDB and the small minority of KOs with no
-KOfam threshold. KEGG, Pfam, CAZy, AMRFinderPlus, CARD/RGI, SignalP and
+KOfam threshold. KEGG, Pfam, NCBIfam, CAZy, AMRFinderPlus, CARD/RGI, SignalP and
 DefenseFinder keep their native, model-specific acceptance rules. See :ref:`annotation-thresholds` for
 each source's rule, the published evidence behind the defaults, and guidance on
 when to tighten them.
@@ -392,7 +401,7 @@ Output behavior for partial functional runs:
 
 - ``annotating/gene_annotations.tsv.xz`` is generated when any gene-level
   source is selected
-  (``kegg,cazy,pfam,virulence,amr,signalp,defense``).
+  (``kegg,cazy,pfam,ncbifam,virulence,amr,card,signalp,defense``).
 - ``annotating/cluster_annotations.tsv.xz`` is generated when any cluster-level
   source is selected (``dbcan,antismash,defense,mobile``).
 - Merged tables are still generated from the available sources when only a

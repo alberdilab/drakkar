@@ -62,7 +62,7 @@ class AnnotationTableWorkflowTests(unittest.TestCase):
                 self.assertIsNotNone(match)
                 shell = match.group("shell")
                 self.assertIn("awk 'FNR==1 && NR!=1 {{ next }} {{ print }}'", shell)
-                self.assertIn("| xz -c > {output}", shell)
+                self.assertIn("| xz -T {threads} -c > {output}", shell)
 
     def test_cazy_rule_uses_dbcan_coverage_filtered_output(self) -> None:
         rules = ANNOTATION_RULES.read_text(encoding="utf-8")
@@ -132,12 +132,15 @@ class AnnotationTableWorkflowTests(unittest.TestCase):
 
     def test_amr_target_runs_amrfinderplus_not_the_hmm_library(self) -> None:
         rules = ANNOTATION_RULES.read_text(encoding="utf-8")
+        match = re.search(r"rule amr:.*?(?=\nrule )", rules, re.DOTALL)
+        self.assertIsNotNone(match)
+        amr_rule = match.group(0)
         # The gene-level AMR source is AMRFinderPlus in combined mode. The
         # NCBIfam-AMR HMM library it used to scan is no longer read here.
-        self.assertIn("amrfinder \\", rules)
-        self.assertIn("--annotation_format standard", rules)
-        self.assertIn("--database {params.db:q}", rules)
-        self.assertNotIn("--cut_tc", rules)
+        self.assertIn("amrfinder \\", amr_rule)
+        self.assertIn("--annotation_format standard", amr_rule)
+        self.assertIn("--database {params.db:q}", amr_rule)
+        self.assertNotIn("--cut_tc", amr_rule)
         self.assertNotIn("AMR_DB_TSV", rules)
         self.assertIn('AMRFINDER_DB = config["AMRFINDER_DB"]', rules)
         # Combined mode needs all three Prodigal products plus the contigs.
@@ -145,6 +148,25 @@ class AnnotationTableWorkflowTests(unittest.TestCase):
         self.assertIn("--nucleotide {params.contigs:q}", rules)
         self.assertIn("--protein {input.faa:q}", rules)
         self.assertIn("--gff {input.gff:q}", rules)
+
+    def test_ncbifam_is_opt_in_and_uses_native_trusted_cutoffs(self) -> None:
+        rules = ANNOTATION_RULES.read_text(encoding="utf-8")
+        snakefile = (ROOT / "drakkar" / "workflow" / "Snakefile").read_text(
+            encoding="utf-8"
+        )
+        match = re.search(r"rule ncbifam:.*?(?=\nrule )", rules, re.DOTALL)
+        self.assertIsNotNone(match)
+        ncbifam_rule = match.group(0)
+        self.assertIn("--cut_tc", ncbifam_rule)
+        self.assertIn("--domtblout {output:q}", ncbifam_rule)
+        self.assertIn("annotating/ncbifam/{{mag}}.tblout", ncbifam_rule)
+        self.assertIn('RUN_NCBIFAM = "ncbifam" in ANNOTATING_TYPE_SET', rules)
+        self.assertIn('("ncbifam", RUN_NCBIFAM),', rules)
+        self.assertIn('OPTIONAL_GENE_ANNOTATION_COMPONENTS = {"ncbifam"}', snakefile)
+
+        self.assertEqual(normalize_annotation_type("ncbifam"), "ncbifam")
+        self.assertNotIn("ncbifam", normalize_annotation_type("function").split(","))
+        self.assertNotIn("ncbifam", normalize_annotation_type("genes").split(","))
 
     def test_card_target_runs_rgi_in_protein_mode(self) -> None:
         rules = ANNOTATION_RULES.read_text(encoding="utf-8")

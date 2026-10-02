@@ -53,6 +53,7 @@ Supported database subcommands:
 - ``kegg`` (alias: ``kofams``)
 - ``cazy``
 - ``pfam``
+- ``ncbifam``
 - ``vfdb``
 - ``amr``
 - ``amrfinderplus`` (alias: ``amrfinder``)
@@ -93,6 +94,10 @@ Examples:
 
 .. code-block:: console
 
+   $ drakkar database ncbifam --directory /projects/alberdilab/data/databases/drakkar/ncbifam --version 20.0 --set-default
+
+.. code-block:: console
+
    $ drakkar database vfdb --directory /projects/alberdilab/data/databases/drakkar/vfdb --set-default
 
 .. code-block:: console
@@ -114,7 +119,8 @@ Options:
 - ``--version``: folder name to create inside ``--directory``. For ``kegg``,
   use the KEGG archive date such as ``2026-02-01``. For ``cazy``, use the
   upstream dbCAN release label such as ``V14``. For ``pfam``, use the Pfam
-  release directory name such as ``Pfam37.4``. For ``amr``, use the NCBI
+  release directory name such as ``Pfam37.4``. For ``ncbifam``, use the NCBI
+  PGAP HMM release such as ``20.0``. For ``amr``, use the NCBI
   AMRFinder release directory name such as ``2025-07-16.1``. For ``vfdb``,
   you can omit ``--version`` and DRAKKAR will use the UTC download date. For
   ``amrfinderplus``, use the NCBI data release such as ``2026-08-07.1``; for
@@ -132,7 +138,7 @@ Behavior:
 - For managed annotation databases, ``config.yaml`` stores the release
   directory, not the internal HMM or MMseqs prefix file.
 - The workflow resolves the expected internal files automatically, for example
-  ``kofams``, ``pfam``, ``amr.tsv``, or ``vfdb``.
+  ``kofams``, ``pfam``, ``hmm_PGAP.LIB``, ``amr.tsv``, or ``vfdb``.
 - ``--set-default`` rewrites that config entry to the newly installed release
   directory.
 
@@ -157,6 +163,16 @@ Database-specific rules:
   the EC mapping table, unzips the HMM file, and runs ``hmmpress``. If the
   requested release is missing, DRAKKAR points you to
   ``https://ftp.ebi.ac.uk/pub/databases/Pfam/releases/``.
+- ``ncbifam``: use NCBI's numbered PGAP HMM release, currently pinned by the
+  shipped configuration to ``20.0``. DRAKKAR downloads the exact
+  ``hmm_PGAP.LIB``, ``hmm_PGAP.tsv``, and ``RELEASE_NOTES.txt`` files from
+  ``https://ftp.ncbi.nlm.nih.gov/hmm/<version>/``, confirms that the release
+  notes match the requested version, verifies that every installed NF/TIGR
+  model has native sequence and domain trusted cutoffs, and runs ``hmmpress``.
+  ``hmm_PGAP.tsv`` is required at annotation time: it supplies exact versioned
+  accessions, model descriptions, family type, naming flags, profile source,
+  and TC1/TC2. A missing cutoff aborts installation; DRAKKAR never installs a
+  generic E-value fallback for this source.
 - ``amr``: use the NCBI AMRFinder release directory name, such as
   ``2025-07-16.1``. DRAKKAR downloads both
   ``NCBIfam-AMRFinder.HMM.tar.gz`` and ``NCBIfam-AMRFinder.tsv`` from
@@ -187,8 +203,10 @@ Version logging:
 
 - Each run writes ``database_versions.yaml`` inside the installed release
   directory.
-- The log records the requested version, resolved install directory, source
-  URLs, source-version label, and installed asset checksums and file sizes.
+- The log records the requested version, retrieval time, resolved install
+  directory, source URLs, source-version label, and installed asset checksums
+  and file sizes. For NCBIfam, each profile-library, metadata-sidecar and
+  release-notes record also retains its upstream filename, role and source URL.
 
 Checking for newer releases
 ---------------------------
@@ -217,7 +235,7 @@ release, so the reported version can be applied directly.
 
 Databases that can be checked:
 
-- ``kegg`` (alias: ``kofams``), ``cazy``, ``pfam``, ``vfdb``, ``amr``,
+- ``kegg`` (alias: ``kofams``), ``cazy``, ``pfam``, ``ncbifam``, ``vfdb``, ``amr``,
   ``amrfinderplus`` (alias: ``amrfinder``), ``card`` and ``foldseek``, using
   the release directory recorded in ``config.yaml``.
 - ``gtdb``, read from the ``GTDB_DB`` entry. GTDB reference data is installed by
@@ -329,7 +347,8 @@ DRAKKAR verifies that each database the requested module needs is present and
 that none of its artifacts are missing or empty. For managed releases this
 covers every file the installer produces, including the pressed HMM indices,
 the KEGG hierarchy JSON, the KOfam ``ko_list`` cutoff table, and the Pfam EC
-mapping table. Only the databases the run actually needs are checked, so
+mapping table. NCBIfam checks additionally require ``hmm_PGAP.tsv``, release
+notes, and the checksum manifest. Only the databases the run actually needs are checked, so
 ``--annotation-type kegg`` does not require a Pfam release.
 
 If something is missing, DRAKKAR names the exact files and prints the command

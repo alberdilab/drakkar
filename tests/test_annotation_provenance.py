@@ -78,6 +78,7 @@ class AnnotationProvenanceTests(unittest.TestCase):
             annotation_report_sources("kegg,virulence,amr,card,mobile,defense"),
             {"kegg", "vfdb", "ncbi_amrfinder", "card", "genomad", "defensefinder"},
         )
+        self.assertEqual(annotation_report_sources("ncbifam"), {"ncbifam"})
         # Bundle keywords and taxonomy are not annotation sources.
         self.assertEqual(annotation_report_sources("taxonomy,function,genes"), set())
 

@@ -21,6 +21,9 @@ QC_COLUMNS = [
     "unmapped_records",
     "unique_entities",
     "filter_stage",
+    "database_release",
+    "database_source_version",
+    "database_checksums",
 ]
 
 
@@ -77,6 +80,7 @@ def describe_database(configured_path):
             "installation_manifest": str(version_manifest),
             "requested_version": installed.get("requested_version"),
             "source_version": installed.get("source_version"),
+            "retrieved_at": installed.get("retrieved_at") or installed.get("generated_at"),
             "sources": installed.get("sources", []),
             "files": installed.get("files", []),
         })

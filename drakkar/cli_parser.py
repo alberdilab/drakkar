@@ -128,7 +128,7 @@ def build_parser():
         default="taxonomy,function",
         help=(
             "Comma-separated annotation targets. Options: taxonomy, function, genes, clusters, "
-            "kegg, cazy, pfam, virulence (vfdb), amr, signalp, dbcan, antismash, "
+            "kegg, cazy, pfam, ncbifam, virulence (vfdb), amr, signalp, dbcan, antismash, "
             "card (rgi), defense, mobile (genomad), network. Default: taxonomy,function"
         ),
     )
@@ -250,7 +250,7 @@ def build_parser():
         default="taxonomy,function",
         help=(
             "Comma-separated annotation targets. Options: taxonomy, function, genes, clusters, "
-            "kegg, cazy, pfam, virulence (vfdb), amr, signalp, dbcan, antismash, "
+            "kegg, cazy, pfam, ncbifam, virulence (vfdb), amr, signalp, dbcan, antismash, "
             "card (rgi), defense, mobile (genomad), network. Default: taxonomy,function"
         ),
     )
@@ -377,6 +377,11 @@ def build_parser():
     database_kegg = database_subparsers.add_parser("kegg", parents=[database_parent], help="Install or update the KEGG/KOfam database", aliases=["kofams"])
     database_cazy = database_subparsers.add_parser("cazy", parents=[database_parent], help="Install or update the CAZy database")
     database_pfam = database_subparsers.add_parser("pfam", parents=[database_parent], help="Install or update the PFAM database")
+    database_ncbifam = database_subparsers.add_parser(
+        "ncbifam",
+        parents=[database_parent],
+        help="Install a versioned full NCBIfam/PGAP HMM release",
+    )
     database_vfdb = database_subparsers.add_parser("vfdb", parents=[database_parent], help="Install or update the VFDB database")
     database_amr = database_subparsers.add_parser("amr", parents=[database_parent], help="Install or update the legacy NCBIfam-AMRFinder HMM database")
     database_amrfinderplus = database_subparsers.add_parser(
@@ -675,7 +680,7 @@ def build_parser():
             "drakkar database vfdb --directory /db/vfdb --set-default",
         ],
         command_groups=[
-            ("Managed Databases", ["kegg", "cazy", "pfam", "vfdb", "amr", "amrfinderplus", "card"]),
+            ("Managed Databases", ["kegg", "cazy", "pfam", "ncbifam", "vfdb", "amr", "amrfinderplus", "card"]),
             ("Version Checks", ["latest", "update"]),
         ],
         sections=[
@@ -702,6 +707,13 @@ def build_parser():
             "Install a Pfam release and prepare the pressed HMM database used by annotation rules.",
             [
                 "drakkar database pfam --directory /db/pfam --version Pfam37.4",
+            ],
+        ),
+        database_ncbifam: (
+            "Install a complete versioned NCBIfam/PGAP HMM library and its profile metadata.",
+            [
+                "drakkar database ncbifam --directory /db/ncbifam --version 20.0",
+                "drakkar database ncbifam --version 20.0 --set-default",
             ],
         ),
         database_vfdb: (

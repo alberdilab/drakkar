@@ -8,6 +8,30 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.6.5] - 2026-10-02
+
+### Added
+
+- First-class, opt-in NCBIfam gene annotation through
+  `--annotation-type ncbifam`. The workflow scans the existing Prodigal
+  proteins with HMMER's native trusted model cutoffs, retains every accepted
+  profile hit in the lossless long-form table, and records scores, E-values,
+  coverage, coordinates, cutoff evidence, profile metadata, and database
+  provenance.
+- Managed installation of the complete NCBIfam/PGAP HMM release, pinned to
+  `20.0` in the shipped configuration. Installation preserves NCBI's native
+  `hmm_PGAP.LIB` and `hmm_PGAP.tsv` artifacts, validates TC1/TC2 for every
+  installed profile, runs `hmmpress`, and records source URLs, retrieval
+  time, filenames, roles, and SHA-256 checksums in the database manifest.
+
+### Changed
+
+- Versioned NCBIfam identifiers are preserved exactly. Accessions such as
+  `NF040708.3` and `TIGR04545.1` remain under `source=ncbifam` and are
+  never stripped or converted to legacy TIGRFAM identities. Profiles without
+  native trusted cutoffs now fail explicitly instead of falling back to a
+  generic E-value threshold.
+
 ## [2.6.4] - 2026-09-29
 
 ### Fixed

@@ -60,6 +60,9 @@ AMR_DB: "/maps/projects/alberdilab/data/databases/drakkar/amr/2026-08-07.1"
 AMRFINDER_DB: "/maps/projects/alberdilab/data/databases/drakkar/amrfinderplus/2026-08-07.1"
 CARD_DB: "/maps/projects/alberdilab/data/databases/drakkar/card/4.0.2"
 PFAM_DB: "/maps/projects/alberdilab/data/databases/drakkar/pfam/Pfam38.2"
+# Full NCBIfam/PGAP HMM collection. This is opt-in through
+# --annotation-type ncbifam and is not part of the function/genes bundles.
+NCBIFAM_DB: "/maps/projects/alberdilab/data/databases/drakkar/ncbifam/20.0"
 VFDB_DB: "/maps/projects/alberdilab/data/databases/drakkar/vfdb/2026-08-21"
 GENOMAD_DB: "/datasets/globe_databases/genomad/genomad_db_v1.9/genomad_db"
 SINGLEM_DB: "/maps/datasets/globe_databases/singlem/4.3.0/S4.3.0.GTDB_r220.metapackage_20240523.smpkg.zb"

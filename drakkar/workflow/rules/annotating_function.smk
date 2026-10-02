@@ -31,6 +31,11 @@ KEGG_DB_KOLIST = str(database_registry.database_artifact_path("kegg", config["KE
 CAZY_DB = str(database_registry.database_artifact_path("cazy", config["CAZY_DB"]))
 PFAM_DB = str(database_registry.database_artifact_path("pfam", config["PFAM_DB"]))
 PFAM_DB_EC = str(database_registry.database_artifact_path("pfam", config["PFAM_DB"], "_ec.tsv"))
+NCBIFAM_DB = str(database_registry.database_artifact_path("ncbifam", config["NCBIFAM_DB"]))
+NCBIFAM_RELEASE_DIR = database_registry.database_release_from_config(
+    "ncbifam", config["NCBIFAM_DB"]
+)
+NCBIFAM_METADATA = str(NCBIFAM_RELEASE_DIR / "hmm_PGAP.tsv")
 # Gene-level AMR uses AMRFinderPlus itself, not the NCBIfam-AMR HMM library that
 # earlier releases searched with hmmscan. CARD/RGI is a second, independent
 # caller over the same Prodigal proteins.
@@ -59,6 +64,7 @@ ANNOTATING_TYPE_SET = set(ANNOTATING_TYPE)
 RUN_KEGG = "kegg" in ANNOTATING_TYPE_SET
 RUN_CAZY = "cazy" in ANNOTATING_TYPE_SET
 RUN_PFAM = "pfam" in ANNOTATING_TYPE_SET
+RUN_NCBIFAM = "ncbifam" in ANNOTATING_TYPE_SET
 RUN_VIRULENCE = "virulence" in ANNOTATING_TYPE_SET
 RUN_AMR = "amr" in ANNOTATING_TYPE_SET
 RUN_CARD = "card" in ANNOTATING_TYPE_SET
@@ -75,6 +81,7 @@ ENABLED_GENE_SOURCES = [
         ("kegg", RUN_KEGG),
         ("cazy", RUN_CAZY),
         ("pfam", RUN_PFAM),
+        ("ncbifam", RUN_NCBIFAM),
         ("virulence", RUN_VIRULENCE),
         ("amr", RUN_AMR),
         ("card", RUN_CARD),
@@ -115,6 +122,8 @@ if RUN_CAZY:
     ANNOTATION_DATABASES["cazy"] = config["CAZY_DB"]
 if RUN_PFAM:
     ANNOTATION_DATABASES["pfam"] = config["PFAM_DB"]
+if RUN_NCBIFAM:
+    ANNOTATION_DATABASES["ncbifam"] = config["NCBIFAM_DB"]
 if RUN_VIRULENCE:
     ANNOTATION_DATABASES["vfdb"] = config["VFDB_DB"]
 if RUN_AMR:
@@ -133,7 +142,7 @@ if RUN_STRUCTURE:
     ANNOTATION_DATABASES["foldseek"] = FOLDSEEK_DB
 
 ANNOTATION_TOOLS = {}
-if RUN_KEGG or RUN_PFAM:
+if RUN_KEGG or RUN_PFAM or RUN_NCBIFAM:
     ANNOTATION_TOOLS["hmmer"] = HMMER_MODULE
 if RUN_AMR:
     ANNOTATION_TOOLS["amrfinderplus"] = "workflow/envs/amr_amrfinder.yaml"
@@ -175,6 +184,8 @@ def selected_gene_annotation_inputs(wildcards):
         selected.append(f"{OUTPUT_DIR}/annotating/cazy/{wildcards.mag}/dbCAN_hmm_results.tsv")
     if RUN_PFAM:
         selected.append(f"{OUTPUT_DIR}/annotating/pfam/{wildcards.mag}.tsv")
+    if RUN_NCBIFAM:
+        selected.append(f"{OUTPUT_DIR}/annotating/ncbifam/{wildcards.mag}.tblout")
     if RUN_VIRULENCE:
         selected.append(f"{OUTPUT_DIR}/annotating/vfdb/{wildcards.mag}.txt")
     if RUN_AMR:
@@ -200,6 +211,8 @@ def structure_gating_inputs(wildcards):
         gating.append(f"{OUTPUT_DIR}/annotating/pfam/{wildcards.mag}.tsv")
     if RUN_CAZY:
         gating.append(f"{OUTPUT_DIR}/annotating/cazy/{wildcards.mag}/dbCAN_hmm_results.tsv")
+    if RUN_NCBIFAM:
+        gating.append(f"{OUTPUT_DIR}/annotating/ncbifam/{wildcards.mag}.tblout")
     return gating
 
 
@@ -345,6 +358,38 @@ rule pfam:
         module purge
         module load {params.hmmer_module}
         hmmscan -o {output.txt} --tblout {output.tsv} --cut_ga --noali {params.db} {input}
+        """
+
+rule ncbifam:
+    input:
+        f"{OUTPUT_DIR}/annotating/prodigal/{{mag}}.faa"
+    output:
+        f"{OUTPUT_DIR}/annotating/ncbifam/{{mag}}.tblout"
+    params:
+        hmmer_module={HMMER_MODULE},
+        db={NCBIFAM_DB}
+    threads:
+        1
+    resources:
+        mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(16*1024, int(input.size_mb * 1024 * 8)) * 2 ** (attempt - 1)),
+        runtime=lambda wildcards, input, attempt: cap_runtime(max(30, int(input.size_mb * 120)) * 2 ** (attempt - 1))
+    message: "Annotating NCBIfam families of MAG {wildcards.mag}..."
+    shell:
+        """
+        set -euo pipefail
+        module purge
+        module load {params.hmmer_module}
+        # --domtblout retains model/query coordinates and domain scores. Every
+        # accepted sequence and domain must clear its model's native TC1/TC2.
+        # A profile without TC values makes HMMER fail; there is deliberately
+        # no generic E-value fallback.
+        hmmscan \
+            -o /dev/null \
+            --domtblout {output:q} \
+            --cut_tc \
+            --noali \
+            {params.db:q} \
+            {input:q}
         """
 
 rule vfdb:
@@ -575,6 +620,7 @@ rule merge_gene_annotations:
         kegg_db={KEGG_DB_JSON},
         kegg_cutoffs={KEGG_DB_KOLIST},
         ec_db={PFAM_DB_EC},
+        ncbifam_metadata={NCBIFAM_METADATA},
         vf_db={VFDB_DB_TSV},
         foldseek_db={FOLDSEEK_MAP_DB},
         sources=",".join(ENABLED_GENE_SOURCES),
@@ -584,6 +630,7 @@ rule merge_gene_annotations:
         target_coverage={ANNOTATION_TARGET_COVERAGE},
         kegg=lambda wildcards: f"{OUTPUT_DIR}/annotating/kegg/{wildcards.mag}.tsv",
         pfam=lambda wildcards: f"{OUTPUT_DIR}/annotating/pfam/{wildcards.mag}.tsv",
+        ncbifam=lambda wildcards: f"{OUTPUT_DIR}/annotating/ncbifam/{wildcards.mag}.tblout",
         cazy=lambda wildcards: f"{OUTPUT_DIR}/annotating/cazy/{wildcards.mag}/dbCAN_hmm_results.tsv",
         vf=lambda wildcards: f"{OUTPUT_DIR}/annotating/vfdb/{wildcards.mag}.txt",
         amr=lambda wildcards: f"{OUTPUT_DIR}/annotating/amr/{wildcards.mag}.tsv",
@@ -612,6 +659,8 @@ rule merge_gene_annotations:
             -keggcutoffs {params.kegg_cutoffs} \
             -pfam {params.pfam} \
             -ec {params.ec_db} \
+            -ncbifam {params.ncbifam} \
+            -ncbifam-metadata {params.ncbifam_metadata} \
             -cazy {params.cazy} \
             -vf {params.vf} \
             -vfdb {params.vf_db} \
@@ -1001,6 +1050,7 @@ rule annotation_report:
             "annotation_query_coverage": ANNOTATION_QUERY_COVERAGE,
             "annotation_target_coverage": ANNOTATION_TARGET_COVERAGE,
             "kofam_acceptance": "native_model_cutoffs",
+            **({"ncbifam_acceptance": "native_trusted_cutoffs_no_fallback"} if RUN_NCBIFAM else {}),
         }),
         databases=assignment_args(ANNOTATION_DATABASES),
         tools=assignment_args(ANNOTATION_TOOLS),

@@ -106,6 +106,14 @@ LATEST_SOURCES = {
         "url": "https://ftp.ebi.ac.uk/pub/databases/Pfam/releases/",
         "entry_pattern": r"^(Pfam\d+\.\d+)/$",
     },
+    "ncbifam": {
+        "label": "NCBIfam/PGAP HMMs",
+        "config_key": "NCBIFAM_DB",
+        "managed": True,
+        "strategy": "index",
+        "url": "https://ftp.ncbi.nlm.nih.gov/hmm/",
+        "entry_pattern": r"^(\d+\.\d+)/$",
+    },
     "vfdb": {
         "label": "VFDB",
         "config_key": "VFDB_DB",

@@ -45,6 +45,9 @@ MANAGED_REQUIRED_ARTIFACTS = {
     "kegg": ("", *HMM_PRESSED_SUFFIXES, ".json", "_ko_list.tsv"),
     "cazy": ("", *HMM_PRESSED_SUFFIXES),
     "pfam": ("", *HMM_PRESSED_SUFFIXES, "_ec.tsv"),
+    # NCBIfam preserves NCBI's native filenames rather than deriving the
+    # metadata filename from the library basename.
+    "ncbifam": ("", *HMM_PRESSED_SUFFIXES),
     "vfdb": ("", ".dbtype", ".index", ".tsv"),
     "amr": ("", *HMM_PRESSED_SUFFIXES, ".tsv"),
 }
@@ -82,6 +85,13 @@ ANNOTATION_DATABASE_REQUIREMENTS = {
         "source": "pfam",
         "label": "Pfam",
         "stale_outputs": ("annotating/pfam/*.tsv", *GENE_ANNOTATION_OUTPUTS),
+    },
+    "ncbifam": {
+        "config_key": "NCBIFAM_DB",
+        "database": "ncbifam",
+        "source": "ncbifam",
+        "label": "NCBIfam/PGAP HMMs",
+        "stale_outputs": ("annotating/ncbifam/*.tblout", *GENE_ANNOTATION_OUTPUTS),
     },
     "virulence": {
         "config_key": "VFDB_DB",
@@ -302,6 +312,18 @@ def missing_artifacts(requirement):
             release_dir / "fam.tsv",
         )
         return [str(path) for path in required if not _is_populated(path)]
+    if requirement.database == "ncbifam":
+        release_dir = database_release_from_config(requirement.database, configured)
+        if not release_dir.is_dir():
+            return [str(release_dir)]
+        required = (
+            database_artifact_path("ncbifam", configured),
+            *(Path(f"{database_artifact_path('ncbifam', configured)}{suffix}") for suffix in HMM_PRESSED_SUFFIXES),
+            release_dir / "hmm_PGAP.tsv",
+            release_dir / "RELEASE_NOTES.txt",
+            release_dir / "database_versions.yaml",
+        )
+        return [str(path) for path in required if not _is_populated(path)]
     if requirement.database in MANAGED_REQUIRED_ARTIFACTS:
         release_dir = database_release_from_config(requirement.database, configured)
         if not release_dir.is_dir():
@@ -469,7 +491,7 @@ def _describe_record(record):
 # ENABLED_CLUSTER_SOURCES in workflow/rules/annotating_function.smk, and
 # test_annotation_provenance keeps the two definitions in step.
 GENE_ANNOTATION_COMPONENTS = (
-    "kegg", "cazy", "pfam", "virulence", "amr", "card", "signalp", "defense",
+    "kegg", "cazy", "pfam", "ncbifam", "virulence", "amr", "card", "signalp", "defense",
 )
 CLUSTER_ANNOTATION_COMPONENTS = ("dbcan", "mobile", "antismash", "defense")
 

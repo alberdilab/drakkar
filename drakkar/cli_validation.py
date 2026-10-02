@@ -20,15 +20,18 @@ def normalize_annotation_type(annotation_type):
         "dbcan", "antismash", "defense", "mobile"
     }
     gene_components = {"kegg", "cazy", "pfam", "virulence", "amr", "card", "signalp"}
+    # NCBIfam is deliberately opt-in: accepting it as a target must not make
+    # the established ``function`` or ``genes`` bundles run a multi-GB library.
+    optional_gene_components = {"ncbifam"}
     clusters_only_components = {"dbcan", "antismash", "mobile"}
     aliases = {"vfdb": "virulence", "genomad": "mobile", "rgi": "card"}
     allowed = {
         "taxonomy", "function", "genes", "clusters", "network",
-        *functional_components
+        *functional_components, *optional_gene_components
     }
     option_order = [
         "taxonomy", "function", "genes", "clusters", "network",
-        "kegg", "cazy", "pfam", "virulence", "amr", "card", "signalp",
+        "kegg", "cazy", "pfam", "ncbifam", "virulence", "amr", "card", "signalp",
         "dbcan", "antismash", "defense", "mobile"
     ]
     requested = [item.strip().lower() for item in annotation_type.split(",") if item.strip()]
@@ -42,7 +45,7 @@ def normalize_annotation_type(annotation_type):
     items = [aliases.get(item, item) for item in requested]
     invalid = [item for item in items if item not in allowed]
     if not items or invalid:
-        print(f"{ERROR}ERROR:{RESET} --annotation-type must be a comma-separated list including taxonomy, function, genes, clusters, kegg, cazy, pfam, virulence, amr, card, signalp, dbcan, antismash, defense, mobile, and/or network.")
+        print(f"{ERROR}ERROR:{RESET} --annotation-type must be a comma-separated list including taxonomy, function, genes, clusters, kegg, cazy, pfam, ncbifam, virulence, amr, card, signalp, dbcan, antismash, defense, mobile, and/or network.")
         return None
 
     expanded = set(items)
@@ -402,6 +405,12 @@ def validate_managed_database_version(database_name, version):
             print(f"{ERROR}ERROR:{RESET} KEGG --version must be an archive date in YYYY-MM-DD format, e.g. 2026-02-01")
             return None
         return parsed.strftime("%Y-%m-%d")
+    if database_name == "ncbifam" and not re.fullmatch(r"\d+\.\d+", version):
+        print(
+            f"{ERROR}ERROR:{RESET} NCBIfam --version must use the upstream "
+            "X.Y release format, e.g. 20.0"
+        )
+        return None
     if database_name == "amrfinderplus" and not re.fullmatch(
         r"\d{4}-\d{2}-\d{2}\.\d+", version
     ):
