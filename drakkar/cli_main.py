@@ -747,6 +747,14 @@ def main():
                 print(f"If you want to start from your own bin files, make sure to indicate an input file (-f) or directory (-i).")
                 return
 
+        # Pangenome profiling clusters the genomes with dRep to build its
+        # pangenomes, so there is nothing to skip there.
+        skip_derep = getattr(args, "skip_derep", False)
+        if skip_derep and "pangenomes" in str(args.type).split(","):
+            print(f"{ERROR}ERROR:{RESET} --skip-derep only applies to genomes profiling; "
+                  f"pangenomes profiling needs dRep to cluster the genomes.")
+            return
+
         quality_file = getattr(args, "quality", None)
         ignore_quality = args.ignore_quality
         if quality_file:
@@ -769,6 +777,7 @@ def main():
             run_info,
             snakemake_flags=snakemake_flags,
             slurm_resources=slurm_resources,
+            skip_derep=skip_derep,
         )
 
     ###

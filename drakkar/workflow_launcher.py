@@ -198,6 +198,7 @@ def run_snakemake_profiling(
     run_info=None,
     snakemake_flags="",
     slurm_resources="",
+    skip_derep=False,
 ):
     """ Run the profiling workflow """
 
@@ -212,7 +213,7 @@ def run_snakemake_profiling(
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
         f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} profiling_type={profiling_type} output_dir={output_dir} fraction={fraction} DREP_ANI={ani} "
-        f"IGNORE_QUALITY={ignore_quality} QUALITY_FILE={bool(quality_file)} {resource_overrides}"
+        f"IGNORE_QUALITY={ignore_quality} QUALITY_FILE={bool(quality_file)} SKIP_DEREP={bool(skip_derep)} {resource_overrides}"
         f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--use-conda "

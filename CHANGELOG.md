@@ -8,6 +8,16 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.6.7] - 2026-10-04
+
+### Added
+
+- ``drakkar profiling --skip-derep`` maps the reads against every genome given,
+  without dereplicating them with dRep first. Each genome stands as its own
+  cluster, so ``counts.tsv``, ``bases.tsv``, ``mags.tsv`` and
+  ``dereplicating.tsv`` list every input genome. Genomes profiling only;
+  pangenomes profiling refuses the flag, since it needs dRep's clusters.
+
 ## [2.6.6] - 2026-10-02
 
 ### Added

@@ -18,6 +18,8 @@ MAX_CONTAMINATION = float(config.get("MAX_CONTAMINATION", 10))
 CHECKM2_DB = config["CHECKM2_DB"]
 IGNORE_QUALITY = config.get("IGNORE_QUALITY", False)
 QUALITY_FILE = config.get("QUALITY_FILE", False)
+# --skip-derep: every genome given is profiled, none dereplicated away.
+SKIP_DEREP = str(config.get("SKIP_DEREP", False)).strip().lower() in ("true", "1", "yes")
 
 # Annotation databases
 SINGLEM_DB = config["SINGLEM_DB"]
@@ -145,14 +147,39 @@ checkpoint dereplicate:
         ignore_quality=IGNORE_QUALITY,
         ignore_quality_flag="true" if IGNORE_QUALITY else "false",
         ignore_quality_arg="--ignoreGenomeQuality" if (IGNORE_QUALITY and not QUALITY_FILE) else "",
-        use_genomeinfo_flag="true" if (QUALITY_FILE or not IGNORE_QUALITY) else "false"
+        use_genomeinfo_flag="true" if (QUALITY_FILE or not IGNORE_QUALITY) else "false",
+        skip_derep_flag="true" if SKIP_DEREP else "false"
     threads: 8
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(max(8*1024, int(input.size_mb * 10)) * 2 ** (attempt - 1)),
         runtime=lambda wildcards, input, attempt: cap_runtime(max(15, int(input.size_mb / 10)) * 2 ** (attempt - 1))
-    message: "Dereplicating bins using dRep..."
+    message: "Dereplicating bins using dRep..." if not SKIP_DEREP else "Collecting every genome without dereplicating (--skip-derep)..."
     shell:
         """
+        if [ "{params.skip_derep_flag}" = "true" ]; then
+            # Stand in for dRep: every genome is copied (never linked, since
+            # its headers are rewritten next) into dereplicated_genomes as the
+            # sole member of its own cluster, so the catalogue, the mapping and
+            # mags.tsv are built exactly as after a dereplication.
+            rm -rf {params.outdir}
+            mkdir -p {params.outdir}/dereplicated_genomes {params.outdir}/data_tables
+            echo "genome,cluster,score" > {output.Wdb}
+            echo "genome,secondary_cluster,threshold,cluster_method,comparison_algorithm,primary_cluster" > {output.Cdb}
+            i=0
+            for f in {input.genomes}; do
+                i=$((i + 1))
+                if [[ "$f" == *.gz ]]; then
+                    name=$(basename "$f" .gz)
+                    gunzip -c "$f" > "{params.outdir}/dereplicated_genomes/$name"
+                else
+                    name=$(basename "$f")
+                    cp "$f" "{params.outdir}/dereplicated_genomes/$name"
+                fi
+                echo "$name,${{i}}_0,NA" >> {output.Wdb}
+                echo "$name,${{i}}_0,NA,skipped,none,$i" >> {output.Cdb}
+            done
+            exit 0
+        fi
         module purge
         module load {params.mash_module} {params.drep_module}
         rm -rf {params.outdir}

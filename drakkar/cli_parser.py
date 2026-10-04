@@ -216,6 +216,7 @@ def build_parser():
     subparser_profiling.add_argument("-f", "--fraction", required=False, action='store_true', help="Calculate microbial fraction using singlem")
     subparser_profiling.add_argument("-a", "--ani", required=False, type=float, default=0.98, help="ANI threshold for dRep dereplication (-sa). Default: 0.98")
     subparser_profiling.add_argument("-n", "--ignore_quality", action="store_true", help="Pass --ignoreGenomeQuality to dRep during profiling")
+    subparser_profiling.add_argument("--skip-derep", dest="skip_derep", action="store_true", help="Map the reads against every genome given, without dereplicating them with dRep first (genomes profiling only)")
     subparser_profiling.add_argument("-q", "--quality", type=str, help="CSV/TSV with genome, completeness, contamination columns")
     subparser_profiling.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_profiling.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")

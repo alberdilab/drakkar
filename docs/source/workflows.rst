@@ -264,6 +264,9 @@ Options:
 - ``-f/--fraction``: compute microbial fraction with SingleM.
 - ``-a/--ani``: dRep ANI threshold.
 - ``-n/--ignore_quality``: pass ``--ignoreGenomeQuality`` to dRep.
+- ``--skip-derep``: map the reads against every genome given, without
+  dereplicating them first (genomes profiling only). Each genome stands as its
+  own cluster, so the tables below list every input genome.
 - ``-q/--quality``: CSV/TSV with genome, completeness, and contamination; use
   this instead of CheckM2.
 - ``-e/--env_path``: shared Conda environment directory.
@@ -288,7 +291,10 @@ Genome profiling writes three tables to ``profiling_genomes/final/``:
 Annotating
 ^^^^^^^^^^
 
-Annotates dereplicated MAGs taxonomically and/or functionally.
+Annotates the MAGs it is given taxonomically and/or functionally. It neither
+dereplicates them nor reads any sequencing reads: pass the dereplicated genomes
+(for example ``profiling_genomes/drep/dereplicated_genomes``) to annotate a
+catalogue, or every genome to annotate them all.
 When taxonomy annotation is enabled, DRAKKAR also writes
 ``annotating/bacteria.tree`` and, when archaeal MAGs are present,
 ``annotating/archaea.tree`` by pruning GTDB-Tk classify trees down to the
