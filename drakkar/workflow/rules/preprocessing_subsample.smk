@@ -15,7 +15,7 @@ rule subsample_reads:
     params:
         seqkit_module=config["SEQKIT_MODULE"],
         script=f"{PACKAGE_DIR}/workflow/scripts/subsample_reads.py",
-        target=SUBSAMPLE,
+        target=lambda wildcards: SAMPLE_TO_SUBSAMPLE[wildcards.sample],
         seed=11
     threads: 1
     resources:

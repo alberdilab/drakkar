@@ -505,16 +505,16 @@ def main():
         if args.file and args.input:
             print(f"Both sample info file and input directory were provided.")
             print(f"DRAKKAR will continue with the information provided in the sample info file.")
-            file_samples_to_json(args.file,args.output)
+            file_samples_to_json(args.file,args.output,subsample=args.subsample)
 
         elif args.file and not args.input:
             print(f"DRAKKAR will run with the information provided in the sample info file.")
-            file_samples_to_json(args.file,args.output)
+            file_samples_to_json(args.file,args.output,subsample=args.subsample)
 
         elif args.input and not args.file:
             print(f"No sample info file was provided.")
             print(f"DRAKKAR will run with the files in the input directory.")
-            argument_samples_to_json(args.input,args.output)
+            argument_samples_to_json(args.input,args.output,subsample=args.subsample)
 
         else:
             print(f"Please provide either an input directory (-i) or a sample info file (-f)")
@@ -727,21 +727,24 @@ def main():
             print(f"")
             print(f"Both bin path file and input directory were provided.")
             print(f"DRAKKAR will use the reads provided in the file.")
-            file_preprocessed_to_json(reads_file,args.output)
+            file_preprocessed_to_json(reads_file,args.output,subsample=getattr(args, "subsample", None),enable_subsample=args.command == "profiling")
         elif reads_file and not reads_dir:
             print(f"")
             print(f"DRAKKAR will use the reads provided in the file.")
-            file_preprocessed_to_json(reads_file,args.output)
+            file_preprocessed_to_json(reads_file,args.output,subsample=getattr(args, "subsample", None),enable_subsample=args.command == "profiling")
         elif reads_dir and not reads_file:
             print(f"")
             print(f"No sample info file was provided.")
             print(f"DRAKKAR will use the reads from the input directory.")
-            argument_preprocessed_to_json(reads_dir,args.output)
+            argument_preprocessed_to_json(reads_dir,args.output,subsample=getattr(args, "subsample", None))
         else:
             print(f"")
             print(f"No input information was provided. DRAKKAR will try to guess the location of the reads.")
             if any(os.scandir(f"{args.output}/preprocessing/final")):
-                argument_preprocessed_to_json(f"{args.output}/preprocessing/final",args.output)
+                argument_preprocessed_to_json(
+                    f"{args.output}/preprocessing/final", args.output,
+                    subsample=getattr(args, "subsample", None) if args.command == "profiling" else None,
+                )
             else:
                 print(f"ERROR: No bin data was found in the output directory.")
                 print(f"Make sure that the preprocessing and cataloging modules were run in this directory.")
@@ -779,6 +782,7 @@ def main():
             snakemake_flags=snakemake_flags,
             slurm_resources=slurm_resources,
             skip_derep=skip_derep,
+            subsample=getattr(args, "subsample", None) if args.command == "profiling" else None,
         )
 
     ###

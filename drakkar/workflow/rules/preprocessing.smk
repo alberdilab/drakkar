@@ -157,7 +157,7 @@ rule preprocessings_stats:
         singlem=expand(f"{OUTPUT_DIR}/preprocessing/singlem/{{sample}}_smf.tsv", sample=samples) if FRACTION else [],
         nonpareil=expand(f"{OUTPUT_DIR}/preprocessing/nonpareil/{{sample}}_np.tsv", sample=samples) if NONPAREIL else [],
         seqkit=expand(f"{OUTPUT_DIR}/preprocessing/seqkit/{{sample}}_sana.tsv", sample=samples) if SANITIZE else [],
-        subsample=expand(f"{OUTPUT_DIR}/preprocessing/subsample/{{sample}}_subsample.tsv", sample=samples) if SUBSAMPLE else []
+        subsample=expand(f"{OUTPUT_DIR}/preprocessing/subsample/{{sample}}_subsample.tsv", sample=SAMPLE_TO_SUBSAMPLE)
     output:
         f"{OUTPUT_DIR}/preprocessing.tsv"
     localrule: True

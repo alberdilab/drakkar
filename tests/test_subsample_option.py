@@ -14,6 +14,7 @@ from unittest.mock import patch
 
 from drakkar import cli as cli_module
 from drakkar.cli_parser import build_parser
+from drakkar.input_manifests import file_samples_to_json, file_preprocessed_to_json
 from drakkar.subsample import parse_subsample_value, subsample_fraction
 from drakkar.workflow.scripts import subsample_reads
 
@@ -48,13 +49,15 @@ class SubsampleValueTests(unittest.TestCase):
             parse_subsample_value("1.0")
 
     def test_cli_accepts_both_commands(self):
-        for command in ("preprocessing", "complete"):
+        for command in ("preprocessing", "complete", "profiling"):
             for value in ("0.25", "50M", "10Gb"):
                 with self.subTest(command=command, value=value):
-                    args = build_parser().parse_args([command, "-f", "samples.tsv", "--subsample", value])
+                    table_arg = "-R" if command == "profiling" else "-f"
+                    args = build_parser().parse_args([command, table_arg, "samples.tsv", "--subsample", value])
                     self.assertEqual(args.subsample, value)
             with self.assertRaises(SystemExit):
-                build_parser().parse_args([command, "-f", "samples.tsv", "--subsample", "1.0"])
+                table_arg = "-R" if command == "profiling" else "-f"
+                build_parser().parse_args([command, table_arg, "samples.tsv", "--subsample", "1.0"])
 
     def test_fraction_never_upsamples(self):
         self.assertEqual(subsample_fraction("0.25", 10, 2000), 0.25)
@@ -72,6 +75,50 @@ class SubsampleValueTests(unittest.TestCase):
                     subsample="10Gb",
                 )
         self.assertIn("subsample=10Gb", shlex.split(run_mock.call_args.args[0][2]))
+        with patch.object(cli_module, "config_vars", {"SNAKEMAKE_MODULE": "snakemake"}):
+            with patch.object(cli_module, "run_subprocess_with_logging") as run_mock:
+                cli_module.run_snakemake_profiling(
+                    "profiling", "project", "genomes", "/tmp/output", "/tmp/envs", "local",
+                    False, 0.98, False, None, subsample="50M",
+                )
+        self.assertIn("subsample=50M", shlex.split(run_mock.call_args.args[0][2]))
+
+    def test_table_targets_override_fallback_and_errors(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for sample in ("S1", "S2", "S3"):
+                for mate in (1, 2):
+                    (root / f"{sample}_{mate}.fq.gz").write_bytes(b"reads")
+            table = root / "samples.tsv"
+            table.write_text("sample\trawreads1\trawreads2\tsubsample\n" + "".join(
+                f"{s}\t{root / (s + '_1.fq.gz')}\t{root / (s + '_2.fq.gz')}\t{v}\n"
+                for s, v in (("S1", "10Gb"), ("S2", "NA"), ("S3", ""))
+            ))
+            file_samples_to_json(str(table), str(root), subsample="0.25")
+            self.assertEqual(json.loads((root / "data/sample_to_subsample.json").read_text()),
+                             {"S1": "10Gb", "S2": "0.25", "S3": "0.25"})
+            file_samples_to_json(str(table), str(root))
+            self.assertEqual(json.loads((root / "data/sample_to_subsample.json").read_text()), {"S1": "10Gb"})
+            # Plain integers next to blank cells must stay text, not become 50000000.0.
+            table.write_text(table.read_text().replace("\t10Gb\n", "\t50000000\n"))
+            file_samples_to_json(str(table), str(root))
+            self.assertEqual(json.loads((root / "data/sample_to_subsample.json").read_text()), {"S1": "50000000"})
+            table.write_text(table.read_text().replace("\t50000000\n", "\t10Gb\n"))
+            file_preprocessed_to_json(str(table), str(root), subsample="50M", enable_subsample=True)
+            self.assertEqual(json.loads((root / "data/sample_to_subsample.json").read_text()),
+                             {"S1": "10Gb", "S2": "50M", "S3": "50M"})
+            file_preprocessed_to_json(str(table), str(root))
+            self.assertEqual(json.loads((root / "data/sample_to_subsample.json").read_text()), {})
+            table.write_text(table.read_text().replace("\t10Gb\n", "\tbad-target\n"))
+            with patch("drakkar.input_manifests.report_input_resolution_errors", side_effect=ValueError) as report:
+                with self.assertRaises(ValueError):
+                    file_samples_to_json(str(table), str(root))
+            self.assertIn("S1", report.call_args.args[0][0])
+            self.assertIn("bad-target", report.call_args.args[0][0])
+            with patch("drakkar.input_manifests.report_input_resolution_errors", side_effect=ValueError) as report:
+                with self.assertRaises(ValueError):
+                    file_preprocessed_to_json(str(table), str(root), enable_subsample=True)
+            self.assertIn("bad-target", report.call_args.args[0][0])
 
     def test_summary_reads_are_both_mates_and_na_when_unused(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -128,16 +175,30 @@ class SubsampleWiringTests(unittest.TestCase):
     def test_input_selection(self):
         source = (WORKFLOW / "Snakefile").read_text()
         block = source.split("def preprocessing_read(")[1].split("\n####", 1)[0]
-        namespace = {"OUTPUT_DIR": "/out", "SANITIZE": False, "SUBSAMPLE": None}
+        namespace = {"OUTPUT_DIR": "/out", "SANITIZE": False, "SAMPLE_TO_SUBSAMPLE": {}}
         exec("def preprocessing_read(" + block, namespace)
         read = namespace["preprocessing_read"]
         sample = SimpleNamespace(sample="S1")
         self.assertEqual(read(sample, 1), "/out/data/reads/S1_1.fq.gz")
-        namespace["SUBSAMPLE"] = "10Gb"
+        namespace["SAMPLE_TO_SUBSAMPLE"] = {"S1": "10Gb"}
         self.assertEqual(read(sample, 2), "/out/preprocessing/subsample/S1_2.fq.gz")
+        self.assertEqual(read(SimpleNamespace(sample="S2"), 2), "/out/data/reads/S2_2.fq.gz")
         namespace["SANITIZE"] = True
         self.assertEqual(read(sample, 1), "/out/preprocessing/seqkit/S1_1.fq.gz")
         self.assertEqual(read(sample, 1, after_sanitize=False), "/out/preprocessing/subsample/S1_1.fq.gz")
+
+    def test_profiling_read_selection(self):
+        source = (WORKFLOW / "Snakefile").read_text()
+        block = source.split("def profiling_read(")[1].split("def profiling_subsample_input(", 1)[0]
+        namespace = {"OUTPUT_DIR": "/out", "SAMPLE_TO_SUBSAMPLE": {"S1": "50M"},
+                     "PREPROCESSED_TO_READS1": {"S1": ["r1"], "S2": ["raw1"]},
+                     "PREPROCESSED_TO_READS2": {"S1": ["r2"], "S2": ["raw2"]}}
+        exec("def profiling_read(" + block, namespace)
+        self.assertEqual(namespace["profiling_read"](SimpleNamespace(sample="S1"), 1),
+                         "/out/profiling/subsample/S1_1.fq.gz")
+        self.assertEqual(namespace["profiling_read"](SimpleNamespace(sample="S2"), 2), ["raw2"])
+        genomes = (WORKFLOW / "rules/profiling_genomes.smk").read_text()
+        self.assertEqual(genomes.count("profiling_read(wildcards, 1)"), 4)
 
     def test_both_workflow_branches_and_consumers(self):
         snakefile = (WORKFLOW / "Snakefile").read_text()

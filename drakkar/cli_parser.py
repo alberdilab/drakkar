@@ -214,6 +214,7 @@ def build_parser():
     subparser_profiling.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
     subparser_profiling.add_argument("-r", "--reads_dir", required=False, help="Directory in which metagenomic reads are stored")
     subparser_profiling.add_argument("-R", "--reads_file", required=False, help="Sample detail file, tab- or comma-separated")
+    subparser_profiling.add_argument("--subsample", type=subsample_option, help="Subsample supplied read pairs: fraction (0.25), target pairs (50M), or total bases (10Gb)")
     subparser_profiling.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_profiling.add_argument("-t", "--type", required=False, default="genomes", help="Either genomes or pangenomes profiling type. Default: genomes")
     subparser_profiling.add_argument("-f", "--fraction", required=False, action='store_true', help="Calculate microbial fraction using singlem")
@@ -580,7 +581,7 @@ def build_parser():
         ],
         sections=[
             ("Input Sources", ["bins_dir", "bins_file", "reads_dir", "reads_file"]),
-            ("Analysis Settings", ["type", "fraction", "ani", "ignore_quality", "quality"]),
+            ("Analysis Settings", ["type", "fraction", "subsample", "ani", "ignore_quality", "quality"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark", "skip_database_check", "allow_database_change", "allow_annotation_change"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
             ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),

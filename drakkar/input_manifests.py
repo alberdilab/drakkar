@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import re
@@ -20,8 +21,37 @@ from drakkar.downloads import (
 from drakkar.input_errors import InputFileError, report_input_resolution_errors, require_non_empty_file
 from drakkar.input_tables import read_input_table
 from drakkar.output import print
+from drakkar.subsample import parse_subsample_value
 
 ASSEMBLY_COLUMN_CANDIDATES = ("assembly", "coassembly")
+
+def _subsample_targets(df, cli_target, infofile):
+    """Resolve and validate row targets before any read downloads start."""
+    resolved = {}
+    errors = []
+    for idx, row in df.iterrows():
+        sample = _normalized_value(row.get("sample"))
+        cell = row.get("subsample")
+        value = _normalized_value(cell)
+        target = cli_target if not value or value.upper() == "NA" else value
+        if target is not None:
+            try:
+                parse_subsample_value(target)
+            except argparse.ArgumentTypeError as exc:
+                errors.append(f"Sample {sample or '(missing)'} on row {idx + 1} of {infofile}: invalid subsample value {target!r}: {exc}")
+                continue
+        if sample in resolved and resolved[sample] != target:
+            errors.append(f"Sample {sample} on row {idx + 1} of {infofile}: conflicting subsample values {resolved[sample]!r} and {target!r}.")
+        else:
+            resolved[sample] = target
+    if errors:
+        report_input_resolution_errors(errors)
+    return {sample: target for sample, target in resolved.items() if target is not None}
+
+def _write_subsample_targets(output, targets):
+    os.makedirs(f"{output}/data", exist_ok=True)
+    with open(f"{output}/data/sample_to_subsample.json", "w") as handle:
+        json.dump(targets, handle)
 
 def check_reference_columns(file_path):
     """Checks if a file contains 'reference_name' and 'reference_path' columns with non-NA values."""
@@ -52,8 +82,9 @@ def check_assembly_column(file_path):
         return False
     return True
 
-def file_samples_to_json(infofile, output):
-    df = read_input_table(infofile, label="sample info file")
+def file_samples_to_json(infofile, output, subsample=None):
+    df = read_input_table(infofile, label="sample info file", dtype={"subsample": str})
+    targets = _subsample_targets(df, subsample, infofile)
 
     SAMPLE_TO_READS1 = defaultdict(list)
     SAMPLE_TO_READS2 = defaultdict(list)
@@ -81,6 +112,7 @@ def file_samples_to_json(infofile, output):
 
     with open(f"{output}/data/sample_to_reads2.json", "w") as f:
         json.dump(SAMPLE_TO_READS2, f)
+    _write_subsample_targets(output, targets)
 
 def file_references_to_json(infofile, output):
     df = read_input_table(infofile, label="sample info file")
@@ -147,7 +179,7 @@ def file_references_to_json(infofile, output):
     with open(f"{output}/data/sample_to_reference.json", "w") as f:
         json.dump(SAMPLE_TO_REFERENCE, f, indent=4)
 
-def argument_samples_to_json(argument, output):
+def argument_samples_to_json(argument, output, subsample=None):
     # Define the directory containing the raw reads
     READS_DIR = Path(argument).resolve()
 
@@ -186,6 +218,7 @@ def argument_samples_to_json(argument, output):
 
     with open(f"{output}/data/sample_to_reads2.json", "w") as f:
         json.dump(SAMPLE_TO_READS2, f)
+    _write_subsample_targets(output, {sample: subsample for sample in SAMPLE_TO_READS1} if subsample else {})
 
 def argument_references_to_json(argument, sample_to_reads, output):
     try:
@@ -223,8 +256,9 @@ def argument_references_to_json(argument, sample_to_reads, output):
     with open(f"{output}/data/sample_to_reference.json", "w") as f:
         json.dump(SAMPLE_TO_REFERENCE, f, indent=4)
 
-def file_preprocessed_to_json(infofile, output):
-    df = read_input_table(infofile, label="sample info file")
+def file_preprocessed_to_json(infofile, output, subsample=None, enable_subsample=False):
+    df = read_input_table(infofile, label="sample info file", dtype={"subsample": str})
+    targets = _subsample_targets(df, subsample, infofile) if enable_subsample else {}
 
     SAMPLE_TO_READS1 = defaultdict(list)
     SAMPLE_TO_READS2 = defaultdict(list)
@@ -252,8 +286,9 @@ def file_preprocessed_to_json(infofile, output):
 
     with open(f"{output}/data/preprocessed_to_reads2.json", "w") as f:
         json.dump(SAMPLE_TO_READS2, f)
+    _write_subsample_targets(output, targets)
 
-def argument_preprocessed_to_json(argument, output):
+def argument_preprocessed_to_json(argument, output, subsample=None):
     # Define the directory containing the raw reads
     PREPROCESSED_DIR = Path(argument).resolve()
 
@@ -292,6 +327,7 @@ def argument_preprocessed_to_json(argument, output):
 
     with open(f"{output}/data/preprocessed_to_reads2.json", "w") as f:
         json.dump(PREPROCESSED_TO_READS2, f)
+    _write_subsample_targets(output, {sample: subsample for sample in PREPROCESSED_TO_READS1} if subsample else {})
 
 def file_assemblies_to_json(infofile=None, samples=None, individual=False, all=False, output=False):
 

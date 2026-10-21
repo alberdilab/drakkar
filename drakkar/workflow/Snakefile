@@ -130,9 +130,23 @@ def preprocessing_read(wildcards, mate, after_sanitize=True):
     """Select the earliest available read stage for preprocessing consumers."""
     if after_sanitize and SANITIZE:
         return f"{OUTPUT_DIR}/preprocessing/seqkit/{wildcards.sample}_{mate}.fq.gz"
-    if SUBSAMPLE:
+    if wildcards.sample in SAMPLE_TO_SUBSAMPLE:
         return f"{OUTPUT_DIR}/preprocessing/subsample/{wildcards.sample}_{mate}.fq.gz"
     return f"{OUTPUT_DIR}/data/reads/{wildcards.sample}_{mate}.fq.gz"
+
+def profiling_read(wildcards, mate):
+    """Use a subsampled read only for standalone profiling targets."""
+    if wildcards.sample in SAMPLE_TO_SUBSAMPLE:
+        return f"{OUTPUT_DIR}/profiling/subsample/{wildcards.sample}_{mate}.fq.gz"
+    reads = PREPROCESSED_TO_READS1 if mate == 1 else PREPROCESSED_TO_READS2
+    return reads[wildcards.sample]
+
+def profiling_subsample_input(wildcards, mate):
+    reads = PREPROCESSED_TO_READS1 if mate == 1 else PREPROCESSED_TO_READS2
+    paths = reads[wildcards.sample]
+    if len(paths) == 1:
+        return paths[0]
+    return f"{OUTPUT_DIR}/profiling/subsample_input/{wildcards.sample}_{mate}.fq.gz"
 
 ####
 # Create environments
@@ -167,6 +181,10 @@ if WORKFLOW == "preprocessing":
     with open(f"{OUTPUT_DIR}/data/sample_to_reads2.json", "r") as f:
         SAMPLE_TO_READS2 = json.load(f)
 
+    subsample_path = f"{OUTPUT_DIR}/data/sample_to_subsample.json"
+    with open(subsample_path, "r") as f:
+        SAMPLE_TO_SUBSAMPLE = json.load(f)
+
     samples = list(SAMPLE_TO_READS1.keys())
 
     # Reference preparation, mapping, metagenomic read extraction, and host read summaries only run
@@ -197,7 +215,7 @@ if WORKFLOW == "preprocessing":
                 #f"{OUTPUT_DIR}/data/preprocessing_report.done"
 
         include: "rules/preparing.smk"
-        if SUBSAMPLE:
+        if SAMPLE_TO_SUBSAMPLE:
             include: "rules/preprocessing_subsample.smk"
         if SANITIZE:
             include: "rules/preprocessing_sanitize.smk"
@@ -216,7 +234,7 @@ if WORKFLOW == "preprocessing":
                 #f"{OUTPUT_DIR}/data/preprocessing_report.done"
 
         include: "rules/preparing.smk"
-        if SUBSAMPLE:
+        if SAMPLE_TO_SUBSAMPLE:
             include: "rules/preprocessing_subsample.smk"
         if SANITIZE:
             include: "rules/preprocessing_sanitize.smk"
@@ -312,6 +330,9 @@ if WORKFLOW == "profiling":
     with open(f"{OUTPUT_DIR}/data/preprocessed_to_reads2.json", "r") as f:
         PREPROCESSED_TO_READS2 = json.load(f)
 
+    with open(f"{OUTPUT_DIR}/data/sample_to_subsample.json", "r") as f:
+        SAMPLE_TO_SUBSAMPLE = json.load(f)
+
     samples = list(PREPROCESSED_TO_READS1.keys())
 
     with open(f"{OUTPUT_DIR}/data/bins_to_files.json", "r") as f:
@@ -332,6 +353,9 @@ if WORKFLOW == "profiling":
 
     if "genomes" in PROFILING_TYPE:
         include: "rules/profiling_genomes.smk"
+
+    if SAMPLE_TO_SUBSAMPLE and "genomes" in PROFILING_TYPE:
+        include: "rules/profiling_subsample.smk"
 
     if "pangenomes" in PROFILING_TYPE:
         include: "rules/profiling_pangenomes.smk"

@@ -148,7 +148,9 @@ Subsampling happens first, before ``--sanitize`` and fastp. A pair count or
 total-base target larger than the input keeps the sample unchanged. The same
 fixed seed (11) selects mates from both files, and ``preprocessing.tsv`` records
 the retained number of reads across R1 and R2 in ``reads_subsampled`` (``NA``
-when unused). See :ref:`sequencing-platforms` for platform-specific read names.
+when unused). The sample table's optional ``subsample`` column overrides the
+CLI value; blank or ``NA`` uses the CLI value, and samples with neither are
+not subsampled. See :ref:`sequencing-platforms` for platform-specific read names.
 
 .. _sequencing-platforms:
 
@@ -279,6 +281,9 @@ Options:
 - ``-o/--output``: output directory.
 - ``-t/--type``: profiling type (``genomes`` or ``pangenomes``).
 - ``-f/--fraction``: compute microbial fraction with SingleM.
+- ``--subsample``: subsample supplied genome-profiling reads before mapping,
+  SingleM, and input read/base counting. The optional ``subsample`` table
+  column overrides this per sample; see :ref:`subsampling-reads`.
 - ``-a/--ani``: dRep ANI threshold.
 - ``-n/--ignore_quality``: pass ``--ignoreGenomeQuality`` to dRep.
 - ``--skip-derep``: map the reads against every genome given, without

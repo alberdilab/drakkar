@@ -9,6 +9,8 @@ This project tracks release notes here from this point forward.
 - ``--subsample`` on ``drakkar preprocessing`` and ``drakkar complete`` to
   reduce raw paired-read depth by fraction, target pairs, or total bases before
   sanitizing and filtering; ``preprocessing.tsv`` records ``reads_subsampled``.
+- Optional per-sample ``subsample`` table column with command-line fallback,
+  and ``drakkar profiling --subsample`` for standalone genome profiling reads.
 
 ## [2.6.7] - 2026-10-04
 

@@ -267,8 +267,8 @@ rule index_catalogue:
 rule map_to_catalogue:
     input:
         index=f"{OUTPUT_DIR}/profiling_genomes/catalogue/genome_catalogue.rev.1.bt2l",
-        r1=lambda wildcards: PREPROCESSED_TO_READS1[wildcards.sample],
-        r2=lambda wildcards: PREPROCESSED_TO_READS2[wildcards.sample]
+        r1=lambda wildcards: profiling_read(wildcards, 1),
+        r2=lambda wildcards: profiling_read(wildcards, 2)
     output:
         f"{OUTPUT_DIR}/profiling_genomes/bowtie2/{{sample}}.bam"
     params:
@@ -342,8 +342,8 @@ rule profiling_stats:
 
 rule profiling_total_reads:
     input:
-        r1=lambda wildcards: PREPROCESSED_TO_READS1[wildcards.sample],
-        r2=lambda wildcards: PREPROCESSED_TO_READS2[wildcards.sample]
+        r1=lambda wildcards: profiling_read(wildcards, 1),
+        r2=lambda wildcards: profiling_read(wildcards, 2)
     output:
         reads=f"{OUTPUT_DIR}/profiling_genomes/bowtie2/{{sample}}.totalreads",
         bases=f"{OUTPUT_DIR}/profiling_genomes/bowtie2/{{sample}}.totalbases"
@@ -463,8 +463,8 @@ rule mag_metadata:
 
 rule singlem_profile:
     input:
-        r1=lambda wildcards: PREPROCESSED_TO_READS1[wildcards.sample],
-        r2=lambda wildcards: PREPROCESSED_TO_READS2[wildcards.sample]
+        r1=lambda wildcards: profiling_read(wildcards, 1),
+        r2=lambda wildcards: profiling_read(wildcards, 2)
     output:
         f"{OUTPUT_DIR}/profiling_genomes/singlem/{{sample}}.profile"
     params:
@@ -484,8 +484,8 @@ rule singlem_profile:
 
 rule singlem_microbial_fraction:
     input:
-        r1=lambda wildcards: PREPROCESSED_TO_READS1[wildcards.sample],
-        r2=lambda wildcards: PREPROCESSED_TO_READS2[wildcards.sample],
+        r1=lambda wildcards: profiling_read(wildcards, 1),
+        r2=lambda wildcards: profiling_read(wildcards, 2),
         profile=f"{OUTPUT_DIR}/profiling_genomes/singlem/{{sample}}.profile"
     output:
         f"{OUTPUT_DIR}/profiling_genomes/singlem/{{sample}}.tsv"
