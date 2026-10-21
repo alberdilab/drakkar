@@ -24,6 +24,7 @@ REFERENCE = config.get("reference", None)
 FRACTION = config.get("fraction", None)
 NONPAREIL = config.get("nonpareil", None)
 SANITIZE = config.get("sanitize", None)
+SUBSAMPLE = str(config["subsample"]) if config.get("subsample") not in (None, "") else None
 PLATFORM = str(config.get("platform", "illumina")).lower()
 PROFILING_TYPE = config["profiling_type"].split(",") if "profiling_type" in config else []
 ANNOTATING_TYPE = config["annotating_type"].split(",") if "annotating_type" in config else []
@@ -124,6 +125,15 @@ def calculate_file_sizes(file_dict):
 
     return file_sizes
 
+
+def preprocessing_read(wildcards, mate, after_sanitize=True):
+    """Select the earliest available read stage for preprocessing consumers."""
+    if after_sanitize and SANITIZE:
+        return f"{OUTPUT_DIR}/preprocessing/seqkit/{wildcards.sample}_{mate}.fq.gz"
+    if SUBSAMPLE:
+        return f"{OUTPUT_DIR}/preprocessing/subsample/{wildcards.sample}_{mate}.fq.gz"
+    return f"{OUTPUT_DIR}/data/reads/{wildcards.sample}_{mate}.fq.gz"
+
 ####
 # Create environments
 ####
@@ -187,6 +197,8 @@ if WORKFLOW == "preprocessing":
                 #f"{OUTPUT_DIR}/data/preprocessing_report.done"
 
         include: "rules/preparing.smk"
+        if SUBSAMPLE:
+            include: "rules/preprocessing_subsample.smk"
         if SANITIZE:
             include: "rules/preprocessing_sanitize.smk"
         include: "rules/preprocessing_ref.smk"
@@ -204,6 +216,8 @@ if WORKFLOW == "preprocessing":
                 #f"{OUTPUT_DIR}/data/preprocessing_report.done"
 
         include: "rules/preparing.smk"
+        if SUBSAMPLE:
+            include: "rules/preprocessing_subsample.smk"
         if SANITIZE:
             include: "rules/preprocessing_sanitize.smk"
         include: "rules/preprocessing.smk"

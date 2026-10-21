@@ -13,6 +13,13 @@ from drakkar.cli_context import (
 )
 from drakkar.database_registry import MANAGED_DATABASES, normalize_managed_database_name
 from drakkar.output import print
+from drakkar.subsample import parse_subsample_value
+
+
+def subsample_option(value):
+    """Validate a CLI subsampling target while preserving its spelling."""
+    parse_subsample_value(value)
+    return value
 
 def normalize_annotation_type(annotation_type):
     functional_components = {

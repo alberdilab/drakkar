@@ -6,7 +6,9 @@ This project tracks release notes here from this point forward.
 
 ### Added
 
-- No unreleased changes yet.
+- ``--subsample`` on ``drakkar preprocessing`` and ``drakkar complete`` to
+  reduce raw paired-read depth by fraction, target pairs, or total bases before
+  sanitizing and filtering; ``preprocessing.tsv`` records ``reads_subsampled``.
 
 ## [2.6.7] - 2026-10-04
 

@@ -199,6 +199,20 @@ Notes on the split:
   a study can carry a hundred of them.
 - ``--platform`` continues to apply to the whole run, not per sample.
 
+Subsampling raw reads
+^^^^^^^^^^^^^^^^^^^^^
+
+Use ``--subsample`` with ``drakkar preprocessing`` or ``drakkar complete`` to
+lower sequencing depth before sanitizing or quality filtering. For example,
+``--subsample 0.25`` keeps approximately one quarter of the read pairs,
+``--subsample 50M`` targets 50 million pairs per sample, and
+``--subsample 10Gb`` targets 10 billion total R1 and R2 bases per sample.
+Pair counts also accept plain integers and ``K``/``M``/``G`` suffixes; base
+targets accept ``Mb``/``Gb``. Count and base targets never increase depth: a
+smaller sample is kept whole. R1 and R2 use the same fixed random seed (11).
+The ``reads_subsampled`` column of ``preprocessing.tsv`` counts both mates and
+is ``NA`` when the option is unused.
+
 Cataloging read resolution
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 

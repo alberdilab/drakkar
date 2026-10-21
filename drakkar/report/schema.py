@@ -19,7 +19,7 @@ import sqlite3
 from datetime import datetime, timezone
 
 # Bump when the layout below changes in a way that invalidates existing files.
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 TAXONOMIC_RANKS = ("domain", "phylum", "class", "order", "family", "genus", "species")
 
@@ -169,6 +169,7 @@ SCHEMA_STATEMENTS = [
     """
     CREATE TABLE IF NOT EXISTS sample (
         sample_id TEXT PRIMARY KEY,
+        reads_subsampled INTEGER,
         seqkit_sana_reads INTEGER,
         reads_pre_fastp INTEGER,
         bases_pre_fastp INTEGER,

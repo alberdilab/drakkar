@@ -15,6 +15,7 @@ from drakkar.cli_validation import (
     positive_unit_interval_float,
     positive_int,
     unit_interval_float,
+    subsample_option,
 )
 from drakkar.database_latest import DEFAULT_TIMEOUT as DEFAULT_LATEST_TIMEOUT
 from drakkar.database_registry import MANAGED_DATABASES
@@ -152,6 +153,7 @@ def build_parser():
     subparser_complete.add_argument("--fraction", required=False, action='store_true', help="Calculate microbial fraction using singlem")
     subparser_complete.add_argument("--nonpareil", required=False, action='store_true', help="Estimate metagenomic coverage and diversity using Nonpareil during preprocessing")
     subparser_complete.add_argument("--sanitize", required=False, action='store_true', help="Sanitize paired FASTQ files using seqkit sana before quality filtering")
+    subparser_complete.add_argument("--subsample", type=subsample_option, help="Subsample raw read pairs first: fraction (0.25), target pairs (50M), or total bases (10Gb)")
     subparser_complete.add_argument("--platform", required=False, default="illumina", choices=["illumina", "bgi"], help="Sequencing platform of the input reads, used to select adapter sequences and read-name handling during preprocessing. Default: illumina")
     subparser_complete.add_argument("-a", "--ani", required=False, type=float, default=0.98, help="ANI threshold for dRep dereplication (-sa). Default: 0.98")
     subparser_complete.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
@@ -172,6 +174,7 @@ def build_parser():
     subparser_preprocessing.add_argument("--fraction", required=False, action='store_true', help="Calculate microbial fraction using singlem")
     subparser_preprocessing.add_argument("--nonpareil", required=False, action='store_true', help="Estimate metagenomic coverage and diversity using Nonpareil")
     subparser_preprocessing.add_argument("--sanitize", required=False, action='store_true', help="Sanitize paired FASTQ files using seqkit sana before quality filtering")
+    subparser_preprocessing.add_argument("--subsample", type=subsample_option, help="Subsample raw read pairs first: fraction (0.25), target pairs (50M), or total bases (10Gb)")
     subparser_preprocessing.add_argument("--platform", required=False, default="illumina", choices=["illumina", "bgi"], help="Sequencing platform of the input reads, used to select adapter sequences and read-name handling during preprocessing. Default: illumina")
     subparser_preprocessing.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_preprocessing.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
@@ -520,7 +523,7 @@ def build_parser():
         ],
         sections=[
             ("Input Sources", ["input", "file", "reference", "reference_index"]),
-            ("Workflow Scope", ["mode", "binners", "type", "annotation_type", "gtdb_version", "gtdb_scratch", "annotation_evalue", "annotation_identity", "annotation_query_coverage", "annotation_target_coverage", "min_completeness", "max_contamination", "min_bin_length", "max_bin_length", "multicoverage", "fraction", "nonpareil", "sanitize", "ani"]),
+            ("Workflow Scope", ["mode", "binners", "type", "annotation_type", "gtdb_version", "gtdb_scratch", "annotation_evalue", "annotation_identity", "annotation_query_coverage", "annotation_target_coverage", "min_completeness", "max_contamination", "min_bin_length", "max_bin_length", "multicoverage", "fraction", "nonpareil", "sanitize", "subsample", "ani"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark", "skip_database_check", "allow_database_change", "allow_annotation_change"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
             ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),
@@ -539,7 +542,7 @@ def build_parser():
         ],
         sections=[
             ("Input Sources", ["input", "file", "reference", "reference_index"]),
-            ("Optional Analyses", ["fraction", "nonpareil", "sanitize"]),
+            ("Optional Analyses", ["fraction", "nonpareil", "sanitize", "subsample"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark", "skip_database_check", "allow_database_change", "allow_annotation_change"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
             ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),

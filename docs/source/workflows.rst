@@ -88,6 +88,9 @@ Options:
 - ``-c/--multicoverage``: enable multicoverage mapping.
 - ``--fraction``: compute microbial fraction with SingleM.
 - ``--nonpareil``: estimate metagenomic coverage and diversity with Nonpareil.
+- ``--subsample``: reduce raw read depth before sanitizing and filtering;
+  accepts a fraction (``0.25``), target pairs (``50M``), or total bases
+  (``10Gb``) per sample. See :ref:`subsampling-reads`.
 - ``--platform``: sequencing platform of the input reads, either ``illumina``
   (default) or ``bgi``. See :ref:`sequencing-platforms`.
 - ``-a/--ani``: dRep ANI threshold (default: ``0.98``).
@@ -125,6 +128,9 @@ Options:
   reference FASTA and Bowtie2 index files; incompatible with ``-r/--reference``.
 - ``--fraction``: compute microbial fraction with SingleM after preprocessing.
 - ``--nonpareil``: estimate metagenomic coverage and diversity with Nonpareil.
+- ``--subsample``: reduce raw read depth before sanitizing and filtering;
+  accepts a fraction (``0.25``), target pairs (``50M``), or total bases
+  (``10Gb``) per sample. See :ref:`subsampling-reads`.
 - ``--platform``: sequencing platform of the input reads, either ``illumina``
   (default) or ``bgi``. See :ref:`sequencing-platforms`.
 - ``-e/--env_path``: shared Conda environment directory.
@@ -132,6 +138,17 @@ Options:
 - ``--overwrite``: delete a locked output directory and rerun from scratch.
 - ``--skip-benchmark`` / ``--memory-multiplier`` / ``--time-multiplier`` /
   ``--snakemake-*`` / ``--slurm-*``: see :ref:`snakemake-slurm-management`.
+
+.. _subsampling-reads:
+
+Read subsampling
+^^^^^^^^^^^^^^^^
+
+Subsampling happens first, before ``--sanitize`` and fastp. A pair count or
+total-base target larger than the input keeps the sample unchanged. The same
+fixed seed (11) selects mates from both files, and ``preprocessing.tsv`` records
+the retained number of reads across R1 and R2 in ``reads_subsampled`` (``NA``
+when unused). See :ref:`sequencing-platforms` for platform-specific read names.
 
 .. _sequencing-platforms:
 

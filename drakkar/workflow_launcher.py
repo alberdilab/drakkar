@@ -62,6 +62,7 @@ def run_snakemake_preprocessing(
     run_info=None,
     snakemake_flags="",
     slurm_resources="",
+    subsample=None,
 ):
 
     """ Run the preprocessing workflow """
@@ -76,7 +77,7 @@ def run_snakemake_preprocessing(
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} reference={reference} fraction={fraction} nonpareil={nonpareil} sanitize={sanitize} platform={platform} {resource_overrides}"
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} reference={reference} fraction={fraction} nonpareil={nonpareil} sanitize={sanitize} platform={platform} subsample={shlex.quote(subsample or '')} {resource_overrides}"
         f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--conda-frontend mamba "

@@ -26,8 +26,8 @@ PAIR_ID_REGEXP = r"--id-regexp '^(\S+)\/[12]'" if PLATFORM == "bgi" else ""
 
 rule seqkit_sana:
     input:
-        r1=f"{OUTPUT_DIR}/data/reads/{{sample}}_1.fq.gz",
-        r2=f"{OUTPUT_DIR}/data/reads/{{sample}}_2.fq.gz"
+        r1=lambda wildcards: preprocessing_read(wildcards, 1, after_sanitize=False),
+        r2=lambda wildcards: preprocessing_read(wildcards, 2, after_sanitize=False)
     output:
         r1=f"{OUTPUT_DIR}/preprocessing/seqkit/{{sample}}_1.fq.gz",
         r2=f"{OUTPUT_DIR}/preprocessing/seqkit/{{sample}}_2.fq.gz",

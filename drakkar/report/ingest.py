@@ -515,7 +515,7 @@ def ingest_preprocessing(connection, output_dir):
 
     frame = _read_table(source)
     columns = [
-        "seqkit_sana_reads", "reads_pre_fastp", "bases_pre_fastp",
+        "reads_subsampled", "seqkit_sana_reads", "reads_pre_fastp", "bases_pre_fastp",
         "adapter_trimmed_reads", "adapter_trimmed_bases",
         "reads_post_fastp", "bases_post_fastp",
         "host_reads", "host_bases", "metagenomic_reads", "metagenomic_bases",

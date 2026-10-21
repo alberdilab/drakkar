@@ -57,8 +57,8 @@ POLYG_FLAG = "--trim_poly_g" if PLATFORM == "illumina" else ""
 
 rule fastp:
     input:
-        r1=lambda wildcards: f"{OUTPUT_DIR}/preprocessing/seqkit/{wildcards.sample}_1.fq.gz" if SANITIZE else f"{OUTPUT_DIR}/data/reads/{wildcards.sample}_1.fq.gz",
-        r2=lambda wildcards: f"{OUTPUT_DIR}/preprocessing/seqkit/{wildcards.sample}_2.fq.gz" if SANITIZE else f"{OUTPUT_DIR}/data/reads/{wildcards.sample}_2.fq.gz"
+        r1=lambda wildcards: preprocessing_read(wildcards, 1),
+        r2=lambda wildcards: preprocessing_read(wildcards, 2)
     output:
         r1=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}_1.fq.gz",
         r2=f"{OUTPUT_DIR}/preprocessing/fastp/{{sample}}_2.fq.gz",
@@ -287,7 +287,8 @@ rule preprocessing_stats:
         bases_host=expand(f"{OUTPUT_DIR}/preprocessing/final/{{sample}}.hostbases", sample=samples),
         singlem=expand(f"{OUTPUT_DIR}/preprocessing/singlem/{{sample}}_smf.tsv", sample=samples) if FRACTION else [],
         nonpareil=expand(f"{OUTPUT_DIR}/preprocessing/nonpareil/{{sample}}_np.tsv", sample=samples) if NONPAREIL else [],
-        seqkit=expand(f"{OUTPUT_DIR}/preprocessing/seqkit/{{sample}}_sana.tsv", sample=samples) if SANITIZE else []
+        seqkit=expand(f"{OUTPUT_DIR}/preprocessing/seqkit/{{sample}}_sana.tsv", sample=samples) if SANITIZE else [],
+        subsample=expand(f"{OUTPUT_DIR}/preprocessing/subsample/{{sample}}_subsample.tsv", sample=samples) if SUBSAMPLE else []
     output:
         f"{OUTPUT_DIR}/preprocessing.tsv"
     localrule: True
@@ -295,7 +296,8 @@ rule preprocessing_stats:
         package_dir={PACKAGE_DIR},
         singlem_arg=lambda wildcards, input: "-s " + " ".join(input.singlem) if input.singlem else "",
         nonpareil_arg=lambda wildcards, input: "-n " + " ".join(input.nonpareil) if input.nonpareil else "",
-        seqkit_arg=lambda wildcards, input: "-k " + " ".join(input.seqkit) if input.seqkit else ""
+        seqkit_arg=lambda wildcards, input: "-k " + " ".join(input.seqkit) if input.seqkit else "",
+        subsample_arg=lambda wildcards, input: "--subsample " + " ".join(input.subsample) if input.subsample else ""
     threads: 1
     resources:
         mem_mb=lambda wildcards, input, attempt: cap_mem_mb(1*1024 * 2 ** (attempt - 1)),
@@ -303,7 +305,7 @@ rule preprocessing_stats:
     message: "Creating preprocessing stats..."
     shell:
         """
-        python {params.package_dir}/workflow/scripts/preprocessing_stats.py -p {input.fastp} -m {input.bases_metagenomic} -M {input.reads_metagenomic} -g {input.bases_host} -G {input.reads_host} {params.singlem_arg} {params.nonpareil_arg} {params.seqkit_arg} -o {output}
+        python {params.package_dir}/workflow/scripts/preprocessing_stats.py -p {input.fastp} -m {input.bases_metagenomic} -M {input.reads_metagenomic} -g {input.bases_host} -G {input.reads_host} {params.singlem_arg} {params.nonpareil_arg} {params.seqkit_arg} {params.subsample_arg} -o {output}
         """
 
 # Generate an HTML report summarizing preprocessing statistics.  

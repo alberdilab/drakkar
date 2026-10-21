@@ -580,6 +580,7 @@ def main():
             run_info,
             snakemake_flags=snakemake_flags,
             slurm_resources=slurm_resources,
+            subsample=args.subsample,
         )
 
     ###
