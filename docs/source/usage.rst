@@ -66,7 +66,7 @@ the chosen workflow are required.
 - ``rawreads1``: path or URL to R1 reads (raw, before preprocessing).
 - ``rawreads2``: path or URL to R2 reads (raw, before preprocessing).
 - ``subsample``: optional per-sample read-depth target for preprocessing,
-  complete, cataloging, profiling, or expressing. Accepts the same values as
+  complete, standalone profiling, or expressing. Accepts the same values as
   ``--subsample``; a blank or ``NA`` cell uses the command-line value.
 - ``accession``: ENA/SRA paired-end run accession such as ``ERR4303216`` or
   ``SRR12345678``. Use this instead of ``rawreads1`` and ``rawreads2`` when
@@ -206,7 +206,7 @@ Subsampling raw reads
 ^^^^^^^^^^^^^^^^^^^^^
 
 Use ``--subsample`` with ``drakkar preprocessing``, ``drakkar complete``,
-``drakkar cataloging``, ``drakkar profiling``, or ``drakkar expressing`` to
+``drakkar profiling``, or ``drakkar expressing`` to
 lower sequencing depth before reads are analysed.
 For example,
 ``--subsample 0.25`` keeps approximately one quarter of the read pairs,
@@ -217,15 +217,14 @@ targets accept ``Mb``/``Gb``. Count and base targets never increase depth: a
 smaller sample is kept whole. R1 and R2 use the same fixed random seed (11).
 The optional ``subsample`` column overrides ``--subsample`` for that sample;
 blank and ``NA`` cells fall back to the command-line value. Samples with
-neither value use their original reads. Standalone cataloging samples each
-sample before assembly and mapping, including when several samples share a
-coassembly. Standalone expressing samples each metatranscriptome read pair
-before mapping and gene counting. These outputs are kept separately in
-``cataloging/subsample/`` and ``expressing/subsample/``. Standalone genome
-profiling samples reads before Bowtie2 mapping, SingleM, and total-read
-counting, writing them to ``profiling/subsample/``. In ``complete``,
-cataloging and profiling use the final preprocessing reads without sampling
-them a second time. The
+neither value use their original reads. Cataloging is never subsampled: it
+assembles whatever preprocessing produced. Standalone expressing samples each
+metatranscriptome read pair before mapping and gene counting, writing them to
+``expressing/subsample/``. Standalone genome profiling samples reads before
+Bowtie2 mapping, SingleM, and total-read counting, writing them to
+``profiling/subsample/``. Profiling only samples external reads: samples whose
+reads are DRAKKAR's own ``preprocessing/final`` files (including in
+``complete``) are not sampled a second time. The
 ``reads_subsampled`` column of ``preprocessing.tsv`` counts both mates and is
 ``NA`` for samples without a target.
 

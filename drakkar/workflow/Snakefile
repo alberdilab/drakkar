@@ -266,12 +266,6 @@ if WORKFLOW == "cataloging":
     with open(f"{OUTPUT_DIR}/data/preprocessed_to_reads2.json", "r") as f:
         PREPROCESSED_TO_READS2 = json.load(f)
 
-    with open(f"{OUTPUT_DIR}/data/sample_to_subsample.json", "r") as f:
-        SAMPLE_TO_SUBSAMPLE = json.load(f)
-
-    DOWNSTREAM_READS1 = PREPROCESSED_TO_READS1
-    DOWNSTREAM_READS2 = PREPROCESSED_TO_READS2
-
     with open(f"{OUTPUT_DIR}/data/assembly_to_samples.json", "r") as f:
         ASSEMBLY_TO_SAMPLES = json.load(f)
 
@@ -344,8 +338,6 @@ if WORKFLOW == "cataloging":
             collect_bin_fastas
 
     include: "rules/cataloging.smk"
-    if SAMPLE_TO_SUBSAMPLE:
-        include: "rules/downstream_subsample.smk"
 
 if WORKFLOW == "profiling":
 

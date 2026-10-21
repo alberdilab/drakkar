@@ -8,6 +8,16 @@ This project tracks release notes here from this point forward.
 
 - No unreleased changes yet.
 
+## [2.6.9] - 2026-10-21
+
+### Changed
+
+- Subsampling no longer applies to cataloging: ``drakkar cataloging`` has no
+  ``--subsample`` option and always assembles the reads it is given.
+- Profiling skips subsampling for samples whose reads are DRAKKAR's own
+  ``preprocessing/final`` output (already subsampled by preprocessing), so
+  depth is no longer reduced twice. External reads are still subsampled.
+
 ## [2.6.8] - 2026-10-21
 
 ### Added

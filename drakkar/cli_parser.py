@@ -187,7 +187,6 @@ def build_parser():
     subparser_cataloging = subparsers.add_parser("cataloging", help="Assemble reads, bin genomes, and build the MAG catalog used by downstream workflows")
     subparser_cataloging.add_argument("-i", "--input", required=False, help="Input directory (required if no sample detail file is provided)")
     subparser_cataloging.add_argument("-f", "--file", required=False, help="Sample detail file, tab- or comma-separated (required if no input directory is provided)")
-    subparser_cataloging.add_argument("--subsample", type=subsample_option, help="Subsample supplied read pairs: fraction (0.25), target pairs (50M), or total bases (10Gb)")
     subparser_cataloging.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_cataloging.add_argument("-m", "--mode", required=False, help="Comma-separated list of cataloging modes (e.g. individual,all)")
     subparser_cataloging.add_argument(
@@ -563,7 +562,7 @@ def build_parser():
         ],
         sections=[
             ("Input Sources", ["input", "file"]),
-            ("Assembly Strategy", ["mode", "binners", "multicoverage", "subsample"]),
+            ("Assembly Strategy", ["mode", "binners", "multicoverage"]),
             ("Bin Filtering", ["min_completeness", "max_contamination", "min_bin_length", "max_bin_length"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark", "skip_database_check", "allow_database_change", "allow_annotation_change"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),

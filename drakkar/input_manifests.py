@@ -48,6 +48,17 @@ def _subsample_targets(df, cli_target, infofile):
         report_input_resolution_errors(errors)
     return {sample: target for sample, target in resolved.items() if target is not None}
 
+def _drop_drakkar_preprocessed(targets, sample_to_reads, output):
+    """Drop targets for samples whose reads DRAKKAR already preprocessed here.
+
+    Preprocessing applies the subsample target itself, so sampling the
+    preprocessing/final reads again would compound the reduction.
+    """
+    final = Path(output).resolve() / "preprocessing" / "final"
+    def internal(paths):
+        return bool(paths) and all(final in Path(p).resolve().parents for p in paths)
+    return {sample: value for sample, value in targets.items() if not internal(sample_to_reads.get(sample))}
+
 def _write_subsample_targets(output, targets):
     os.makedirs(f"{output}/data", exist_ok=True)
     with open(f"{output}/data/sample_to_subsample.json", "w") as handle:
@@ -286,9 +297,9 @@ def file_preprocessed_to_json(infofile, output, subsample=None, enable_subsample
 
     with open(f"{output}/data/preprocessed_to_reads2.json", "w") as f:
         json.dump(SAMPLE_TO_READS2, f)
-    _write_subsample_targets(output, targets)
+    _write_subsample_targets(output, _drop_drakkar_preprocessed(targets, SAMPLE_TO_READS1, output))
 
-def argument_preprocessed_to_json(argument, output, subsample=None, infofile=None):
+def argument_preprocessed_to_json(argument, output, subsample=None):
     # Define the directory containing the raw reads
     PREPROCESSED_DIR = Path(argument).resolve()
 
@@ -328,10 +339,7 @@ def argument_preprocessed_to_json(argument, output, subsample=None, infofile=Non
     with open(f"{output}/data/preprocessed_to_reads2.json", "w") as f:
         json.dump(PREPROCESSED_TO_READS2, f)
     targets = {sample: subsample for sample in PREPROCESSED_TO_READS1} if subsample else {}
-    if infofile is not None:
-        df = read_input_table(infofile, label="sample info file", dtype={"subsample": str})
-        targets.update({sample: value for sample, value in _subsample_targets(df, subsample, infofile).items() if sample in PREPROCESSED_TO_READS1})
-    _write_subsample_targets(output, targets)
+    _write_subsample_targets(output, _drop_drakkar_preprocessed(targets, PREPROCESSED_TO_READS1, output))
 
 def file_assemblies_to_json(infofile=None, samples=None, individual=False, all=False, output=False):
 

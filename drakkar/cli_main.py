@@ -589,31 +589,24 @@ def main():
 
     if args.command in ("cataloging", "complete"):
         section("STARTING CATALOGING PIPELINE")
-        catalog_subsample = args.subsample if args.command == "cataloging" else None
 
         # Generate cataloging data dictionaries
 
         if args.file and args.input:
             print(f"Both sample info file and input directory were provided.")
             print(f"DRAKKAR will continue with the information provided in the input directory.")
-            argument_preprocessed_to_json(
-                args.input, args.output, subsample=catalog_subsample,
-                infofile=args.file if args.command == "cataloging" else None,
-            )
+            argument_preprocessed_to_json(args.input,args.output)
         elif args.file and not args.input:
             print(f"DRAKKAR will run with the information provided in the sample info file.")
-            file_preprocessed_to_json(
-                args.file, args.output, subsample=catalog_subsample,
-                enable_subsample=args.command == "cataloging",
-            )
+            file_preprocessed_to_json(args.file,args.output)
         elif args.input and not args.file:
             print(f"No sample info file was provided.")
             print(f"DRAKKAR will run with the files in the input directory.")
-            argument_preprocessed_to_json(args.input,args.output,subsample=catalog_subsample)
+            argument_preprocessed_to_json(args.input,args.output)
         else:
             print(f"No input information was provided. DRAKKAR will try to guess the location of the preprocessing data")
             if any(os.scandir(f"{args.output}/preprocessing/final")):
-                argument_preprocessed_to_json(f"{args.output}/preprocessing/final",args.output,subsample=catalog_subsample)
+                argument_preprocessed_to_json(f"{args.output}/preprocessing/final",args.output)
             else:
                 print(f"ERROR: No preprocessed data was found in the output directory.")
                 print(f"    Please, provide an input directory or sample info file to proceed.")
@@ -680,7 +673,6 @@ def main():
             max_contamination=args.max_contamination,
             min_bin_length=args.min_bin_length,
             max_bin_length=args.max_bin_length,
-            subsample=catalog_subsample,
         )
 
     ###

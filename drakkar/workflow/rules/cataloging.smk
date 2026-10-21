@@ -95,8 +95,8 @@ def selected_binner_expand(binner):
 
 rule assembly:
     input:
-        r1=lambda wildcards: [path for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly] for path in downstream_sample_reads(sample, 1)],
-        r2=lambda wildcards: [path for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly] for path in downstream_sample_reads(sample, 2)]
+        r1=lambda wildcards: [path for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly] for path in PREPROCESSED_TO_READS1[sample]],
+        r2=lambda wildcards: [path for sample in ASSEMBLY_TO_SAMPLES[wildcards.assembly] for path in PREPROCESSED_TO_READS2[sample]]
     output:
         f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}.fna"
     params:
@@ -188,8 +188,8 @@ rule assembly_map:
     input:
         index=lambda wildcards: f"{OUTPUT_DIR}/cataloging/megahit/{wildcards.assembly}/{wildcards.assembly}.rev.2.bt2",
         assembly=f"{OUTPUT_DIR}/cataloging/megahit/{{assembly}}/{{assembly}}.fna",
-        r1=lambda wildcards: downstream_read(wildcards, 1),
-        r2=lambda wildcards: downstream_read(wildcards, 2)
+        r1=lambda wildcards: PREPROCESSED_TO_READS1[wildcards.sample],
+        r2=lambda wildcards: PREPROCESSED_TO_READS2[wildcards.sample]
     output:
         f"{OUTPUT_DIR}/cataloging/bowtie2/{{assembly}}/{{sample}}.bam"
     params:

@@ -104,7 +104,6 @@ def run_snakemake_cataloging(
     max_contamination=None,
     min_bin_length=None,
     max_bin_length=None,
-    subsample=None,
 ):
 
     """ Run the cataloging workflow """
@@ -125,7 +124,7 @@ def run_snakemake_cataloging(
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} binners={binners} subsample={shlex.quote(subsample or '')} {bin_filter_config}{resource_overrides}"
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} binners={binners} {bin_filter_config}{resource_overrides}"
         f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--conda-frontend mamba "

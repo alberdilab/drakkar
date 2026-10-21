@@ -86,9 +86,6 @@ Options:
   ``--max-bin-length``: bin filtering thresholds applied by Binette during
   cataloging. See *Cataloging* below.
 - ``-c/--multicoverage``: enable multicoverage mapping.
-- ``--subsample``: subsample each sample's supplied reads before assembly and
-  mapping, including coassemblies. The ``subsample`` table column overrides
-  the CLI value per sample; see :ref:`subsampling-reads`.
 - ``--fraction``: compute microbial fraction with SingleM.
 - ``--nonpareil``: estimate metagenomic coverage and diversity with Nonpareil.
 - ``--subsample``: reduce raw read depth before sanitizing and filtering;

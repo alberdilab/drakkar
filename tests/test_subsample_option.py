@@ -55,7 +55,7 @@ class SubsampleValueTests(unittest.TestCase):
             parse_subsample_value("1.0")
 
     def test_cli_accepts_both_commands(self):
-        for command in ("preprocessing", "complete", "cataloging", "profiling", "expressing"):
+        for command in ("preprocessing", "complete", "profiling", "expressing"):
             for value in ("0.25", "50M", "10Gb"):
                 with self.subTest(command=command, value=value):
                     table_arg = "-R" if command in ("profiling", "expressing") else "-f"
@@ -64,6 +64,8 @@ class SubsampleValueTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 table_arg = "-R" if command in ("profiling", "expressing") else "-f"
                 build_parser().parse_args([command, table_arg, "samples.tsv", "--subsample", "1.0"])
+        with patch("sys.stderr"), self.assertRaises(SystemExit):
+            build_parser().parse_args(["cataloging", "-f", "samples.tsv", "--subsample", "0.25"])
 
     def test_fraction_never_upsamples(self):
         self.assertEqual(subsample_fraction("0.25", 10, 2000), 0.25)
@@ -88,12 +90,6 @@ class SubsampleValueTests(unittest.TestCase):
                     False, 0.98, False, None, subsample="50M",
                 )
         self.assertIn("subsample=50M", shlex.split(run_mock.call_args.args[0][2]))
-        with patch.object(cli_module, "config_vars", {"SNAKEMAKE_MODULE": "snakemake"}):
-            with patch.object(cli_module, "run_subprocess_with_logging") as run_mock:
-                cli_module.run_snakemake_cataloging(
-                    "cataloging", "project", "/tmp/output", "/tmp/envs", "local", subsample="10Gb",
-                )
-        self.assertIn("subsample=10Gb", shlex.split(run_mock.call_args.args[0][2]))
         with patch.object(cli_module, "config_vars", {"SNAKEMAKE_MODULE": "snakemake"}):
             with patch.object(cli_module, "run_subprocess_with_logging") as run_mock:
                 cli_module.run_snakemake_expressing(
@@ -152,10 +148,20 @@ class SubsampleValueTests(unittest.TestCase):
             file_preprocessed_to_json(str(table), str(root), subsample="0.25", enable_subsample=True)
             target_path = root / "data/sample_to_subsample.json"
             self.assertEqual(json.loads(target_path.read_text()), {"S1": "10Gb", "S2": "0.25"})
-            # Cataloging -i plus -f reads files from the directory but keeps
-            # per-sample target metadata from the table.
-            argument_preprocessed_to_json(str(root), str(root), subsample="0.25", infofile=str(table))
-            self.assertEqual(json.loads(target_path.read_text()), {"S1": "10Gb", "S2": "0.25"})
+            # Reads already preprocessed by DRAKKAR are never sampled again.
+            final = root / "preprocessing" / "final"
+            final.mkdir(parents=True)
+            for sample in ("S1", "S2"):
+                for mate in (1, 2):
+                    (final / f"{sample}_{mate}.fq.gz").write_bytes(b"reads")
+            argument_preprocessed_to_json(str(final), str(root), subsample="0.25")
+            self.assertEqual(json.loads(target_path.read_text()), {})
+            internal = root / "internal.tsv"
+            internal.write_text("sample\trawreads1\trawreads2\tsubsample\n" +
+                f"S1\t{final / 'S1_1.fq.gz'}\t{final / 'S1_2.fq.gz'}\t10Gb\n" +
+                f"S3\t{root / 'S2_1.fq.gz'}\t{root / 'S2_2.fq.gz'}\t\n")
+            file_preprocessed_to_json(str(internal), str(root), subsample="0.25", enable_subsample=True)
+            self.assertEqual(json.loads(target_path.read_text()), {"S3": "0.25"})
             argument_preprocessed_to_json(str(root), str(root))
             self.assertEqual(json.loads(target_path.read_text()), {})
             file_transcriptome_to_json(str(table), str(root), subsample="50M")
@@ -171,10 +177,6 @@ class SubsampleValueTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     file_transcriptome_to_json(str(table), str(root))
             self.assertIn("S1", report.call_args.args[0][0])
-            self.assertIn("invalid", report.call_args.args[0][0])
-            with patch("drakkar.input_manifests.report_input_resolution_errors", side_effect=ValueError) as report:
-                with self.assertRaises(ValueError):
-                    argument_preprocessed_to_json(str(root), str(root), infofile=str(table))
             self.assertIn("invalid", report.call_args.args[0][0])
 
     def test_summary_reads_are_both_mates_and_na_when_unused(self):
@@ -257,28 +259,24 @@ class SubsampleWiringTests(unittest.TestCase):
         genomes = (WORKFLOW / "rules/profiling_genomes.smk").read_text()
         self.assertEqual(genomes.count("profiling_read(wildcards, 1)"), 4)
 
-    def test_cataloging_and_expressing_read_selection(self):
+    def test_expressing_read_selection_and_no_cataloging_subsample(self):
         source = (WORKFLOW / "Snakefile").read_text()
         block = source.split("def downstream_sample_reads(")[1].split("\n####", 1)[0]
         namespace = {
-            "OUTPUT_DIR": "/out", "WORKFLOW": "cataloging",
+            "OUTPUT_DIR": "/out", "WORKFLOW": "expressing",
             "SAMPLE_TO_SUBSAMPLE": {"S1": "10Gb"},
             "DOWNSTREAM_READS1": {"S1": ["s1_lane1", "s1_lane2"], "S2": ["s2_raw"]},
             "DOWNSTREAM_READS2": {"S1": ["s1_r2"], "S2": ["s2_r2"]},
         }
         exec("def downstream_sample_reads(" + block, namespace)
         select = namespace["downstream_sample_reads"]
-        self.assertEqual(select("S1", 1), ["/out/cataloging/subsample/S1_1.fq.gz"])
+        self.assertEqual(select("S1", 1), ["/out/expressing/subsample/S1_1.fq.gz"])
         self.assertEqual(select("S2", 1), ["s2_raw"])
-        namespace["WORKFLOW"] = "expressing"
-        self.assertEqual(select("S1", 2), ["/out/expressing/subsample/S1_2.fq.gz"])
-        catalog = (WORKFLOW / "rules/cataloging.smk").read_text()
         expressing = (WORKFLOW / "rules/expressing.smk").read_text()
-        self.assertIn("downstream_sample_reads(sample, 1)", catalog)
-        self.assertIn("downstream_read(wildcards, 1)", catalog)
         self.assertIn("downstream_read(wildcards, 1)", expressing)
-        self.assertIn('catalog_subsample = args.subsample if args.command == "cataloging" else None',
-                      (ROOT / "drakkar/cli_main.py").read_text())
+        catalog = (WORKFLOW / "rules/cataloging.smk").read_text()
+        self.assertNotIn("downstream_", catalog)
+        self.assertNotIn("subsample", (ROOT / "drakkar/cli_main.py").read_text().split("STARTING CATALOGING PIPELINE")[1].split("# Profiling")[0])
 
     def test_both_workflow_branches_and_consumers(self):
         snakefile = (WORKFLOW / "Snakefile").read_text()
