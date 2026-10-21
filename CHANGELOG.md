@@ -11,6 +11,9 @@ This project tracks release notes here from this point forward.
   sanitizing and filtering; ``preprocessing.tsv`` records ``reads_subsampled``.
 - Optional per-sample ``subsample`` table column with command-line fallback,
   and ``drakkar profiling --subsample`` for standalone genome profiling reads.
+- ``--subsample`` and the per-sample table column for standalone cataloging
+  and expressing; cataloging samples reads before coassembly and mapping,
+  while expressing samples reads before mapping and gene counting.
 
 ## [2.6.7] - 2026-10-04
 

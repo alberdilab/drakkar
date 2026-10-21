@@ -148,6 +148,23 @@ def profiling_subsample_input(wildcards, mate):
         return paths[0]
     return f"{OUTPUT_DIR}/profiling/subsample_input/{wildcards.sample}_{mate}.fq.gz"
 
+def downstream_sample_reads(sample, mate):
+    """Keep each sample's original lane list unless it has a target."""
+    reads = DOWNSTREAM_READS1 if mate == 1 else DOWNSTREAM_READS2
+    if sample in SAMPLE_TO_SUBSAMPLE:
+        return [f"{OUTPUT_DIR}/{WORKFLOW}/subsample/{sample}_{mate}.fq.gz"]
+    return reads[sample]
+
+def downstream_read(wildcards, mate):
+    return downstream_sample_reads(wildcards.sample, mate)
+
+def downstream_subsample_input(wildcards, mate):
+    reads = DOWNSTREAM_READS1 if mate == 1 else DOWNSTREAM_READS2
+    paths = reads[wildcards.sample]
+    if len(paths) == 1:
+        return paths[0]
+    return f"{OUTPUT_DIR}/{WORKFLOW}/subsample_input/{wildcards.sample}_{mate}.fq.gz"
+
 ####
 # Create environments
 ####
@@ -249,6 +266,12 @@ if WORKFLOW == "cataloging":
     with open(f"{OUTPUT_DIR}/data/preprocessed_to_reads2.json", "r") as f:
         PREPROCESSED_TO_READS2 = json.load(f)
 
+    with open(f"{OUTPUT_DIR}/data/sample_to_subsample.json", "r") as f:
+        SAMPLE_TO_SUBSAMPLE = json.load(f)
+
+    DOWNSTREAM_READS1 = PREPROCESSED_TO_READS1
+    DOWNSTREAM_READS2 = PREPROCESSED_TO_READS2
+
     with open(f"{OUTPUT_DIR}/data/assembly_to_samples.json", "r") as f:
         ASSEMBLY_TO_SAMPLES = json.load(f)
 
@@ -321,6 +344,8 @@ if WORKFLOW == "cataloging":
             collect_bin_fastas
 
     include: "rules/cataloging.smk"
+    if SAMPLE_TO_SUBSAMPLE:
+        include: "rules/downstream_subsample.smk"
 
 if WORKFLOW == "profiling":
 
@@ -450,6 +475,12 @@ if WORKFLOW == "expressing":
     with open(f"{OUTPUT_DIR}/data/transcriptome_to_reads2.json", "r") as f:
         TRANSCRIPTOME_TO_READS2 = json.load(f)
 
+    with open(f"{OUTPUT_DIR}/data/sample_to_subsample.json", "r") as f:
+        SAMPLE_TO_SUBSAMPLE = json.load(f)
+
+    DOWNSTREAM_READS1 = TRANSCRIPTOME_TO_READS1
+    DOWNSTREAM_READS2 = TRANSCRIPTOME_TO_READS2
+
     samples = list(TRANSCRIPTOME_TO_READS1.keys())
 
     with open(f"{OUTPUT_DIR}/data/mags_to_files.json", "r") as f:
@@ -462,3 +493,5 @@ if WORKFLOW == "expressing":
             f"{OUTPUT_DIR}/expressing/gene_counts.tsv.xz"
 
     include: "rules/expressing.smk"
+    if SAMPLE_TO_SUBSAMPLE:
+        include: "rules/downstream_subsample.smk"

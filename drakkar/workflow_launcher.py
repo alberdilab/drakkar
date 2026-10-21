@@ -104,6 +104,7 @@ def run_snakemake_cataloging(
     max_contamination=None,
     min_bin_length=None,
     max_bin_length=None,
+    subsample=None,
 ):
 
     """ Run the cataloging workflow """
@@ -124,7 +125,7 @@ def run_snakemake_cataloging(
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} binners={binners} {bin_filter_config}{resource_overrides}"
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} binners={binners} subsample={shlex.quote(subsample or '')} {bin_filter_config}{resource_overrides}"
         f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--conda-frontend mamba "
@@ -388,7 +389,7 @@ def run_snakemake_inspecting(workflow, project_name, output_dir, env_path, profi
     ]
     run_subprocess_with_logging(snakemake_command, run_info=run_info, workflow_name=workflow)
 
-def run_snakemake_expressing(workflow, project_name, output_dir, env_path, profile, memory_multiplier=1, time_multiplier=1, run_info=None, snakemake_flags="", slurm_resources=""):
+def run_snakemake_expressing(workflow, project_name, output_dir, env_path, profile, memory_multiplier=1, time_multiplier=1, run_info=None, snakemake_flags="", slurm_resources="", subsample=None):
     """ Run the expressing workflow """
 
     resource_overrides = resource_config(memory_multiplier, time_multiplier)
@@ -401,7 +402,7 @@ def run_snakemake_expressing(workflow, project_name, output_dir, env_path, profi
         f"--directory {output_dir} "
         f"--workflow-profile {PACKAGE_DIR / 'profile' / profile} "
         f"--configfile {CONFIG_PATH} "
-        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} {resource_overrides}"
+        f"--config package_dir={PACKAGE_DIR} project_name={project_name} workflow={workflow} output_dir={output_dir} subsample={shlex.quote(subsample or '')} {resource_overrides}"
         f"{default_resources}"
         f"--conda-prefix {env_path} "
         f"--use-conda "

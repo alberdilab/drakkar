@@ -187,6 +187,7 @@ def build_parser():
     subparser_cataloging = subparsers.add_parser("cataloging", help="Assemble reads, bin genomes, and build the MAG catalog used by downstream workflows")
     subparser_cataloging.add_argument("-i", "--input", required=False, help="Input directory (required if no sample detail file is provided)")
     subparser_cataloging.add_argument("-f", "--file", required=False, help="Sample detail file, tab- or comma-separated (required if no input directory is provided)")
+    subparser_cataloging.add_argument("--subsample", type=subsample_option, help="Subsample supplied read pairs: fraction (0.25), target pairs (50M), or total bases (10Gb)")
     subparser_cataloging.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_cataloging.add_argument("-m", "--mode", required=False, help="Comma-separated list of cataloging modes (e.g. individual,all)")
     subparser_cataloging.add_argument(
@@ -353,6 +354,7 @@ def build_parser():
     subparser_expressing.add_argument("-B", "--bins_file", required=False, help="Text file containing paths to the bins (.fa or .fna)")
     subparser_expressing.add_argument("-r", "--reads_dir", required=False, help="Directory in which metagenomic reads are stored")
     subparser_expressing.add_argument("-R", "--reads_file", required=False, help="Sample detail file, tab- or comma-separated")
+    subparser_expressing.add_argument("--subsample", type=subsample_option, help="Subsample supplied read pairs: fraction (0.25), target pairs (50M), or total bases (10Gb)")
     subparser_expressing.add_argument("-o", "--output", required=False, default=os.getcwd(), help="Output directory. Default is the directory from which drakkar is called.")
     subparser_expressing.add_argument("-e", "--env_path",type=str, help="Path to a shared conda environment directory (default: drakkar install path)")
     subparser_expressing.add_argument("-p", "--profile", required=False, default="slurm", help="Snakemake profile. Default is slurm")
@@ -561,7 +563,7 @@ def build_parser():
         ],
         sections=[
             ("Input Sources", ["input", "file"]),
-            ("Assembly Strategy", ["mode", "binners", "multicoverage"]),
+            ("Assembly Strategy", ["mode", "binners", "multicoverage", "subsample"]),
             ("Bin Filtering", ["min_completeness", "max_contamination", "min_bin_length", "max_bin_length"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark", "skip_database_check", "allow_database_change", "allow_annotation_change"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
@@ -674,6 +676,7 @@ def build_parser():
         ],
         sections=[
             ("Input Sources", ["bins_dir", "bins_file", "reads_dir", "reads_file"]),
+            ("Analysis Settings", ["subsample"]),
             ("Run Configuration", ["output", "env_path", "profile", "overwrite", "skip_benchmark"]),
             ("Resource Scaling", ["memory_multiplier", "time_multiplier"]),
             ("Snakemake Overrides", ["snakemake_latency_wait", "snakemake_jobs", "snakemake_cores", "snakemake_executor", "snakemake_retries", "snakemake_rerun_incomplete", "snakemake_keep_going"]),

@@ -86,6 +86,9 @@ Options:
   ``--max-bin-length``: bin filtering thresholds applied by Binette during
   cataloging. See *Cataloging* below.
 - ``-c/--multicoverage``: enable multicoverage mapping.
+- ``--subsample``: subsample each sample's supplied reads before assembly and
+  mapping, including coassemblies. The ``subsample`` table column overrides
+  the CLI value per sample; see :ref:`subsampling-reads`.
 - ``--fraction``: compute microbial fraction with SingleM.
 - ``--nonpareil``: estimate metagenomic coverage and diversity with Nonpareil.
 - ``--subsample``: reduce raw read depth before sanitizing and filtering;
@@ -629,6 +632,9 @@ Options:
 - ``-r/--reads_dir``: directory with transcriptome reads.
 - ``-R/--reads_file``: transcriptome sample table, using either
   ``rawreads1``/``rawreads2`` or an ENA/SRA ``accession``.
+- ``--subsample``: subsample each sample's metatranscriptome reads before
+  mapping and gene counting. The optional ``subsample`` table column
+  overrides the CLI value; see :ref:`subsampling-reads`.
 - ``-o/--output``: output directory.
 - ``-e/--env_path``: shared Conda environment directory.
 - ``-p/--profile``: Snakemake profile.

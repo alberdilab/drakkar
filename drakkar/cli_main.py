@@ -589,24 +589,31 @@ def main():
 
     if args.command in ("cataloging", "complete"):
         section("STARTING CATALOGING PIPELINE")
+        catalog_subsample = args.subsample if args.command == "cataloging" else None
 
         # Generate cataloging data dictionaries
 
         if args.file and args.input:
             print(f"Both sample info file and input directory were provided.")
             print(f"DRAKKAR will continue with the information provided in the input directory.")
-            argument_preprocessed_to_json(args.input,args.output)
+            argument_preprocessed_to_json(
+                args.input, args.output, subsample=catalog_subsample,
+                infofile=args.file if args.command == "cataloging" else None,
+            )
         elif args.file and not args.input:
             print(f"DRAKKAR will run with the information provided in the sample info file.")
-            file_preprocessed_to_json(args.file,args.output)
+            file_preprocessed_to_json(
+                args.file, args.output, subsample=catalog_subsample,
+                enable_subsample=args.command == "cataloging",
+            )
         elif args.input and not args.file:
             print(f"No sample info file was provided.")
             print(f"DRAKKAR will run with the files in the input directory.")
-            argument_preprocessed_to_json(args.input,args.output)
+            argument_preprocessed_to_json(args.input,args.output,subsample=catalog_subsample)
         else:
             print(f"No input information was provided. DRAKKAR will try to guess the location of the preprocessing data")
             if any(os.scandir(f"{args.output}/preprocessing/final")):
-                argument_preprocessed_to_json(f"{args.output}/preprocessing/final",args.output)
+                argument_preprocessed_to_json(f"{args.output}/preprocessing/final",args.output,subsample=catalog_subsample)
             else:
                 print(f"ERROR: No preprocessed data was found in the output directory.")
                 print(f"    Please, provide an input directory or sample info file to proceed.")
@@ -673,6 +680,7 @@ def main():
             max_contamination=args.max_contamination,
             min_bin_length=args.min_bin_length,
             max_bin_length=args.max_bin_length,
+            subsample=catalog_subsample,
         )
 
     ###
@@ -975,21 +983,21 @@ def main():
             print(f"")
             print(f"Both bin path file and input directory were provided.")
             print(f"DRAKKAR will use the reads provided in the file.")
-            file_transcriptome_to_json(reads_file,args.output)
+            file_transcriptome_to_json(reads_file,args.output,subsample=args.subsample)
         elif reads_file and not reads_dir:
             print(f"")
             print(f"DRAKKAR will use the reads provided in the file.")
-            file_transcriptome_to_json(reads_file,args.output)
+            file_transcriptome_to_json(reads_file,args.output,subsample=args.subsample)
         elif reads_dir and not reads_file:
             print(f"")
             print(f"No sample info file was provided.")
             print(f"DRAKKAR will use the reads from the input directory.")
-            argument_transcriptome_to_json(reads_dir,args.output)
+            argument_transcriptome_to_json(reads_dir,args.output,subsample=args.subsample)
         else:
             print(f"")
             print(f"No input information was provided. DRAKKAR will try to guess the location of the reads.")
             if any(os.scandir(f"{args.output}/preprocessing/final")):
-                argument_transcriptome_to_json(f"{args.output}/preprocessing/final",args.output)
+                argument_transcriptome_to_json(f"{args.output}/preprocessing/final",args.output,subsample=args.subsample)
             else:
                 print(f"ERROR: No bin data was found in the output directory.")
                 print(f"Make sure that the preprocessing and cataloging modules were run in this directory.")
@@ -1007,4 +1015,5 @@ def main():
             run_info,
             snakemake_flags=snakemake_flags,
             slurm_resources=slurm_resources,
+            subsample=args.subsample,
         )

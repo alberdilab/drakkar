@@ -288,7 +288,7 @@ def file_preprocessed_to_json(infofile, output, subsample=None, enable_subsample
         json.dump(SAMPLE_TO_READS2, f)
     _write_subsample_targets(output, targets)
 
-def argument_preprocessed_to_json(argument, output, subsample=None):
+def argument_preprocessed_to_json(argument, output, subsample=None, infofile=None):
     # Define the directory containing the raw reads
     PREPROCESSED_DIR = Path(argument).resolve()
 
@@ -327,7 +327,11 @@ def argument_preprocessed_to_json(argument, output, subsample=None):
 
     with open(f"{output}/data/preprocessed_to_reads2.json", "w") as f:
         json.dump(PREPROCESSED_TO_READS2, f)
-    _write_subsample_targets(output, {sample: subsample for sample in PREPROCESSED_TO_READS1} if subsample else {})
+    targets = {sample: subsample for sample in PREPROCESSED_TO_READS1} if subsample else {}
+    if infofile is not None:
+        df = read_input_table(infofile, label="sample info file", dtype={"subsample": str})
+        targets.update({sample: value for sample, value in _subsample_targets(df, subsample, infofile).items() if sample in PREPROCESSED_TO_READS1})
+    _write_subsample_targets(output, targets)
 
 def file_assemblies_to_json(infofile=None, samples=None, individual=False, all=False, output=False):
 
@@ -616,8 +620,9 @@ def preprocessing_summary(summary_table, bar_width=50):
     print(f"░ Discarded: {pct_discarded:.1f}%, ▒ Host: {pct_host:.1f}%, █ Metagenomic: {pct_metagenomic:.1f}%")
     print(f"│{bar}│")
 
-def file_transcriptome_to_json(infofile, output):
-    df = read_input_table(infofile, label="sample info file")
+def file_transcriptome_to_json(infofile, output, subsample=None):
+    df = read_input_table(infofile, label="sample info file", dtype={"subsample": str})
+    targets = _subsample_targets(df, subsample, infofile)
 
     SAMPLE_TO_READS1 = defaultdict(list)
     SAMPLE_TO_READS2 = defaultdict(list)
@@ -645,8 +650,9 @@ def file_transcriptome_to_json(infofile, output):
 
     with open(f"{output}/data/transcriptome_to_reads2.json", "w") as f:
         json.dump(SAMPLE_TO_READS2, f)
+    _write_subsample_targets(output, targets)
 
-def argument_transcriptome_to_json(argument, output):
+def argument_transcriptome_to_json(argument, output, subsample=None):
     # Define the directory containing the raw reads
     TRANSCRIPTOME_DIR = Path(argument).resolve()
 
@@ -685,3 +691,4 @@ def argument_transcriptome_to_json(argument, output):
 
     with open(f"{output}/data/transcriptome_to_reads2.json", "w") as f:
         json.dump(TRANSCRIPTOME_TO_READS2, f)
+    _write_subsample_targets(output, {sample: subsample for sample in TRANSCRIPTOME_TO_READS1} if subsample else {})

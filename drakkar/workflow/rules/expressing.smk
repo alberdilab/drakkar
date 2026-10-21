@@ -109,8 +109,8 @@ rule index_metagenome:
 rule map_to_metagenome:
     input:
         index=f"{OUTPUT_DIR}/expressing/reference/metagenome.rev.1.bt2",
-        r1=lambda wildcards: TRANSCRIPTOME_TO_READS1[wildcards.sample],
-        r2=lambda wildcards: TRANSCRIPTOME_TO_READS2[wildcards.sample]
+        r1=lambda wildcards: downstream_read(wildcards, 1),
+        r2=lambda wildcards: downstream_read(wildcards, 2)
     output:
         f"{OUTPUT_DIR}/expressing/bowtie2/{{sample}}.bam"
     params:
