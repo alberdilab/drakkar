@@ -355,5 +355,5 @@ rule preprocessing_multiqc:
         """
         module purge
         module load {params.multiqc_module}
-        multiqc --zip-data-dir --outdir {params.datadir} --title "{params.title}" --filename {output.html} {params.datadir}
+        multiqc --force --zip-data-dir --outdir {params.datadir} --title "{params.title}" --filename {output.html} {params.datadir}
         """

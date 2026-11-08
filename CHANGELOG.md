@@ -4,9 +4,12 @@ This project tracks release notes here from this point forward.
 
 ## [Unreleased]
 
-### Added
+### Fixed
 
-- No unreleased changes yet.
+- ``preprocessing_multiqc`` now runs MultiQC with ``--force``. Without it,
+  leftover ``preprocessing_data`` folders from an earlier run made MultiQC
+  write ``preprocessing_N.html`` instead of ``preprocessing.html``, so
+  Snakemake reported the output as missing and every retry failed.
 
 ## [2.6.9] - 2026-10-21
 
