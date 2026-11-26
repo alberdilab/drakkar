@@ -4,6 +4,20 @@ This project tracks release notes here from this point forward.
 
 ## [Unreleased]
 
+### Added
+
+- No unreleased changes yet.
+
+## [2.6.10] - 2026-11-26
+
+### Changed
+
+- The cataloging ``assembly`` rule (assemblies and co-assemblies) now resumes
+  MEGAHIT from its last checkpoint (``--continue``) when a retry follows a
+  time or memory failure, instead of restarting from scratch. A signature of
+  the input reads and settings is stored next to the output directory; if it
+  differs, the directory is wiped and the assembly starts fresh.
+
 ### Fixed
 
 - ``preprocessing_multiqc`` now runs MultiQC with ``--force``. Without it,

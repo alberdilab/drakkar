@@ -111,19 +111,33 @@ rule assembly:
         """
         module purge
         module load {params.megahit_module}
-        rm -rf {params.outputdir}
 
         # Convert input list to a comma-separated string
         R1_FILES=$(echo {input.r1} | tr ' ' ',')
         R2_FILES=$(echo {input.r2} | tr ' ' ',')
 
+        # Resume from MEGAHIT's last checkpoint when a previous attempt (e.g. one
+        # that hit the time or memory limit) left a directory built from the same
+        # inputs and settings; otherwise start from scratch.
+        SIGNATURE=$(echo "$R1_FILES|$R2_FILES|1500" | md5sum | cut -d' ' -f1)
+        MARKER={params.outputdir}.signature
+        CONTINUE=""
+        if [ -f {params.outputdir}/checkpoints.txt ] && [ -f "$MARKER" ] && [ "$(cat $MARKER)" = "$SIGNATURE" ]; then
+            CONTINUE="--continue"
+            echo "Resuming MEGAHIT from checkpoint in {params.outputdir}"
+        else
+            rm -rf {params.outputdir}
+            echo "$SIGNATURE" > $MARKER
+        fi
+
         megahit \
             -t {threads} \
             --verbose \
             --min-contig-len 1500 \
+            $CONTINUE \
             -1 $R1_FILES -2 $R2_FILES \
             -o {params.outputdir}
-        mv {params.outputdir}/final.contigs.fa {params.outputdir}/final.contigs.raw.fa
+        cp {params.outputdir}/final.contigs.fa {params.outputdir}/final.contigs.raw.fa
         awk -v a="{wildcards.assembly}" 'BEGIN{{i=1}} /^>/{{print ">" a "_" i++; next}} {{print}}' \
             {params.outputdir}/final.contigs.raw.fa > {output}
         """
